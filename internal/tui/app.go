@@ -3,10 +3,10 @@ package tui
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/catherinevee/driftmgr/internal/discovery"
 	"github.com/catherinevee/driftmgr/internal/models"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Screen represents different screens in the TUI
@@ -22,7 +22,7 @@ const (
 
 // App represents the main TUI application
 type App struct {
-	currentScreen    Screen
+	currentScreen   Screen
 	width           int
 	height          int
 	mainMenu        *MainMenu
@@ -113,7 +113,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) View() string {
 	// Header
 	header := RenderTitle("🚀 Terraform Import Helper v2.0")
-	
+
 	// Content based on current screen
 	var content string
 	switch a.currentScreen {

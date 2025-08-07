@@ -9,18 +9,18 @@ import (
 
 func TestNewMainMenu(t *testing.T) {
 	menu := NewMainMenu()
-	
+
 	assert.NotNil(t, menu)
 	assert.Equal(t, 0, menu.cursor)
 	assert.Equal(t, 4, len(menu.options)) // Should have 4 menu options
-	
+
 	expectedOptions := []string{
 		"🔍 Resource Discovery",
-		"📥 Import Resources", 
+		"📥 Import Resources",
 		"⚙️  Configuration",
 		"❓ Help",
 	}
-	
+
 	for i, expected := range expectedOptions {
 		assert.Equal(t, expected, menu.options[i])
 	}
@@ -29,51 +29,51 @@ func TestNewMainMenu(t *testing.T) {
 func TestMainMenu_Init(t *testing.T) {
 	menu := NewMainMenu()
 	cmd := menu.Init()
-	
+
 	// Init should return no command
 	assert.Nil(t, cmd)
 }
 
 func TestMainMenu_Update_KeyDown(t *testing.T) {
 	menu := NewMainMenu()
-	
+
 	// Test moving down
 	keyMsg := tea.KeyMsg{Type: tea.KeyDown}
 	newMenu, _ := menu.Update(keyMsg)
 	updatedMenu := newMenu.(*MainMenu)
-	
+
 	assert.Equal(t, 1, updatedMenu.cursor)
-	
+
 	// Test wrapping to top
 	menu.cursor = 3 // Last option
 	newMenu, _ = menu.Update(keyMsg)
 	updatedMenu = newMenu.(*MainMenu)
-	
+
 	assert.Equal(t, 0, updatedMenu.cursor)
 }
 
 func TestMainMenu_Update_KeyUp(t *testing.T) {
 	menu := NewMainMenu()
 	menu.cursor = 1
-	
+
 	// Test moving up
 	keyMsg := tea.KeyMsg{Type: tea.KeyUp}
 	newMenu, _ := menu.Update(keyMsg)
 	updatedMenu := newMenu.(*MainMenu)
-	
+
 	assert.Equal(t, 0, updatedMenu.cursor)
-	
+
 	// Test wrapping to bottom
 	menu.cursor = 0 // First option
 	newMenu, _ = menu.Update(keyMsg)
 	updatedMenu = newMenu.(*MainMenu)
-	
+
 	assert.Equal(t, 3, updatedMenu.cursor)
 }
 
 func TestMainMenu_Update_Enter(t *testing.T) {
 	menu := NewMainMenu()
-	
+
 	tests := []struct {
 		name           string
 		cursor         int
@@ -100,16 +100,16 @@ func TestMainMenu_Update_Enter(t *testing.T) {
 			expectedScreen: HelpScreen,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			menu.cursor = tt.cursor
-			
+
 			keyMsg := tea.KeyMsg{Type: tea.KeyEnter}
 			_, cmd := menu.Update(keyMsg)
-			
+
 			assert.NotNil(t, cmd)
-			
+
 			// Execute the command to get the message
 			msg := cmd()
 			switchMsg, ok := msg.(SwitchScreenMsg)
@@ -121,26 +121,26 @@ func TestMainMenu_Update_Enter(t *testing.T) {
 
 func TestMainMenu_Update_J_K_Keys(t *testing.T) {
 	menu := NewMainMenu()
-	
+
 	// Test 'j' key (down)
 	keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")}
 	newMenu, _ := menu.Update(keyMsg)
 	updatedMenu := newMenu.(*MainMenu)
-	
+
 	assert.Equal(t, 1, updatedMenu.cursor)
-	
+
 	// Test 'k' key (up)
 	keyMsg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")}
 	newMenu, _ = updatedMenu.Update(keyMsg)
 	updatedMenu = newMenu.(*MainMenu)
-	
+
 	assert.Equal(t, 0, updatedMenu.cursor)
 }
 
 func TestMainMenu_View(t *testing.T) {
 	menu := NewMainMenu()
 	view := menu.View()
-	
+
 	assert.NotEmpty(t, view)
 	assert.Contains(t, view, "Terraform Import Helper")
 	assert.Contains(t, view, "🔍 Resource Discovery")
@@ -152,11 +152,11 @@ func TestMainMenu_View(t *testing.T) {
 
 func TestMainMenu_View_CursorPosition(t *testing.T) {
 	menu := NewMainMenu()
-	
+
 	for i := 0; i < len(menu.options); i++ {
 		menu.cursor = i
 		view := menu.View()
-		
+
 		assert.NotEmpty(t, view)
 		// The view should contain the cursor indicator for the selected option
 		assert.Contains(t, view, "→")

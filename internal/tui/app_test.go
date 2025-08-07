@@ -9,7 +9,7 @@ import (
 
 func TestNewApp(t *testing.T) {
 	app := NewApp()
-	
+
 	assert.NotNil(t, app)
 	assert.Equal(t, MainMenuScreen, app.currentScreen)
 	assert.NotNil(t, app.mainMenu)
@@ -22,51 +22,51 @@ func TestNewApp(t *testing.T) {
 func TestApp_Init(t *testing.T) {
 	app := NewApp()
 	cmd := app.Init()
-	
+
 	// Init should return no command
 	assert.Nil(t, cmd)
 }
 
 func TestApp_Update(t *testing.T) {
 	app := NewApp()
-	
+
 	tests := []struct {
 		name           string
 		msg            tea.Msg
 		expectedScreen Screen
 	}{
 		{
-			name: "navigate to discovery",
-			msg:  SwitchScreenMsg{Screen: DiscoveryScreen},
+			name:           "navigate to discovery",
+			msg:            SwitchScreenMsg{Screen: DiscoveryScreen},
 			expectedScreen: DiscoveryScreen,
 		},
 		{
-			name: "navigate to import",
-			msg:  SwitchScreenMsg{Screen: ImportScreen},
+			name:           "navigate to import",
+			msg:            SwitchScreenMsg{Screen: ImportScreen},
 			expectedScreen: ImportScreen,
 		},
 		{
-			name: "navigate to config",
-			msg:  SwitchScreenMsg{Screen: ConfigScreen},
+			name:           "navigate to config",
+			msg:            SwitchScreenMsg{Screen: ConfigScreen},
 			expectedScreen: ConfigScreen,
 		},
 		{
-			name: "navigate to help",
-			msg:  SwitchScreenMsg{Screen: HelpScreen},
+			name:           "navigate to help",
+			msg:            SwitchScreenMsg{Screen: HelpScreen},
 			expectedScreen: HelpScreen,
 		},
 		{
-			name: "navigate back to main menu",
-			msg:  SwitchScreenMsg{Screen: MainMenuScreen},
+			name:           "navigate back to main menu",
+			msg:            SwitchScreenMsg{Screen: MainMenuScreen},
 			expectedScreen: MainMenuScreen,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			newApp, _ := app.Update(tt.msg)
 			updatedApp := newApp.(*App)
-			
+
 			assert.Equal(t, tt.expectedScreen, updatedApp.currentScreen)
 		})
 	}
@@ -74,7 +74,7 @@ func TestApp_Update(t *testing.T) {
 
 func TestApp_Update_KeyMsg(t *testing.T) {
 	app := NewApp()
-	
+
 	tests := []struct {
 		name     string
 		key      string
@@ -96,21 +96,21 @@ func TestApp_Update_KeyMsg(t *testing.T) {
 			expected: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset to main menu for each test
 			app.currentScreen = MainMenuScreen
-			
+
 			keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.key)}
 			if tt.key == "ctrl+c" {
 				keyMsg = tea.KeyMsg{Type: tea.KeyCtrlC}
 			} else if tt.key == "esc" {
 				keyMsg = tea.KeyMsg{Type: tea.KeyEsc}
 			}
-			
+
 			newApp, cmd := app.Update(keyMsg)
-			
+
 			if tt.expected {
 				// Should have quit command
 				assert.NotNil(t, cmd)
@@ -126,7 +126,7 @@ func TestApp_Update_KeyMsg(t *testing.T) {
 
 func TestApp_View(t *testing.T) {
 	app := NewApp()
-	
+
 	tests := []struct {
 		name   string
 		screen Screen
@@ -152,12 +152,12 @@ func TestApp_View(t *testing.T) {
 			screen: HelpScreen,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app.currentScreen = tt.screen
 			view := app.View()
-			
+
 			assert.NotEmpty(t, view)
 			assert.Contains(t, view, "Terraform Import Helper") // Should contain title
 		})
@@ -178,7 +178,7 @@ func TestScreen_Constants(t *testing.T) {
 		ConfigScreen,
 		HelpScreen,
 	}
-	
+
 	for i, screen := range screens {
 		assert.Equal(t, Screen(i), screen)
 	}

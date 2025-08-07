@@ -1,32 +1,32 @@
-# 🐳 Docker Usage Guide
+# Docker Deployment Guide
 
-This guide shows you how to run the Terraform Import Helper using Docker containers.
+This guide covers containerized deployment of DriftMgr for production and development environments.
 
-## 🚀 Quick Start
+## Container Distribution
 
-### Option 1: Using Pre-built Image (Recommended)
+### Production Deployment
 ```bash
-# Pull the latest image
+# Pull production image
 docker pull catherinevee/driftmgr:latest
 
-# Run with help
-docker run --rm catherinevee/driftmgr:latest
+# Basic execution
+docker run --rm catherinevee/driftmgr:latest --help
 
-# Run interactive mode
+# Interactive terminal mode
 docker run --rm -it catherinevee/driftmgr:latest interactive
 ```
 
-### Option 2: Build Locally
+### Local Build
 ```bash
-# Clone the repository
+# Clone source repository
 git clone https://github.com/catherinevee/driftmgr.git
 cd driftmgr
 
-# Build the Docker image
+# Build container image
 docker build -t driftmgr:local .
 
-# Run the container
-docker run --rm driftmgr:local
+# Execute local build
+docker run --rm driftmgr:local --version
 ```
 
 ## 📋 Available Docker Images

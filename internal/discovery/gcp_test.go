@@ -6,7 +6,6 @@ import (
 
 	"github.com/catherinevee/driftmgr/internal/models"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestNewGCPProvider(t *testing.T) {

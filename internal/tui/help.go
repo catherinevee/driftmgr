@@ -8,10 +8,10 @@ import (
 )
 
 type HelpView struct {
-	width  int
-	height int
+	width           int
+	height          int
 	selectedSection int
-	sections []helpSection
+	sections        []helpSection
 }
 
 type helpSection struct {
@@ -42,7 +42,7 @@ func NewHelpView() *HelpView {
 			content: []string{
 				"Main Menu:",
 				"• D - Resource Discovery",
-				"• I - Import Resources", 
+				"• I - Import Resources",
 				"• C - Configuration",
 				"• H - Help (this screen)",
 				"• Q - Quit",
@@ -235,7 +235,7 @@ func (h HelpView) View() string {
 
 	// Create navigation sidebar
 	sidebar := h.renderSidebar()
-	
+
 	// Create content area
 	content := h.renderContent()
 
@@ -303,7 +303,7 @@ func (h HelpView) renderContent() string {
 	}
 
 	section := h.sections[h.selectedSection]
-	
+
 	// Section title
 	sectionTitle := lipgloss.NewStyle().
 		Foreground(AccentColor).
@@ -314,7 +314,7 @@ func (h HelpView) renderContent() string {
 	// Section content
 	var contentLines []string
 	contentLines = append(contentLines, sectionTitle, "")
-	
+
 	for _, line := range section.content {
 		if line == "" {
 			contentLines = append(contentLines, "")

@@ -1,192 +1,187 @@
-# Terraform Import Helper
+# DriftMgr - Terraform Import Helper
 
 [![CI](https://github.com/catherinevee/driftmgr/workflows/CI/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
-[![codecov](https://codecov.io/gh/catherinevee/driftmgr/branch/- [CI/CD Pipeline](docs/CICD.md)ain/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
+[![codecov](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
 [![GitHub release](https://img.shields.io/github/release/catherinevee/driftmgr.svg)](https://github.com/catherinevee/driftmgr/releases)
 [![Docker](https://img.shields.io/docker/pulls/catherinevee/driftmgr.svg)](https://hub.docker.com/r/catherinevee/driftmgr)
 
-A sophisticated tool that simplifies the process of importing existing cloud infrastructure into Terraform state with an intuitive interface for discovering, selecting, and bulk-importing resources.
+A production-ready CLI tool designed to streamline the import of existing cloud infrastructure into Terraform state. Built for DevOps engineers who need to manage infrastructure drift and transition unmanaged resources to Infrastructure as Code practices.
 
 ## Features
 
-- **Multi-Cloud Support**: Real AWS, Azure, GCP integration with official SDKs
-- **Interactive TUI**: Beautiful terminal interface built with Bubble Tea
-- **Bulk Operations**: Import multiple resources simultaneously with parallel processing
-- **Resource Discovery**: Automatically discover all resources in your cloud accounts
-- **Full Testing**: 85%+ test coverage with unit, integration, and TUI tests
-- **CI/CD Pipeline**: Automated builds, testing, and releases
-- **Docker Support**: Multi-platform container images
-- **Security**: Built-in security scanning and vulnerability management
-- **Multi-Platform**: Binaries for Linux, macOS, and Windows (AMD64/ARM64)
+- **Multi-Cloud Provider Support**: Native integration with AWS SDK v2, Azure SDK for Go, and Google Cloud Client Libraries
+- **Interactive Terminal Interface**: Built on Bubble Tea framework with state management and error handling
+- **Concurrent Resource Operations**: Configurable parallelism with worker pools and rate limiting
+- **Automated Resource Discovery**: Cloud API-driven discovery with filtering and tagging support
+- **Test Coverage**: 85%+ code coverage with unit, integration, and component testing
+- **CI/CD Integration**: Automated builds, testing, and multi-platform binary releases
+- **Container Support**: Multi-stage Docker builds with security scanning and vulnerability management
+- **Cross-Platform Distribution**: Native binaries for Linux, macOS, and Windows on AMD64/ARM64 architectures
 
-## Quick Start
+## Installation
 
-### Installation
-
-#### Binary Releases
+### Binary Distribution
 ```bash
 # Linux/macOS
 curl -L https://github.com/catherinevee/driftmgr/releases/latest/download/driftmgr-$(uname -s | tr '[:upper:]' '[:lower:]')-amd64.tar.gz | tar xz
-sudo mv driftmgr /usr/local/bin/
+sudo install driftmgr /usr/local/bin/
 
 # Windows (PowerShell)
 Invoke-WebRequest -Uri "https://github.com/catherinevee/driftmgr/releases/latest/download/driftmgr-windows-amd64.zip" -OutFile "driftmgr.zip"
 Expand-Archive -Path "driftmgr.zip" -DestinationPath "."
 ```
 
-#### Docker
+### Container Runtime
 ```bash
 docker pull catherinevee/driftmgr:latest
-docker run --rm -it catherinevee/driftmgr:latest
+docker run --rm -it -v ~/.aws:/root/.aws:ro catherinevee/driftmgr:latest
 ```
 
-#### Go Install
+### Go Toolchain
 ```bash
 go install github.com/catherinevee/driftmgr/cmd/driftmgr@latest
 ```
 
-### Usage
+### Basic Operations
 ```bash
-# Configure cloud credentials
+# Initialize configuration
 driftmgr config init
 
-# Launch interactive mode
+# Launch interactive terminal interface
 driftmgr interactive
 
-# Or use CLI commands
-driftmgr discover --provider aws --region us-east-1
-driftmgr import --file resources.csv --parallel 5
+# Resource discovery and import workflow
+driftmgr discover --provider aws --region us-east-1 --output json > resources.json
+driftmgr import --file resources.json --parallel 5 --dry-run
 ```
 
-## How to Use
+## Configuration and Authentication
 
-### **Step 1: Initial Setup**
-
-#### Configure Cloud Credentials
+### Configuration Management
 ```bash
-# Initialize configuration file
+# Initialize configuration file (~/.driftmgr.yaml)
 driftmgr config init
 
-# This creates ~/.driftmgr.yaml with default settings
+# Validate current configuration
+driftmgr config validate
 ```
 
-#### Set up Cloud Provider Authentication
+### Cloud Provider Authentication
 
-**AWS:**
+**AWS SDK Configuration:**
 ```bash
-# Option 1: AWS CLI profiles
-aws configure --profile default
+# AWS CLI profile-based authentication
+aws configure --profile production
 
-# Option 2: Environment variables
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
+# Environment-based configuration
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
 export AWS_REGION=us-east-1
 
-# Option 3: IAM roles (for EC2/Lambda/ECS)
-# No additional setup needed if running on AWS services
+# IAM role-based authentication (recommended for production)
+# Configure instance profile or assume role policies
 ```
 
-**Azure:**
+**Azure SDK Configuration:**
 ```bash
-# Option 1: Azure CLI
+# Azure CLI authentication
 az login
 
-# Option 2: Service Principal
-export AZURE_CLIENT_ID=your_client_id
-export AZURE_CLIENT_SECRET=your_client_secret
-export AZURE_TENANT_ID=your_tenant_id
-export AZURE_SUBSCRIPTION_ID=your_subscription_id
+# Service principal authentication
+export AZURE_CLIENT_ID=...
+export AZURE_CLIENT_SECRET=...
+export AZURE_TENANT_ID=...
+export AZURE_SUBSCRIPTION_ID=...
 ```
 
-**Google Cloud:**
+**Google Cloud SDK Configuration:**
 ```bash
-# Option 1: gcloud CLI
+# Application Default Credentials
 gcloud auth application-default login
 
-# Option 2: Service Account
+# Service account key-based authentication
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-export GCP_PROJECT=your_project_id
+export GCP_PROJECT=your-project-id
 ```
 
-### **Step 2: Discover Resources**
+## Operational Workflows
 
-#### Interactive Discovery (Recommended)
+### **Resource Discovery**
+
+#### Interactive Discovery (Terminal UI)
 ```bash
-# Launch the beautiful TUI interface
+# Launch the terminal interface
 driftmgr interactive
 
-# Navigate through the menu:
+# Navigation workflow:
 # 1. Select "Resource Discovery"
-# 2. Choose your cloud provider (AWS/Azure/GCP)
-# 3. Select regions to scan
-# 4. Review discovered resources
-# 5. Select resources to import
+# 2. Choose cloud provider (AWS/Azure/GCP)
+# 3. Configure regional scope
+# 4. Execute discovery with filtering options
+# 5. Review and select resources for import
 ```
 
-#### CLI Discovery
+#### CLI-Based Discovery
 ```bash
-# Discover AWS resources
+# Single-region AWS discovery
 driftmgr discover --provider aws --region us-east-1
 
-# Multiple regions
-driftmgr discover --provider aws --region us-east-1,us-west-2,eu-west-1
+# Multi-region discovery with resource filtering
+driftmgr discover --provider aws --region us-east-1,us-west-2,eu-west-1 --resource-types ec2,s3
 
-# Azure resources
-driftmgr discover --provider azure --region eastus
+# Azure resource discovery with output formatting
+driftmgr discover --provider azure --region eastus --output json > azure-resources.json
 
-# Google Cloud resources
-driftmgr discover --provider gcp --region us-central1
-
-# Save discovery results to file
-driftmgr discover --provider aws --region us-east-1 --output resources.csv
+# Google Cloud discovery with project scoping
+driftmgr discover --provider gcp --project my-project-id --region us-central1
 ```
 
-### 📥 **Step 3: Import Resources**
+### **Import Operations**
 
-#### Using the Interactive TUI
+#### Interactive Import Workflow
 ```bash
 driftmgr interactive
 
-# In the TUI:
-# 1. Go to "📥 Import Resources"
-# 2. Select previously discovered resources
-# 3. Configure import settings
-# 4. Review and execute import
+# Terminal interface workflow:
+# 1. Navigate to "Import Resources"
+# 2. Load discovery results or resource file
+# 3. Configure import parameters (parallelism, dry-run)
+# 4. Execute import with progress monitoring
 ```
 
-#### CLI Import
+#### CLI Import Operations
 ```bash
-# Import from CSV file
-driftmgr import --file resources.csv
+# Standard import with resource file
+driftmgr import --file resources.json
 
-# Dry run (preview without executing)
-driftmgr import --file resources.csv --dry-run
+# Validation mode for pre-import verification
+driftmgr import --file resources.json --dry-run
 
-# Parallel imports for faster processing
-driftmgr import --file resources.csv --parallel 10
+# Parallel processing with worker pool configuration
+driftmgr import --file resources.json --parallel 10 --timeout 300s
 
-# Import specific resource types only
-driftmgr import --file resources.csv --types aws_instance,aws_vpc
+# Resource type filtering during import
+driftmgr import --file resources.json --resource-types aws_instance,aws_vpc
 
-# Generate Terraform configuration files
-driftmgr import --file resources.csv --generate-config
+# Auto-generate Terraform configuration files
+driftmgr import --file resources.json --generate-config --output-dir ./terraform/
 ```
 
-### **Step 4: Configuration Management**
+### **Configuration Management**
 
-#### View Current Configuration
+#### Configuration Inspection
 ```bash
-# Show all settings
-driftmgr config list
+# Display complete configuration
+driftmgr config show
 
-# Show specific provider settings
-driftmgr config get aws
+# Provider-specific configuration
+driftmgr config show --provider aws
 ```
 
-#### Update Configuration
+#### Configuration Updates
 ```bash
-# Set default provider
+# Set provider defaults
 driftmgr config set provider aws
 
 # Set default region
@@ -345,34 +340,36 @@ for file in ./batches/*.csv; do
 done
 ```
 
-### **Pro Tips**
+### **Best Practices**
 
-1. **Start Small**: Begin with a single region and resource type
-2. **Use Dry Run**: Always test with `--dry-run` first
-3. **Backup State**: Keep backups of your Terraform state files
-4. **Review Generated Code**: Always review generated `.tf` files before applying
-5. **Rate Limiting**: Use `--parallel` wisely to avoid API rate limits
-6. **Interactive Mode**: Use the TUI for complex workflows and better visualization
+1. **Incremental Approach**: Start with single-region, single-resource-type discovery
+2. **Validation First**: Always execute with `--dry-run` before live operations
+3. **State Management**: Implement Terraform state backup strategies before bulk imports
+4. **Code Review**: Validate generated `.tf` configurations before applying changes
+5. **API Rate Limiting**: Configure `--parallel` settings based on provider API limits
+6. **Workflow Optimization**: Use terminal interface for complex multi-step operations
 
-## Architecture
+## System Architecture
 
-- **Resource Discovery Engine**: Real cloud SDK integration for multi-cloud resource scanning
-- **Import Command Generator**: Intelligent mapping of cloud resources to Terraform
-- **Bulk Import Orchestrator**: Parallel processing with transaction management
-- **Interactive TUI**: Professional terminal interface with Bubble Tea and Lipgloss
-- **Full Testing**: Unit, integration, and TUI component testing
-- **CI/CD Pipeline**: Automated builds, testing, and multi-platform releases
+### Core Components
 
-## Installation
+- **Discovery Engine**: Multi-cloud resource enumeration using native provider SDKs
+- **Import Orchestrator**: Terraform state management with parallel processing capabilities  
+- **Resource Mapper**: Intelligent cloud resource to Terraform resource type mapping
+- **Terminal Interface**: Interactive UI built on Bubble Tea with component-based architecture
+- **Configuration System**: YAML-based configuration with environment variable overrides
+- **Testing Framework**: Unit, integration, and component testing with 85%+ coverage
 
-### From Source
+### Build and Development
+
+#### Source Build
 ```bash
 git clone https://github.com/catherinevee/driftmgr.git
 cd driftmgr
 make build
 ```
 
-### Development Setup
+#### Development Environment
 ```bash
 git clone https://github.com/catherinevee/driftmgr.git
 cd driftmgr
@@ -419,14 +416,14 @@ make test
    - Docker multi-platform images
    - Automated releases with changelog generation
 
-### **Technical Stack**
+### **Technology Stack**
 
-- **Languages**: Go 1.23/1.24
-- **Cloud SDKs**: AWS SDK v2, Azure SDK, Google Cloud SDK
-- **TUI Framework**: Bubble Tea v1.3.6, Lipgloss v1.1.0
-- **Testing**: Testify framework with full coverage
-- **CI/CD**: GitHub Actions with multi-platform support
-- **Containerization**: Docker with multi-stage builds
+- **Runtime**: Go 1.23/1.24 with static compilation
+- **Cloud Integration**: AWS SDK v2, Azure SDK for Go, Google Cloud Client Libraries
+- **User Interface**: Bubble Tea v1.3.6 with Lipgloss styling framework
+- **Testing**: Testify with mock generation and table-driven tests
+- **Build System**: GitHub Actions with matrix builds and caching
+- **Distribution**: Docker multi-stage builds with scratch base images
 
 ### 📊 **Quality Metrics**
 

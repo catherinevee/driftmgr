@@ -1,54 +1,44 @@
-# Contributing to Terraform Import Helper
+# Contributing to DriftMgr
 
-Thank you for your interest in contributing to driftmgr! This document provides guidelines and information for contributors.
+This document outlines the development workflow, code standards, and contribution guidelines for the DriftMgr project.
 
-## Development Setup
+## Development Environment
 
 ### Prerequisites
-- Go 1.21 or later
-- Git
-- Terraform (for testing import functionality)
-- Cloud provider CLI tools (AWS CLI, Azure CLI, gcloud) for testing
+- Go 1.23+ with module support enabled
+- Git with configured GPG signing (recommended)
+- Terraform CLI for integration testing
+- Cloud provider SDKs: AWS CLI v2, Azure CLI, Google Cloud SDK
 
-### Getting Started
+### Environment Setup
 
-1. Fork the repository
-2. Clone your fork:
+1. Fork and clone the repository:
    ```bash
    git clone https://github.com/yourusername/driftmgr.git
    cd driftmgr
    ```
 
-3. Install dependencies:
-   ```bash
-   make deps
-   ```
-
-4. Set up development environment:
+2. Initialize development dependencies:
    ```bash
    make dev-setup
    ```
 
-5. Build the project:
+3. Verify build environment:
    ```bash
    make build
-   ```
-
-6. Run tests:
-   ```bash
    make test
+   make lint
    ```
 
-## Project Structure
+## Project Architecture
 
 ```
 driftmgr/
-├── cmd/                    # Application entry point
+├── cmd/main.go            # Application entry point and CLI initialization
 ├── internal/
-│   ├── cmd/               # CLI commands
-│   ├── discovery/         # Resource discovery engine
-│   ├── importer/          # Import orchestration
-│   ├── models/            # Data models
+│   ├── cmd/               # Command implementations and argument parsing
+│   ├── discovery/         # Multi-cloud resource discovery engine
+│   ├── importer/          # Terraform import orchestration
 │   └── tui/               # Terminal UI components
 ├── examples/              # Example files and configurations
 ├── docs/                  # Documentation

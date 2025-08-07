@@ -12,18 +12,18 @@ import (
 // ConfigView represents the modern configuration view
 type ConfigView struct {
 	// State management
-	state       ConfigState
-	width       int
-	height      int
-	
+	state  ConfigState
+	width  int
+	height int
+
 	// UI components
-	inputs      []textinput.Model
-	focusIndex  int
-	
+	inputs     []textinput.Model
+	focusIndex int
+
 	// Configuration data
-	config      Configuration
-	saved       bool
-	err         error
+	config Configuration
+	saved  bool
+	err    error
 }
 
 type ConfigState int
@@ -37,23 +37,23 @@ const (
 
 type Configuration struct {
 	// Cloud provider credentials
-	AWSProfile     string
-	AWSRegion      string
+	AWSProfile        string
+	AWSRegion         string
 	AzureSubscription string
-	AzureTenant    string
-	GCPProject     string
-	GCPCredentials string
-	
+	AzureTenant       string
+	GCPProject        string
+	GCPCredentials    string
+
 	// Import settings
 	OutputDirectory string
 	TerraformBinary string
 	Parallelism     string
 	DryRun          bool
-	
+
 	// Advanced settings
-	LogLevel        string
-	MaxRetries      string
-	Timeout         string
+	LogLevel   string
+	MaxRetries string
+	Timeout    string
 }
 
 type ConfigSaveCompleteMsg struct{}
@@ -63,48 +63,48 @@ type ConfigSaveErrorMsg struct{ Err error }
 func NewConfigView() *ConfigView {
 	// Initialize all text inputs
 	inputs := make([]textinput.Model, 10)
-	
+
 	// AWS Configuration
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "default"
 	inputs[0].Width = 30
 	inputs[0].Focus()
-	
+
 	inputs[1] = textinput.New()
 	inputs[1].Placeholder = "us-east-1"
 	inputs[1].Width = 30
-	
+
 	// Azure Configuration
 	inputs[2] = textinput.New()
 	inputs[2].Placeholder = "subscription-id"
 	inputs[2].Width = 40
-	
+
 	inputs[3] = textinput.New()
 	inputs[3].Placeholder = "tenant-id"
 	inputs[3].Width = 40
-	
+
 	// GCP Configuration
 	inputs[4] = textinput.New()
 	inputs[4].Placeholder = "project-id"
 	inputs[4].Width = 30
-	
+
 	inputs[5] = textinput.New()
 	inputs[5].Placeholder = "/path/to/credentials.json"
 	inputs[5].Width = 50
-	
+
 	// Import Settings
 	inputs[6] = textinput.New()
 	inputs[6].Placeholder = "./terraform"
 	inputs[6].Width = 40
-	
+
 	inputs[7] = textinput.New()
 	inputs[7].Placeholder = "terraform"
 	inputs[7].Width = 30
-	
+
 	inputs[8] = textinput.New()
 	inputs[8].Placeholder = "5"
 	inputs[8].Width = 10
-	
+
 	// Advanced Settings
 	inputs[9] = textinput.New()
 	inputs[9].Placeholder = "info"

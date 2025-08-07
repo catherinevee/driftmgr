@@ -4,17 +4,17 @@ run:
 
 linters:
   enable:
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - typecheck
-    - unused
-    - gosec
-    - gofmt
-    - goimports
-    - misspell
+  - errcheck
+  - gosimple
+  - govet
+  - ineffassign
+  - staticcheck
+  - typecheck
+  - unused
+  - gosec
+  - gofmt
+  - goimports
+  - misspell
 
 issues:
   max-issues-per-linter: 50

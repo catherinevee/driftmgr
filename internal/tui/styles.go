@@ -113,7 +113,7 @@ var (
 				Foreground(lipgloss.Color("#000000"))
 
 	progressIncompleteStyle = lipgloss.NewStyle().
-					Background(mutedColor)
+				Background(mutedColor)
 
 	// Button styles
 	buttonStyle = lipgloss.NewStyle().
@@ -200,16 +200,16 @@ func RenderProgressBar(current, total int, width int) string {
 
 	progress := float64(current) / float64(total)
 	completed := int(float64(width) * progress)
-	
+
 	completeBar := progressCompleteStyle.Width(completed).Render("")
 	incompleteBar := progressIncompleteStyle.Width(width - completed).Render("")
-	
+
 	progressText := lipgloss.JoinHorizontal(lipgloss.Left, completeBar, incompleteBar)
 	statusText := lipgloss.NewStyle().Align(lipgloss.Center).Width(width).
-		Render(lipgloss.JoinVertical(lipgloss.Center, 
-			progressText, 
+		Render(lipgloss.JoinVertical(lipgloss.Center,
+			progressText,
 			fmt.Sprintf("%d/%d (%.1f%%)", current, total, progress*100)))
-	
+
 	return progressBarStyle.Width(width + 4).Render(statusText)
 }
 

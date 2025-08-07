@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/compute/apiv1"
+	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/catherinevee/driftmgr/internal/models"
 	"google.golang.org/api/iterator"

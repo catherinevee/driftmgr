@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/catherinevee/driftmgr/internal/discovery"
 	"github.com/catherinevee/driftmgr/internal/models"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // DiscoveryView represents the resource discovery screen
@@ -130,18 +130,18 @@ func (d *DiscoveryView) handleResultsView(msg tea.KeyMsg) (*DiscoveryView, tea.C
 func (d *DiscoveryView) startDiscovery() (*DiscoveryView, tea.Cmd) {
 	d.isDiscovering = true
 	d.state = Discovering
-	
+
 	return d, func() tea.Msg {
 		config := discovery.Config{
 			Provider: d.selectedProvider,
 			Regions:  d.selectedRegions,
 		}
-		
+
 		resources, err := d.engine.Discover(config)
 		if err != nil {
 			return StatusMsg{Message: fmt.Sprintf("Discovery failed: %v", err)}
 		}
-		
+
 		return ResourcesFoundMsg{Resources: resources}
 	}
 }
@@ -173,7 +173,7 @@ func (d *DiscoveryView) View() string {
 
 func (d *DiscoveryView) renderProviderSelection() string {
 	title := RenderTitle("🔍 Resource Discovery - Provider Selection")
-	
+
 	content := []string{
 		"Select a cloud provider to scan for resources:",
 		"",
@@ -183,7 +183,7 @@ func (d *DiscoveryView) renderProviderSelection() string {
 		"",
 		RenderHelp("Press number to select provider, Enter to continue"),
 	}
-	
+
 	return contentStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
 			title,
@@ -194,7 +194,7 @@ func (d *DiscoveryView) renderProviderSelection() string {
 
 func (d *DiscoveryView) renderRegionSelection() string {
 	title := RenderTitle(fmt.Sprintf("🌍 Region Selection - %s", strings.ToUpper(d.selectedProvider)))
-	
+
 	var regions []string
 	switch d.selectedProvider {
 	case "aws":
@@ -204,14 +204,14 @@ func (d *DiscoveryView) renderRegionSelection() string {
 	case "gcp":
 		regions = []string{"1. US Central 1 (us-central1)", "2. US East 1 (us-east1)", "a. All regions"}
 	}
-	
+
 	content := []string{
 		"Select regions to scan:",
 		"",
 	}
 	content = append(content, regions...)
 	content = append(content, "", RenderHelp("Press number/letter to select, Enter to start discovery, Backspace to go back"))
-	
+
 	return contentStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
 			title,
@@ -222,7 +222,7 @@ func (d *DiscoveryView) renderRegionSelection() string {
 
 func (d *DiscoveryView) renderDiscovering() string {
 	title := RenderTitle("🔍 Discovering Resources...")
-	
+
 	content := []string{
 		fmt.Sprintf("Scanning %s resources...", strings.ToUpper(d.selectedProvider)),
 		"",
@@ -231,7 +231,7 @@ func (d *DiscoveryView) renderDiscovering() string {
 		"",
 		RenderProgressBar(1, 3, 40), // Simulated progress
 	}
-	
+
 	return contentStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
 			title,
@@ -242,7 +242,7 @@ func (d *DiscoveryView) renderDiscovering() string {
 
 func (d *DiscoveryView) renderResults() string {
 	title := RenderTitle(fmt.Sprintf("📊 Discovery Results - %d Resources Found", len(d.resources)))
-	
+
 	if len(d.resources) == 0 {
 		content := []string{
 			"No resources found.",
@@ -256,7 +256,7 @@ func (d *DiscoveryView) renderResults() string {
 			),
 		)
 	}
-	
+
 	// Table header
 	header := lipgloss.JoinHorizontal(lipgloss.Left,
 		tableHeaderStyle.Width(3).Render(""),
@@ -265,7 +265,7 @@ func (d *DiscoveryView) renderResults() string {
 		tableHeaderStyle.Width(10).Render("PROVIDER"),
 		tableHeaderStyle.Width(15).Render("REGION"),
 	)
-	
+
 	// Table rows
 	var rows []string
 	start := 0
@@ -277,20 +277,20 @@ func (d *DiscoveryView) renderResults() string {
 		}
 		end = start + 10
 	}
-	
+
 	for i := start; i < end && i < len(d.resources); i++ {
 		resource := d.resources[i]
-		
+
 		selected := ""
 		if d.selectedRes[i] {
 			selected = "✓"
 		}
-		
+
 		style := tableRowStyle
 		if i == d.cursor {
 			style = tableSelectedRowStyle
 		}
-		
+
 		row := lipgloss.JoinHorizontal(lipgloss.Left,
 			style.Width(3).Render(selected),
 			style.Width(25).Render(truncate(resource.Name, 23)),
@@ -300,18 +300,18 @@ func (d *DiscoveryView) renderResults() string {
 		)
 		rows = append(rows, row)
 	}
-	
+
 	table := lipgloss.JoinVertical(lipgloss.Left, append([]string{header}, rows...)...)
-	
+
 	// Instructions
 	instructions := RenderHelp("↑/↓: navigate, Space: select, Enter: import selected, 'r': restart")
-	
+
 	selectedCount := len(d.getSelectedResources())
 	status := ""
 	if selectedCount > 0 {
 		status = RenderSuccess(fmt.Sprintf("%d resources selected for import", selectedCount))
 	}
-	
+
 	return contentStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left,
 			title,

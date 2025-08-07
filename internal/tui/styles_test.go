@@ -21,7 +21,7 @@ func TestColors(t *testing.T) {
 		BorderColor,
 		HighlightColor,
 	}
-	
+
 	for _, color := range colors {
 		assert.NotEmpty(t, string(color))
 	}
@@ -140,7 +140,7 @@ func TestRenderTitle(t *testing.T) {
 			title: "",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := RenderTitle(tt.title)
@@ -174,16 +174,16 @@ func TestRenderMenuItem(t *testing.T) {
 			isSelected: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := RenderMenuItem(tt.text, tt.isSelected)
 			assert.NotEmpty(t, result)
-			
+
 			if tt.isSelected {
 				assert.Contains(t, result, "→")
 			}
-			
+
 			if tt.text != "" {
 				assert.Contains(t, result, tt.text)
 			}
@@ -213,12 +213,12 @@ func TestRenderButton(t *testing.T) {
 			isActive: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := RenderButton(tt.text, tt.isActive)
 			assert.NotEmpty(t, result)
-			
+
 			if tt.text != "" {
 				assert.Contains(t, result, tt.text)
 			}

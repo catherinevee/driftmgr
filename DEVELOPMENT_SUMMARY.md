@@ -1,54 +1,47 @@
-# Terraform Import Helper - Development Progress
+# DriftMgr - Technical Implementation Summary
 
-## 🎯 Project Overview
+## Project Scope
 
-We have successfully created the foundation for a comprehensive Terraform Import Helper tool called **driftmgr**. This tool simplifies the process of importing existing cloud infrastructure into Terraform state with an intuitive interface for discovering, selecting, and bulk-importing resources.
+DriftMgr is a production-ready CLI tool designed for DevOps engineers to streamline the import of existing cloud infrastructure into Terraform state management. The implementation focuses on multi-cloud resource discovery, automated import orchestration, and operational reliability.
 
-## ✅ What's Been Implemented
+## Implementation Status
 
-### 1. Core Architecture
-- **Modular Design**: Well-structured Go application with clear separation of concerns
-- **CLI Framework**: Built with Cobra for professional command-line interface
-- **Configuration Management**: Viper-based configuration with YAML support
-- **Multi-Cloud Support**: Abstracted provider interface for AWS, Azure, and GCP
+### 1. System Architecture
+- **Modular Design**: Go application with domain-driven architecture and clear interface boundaries
+- **CLI Framework**: Cobra-based command interface with standardized flag handling and validation
+- **Configuration Management**: Viper integration with hierarchical configuration (file, environment, CLI)
+- **Provider Abstraction**: Interface-based multi-cloud support with pluggable provider implementations
 
-### 2. Project Structure
+### 2. Codebase Structure
 ```
 driftmgr/
-├── cmd/                    # Application entry point
-│   └── main.go
+├── cmd/main.go            # Application bootstrap and dependency injection
 ├── internal/
-│   ├── cmd/               # CLI commands (discover, import, config, interactive)
-│   ├── discovery/         # Resource discovery engine with provider implementations
-│   ├── importer/          # Import orchestration with parallel processing
-│   ├── models/            # Data models and types
-│   └── tui/               # Terminal UI foundation (simplified for v1)
-├── examples/              # Sample files and configurations
-│   ├── resources.csv      # Sample CSV format
-│   ├── sample-resources.json # Sample JSON format
-│   └── .driftmgr.yaml    # Sample configuration
-├── docs/                  # Documentation
-├── Makefile              # Build automation
-├── CONTRIBUTING.md       # Contribution guidelines
-├── LICENSE               # MIT License
-└── README.md             # Project overview
+│   ├── cmd/               # Command implementations with argument validation
+│   ├── discovery/         # Resource discovery with provider-specific implementations
+│   ├── importer/          # Import orchestration with concurrent processing
+│   ├── models/            # Domain models and type definitions
+│   └── tui/               # Interactive terminal interface with Bubble Tea
+├── examples/              # Reference configurations and data formats
+├── docs/                  # Technical documentation and API references
+├── .github/workflows/     # CI/CD pipeline configuration
+└── Makefile              # Build automation and development tasks
 ```
 
-### 3. Command Line Interface
-- **discover**: Scan cloud providers for existing resources
-- **import**: Import discovered resources into Terraform state
-- **interactive**: Launch interactive terminal UI (foundation laid)
-- **config**: Manage configuration settings
+### 3. Command Interface
+- **discover**: Multi-cloud resource enumeration with filtering and output formatting
+- **import**: Terraform state import with parallel processing and transaction management
+- **interactive**: Terminal-based UI for complex workflows and resource selection
+- **config**: Configuration management with validation and provider setup
 
-### 4. Resource Discovery Engine
-- **Provider Interface**: Abstract interface for cloud provider implementations
-- **AWS Provider**: Mock implementation with realistic sample data
-- **Azure Provider**: Mock implementation with Azure-specific resources
-- **GCP Provider**: Mock implementation with Google Cloud resources
-- **Output Formats**: Support for table, JSON, and CSV output formats
+### 4. Discovery Engine
+- **Provider Interface**: Standardized interface for cloud provider resource enumeration
+- **AWS Implementation**: SDK v2 integration with EC2, S3, VPC, and additional services
+- **Azure Implementation**: Resource Manager integration with subscription-wide discovery
+- **GCP Implementation**: Client library integration with project-scoped resource scanning
+- **Output Serialization**: JSON, CSV, and table formats with configurable field selection
 
-### 5. Import Engine
-- **Bulk Processing**: Import multiple resources simultaneously
+### 5. Import Orchestration
 - **Parallel Execution**: Configurable parallelism with channel-based concurrency
 - **Input Formats**: Support for CSV and JSON resource lists
 - **Terraform Generation**: Automatic generation of Terraform configuration blocks
