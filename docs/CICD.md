@@ -2,7 +2,7 @@
 
 This document describes the comprehensive CI/CD pipeline for the Terraform Import Helper project.
 
-## 🏗️ Pipeline Overview
+## Pipeline Overview
 
 Our CI/CD pipeline consists of several automated workflows:
 
@@ -35,7 +35,7 @@ Our CI/CD pipeline consists of several automated workflows:
 - **Update**: Automatically updates Go dependencies
 - **Security Audit**: Scans for security vulnerabilities
 
-## 🔧 Workflow Details
+## Workflow Details
 
 ### CI Workflow Jobs
 
@@ -122,7 +122,7 @@ strategy:
   - `1.0` (major.minor)
   - `1` (major only)
 
-## 🚀 Deployment Process
+## Deployment Process
 
 ### Automatic Release Process
 1. **Tag Creation**: Developer creates and pushes a version tag
@@ -172,7 +172,7 @@ git push origin v1.0.0
 - **Race Detection**: Concurrent safety testing
 - **Multi-version Testing**: Go 1.23 and 1.24 compatibility
 
-## 📊 Monitoring & Observability
+## Monitoring & Observability
 
 ### Build Status
 - **GitHub Actions**: Real-time build status
