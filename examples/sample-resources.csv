@@ -1,0 +1,9 @@
+id,name,type,provider,region,import_id,terraform_type
+i-1234567890abcdef0,web-server-1,aws_instance,aws,us-east-1,i-1234567890abcdef0,aws_instance
+i-0987654321fedcba0,web-server-2,aws_instance,aws,us-east-1,i-0987654321fedcba0,aws_instance
+vpc-12345678,main-vpc,aws_vpc,aws,us-east-1,vpc-12345678,aws_vpc
+subnet-11111111,public-subnet-1,aws_subnet,aws,us-east-1,subnet-11111111,aws_subnet
+subnet-22222222,private-subnet-1,aws_subnet,aws,us-east-1,subnet-22222222,aws_subnet
+sg-87654321,web-security-group,aws_security_group,aws,us-east-1,sg-87654321,aws_security_group
+sg-11223344,db-security-group,aws_security_group,aws,us-east-1,sg-11223344,aws_security_group
+example-bucket-prod,example-bucket-prod,aws_s3_bucket,aws,global,example-bucket-prod,aws_s3_bucket
