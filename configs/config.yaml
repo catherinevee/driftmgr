@@ -1,0 +1,67 @@
+# DriftMgr Configuration File
+# This file contains all configuration options for the DriftMgr application
+
+server:
+  port: 8080
+  host: "localhost"
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "60s"
+  max_request_size: 10485760 # 10MB
+  enable_cors: true
+  allowed_origins:
+  - "http://localhost:3000"
+  - "https://driftmgr.example.com"
+
+discovery:
+  concurrency_limit: 10
+  timeout: "5m"
+  retry_attempts: 3
+  retry_delay: "1s"
+  batch_size: 100
+  enable_caching: true
+  cache_ttl: "15m"
+
+cache:
+  type: "memory" # Options: memory, redis
+  ttl: "15m"
+  max_size: 104857600 # 100MB
+  max_entries: 10000
+  cleanup_period: "5m"
+  # Redis configuration (used when type: redis)
+  redis_url: "localhost:6379"
+  redis_password: ""
+  redis_db: 0
+
+security:
+  enable_auth: false
+  jwt_secret: "your-secret-key-here"
+  jwt_expiration: "24h"
+  rate_limit: 1000
+  rate_limit_window: "1m"
+  allowed_ips:
+  - "127.0.0.1"
+  - "::1"
+  enable_tls: false
+  tls_cert_file: ""
+  tls_key_file: ""
+
+logging:
+  level: "info" # Options: debug, info, warn, error
+  format: "json" # Options: json, text
+  output: "stdout" # Options: stdout, stderr, file
+  file: "logs/driftmgr.log"
+  max_size: 100 # MB
+  max_backups: 3
+  max_age: 28 # days
+  compress: true
+
+database:
+  type: "postgres" # Options: postgres, mysql, sqlite
+  host: "localhost"
+  port: 5432
+  username: "driftmgr"
+  password: "password"
+  database: "driftmgr"
+  ssl_mode: "disable" # Options: disable, require, verify-ca, verify-full
+  max_connections: 10

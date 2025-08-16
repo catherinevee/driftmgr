@@ -1,164 +1,114 @@
-# Makefile for driftmgr
+# DriftMgr Makefile
+# Build automation for DriftMgr project
 
-.PHONY: build test clean install run fmt vet tidy
+.PHONY: help build test clean setup lint docker-build docker-run
+
+# Default target
+help:
+	@echo "Available targets:"
+	@echo "  build        - Build the application"
+	@echo "  test         - Run tests"
+	@echo "  clean        - Clean build artifacts"
+	@echo "  setup        - Setup development environment"
+	@echo "  lint         - Run linters"
+	@echo "  docker-build - Build Docker image"
+	@echo "  docker-run   - Run Docker container"
 
 # Build the application
 build:
-	go build -o bin/driftmgr cmd/main.go
+	@echo "Building DriftMgr..."
+	@powershell -ExecutionPolicy Bypass -File scripts/build/build.ps1
+	@echo "Verifying build..."
+	@powershell -ExecutionPolicy Bypass -File scripts/build/verify-build.ps1
 
-# Build for multiple platforms
-build-all:
-	GOOS=windows GOARCH=amd64 go build -o bin/driftmgr-windows-amd64.exe cmd/main.go
-	GOOS=linux GOARCH=amd64 go build -o bin/driftmgr-linux-amd64 cmd/main.go
-	GOOS=darwin GOARCH=amd64 go build -o bin/driftmgr-darwin-amd64 cmd/main.go
-	GOOS=darwin GOARCH=arm64 go build -o bin/driftmgr-darwin-arm64 cmd/main.go
-
-# Install the application
-install:
-	go install cmd/main.go
-
-# Run the application
-run:
-	go run cmd/main.go
-
-# Run with interactive mode
-interactive:
-	go run cmd/main.go interactive
-
-# Test the application
+# Run tests
 test:
-	go test ./...
+	@echo "Running comprehensive tests..."
+	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1
 
-# Test with verbose output
-test-verbose:
-	go test -v ./...
+# Run specific test types
+test-unit:
+	@echo "Running unit tests..."
+	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 unit
 
-# Test individual packages
-test-models:
-	go test -v ./internal/models
+test-integration:
+	@echo "Running integration tests..."
+	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 integration
 
-test-discovery:
-	go test -v ./internal/discovery
+test-e2e:
+	@echo "Running end-to-end tests..."
+	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 e2e
 
-test-tui:
-	go test -v ./internal/tui
+test-benchmark:
+	@echo "Running benchmarks..."
+	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 benchmarks
 
-test-importer:
-	go test -v ./internal/importer
+test-security:
+	@echo "Running security tests..."
+	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 security
 
-# Test with coverage
 test-coverage:
-	go test -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-
-# Format the code
-fmt:
-	go fmt ./...
-
-# Vet the code
-vet:
-	go vet ./...
-
-# Tidy up dependencies
-tidy:
-	go mod tidy
+	@echo "Generating coverage report..."
+	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 coverage
 
 # Clean build artifacts
 clean:
-	rm -rf bin/
-	rm -f coverage.out coverage.html
+	@echo "Cleaning build artifacts..."
+	@if exist bin rmdir /s /q bin
+	@if exist dist rmdir /s /q dist
+	@go clean -cache
+
+# Setup development environment
+setup:
+	@echo "Setting up development environment..."
+	@go mod download
+	@go mod tidy
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 # Run linters
 lint:
-	golangci-lint run
+	@echo "Running linters..."
+	@golangci-lint run
 
-# Initialize go modules if not present
-init:
-	go mod init github.com/catherinevee/driftmgr || true
-	go mod tidy
-
-# Download dependencies
-deps:
-	go mod download
-
-# Generate mocks (if using mockgen)
-mocks:
-	go generate ./...
-
-# Run all checks
-check: fmt vet test
-
-# Development setup
-dev-setup:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-# Example commands
-example-discover:
-	go run cmd/main.go discover --provider aws --region us-east-1
-
-example-import:
-	go run cmd/main.go import --file examples/sample-resources.csv --dry-run
-
-example-config:
-	go run cmd/main.go config init
-
-# Help
-help:
-	@echo "Available targets:"
-	@echo "  build          - Build the application"
-	@echo "  build-all      - Build for multiple platforms"
-	@echo "  install        - Install the application"
-	@echo "  run            - Run the application"
-	@echo "  interactive    - Run in interactive mode"
-	@echo "  test           - Run tests"
-	@echo "  test-verbose   - Run tests with verbose output"
-	@echo "  test-models    - Test models package only"
-	@echo "  test-discovery - Test discovery package only"
-	@echo "  test-tui       - Test TUI package only"
-	@echo "  test-importer  - Test importer package only"
-	@echo "  test-coverage  - Run tests with coverage"
-	@echo "  fmt            - Format code"
-	@echo "  vet            - Vet code"
-	@echo "  tidy           - Tidy dependencies"
-	@echo "  clean          - Clean build artifacts"
-	@echo "  lint           - Run linters"
-	@echo "  check          - Run all checks"
-	@echo "  dev-setup      - Setup development environment"
-	@echo "  docker-build   - Build Docker image"
-	@echo "  docker-run     - Run Docker container"
-	@echo "  docker-dev     - Start development environment"
-	@echo "  ci-local       - Run CI checks locally"
-	@echo "  release-local  - Test release build locally"
-	@echo "  help           - Show this help"
-
-# Docker targets
+# Build Docker image
 docker-build:
-	docker build -t driftmgr:latest .
+	@echo "Building Docker image..."
+	@docker build -f deployments/docker/Dockerfile -t driftmgr:latest .
 
+# Run Docker container
 docker-run:
-	docker run --rm -it driftmgr:latest
+	@echo "Running Docker container..."
+	@docker run -p 8080:8080 driftmgr:latest
 
-docker-dev:
-	docker-compose up driftmgr-dev
+# Install dependencies
+deps:
+	@echo "Installing dependencies..."
+	@go mod download
+	@go mod tidy
 
-docker-test:
-	docker-compose up driftmgr-test
+# Generate documentation
+docs:
+	@echo "Generating documentation..."
+	@if not exist docs\api mkdir docs\api
+	@swag init -g cmd/driftmgr-server/main.go -o docs/api
 
-# CI/CD targets
-ci-local: fmt vet lint test
-	@echo "✅ All CI checks passed locally"
+# Run benchmarks
+bench:
+	@echo "Running benchmarks..."
+	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 benchmarks
 
-release-local:
-	@echo "🚀 Testing release build locally..."
-	rm -rf dist/
-	mkdir -p dist
-	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/driftmgr-linux-amd64 ./cmd/driftmgr
-	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/driftmgr-darwin-amd64 ./cmd/driftmgr
-	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/driftmgr-windows-amd64.exe ./cmd/driftmgr
-	@echo "✅ Release build completed successfully"
+# Format code
+fmt:
+	@echo "Formatting code..."
+	@gofmt -s -w .
+	@goimports -w .
 
-# Security targets
-security-scan:
-	@echo "🔍 Running security scan..."
-	go install golang.org/x/vuln/cmd/govulncheck@latest
-	govulncheck ./...
+# Vet code
+vet:
+	@echo "Vetting code..."
+	@go vet ./...
+
+# Check for security issues
+security:
+	@echo "Checking for security issues..."
+	@gosec ./...

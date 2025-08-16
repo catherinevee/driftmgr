@@ -1,0 +1,53 @@
+[
+  {
+    "id": "i-1234567890abcdef0",
+    "name": "web-server-1",
+    "type": "aws_instance",
+    "provider": "aws",
+    "region": "us-east-1",
+    "tags": {
+      "Name": "web-server-1",
+      "Environment": "production"
+    }
+  },
+  {
+    "id": "vpc-12345678",
+    "name": "main-vpc",
+    "type": "aws_vpc",
+    "provider": "aws",
+    "region": "us-east-1",
+    "tags": {
+      "Name": "main-vpc"
+    }
+  },
+  {
+    "id": "subnet-12345678",
+    "name": "public-subnet-1a",
+    "type": "aws_subnet",
+    "provider": "aws",
+    "region": "us-east-1",
+    "tags": {
+      "Name": "public-subnet-1a"
+    }
+  },
+  {
+    "id": "sg-12345678",
+    "name": "web-security-group",
+    "type": "aws_security_group",
+    "provider": "aws",
+    "region": "us-east-1",
+    "tags": {
+      "Name": "web-security-group"
+    }
+  },
+  {
+    "id": "igw-12345678",
+    "name": "main-internet-gateway",
+    "type": "aws_internet_gateway",
+    "provider": "aws",
+    "region": "us-east-1",
+    "tags": {
+      "Name": "main-internet-gateway"
+    }
+  }
+]

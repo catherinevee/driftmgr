@@ -1,0 +1,125 @@
+name: "Multi-Cloud Resource Discovery"
+description: "Discover existing cloud resources across multiple providers and regions"
+provider: "multi"
+version: "1.0.0"
+
+inputs:
+  providers:
+    description: "Cloud providers to scan"
+    type: "string"
+    default: "aws,azure,gcp"
+    required: true
+
+  regions:
+    description: "Regions to scan (comma-separated)"
+    type: "string"
+    default: "us-east-1,us-west-2"
+    required: true
+
+  resource_types:
+    description: "Resource types to discover"
+    type: "string"
+    default: "ec2,vpc,rds,s3"
+    required: false
+
+  output_format:
+    description: "Output format for discovery results"
+    type: "string"
+    default: "json"
+    options: [ "json", "csv", "yaml" ]
+
+steps:
+- name: "validate-credentials"
+  type: "credential-validation"
+  description: "Validate cloud provider credentials"
+  config:
+    providers: "${providers}"
+    timeout_seconds: 30
+    retry_attempts: 3
+
+- name: "discover-resources"
+  type: "resource-discovery"
+  description: "Discover cloud resources"
+  config:
+    providers: "${providers}"
+    regions: "${regions}"
+    resource_types: "${resource_types}"
+    parallel_discovery: true
+    max_workers: 20
+    timeout_minutes: 60
+
+- name: "filter-resources"
+  type: "resource-filtering"
+  description: "Filter discovered resources"
+  config:
+    include_tags:
+    - "Environment"
+    - "Project"
+    - "Owner"
+    exclude_patterns:
+    - "*test*"
+    - "*temp*"
+    min_age_days: 1
+
+- name: "generate-inventory"
+  type: "inventory-generation"
+  description: "Generate resource inventory"
+  config:
+    format: "${output_format}"
+    output_file: "cloud-inventory.${output_format}"
+    include_metadata: true
+    include_tags: true
+    include_costs: true
+
+- name: "create-import-plan"
+  type: "import-planning"
+  description: "Create Terraform import plan"
+  config:
+    output_file: "import-plan.yaml"
+    group_by_type: true
+    estimate_effort: true
+    include_dependencies: true
+
+outputs:
+  inventory_file:
+    description: "Path to the generated inventory"
+    value: "cloud-inventory.${output_format}"
+
+  import_plan_file:
+    description: "Path to import plan"
+    value: "import-plan.yaml"
+
+  discovery_summary:
+    description: "Discovery summary"
+    value: "${discovery_summary}"
+
+notifications:
+  on_success:
+  - type: "github-comment"
+    config:
+      template: "discovery-success"
+
+  on_failure:
+  - type: "github-comment"
+    config:
+      template: "discovery-failure"
+
+  on_completion:
+  - type: "email"
+    config:
+      recipients: [ "infrastructure@example.com" ]
+      template: "discovery-completion"
+
+metadata:
+  tags:
+  - "discovery"
+  - "multi-cloud"
+  - "inventory"
+  - "terraform"
+
+  documentation:
+  - "https://docs.example.com/resource-discovery"
+  - "https://docs.example.com/multi-cloud-setup"
+
+  maintainers:
+  - "cloud-team@example.com"

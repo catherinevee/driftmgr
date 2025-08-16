@@ -1,0 +1,29 @@
+# Sample Resources CSV
+
+This file demonstrates the CSV format expected by driftmgr for importing resources.
+
+## CSV Format
+
+The CSV file should contain the following columns:
+
+- `id`: Unique identifier for the resource
+- `name`: Human-readable name for the resource
+- `type`: Terraform resource type (e.g., aws_instance, azurerm_virtual_machine)
+- `provider`: Cloud provider (aws, azure, gcp)
+- `region`: Region where the resource is located
+- `import_id`: ID used for terraform import command (defaults to `id` if not specified)
+- `terraform_type`: Terraform resource type (defaults to `type` if not specified)
+
+## Example
+
+```csv
+id,name,type,provider,region,import_id,terraform_type
+# Replace with your actual resource IDs and names
+# Example: i-1234567890abcdef0,web-server-1,aws_instance,aws,us-east-1,i-1234567890abcdef0,aws_instance
+```
+
+## Usage
+
+1. Save your resources in a CSV file following the format above
+2. Run: `driftmgr import --file resources.csv`
+3. Or use the interactive mode: `driftmgr interactive`

@@ -1,0 +1,290 @@
+pipeline {
+    agent any
+    
+    environment {
+        DRIFT_CONFIG_FILE = 'driftmgr.yaml'
+        DRIFT_OUTPUT_FORMAT = 'json'
+        DRIFT_FAIL_ON_DRIFT = 'true'
+        DRIFT_AUTO_REMEDIATE = 'false'
+        DRIFT_REPORTS_DIR = 'drift-reports'
+    }
+    
+    stages {
+        stage('Setup') {
+            steps {
+                script {
+                    // Install DriftMgr if not already installed
+                    if (!fileExists('driftmgr/bin/driftmgr')) {
+                        sh '''
+                            git clone https://github.com/catherinevee/driftmgr.git
+                            cd driftmgr
+                            make build
+                            cd ..
+                        '''
+                    }
+                    
+                    // Add DriftMgr to PATH
+                    env.PATH = "${env.PATH}:${env.WORKSPACE}/driftmgr/bin"
+                }
+            }
+        }
+        
+        stage('Validate Infrastructure') {
+            steps {
+                script {
+                    // Create DriftMgr configuration
+                    writeFile file: 'driftmgr.yaml', text: '''
+                        providers:
+                          aws:
+                            regions: [us-east-1, us-west-2]
+                          azure:
+                            regions: [eastus, westus]
+                          gcp:
+                            regions: [us-central1, us-east1]
+                        ci_cd:
+                          enabled: true
+                          fail_on_drift: true
+                          auto_remediate: false
+                          severity_threshold: high
+                    '''
+                    
+                    // Discover resources for each provider
+                    parallel(
+                        'AWS Discovery': {
+                            sh 'driftmgr discover aws us-east-1,us-west-2'
+                        },
+                        'Azure Discovery': {
+                            sh 'driftmgr discover azure eastus,westus'
+                        },
+                        'GCP Discovery': {
+                            sh 'driftmgr discover gcp us-central1,us-east1'
+                        }
+                    )
+                }
+            }
+        }
+        
+        stage('Analyze Drift') {
+            steps {
+                script {
+                    // Create reports directory
+                    sh "mkdir -p ${env.DRIFT_REPORTS_DIR}"
+                    
+                    // Analyze drift and generate report
+                    sh '''
+                        driftmgr analyze terraform.tfstate --output json > ${DRIFT_REPORTS_DIR}/drift-analysis.json
+                        
+                        # Parse drift count from JSON
+                        DRIFT_COUNT=$(jq '.drift_count // 0' ${DRIFT_REPORTS_DIR}/drift-analysis.json)
+                        echo "DRIFT_COUNT=${DRIFT_COUNT}" > drift-count.env
+                    '''
+                    
+                    // Load drift count into environment
+                    load 'drift-count.env'
+                    
+                    // Fail if drift detected and configured to fail
+                    script {
+                        if (env.DRIFT_FAIL_ON_DRIFT == 'true' && env.DRIFT_COUNT.toInteger() > 0) {
+                            error "Drift detected: ${env.DRIFT_COUNT} resources"
+                        } else if (env.DRIFT_COUNT.toInteger() > 0) {
+                            echo "Warning: Drift detected but pipeline continues"
+                        } else {
+                            echo "No drift detected"
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Generate Reports') {
+            steps {
+                script {
+                    // Generate various report formats
+                    sh '''
+                        # Generate HTML report
+                        driftmgr export terraform html --output ${DRIFT_REPORTS_DIR}/drift-report.html
+                        
+                        # Generate JSON report
+                        driftmgr export terraform json --output ${DRIFT_REPORTS_DIR}/drift-report.json
+                        
+                        # Generate CSV report
+                        driftmgr export terraform csv --output ${DRIFT_REPORTS_DIR}/drift-report.csv
+                    '''
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'master'
+                }
+            }
+            steps {
+                script {
+                    // Deploy infrastructure
+                    sh '''
+                        terraform init
+                        terraform plan -out=tfplan
+                        terraform apply tfplan
+                    '''
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'master'
+                }
+            }
+            steps {
+                script {
+                    // Verify deployment was successful
+                    sh '''
+                        driftmgr discover aws us-east-1,us-west-2
+                        driftmgr perspective terraform.tfstate aws
+                        
+                        # Check for post-deployment drift
+                        driftmgr analyze terraform.tfstate --output json > ${DRIFT_REPORTS_DIR}/post-deployment-drift.json
+                        
+                        POST_DRIFT_COUNT=$(jq '.drift_count // 0' ${DRIFT_REPORTS_DIR}/post-deployment-drift.json)
+                        echo "POST_DRIFT_COUNT=${POST_DRIFT_COUNT}" > post-drift-count.env
+                    '''
+                    
+                    load 'post-drift-count.env'
+                    
+                    script {
+                        if (env.POST_DRIFT_COUNT.toInteger() > 0) {
+                            echo "Warning: Post-deployment drift detected"
+                            // Send notification
+                            sh 'driftmgr notify slack "Post-Deployment Drift" "Drift detected after deployment"'
+                        } else {
+                            echo "Deployment verified successfully"
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Remediate Drift') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'master'
+                }
+            }
+            steps {
+                script {
+                    // Check if remediation is enabled
+                    if (env.DRIFT_AUTO_REMEDIATE == 'true') {
+                        sh '''
+                            echo "Auto-remediating detected drift"
+                            driftmgr remediate-batch terraform --auto
+                            
+                            # Verify remediation
+                            driftmgr discover aws us-east-1,us-west-2
+                            driftmgr analyze terraform.tfstate
+                        '''
+                    } else {
+                        echo "Auto-remediation disabled. Manual intervention required."
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Archive drift reports
+            archiveArtifacts artifacts: "${env.DRIFT_REPORTS_DIR}/**/*", allowEmptyArchive: true
+            
+            // Publish HTML report
+            publishHTML([
+                allowMissing: false,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: env.DRIFT_REPORTS_DIR,
+                reportFiles: 'drift-report.html',
+                reportName: 'Drift Analysis Report'
+            ])
+            
+            // Clean up temporary files
+            sh 'rm -f drift-count.env post-drift-count.env'
+        }
+        
+        success {
+            echo "Pipeline completed successfully"
+        }
+        
+        failure {
+            script {
+                // Send failure notification
+                sh 'driftmgr notify slack "Pipeline Failed" "DriftMgr pipeline failed"'
+                
+                // Generate failure report
+                sh '''
+                    echo "Pipeline failed at stage: ${currentBuild.description}" > ${DRIFT_REPORTS_DIR}/failure-report.txt
+                    echo "Build URL: ${env.BUILD_URL}" >> ${DRIFT_REPORTS_DIR}/failure-report.txt
+                '''
+            }
+        }
+        
+        unstable {
+            echo "Pipeline completed with warnings"
+        }
+    }
+}
+
+// Declarative pipeline for scheduled drift monitoring
+pipeline {
+    agent any
+    
+    triggers {
+        cron('0 2 * * *') // Daily at 2 AM
+    }
+    
+    stages {
+        stage('Scheduled Drift Check') {
+            steps {
+                script {
+                    // Install DriftMgr
+                    if (!fileExists('driftmgr/bin/driftmgr')) {
+                        sh '''
+                            git clone https://github.com/catherinevee/driftmgr.git
+                            cd driftmgr
+                            make build
+                            cd ..
+                        '''
+                    }
+                    
+                    env.PATH = "${env.PATH}:${env.WORKSPACE}/driftmgr/bin"
+                    
+                    // Run scheduled drift check
+                    sh '''
+                        mkdir -p drift-reports
+                        driftmgr discover aws us-east-1,us-west-2
+                        driftmgr analyze terraform.tfstate --output json > drift-reports/scheduled-drift.json
+                        
+                        DRIFT_COUNT=$(jq '.drift_count // 0' drift-reports/scheduled-drift.json)
+                        if [ "$DRIFT_COUNT" -gt 0 ]; then
+                            echo "🚨 Scheduled drift check: $DRIFT_COUNT resources with drift"
+                            driftmgr notify slack "Scheduled Drift Alert" "Drift detected in production infrastructure"
+                            exit 1
+                        else
+                            echo "✅ Scheduled drift check: No drift detected"
+                        fi
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            archiveArtifacts artifacts: 'drift-reports/**/*', allowEmptyArchive: true
+        }
+    }
+}

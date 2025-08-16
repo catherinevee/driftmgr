@@ -1,21 +1,30 @@
-# golangci-lint configuration
 run:
   timeout: 5m
+  modules-download-mode: readonly
 
 linters:
   enable:
-  - errcheck
-  - gosimple
-  - govet
-  - ineffassign
-  - staticcheck
-  - typecheck
-  - unused
-  - gosec
-  - gofmt
-  - goimports
-  - misspell
+    - gofmt
+    - golint
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - unused
+    - misspell
+    - gosec
+
+linters-settings:
+  govet:
+    check-shadowing: true
+  gosec:
+    excludes:
+      - G404 # Use of weak random number generator
 
 issues:
-  max-issues-per-linter: 50
-  max-same-issues: 3
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec

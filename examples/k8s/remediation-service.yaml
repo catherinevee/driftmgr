@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remediation-service
+  namespace: driftmgr
+  labels:
+    app: remediation-service
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: remediation-service
+  template:
+    metadata:
+      labels:
+        app: remediation-service
+        version: v1.0.0
+    spec:
+      containers:
+      - name: remediation-service
+        image: driftmgr/remediation-service:latest
+        ports:
+        - containerPort: 8083
+          name: http
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: driftmgr-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: driftmgr-secrets
+              key: redis-url
+        - name: ANALYSIS_SERVICE_URL
+          value: "http://analysis-service:8082"
+        - name: WORKFLOW_SERVICE_URL
+          value: "http://workflow-service:8084"
+        - name: NOTIFICATION_SERVICE_URL
+          value: "http://notification-service:8085"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8083
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: remediation-service
+  namespace: driftmgr
+  labels:
+    app: remediation-service
+spec:
+  selector:
+    app: remediation-service
+  ports:
+  - port: 8083
+    targetPort: 8083
+    protocol: TCP
+    name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: remediation-service-ingress
+  namespace: driftmgr
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  rules:
+  - host: remediation.driftmgr.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: remediation-service
+            port:
+              number: 8083
+  tls:
+  - hosts:
+    - remediation.driftmgr.local
+    secretName: driftmgr-tls

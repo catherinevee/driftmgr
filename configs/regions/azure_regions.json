@@ -1,0 +1,266 @@
+[
+  {
+    "name": "eastus",
+    "description": "East US",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "eastus2",
+    "description": "East US 2",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "southcentralus",
+    "description": "South Central US",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "westus2",
+    "description": "West US 2",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "westus3",
+    "description": "West US 3",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "australiaeast",
+    "description": "Australia East",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "australiasoutheast",
+    "description": "Australia Southeast",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "southeastasia",
+    "description": "Southeast Asia",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "northeurope",
+    "description": "North Europe",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "swedencentral",
+    "description": "Sweden Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "uksouth",
+    "description": "UK South",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "ukwest",
+    "description": "UK West",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "westeurope",
+    "description": "West Europe",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "centralus",
+    "description": "Central US",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "northcentralus",
+    "description": "North Central US",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "westus",
+    "description": "West US",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "southafricanorth",
+    "description": "South Africa North",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "southafricawest",
+    "description": "South Africa West",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "centralindia",
+    "description": "Central India",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "southindia",
+    "description": "South India",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "westindia",
+    "description": "West India",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "eastasia",
+    "description": "East Asia",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "japaneast",
+    "description": "Japan East",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "japanwest",
+    "description": "Japan West",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "koreacentral",
+    "description": "Korea Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "koreasouth",
+    "description": "Korea South",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "canadacentral",
+    "description": "Canada Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "canadaeast",
+    "description": "Canada East",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "francecentral",
+    "description": "France Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "francesouth",
+    "description": "France South",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "germanywestcentral",
+    "description": "Germany West Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "germanynorth",
+    "description": "Germany North",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "italynorth",
+    "description": "Italy North",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "norwayeast",
+    "description": "Norway East",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "polandcentral",
+    "description": "Poland Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "switzerlandnorth",
+    "description": "Switzerland North",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "switzerlandwest",
+    "description": "Switzerland West",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "uaenorth",
+    "description": "UAE North",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "uaecentral",
+    "description": "UAE Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "brazilsouth",
+    "description": "Brazil South",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "brazilsoutheast",
+    "description": "Brazil Southeast",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "chilecentral",
+    "description": "Chile Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "mexicocentral",
+    "description": "Mexico Central",
+    "enabled": true,
+    "provider": "azure"
+  },
+  {
+    "name": "qatarcentral",
+    "description": "Qatar Central",
+    "enabled": true,
+    "provider": "azure"
+  }
+]

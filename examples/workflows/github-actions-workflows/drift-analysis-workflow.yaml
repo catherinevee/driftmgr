@@ -1,0 +1,113 @@
+name: "AWS Drift Analysis"
+description: "Analyze drift between Terraform state and live AWS infrastructure"
+provider: "aws"
+version: "1.0.0"
+
+inputs:
+  regions:
+    description: "AWS regions to analyze"
+    type: "string"
+    default: "us-east-1,us-west-2"
+    required: true
+
+  environment:
+    description: "Environment name"
+    type: "string"
+    default: "production"
+    required: true
+
+  backup_state:
+    description: "Create backup of state files"
+    type: "boolean"
+    default: true
+
+steps:
+- name: "setup-environment"
+  type: "setup"
+  description: "Setup analysis environment"
+  config:
+    create_backup: true
+    backup_location: "./backups"
+    log_level: "info"
+
+- name: "detect-state-files"
+  type: "state-detect"
+  description: "Detect Terraform state files"
+  config:
+    search_path: "."
+    recursive: true
+    file_patterns:
+    - "*.tfstate"
+    - "*.tfstate.backup"
+
+- name: "analyze-drift"
+  type: "drift-analysis"
+  description: "Analyze drift between state and live infrastructure"
+  config:
+    provider: "aws"
+    regions: "${regions}"
+    parallel_analysis: true
+    max_workers: 10
+    timeout_minutes: 30
+
+- name: "generate-report"
+  type: "report"
+  description: "Generate drift analysis report"
+  config:
+    format: "markdown"
+    output_file: "drift-analysis-report.md"
+    include_summary: true
+    include_details: true
+    include_recommendations: true
+
+- name: "create-import-commands"
+  type: "import-commands"
+  description: "Generate import commands for missing resources"
+  config:
+    output_file: "import-commands.sh"
+    include_validation: true
+    dry_run: true
+
+outputs:
+  report_file:
+    description: "Path to the generated report"
+    value: "drift-analysis-report.md"
+
+  import_commands_file:
+    description: "Path to import commands script"
+    value: "import-commands.sh"
+
+  summary:
+    description: "Analysis summary"
+    value: "${analysis_summary}"
+
+notifications:
+  on_success:
+  - type: "github-comment"
+    config:
+      template: "success"
+
+  on_failure:
+  - type: "github-comment"
+    config:
+      template: "failure"
+
+  on_completion:
+  - type: "slack"
+    config:
+      channel: "#infrastructure"
+      template: "completion"
+
+metadata:
+  tags:
+  - "aws"
+  - "drift-analysis"
+  - "terraform"
+  - "infrastructure"
+
+  documentation:
+  - "https://docs.example.com/drift-analysis"
+  - "https://docs.example.com/aws-integration"
+
+  maintainers:
+  - "infrastructure-team@example.com"

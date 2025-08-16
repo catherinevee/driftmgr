@@ -1,0 +1,12 @@
+{
+  "provider": "aws",
+  "account_id": "025066254478",
+  "options": {
+    "dry_run": true,
+    "force": false,
+    "resource_types": ["ec2_instance", "s3_bucket"],
+    "regions": ["us-east-1"],
+    "timeout": "5m",
+    "batch_size": 5
+  }
+}
