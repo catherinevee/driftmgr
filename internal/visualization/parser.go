@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // TerraformStateParser parses Terraform state files

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // Engine provides unified remediation capabilities

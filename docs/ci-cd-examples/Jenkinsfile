@@ -4,9 +4,9 @@
  * Jenkins Pipeline for DriftMgr
  * Infrastructure Drift Detection and Management Tool
  * 
- * This pipeline provides comprehensive CI/CD capabilities including:
+ * This pipeline provides complete CI/CD capabilities including:
  * - Multi-platform builds
- * - Comprehensive testing (unit, integration, security)
+ * - Thorough testing (unit, integration, security)
  * - Drift detection across multiple cloud providers
  * - Automated remediation with approvals
  * - Security scanning and compliance checks

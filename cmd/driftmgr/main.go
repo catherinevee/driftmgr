@@ -17,9 +17,10 @@ import (
 	"github.com/catherinevee/driftmgr/cmd/driftmgr/commands"
 	"github.com/catherinevee/driftmgr/internal/core/drift"
 	"github.com/catherinevee/driftmgr/internal/credentials"
-	"github.com/catherinevee/driftmgr/internal/discovery"
-	"github.com/catherinevee/driftmgr/internal/models"
-	"github.com/catherinevee/driftmgr/internal/terraform"
+	"github.com/catherinevee/driftmgr/internal/core/discovery"
+	"github.com/catherinevee/driftmgr/internal/utils/graceful"
+	"github.com/catherinevee/driftmgr/internal/core/models"
+	"github.com/catherinevee/driftmgr/internal/integration/terraform"
 	"github.com/catherinevee/driftmgr/internal/terraform/state"
 )
 
@@ -111,6 +112,9 @@ func parseCommandLineArgs(args []string) []string {
 }
 
 func main() {
+	// Set up panic recovery
+	defer graceful.RecoverPanic()
+	
 	// If no arguments provided, show help
 	if len(os.Args) == 1 {
 		showCLIHelp()

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // LogLevel represents the logging level

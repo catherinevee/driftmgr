@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // WorkspaceManager handles multiple Terraform workspaces and environment management

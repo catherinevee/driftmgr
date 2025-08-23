@@ -7,26 +7,26 @@
 
 We created a test scenario where someone made manual changes to AWS resources outside of Terraform:
 
-### 1. 🔧 **EC2 Instance Modified** (i-0a1b2c3d4e5f67890)
+### 1. **EC2 Instance Modified** (i-0a1b2c3d4e5f67890)
 - **Instance Type Changed**: t2.micro → t2.large (via AWS Console)
 - **Root Volume Increased**: 8GB → 20GB
-- **Volume Type Upgraded**: gp2 → gp3  
+- **Volume Type Upgraded**: gp2 → gp3
 - **Encryption Enabled**: false → true
 - **Additional Security Group Added**: sg-9876543210fedcba0
 - **New Tag Added**: CostCenter = "Engineering"
 - **Severity**: CRITICAL (cost and security implications)
 
-### 2. 🔒 **Security Group Modified** (sg-0123456789abcdef0)
+### 2. **Security Group Modified** (sg-0123456789abcdef0)
 - **SSH Port Opened**: Port 22 from 203.0.113.0/24 (emergency access)
 - **Debug Port Added**: Port 8080 from 0.0.0.0/0 (developer added)
 - **New Tag Added**: LastModified = "2024-01-15"
 - **Severity**: CRITICAL (unauthorized ports)
 
-### 3. 🗑️ **S3 Bucket Deleted** (my-app-logs-bucket-12345)
+### 3. **S3 Bucket Deleted** (my-app-logs-bucket-12345)
 - **Resource Missing**: Bucket deleted manually
 - **Severity**: HIGH (data loss risk)
 
-### 4. ➕ **Unmanaged EC2 Instance** (i-9999888877776666)
+### 4. **Unmanaged EC2 Instance** (i-9999888877776666)
 - **New Resource**: Created outside Terraform
 - **Type**: t3.medium instance
 - **Purpose**: Emergency backup server
@@ -47,15 +47,15 @@ State File: test-drift/terraform.tfstate
 Provider: aws
 
 Resources:
-  Total:     4
-  Drifted:   2 (50%)
-  Missing:   1 (25%)  
-  Unmanaged: 1 (25%)
+ Total: 4
+ Drifted: 2 (50%)
+ Missing: 1 (25%)
+ Unmanaged: 1 (25%)
 
 Severity Breakdown:
-  Critical: 1 (EC2 instance changes)
-  High:     1 (S3 bucket missing)
-  Medium:   2 (Security group, unmanaged instance)
+ Critical: 1 (EC2 instance changes)
+ High: 1 (S3 bucket missing)
+ Medium: 2 (Security group, unmanaged instance)
 
 Drift Percentage: 75.0%
 Action Required: Resources have drifted from desired state
@@ -101,14 +101,14 @@ terraform state rm aws_s3_bucket.app_logs
 Add to Terraform configuration:
 ```hcl
 resource "aws_instance" "emergency_backup" {
-  instance_type = "t3.medium"
-  ami          = "ami-0987654321fedcba"
-  
-  tags = {
-    Name      = "UnmanagedServer"
-    CreatedBy = "AWS Console"
-    Purpose   = "Emergency backup server"
-  }
+ instance_type = "t3.medium"
+ ami = "ami-0987654321fedcba"
+
+ tags = {
+ Name = "UnmanagedServer"
+ CreatedBy = "AWS Console"
+ Purpose = "Emergency backup server"
+ }
 }
 ```
 
@@ -139,10 +139,10 @@ terraform import aws_instance.emergency_backup i-9999888877776666
 1. **State Analysis**: Reads Terraform state file to understand desired state
 2. **Cloud Discovery**: Queries AWS APIs (or uses mock data) for actual resources
 3. **Comparison Engine**: Compares state vs reality attribute by attribute
-4. **Drift Classification**: 
-   - Modified: Resources that exist but have changed
-   - Missing: Resources in state but not in cloud
-   - Unmanaged: Resources in cloud but not in state
+4. **Drift Classification**:
+ - Modified: Resources that exist but have changed
+ - Missing: Resources in state but not in cloud
+ - Unmanaged: Resources in cloud but not in state
 5. **Remediation Generation**: Creates Terraform commands to fix drift
 
 ## Conclusion

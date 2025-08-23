@@ -7,7 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // CostAnalyzer provides cost analysis for cloud resources

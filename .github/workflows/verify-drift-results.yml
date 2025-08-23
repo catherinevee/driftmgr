@@ -190,7 +190,7 @@ jobs:
     - name: Verify with Azure Resource Graph
       if: github.event.inputs.comparison_mode == 'detailed' || github.event.inputs.comparison_mode == 'full'
       run: |
-        # Query Azure Resource Graph for comprehensive inventory
+        # Query Azure Resource Graph for complete inventory
         az graph query -q "Resources | summarize count() by type" --output json > azure_graph_inventory.json
         
         # Get detailed resource list

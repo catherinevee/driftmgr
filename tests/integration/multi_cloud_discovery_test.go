@@ -5,7 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/discovery"
+	"github.com/catherinevee/driftmgr/internal/core/discovery"
+	awsprovider "github.com/catherinevee/driftmgr/internal/cloud/aws"
+	azureprovider "github.com/catherinevee/driftmgr/internal/cloud/azure"
+	gcpprovider "github.com/catherinevee/driftmgr/internal/cloud/gcp"
+	doprovider "github.com/catherinevee/driftmgr/internal/cloud/digitalocean"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +24,7 @@ func TestMultiCloudDiscovery(t *testing.T) {
 
 	// Add real cloud providers
 	t.Run("AWS Discovery", func(t *testing.T) {
-		awsProvider, err := discovery.NewAWSProvider()
+		awsProvider, err := awsprovider.NewAWSProvider()
 		if err != nil {
 			t.Skipf("AWS provider not available: %v", err)
 			return
@@ -50,7 +54,7 @@ func TestMultiCloudDiscovery(t *testing.T) {
 	})
 
 	t.Run("Azure Discovery", func(t *testing.T) {
-		azureProvider, err := discovery.NewAzureProvider()
+		azureProvider, err := azureprovider.NewAzureDiscoverer("")
 		if err != nil {
 			t.Skipf("Azure provider not available: %v", err)
 			return
@@ -80,7 +84,7 @@ func TestMultiCloudDiscovery(t *testing.T) {
 	})
 
 	t.Run("GCP Discovery", func(t *testing.T) {
-		gcpProvider, err := discovery.NewGCPProvider()
+		gcpProvider, err := gcpprovider.NewGCPProvider()
 		if err != nil {
 			t.Skipf("GCP provider not available: %v", err)
 			return
@@ -110,7 +114,7 @@ func TestMultiCloudDiscovery(t *testing.T) {
 	})
 
 	t.Run("DigitalOcean Discovery", func(t *testing.T) {
-		doProvider, err := discovery.NewDigitalOceanProvider()
+		doProvider, err := doprovider.NewDigitalOceanDiscoverer("")
 		if err != nil {
 			t.Skipf("DigitalOcean provider not available: %v", err)
 			return

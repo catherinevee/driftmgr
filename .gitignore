@@ -1,27 +1,130 @@
-﻿# Binaries
+# === Go ===
+# Binaries
+/driftmgr
+/driftmgr-client
+/driftmgr-server
+/driftmgr-client.exe
+/driftmgr-server.exe
+/driftmgr.exe
 *.exe
-driftmgr
-validate-discovery
-
-# Go
+*.dll
 *.so
 *.dylib
 *.test
 *.out
+validate-discovery
 
-# Database
+# Coverage and profiling
+coverage.*
+*.coverprofile
+*.prof
+*.pprof
+
+# Dependencies
+vendor/
+go.work
+go.work.sum
+
+# === Development ===
+# IDE/Editors
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.vim/
+
+# Environment
+.env
+.env.*
+*.env
+local.yaml
+*-local.yaml
+configs/local/
+
+# Claude
+.claude/
+
+# === Testing ===
+testdata/tmp/
+test-results/
+*.bench
+junit.xml
+
+# === Build ===
+build/
+dist/
+bin/
+release/
+
+# === Cloud/Infrastructure ===
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+.terragrunt-cache/
+
+# Docker volumes
+postgres-data/
+redis-data/
+*-data/
+*-logs/
+docker-compose.override.yml
+
+# === Security ===
+# Credentials (NEVER commit these)
+*.pem
+*.key
+*.crt
+*.p12
+credentials.json
+*-credentials.json
+service-account*.json
+
+# === Data ===
+# Databases
 *.db
+*.sqlite*
+data/
 
 # Logs
 *.log
+logs/
+*.log.*
 
-# OS
+# === OS ===
 .DS_Store
 Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.Trash-*
 
-# Terraform
-*.tfstate
-.terraform/
+# === Languages ===
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
 
-# Config
-local.yaml
+# Node
+node_modules/
+npm-debug.log*
+
+# === Temporary ===
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+tmp/
+temp/
+
+# === Archives ===
+*.tar.gz
+*.zip
+*.rar
+*.7z

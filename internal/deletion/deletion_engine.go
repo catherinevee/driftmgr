@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/constants"
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // DeletionEngine provides comprehensive resource deletion capabilities

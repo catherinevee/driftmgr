@@ -12,7 +12,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // HTMLExporter exports visualizations to HTML

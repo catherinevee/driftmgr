@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // FilterManager manages resource filtering
@@ -126,8 +126,11 @@ func (fm *FilterManager) filterByStates(resources []models.Resource, states []st
 
 	filtered := make([]models.Resource, 0)
 	for _, resource := range resources {
-		if stateMap[strings.ToLower(resource.State)] {
-			filtered = append(filtered, resource)
+		// Handle State as interface{} - could be string or map
+		if stateStr, ok := resource.State.(string); ok {
+			if stateMap[strings.ToLower(stateStr)] {
+				filtered = append(filtered, resource)
+			}
 		}
 	}
 

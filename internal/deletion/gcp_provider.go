@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/container/v1"
 	"google.golang.org/api/iterator"

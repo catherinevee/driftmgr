@@ -14,27 +14,27 @@ Inspired by [Gobang](https://github.com/TaKO8Ki/gobang), a TUI database manageme
 ## Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│ DriftMgr - Cloud Resource Manager                                      │
-├──────────────┬─────────────────────────────┬──────────────────────────┤
-│ Providers    │ Resources                   │ Details                  │
-│              │                             │                          │
-│ > AWS Prod   │ Name          Type   Status │ Resource Details         │
-│   Azure      │ web-server-01 EC2    Running│ ────────────────         │
-│   GCP        │ database-01   RDS    Active │                          │
-│   DO         │ backup-bucket S3     Active │ ID: i-1234567890         │
-│              │                             │ Name: web-server-01      │
-│              │                             │ Type: EC2 Instance       │
-│              │                             │ Region: us-east-1        │
-│              │                             │ Status: Running          │
-│              │                             │ Cost: $45.20/mo          │
-│              │                             │                          │
-│              │                             │ Tags:                    │
-│              │                             │   Environment: Prod      │
-│              │                             │   Team: Platform         │
-└──────────────┴─────────────────────────────┴──────────────────────────┘
-│ [Providers] | 4 providers | 245 resources | Ready    Tab: Switch | q: Quit │
-└─────────────────────────────────────────────────────────────────────────┘
+
+ DriftMgr - Cloud Resource Manager
+
+ Providers Resources Details
+
+ > AWS Prod Name Type Status Resource Details
+ Azure web-server-01 EC2 Running
+ GCP database-01 RDS Active
+ DO backup-bucket S3 Active ID: i-1234567890
+ Name: web-server-01
+ Type: EC2 Instance
+ Region: us-east-1
+ Status: Running
+ Cost: $45.20/mo
+
+ Tags:
+ Environment: Prod
+ Team: Platform
+
+ [Providers] | 4 providers | 245 resources | Ready Tab: Switch | q: Quit
+
 ```
 
 ## Key Features
@@ -80,18 +80,18 @@ Inspired by [Gobang](https://github.com/TaKO8Ki/gobang), a TUI database manageme
 
 ### Default Mode (Gobang-style)
 ```bash
-driftmgr              # Launches Gobang-style TUI
+driftmgr # Launches Gobang-style TUI
 ```
 
 ### Alternative UIs
 ```bash
-driftmgr --modern-tui  # Modern Bubble Tea interface
-driftmgr --simple-tui  # Simple text-based interface
+driftmgr --modern-tui # Modern Bubble Tea interface
+driftmgr --simple-tui # Simple text-based interface
 ```
 
 ### CLI Mode
 ```bash
-driftmgr --help       # Show CLI help
+driftmgr --help # Show CLI help
 driftmgr discover --provider aws
 ```
 
@@ -101,20 +101,20 @@ driftmgr discover --provider aws
 - **Bubble Tea** - Terminal UI framework
 - **Lipgloss** - Styling and layout
 - **Bubbles Components**:
-  - `list` - Provider selection
-  - `table` - Resource display
-  - `viewport` - Scrollable details
-  - `textinput` - Filter input
-  - `help` - Keyboard shortcuts
+ - `list` - Provider selection
+ - `table` - Resource display
+ - `viewport` - Scrollable details
+ - `textinput` - Filter input
+ - `help` - Keyboard shortcuts
 
 ### Color Palette
 ```go
-Primary:   #7aa2f7  // Blue
-Secondary: #bb9af7  // Purple  
-Tertiary:  #7dcfff  // Cyan
-Selected:  #9ece6a  // Green
-Border:    #565f89  // Gray
-Text:      #c0caf5  // Light
+Primary: #7aa2f7 // Blue
+Secondary: #bb9af7 // Purple
+Tertiary: #7dcfff // Cyan
+Selected: #9ece6a // Green
+Border: #565f89 // Gray
+Text: #c0caf5 // Light
 Background: #1a1b26 // Dark
 ```
 
@@ -140,12 +140,12 @@ Background: #1a1b26 // Dark
 
 | Feature | Gobang | DriftMgr TUI |
 |---------|--------|--------------|
-| Three-panel layout | ✓ | ✓ |
-| Vim keybindings | ✓ | ✓ |
-| Table view | ✓ | ✓ |
-| Real-time filter | ✓ | ✓ |
-| Dark theme | ✓ | ✓ |
-| Status bar | ✓ | ✓ |
+| Three-panel layout | | |
+| Vim keybindings | | |
+| Table view | | |
+| Real-time filter | | |
+| Dark theme | | |
+| Status bar | | |
 | Purpose | Database management | Cloud resource management |
 
 ## Future Enhancements

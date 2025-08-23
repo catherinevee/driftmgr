@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // DependencyManager handles resource dependencies and deletion order

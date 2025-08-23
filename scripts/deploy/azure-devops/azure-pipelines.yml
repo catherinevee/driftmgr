@@ -153,7 +153,7 @@ stages:
       displayName: 'Install DriftMgr'
     
     - script: |
-        echo "Running comprehensive drift test"
+        echo "Running complete drift test"
         driftmgr analyze terraform.tfstate --output $DRIFT_OUTPUT_FORMAT > $DRIFT_REPORTS_DIR/drift-test.json
         
         # Generate additional reports

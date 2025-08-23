@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/config"
-	"github.com/catherinevee/driftmgr/internal/discovery"
+	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
+	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	"github.com/gin-gonic/gin"
 )
 

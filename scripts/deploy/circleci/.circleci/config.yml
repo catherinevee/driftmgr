@@ -97,7 +97,7 @@ jobs:
             cd ..
             sudo cp driftmgr/bin/driftmgr /usr/local/bin/
       - run:
-          name: Run Comprehensive Drift Test
+          name: Run Complete Drift Test
           command: |
             mkdir -p drift-reports
             driftmgr analyze terraform.tfstate --output json > drift-reports/drift-test.json

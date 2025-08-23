@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // SimpleDiagramGenerator generates basic infrastructure diagrams without Graphviz

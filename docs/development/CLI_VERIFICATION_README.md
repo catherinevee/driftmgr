@@ -8,7 +8,7 @@ The CLI Verification feature in DriftMgr provides automatic double-checking of d
 
 - **Automatic Verification**: Seamlessly integrated into the discovery process
 - **Multi-Provider Support**: AWS CLI, Azure CLI, GCP CLI, and DigitalOcean CLI
-- **Comprehensive Coverage**: Verifies EC2 instances, S3 buckets, VPCs, IAM users/roles, Azure VMs, Storage Accounts, and more
+- **Complete Coverage**: Verifies EC2 instances, S3 buckets, VPCs, IAM users/roles, Azure VMs, Storage Accounts, and more
 - **Discrepancy Detection**: Identifies differences between DriftMgr and CLI results with severity levels
 - **Performance Monitoring**: Tracks verification accuracy and timing
 - **Configurable**: Enable/disable, set timeouts, retry limits, and verbosity
@@ -44,11 +44,11 @@ Add the following configuration to your `driftmgr.yaml` file:
 
 ```yaml
 discovery:
-  cli_verification:
-    enabled: true                    # Enable CLI verification
-    timeout_seconds: 30              # Timeout for CLI commands
-    max_retries: 3                   # Maximum retry attempts
-    verbose: false                   # Enable verbose logging
+ cli_verification:
+ enabled: true # Enable CLI verification
+ timeout_seconds: 30 # Timeout for CLI commands
+ max_retries: 3 # Maximum retry attempts
+ verbose: false # Enable verbose logging
 ```
 
 ### Environment Variables
@@ -67,43 +67,43 @@ export DRIFT_CLI_VERIFICATION_VERBOSE=false
 ### Required CLI Tools
 
 1. **AWS CLI** (for AWS verification)
-   ```bash
-   # Install AWS CLI
-   pip install awscli
-   # or
-   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-   unzip awscliv2.zip
-   sudo ./aws/install
-   
-   # Configure AWS credentials
-   aws configure
-   ```
+ ```bash
+ # Install AWS CLI
+ pip install awscli
+ # or
+ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+ unzip awscliv2.zip
+ sudo ./aws/install
+
+ # Configure AWS credentials
+ aws configure
+ ```
 
 2. **Azure CLI** (for Azure verification)
-   ```bash
-   # Install Azure CLI
-   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-   
-   # Login to Azure
-   az login
-   ```
+ ```bash
+ # Install Azure CLI
+ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+ # Login to Azure
+ az login
+ ```
 
 3. **GCP CLI** (for GCP verification - planned)
-   ```bash
-   # Install Google Cloud CLI
-   curl https://sdk.cloud.google.com | bash
-   exec -l $SHELL
-   gcloud init
-   ```
+ ```bash
+ # Install Google Cloud CLI
+ curl https://sdk.cloud.google.com | bash
+ exec -l $SHELL
+ gcloud init
+ ```
 
 4. **DigitalOcean CLI** (for DigitalOcean verification - planned)
-   ```bash
-   # Install doctl
-   snap install doctl
-   
-   # Authenticate
-   doctl auth init
-   ```
+ ```bash
+ # Install doctl
+ snap install doctl
+
+ # Authenticate
+ doctl auth init
+ ```
 
 ### Credential Configuration
 
@@ -136,16 +136,16 @@ doctl account get
 ```yaml
 # driftmgr_cli_verification.yaml
 discovery:
-  cli_verification:
-    enabled: true
-    timeout_seconds: 30
-    max_retries: 3
-    verbose: false
-  
-  regions:
-    - "us-east-1"
-    - "us-west-2"
-    - "eu-west-1"
+ cli_verification:
+ enabled: true
+ timeout_seconds: 30
+ max_retries: 3
+ verbose: false
+
+ regions:
+ - "us-east-1"
+ - "us-west-2"
+ - "eu-west-1"
 ```
 
 ### Running with CLI Verification
@@ -163,7 +163,7 @@ go run test_cli_verification.go
 ### Console Output
 
 ```
-🔍 DriftMgr CLI Verification Test
+ DriftMgr CLI Verification Test
 ==================================
 Testing CLI verification with providers: [aws azure]
 Testing regions: [us-east-1 us-west-2]
@@ -172,11 +172,11 @@ CLI verification timeout: 30 seconds
 CLI verification max retries: 3
 CLI verification verbose: false
 
-🚀 Starting enhanced discovery with CLI verification...
+ Starting enhanced discovery with CLI verification...
 [OK] Discovery completed in 2m15s
-📊 Total resources discovered: 45
+ Total resources discovered: 45
 
-🔍 CLI Verification Results:
+ CLI Verification Results:
 ============================
 Total resources verified: 45
 Resources found in CLI: 43
@@ -184,16 +184,16 @@ Resources not found in CLI: 2
 Total discrepancies: 3
 Accuracy rate: 95.56%
 
-📋 Detailed Verification Results:
+ Detailed Verification Results:
 =================================
 
 Resource: my-ec2-instance (aws_ec2_instance)
 Provider: aws, Region: us-east-1
 CLI Found: true
-  - instance_type: DriftMgr=t3.micro, CLI=t3.small (severity: critical)
-  - state: DriftMgr=running, CLI=stopped (severity: warning)
+ - instance_type: DriftMgr=t3.micro, CLI=t3.small (severity: critical)
+ - state: DriftMgr=running, CLI=stopped (severity: warning)
 
-🎯 Discrepancy Summary:
+ Discrepancy Summary:
 =======================
 Critical discrepancies: 1
 Warning discrepancies: 1
@@ -202,44 +202,44 @@ Info discrepancies: 1
 
 ### JSON Results File
 
-A detailed JSON file is generated with comprehensive verification results:
+A detailed JSON file is generated with complete verification results:
 
 ```json
 {
-  "timestamp": "2025-01-17T10:30:00Z",
-  "summary": {
-    "total_resources": 45,
-    "cli_found": 43,
-    "cli_not_found": 2,
-    "discrepancies": 3,
-    "accuracy_rate": 95.56
-  },
-  "results": [
-    {
-      "resource_id": "i-1234567890abcdef0",
-      "resource_name": "my-ec2-instance",
-      "resource_type": "aws_ec2_instance",
-      "provider": "aws",
-      "region": "us-east-1",
-      "cli_found": true,
-      "cli_resource": {
-        "InstanceId": "i-1234567890abcdef0",
-        "InstanceType": "t3.small",
-        "State": {"Name": "stopped"}
-      },
-      "discrepancies": [
-        {
-          "field": "instance_type",
-          "driftmgr_value": "t3.micro",
-          "cli_value": "t3.small",
-          "severity": "critical"
-        }
-      ],
-      "verification_time": "2025-01-17T10:30:00Z"
-    }
-  ],
-  "discovery_duration": "2m15s",
-  "total_resources_discovered": 45
+ "timestamp": "2025-01-17T10:30:00Z",
+ "summary": {
+ "total_resources": 45,
+ "cli_found": 43,
+ "cli_not_found": 2,
+ "discrepancies": 3,
+ "accuracy_rate": 95.56
+ },
+ "results": [
+ {
+ "resource_id": "i-1234567890abcdef0",
+ "resource_name": "my-ec2-instance",
+ "resource_type": "aws_ec2_instance",
+ "provider": "aws",
+ "region": "us-east-1",
+ "cli_found": true,
+ "cli_resource": {
+ "InstanceId": "i-1234567890abcdef0",
+ "InstanceType": "t3.small",
+ "State": {"Name": "stopped"}
+ },
+ "discrepancies": [
+ {
+ "field": "instance_type",
+ "driftmgr_value": "t3.micro",
+ "cli_value": "t3.small",
+ "severity": "critical"
+ }
+ ],
+ "verification_time": "2025-01-17T10:30:00Z"
+ }
+ ],
+ "discovery_duration": "2m15s",
+ "total_resources_discovered": 45
 }
 ```
 
@@ -285,28 +285,28 @@ A detailed JSON file is generated with comprehensive verification results:
 ### Common Issues
 
 1. **CLI tools not found**
-   ```
-   Error: AWS CLI command failed: exec: "aws": executable file not found in $PATH
-   ```
-   **Solution**: Install and configure the required CLI tools
+ ```
+ Error: AWS CLI command failed: exec: "aws": executable file not found in $PATH
+ ```
+ **Solution**: Install and configure the required CLI tools
 
 2. **Authentication errors**
-   ```
-   Error: AWS CLI command failed: Unable to locate credentials
-   ```
-   **Solution**: Configure cloud provider credentials
+ ```
+ Error: AWS CLI command failed: Unable to locate credentials
+ ```
+ **Solution**: Configure cloud provider credentials
 
 3. **Timeout errors**
-   ```
-   Error: AWS CLI command failed: context deadline exceeded
-   ```
-   **Solution**: Increase timeout_seconds in configuration
+ ```
+ Error: AWS CLI command failed: context deadline exceeded
+ ```
+ **Solution**: Increase timeout_seconds in configuration
 
 4. **Permission errors**
-   ```
-   Error: AWS CLI command failed: AccessDenied
-   ```
-   **Solution**: Ensure CLI credentials have sufficient permissions
+ ```
+ Error: AWS CLI command failed: AccessDenied
+ ```
+ **Solution**: Ensure CLI credentials have sufficient permissions
 
 ### Debug Mode
 
@@ -314,9 +314,9 @@ Enable verbose logging for detailed troubleshooting:
 
 ```yaml
 discovery:
-  cli_verification:
-    enabled: true
-    verbose: true
+ cli_verification:
+ enabled: true
+ verbose: true
 ```
 
 ### Log Analysis
@@ -366,29 +366,29 @@ name: DriftMgr CLI Verification
 on: [push, pull_request]
 
 jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install AWS CLI
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Run DriftMgr with CLI verification
-        run: |
-          go run test_cli_verification.go
-      - name: Upload verification results
-        uses: actions/upload-artifact@v2
-        with:
-          name: cli-verification-results
-          path: cli_verification_results.json
+ verify:
+ runs-on: ubuntu-latest
+ steps:
+ - uses: actions/checkout@v2
+ - name: Install AWS CLI
+ run: |
+ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+ unzip awscliv2.zip
+ sudo ./aws/install
+ - name: Configure AWS credentials
+ uses: aws-actions/configure-aws-credentials@v1
+ with:
+ aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+ aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+ aws-region: us-east-1
+ - name: Run DriftMgr with CLI verification
+ run: |
+ go run test_cli_verification.go
+ - name: Upload verification results
+ uses: actions/upload-artifact@v2
+ with:
+ name: cli-verification-results
+ path: cli_verification_results.json
 ```
 
 ### Monitoring and Alerting
@@ -400,8 +400,8 @@ Set up monitoring for verification accuracy:
 accuracy=$(jq -r '.summary.accuracy_rate' cli_verification_results.json)
 
 if (( $(echo "$accuracy < 95" | bc -l) )); then
-    echo "Warning: CLI verification accuracy below 95%: ${accuracy}%"
-    # Send alert
+ echo "Warning: CLI verification accuracy below 95%: ${accuracy}%"
+ # Send alert
 fi
 ```
 

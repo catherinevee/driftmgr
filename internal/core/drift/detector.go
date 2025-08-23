@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // Detector provides unified drift detection capabilities
 type Detector struct {
 	analyzer  *Analyzer
-	predictor *Predictor
+	predictor *DriftPredictor
 	policy    *PolicyEngine
 	mu        sync.RWMutex
 }
@@ -112,7 +112,7 @@ type Recommendation struct {
 func NewDetector() *Detector {
 	return &Detector{
 		analyzer:  NewAnalyzer(),
-		predictor: NewPredictor(),
+		predictor: NewDriftPredictor(),
 		policy:    NewPolicyEngine(),
 	}
 }

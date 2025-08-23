@@ -13,13 +13,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/config"
-	"github.com/catherinevee/driftmgr/internal/discovery"
-	"github.com/catherinevee/driftmgr/internal/drift"
-	"github.com/catherinevee/driftmgr/internal/models"
-	"github.com/catherinevee/driftmgr/internal/remediation"
-	"github.com/catherinevee/driftmgr/internal/state"
-	"github.com/catherinevee/driftmgr/internal/terragrunt"
+	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
+	"github.com/catherinevee/driftmgr/internal/core/discovery"
+	"github.com/catherinevee/driftmgr/internal/core/drift"
+	"github.com/catherinevee/driftmgr/internal/core/models"
+	"github.com/catherinevee/driftmgr/internal/core/remediation"
+	"github.com/catherinevee/driftmgr/internal/core/state"
+	"github.com/catherinevee/driftmgr/internal/integration/terragrunt"
 	"github.com/catherinevee/driftmgr/internal/visualization"
 )
 

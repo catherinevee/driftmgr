@@ -78,7 +78,7 @@ DriftMgr successfully detected and authenticated with the following accounts:
 [OK] **Multi-Provider Support**: Works with AWS, Azure, and GCP
 [OK] **Multi-Account Support**: Can discover resources across multiple accounts/subscriptions
 [OK] **Multi-Region Discovery**: Can search for resources in different regions
-[OK] **Comprehensive Logging**: Provides detailed discovery logs and progress information
+[OK] **Complete Logging**: Provides detailed discovery logs and progress information
 
 ### Technical Details
 
@@ -117,7 +117,7 @@ DriftMgr successfully demonstrated its ability to:
 - Auto-detect credentials from multiple cloud providers
 - Authenticate with multiple accounts and subscriptions
 - Perform resource discovery across multiple regions
-- Provide comprehensive logging and error handling
+- Provide complete logging and error handling
 
 While no resources were found in the tested accounts, this demonstrates that DriftMgr is fully functional and ready to detect resources when they exist in the cloud accounts it has access to.
 

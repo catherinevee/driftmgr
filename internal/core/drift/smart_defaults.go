@@ -1,7 +1,7 @@
 package drift
 
 import (
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // SmartDefaults provides intelligent drift filtering

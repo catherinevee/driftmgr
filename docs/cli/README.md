@@ -1,6 +1,6 @@
 # DriftMgr CLI Documentation
 
-This directory contains comprehensive documentation for the DriftMgr CLI interface.
+This directory contains detailed documentation for the DriftMgr CLI interface.
 
 ## Documentation Index
 

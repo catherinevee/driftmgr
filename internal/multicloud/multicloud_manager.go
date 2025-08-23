@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/analysis"
-	"github.com/catherinevee/driftmgr/internal/discovery"
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/analysis"
+	"github.com/catherinevee/driftmgr/internal/core/discovery"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 	"github.com/catherinevee/driftmgr/internal/performance"
-	"github.com/catherinevee/driftmgr/internal/remediation"
+	"github.com/catherinevee/driftmgr/internal/core/remediation"
 )
 
 // MultiCloudManager provides unified multi-cloud resource management

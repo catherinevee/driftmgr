@@ -4,7 +4,7 @@
 [![Docker Support](https://img.shields.io/badge/Docker-Supported-blue.svg)](https://github.com/catherinevee/driftmgr)
 [![Security](https://img.shields.io/badge/Security-Enabled-orange.svg)](https://github.com/catherinevee/driftmgr)
 
-DriftMgr is a comprehensive cloud infrastructure drift detection and management tool that provides intelligent monitoring, detection, and remediation capabilities across multiple cloud providers. It features smart drift filtering that reduces noise by 75-85% while maintaining critical security visibility.
+DriftMgr is a complete cloud infrastructure drift detection and management tool that provides intelligent monitoring, detection, and remediation capabilities across multiple cloud providers. It features smart drift filtering that reduces noise by 75-85% while maintaining critical security visibility.
 
 **[PRODUCTION READY]** - Version 1.0 includes full security features, Docker deployment, health monitoring, and enterprise-grade configuration management.
 
@@ -16,7 +16,7 @@ DriftMgr is a comprehensive cloud infrastructure drift detection and management 
 - Audit logging for compliance
 - Encrypted secrets management
 
-### Deployment & Operations  
+### Deployment & Operations
 - Complete Docker and Docker Compose support
 - Health check endpoints (/health/live, /health/ready)
 - Prometheus metrics and Jaeger tracing
@@ -42,78 +42,103 @@ DriftMgr is a comprehensive cloud infrastructure drift detection and management 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           DriftMgr Architecture                          │
-└─────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────────────────┐
-│                             Client Layer                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │
-│  │   CLI Tool   │  │ Web Dashboard│  │   REST API   │  │  WebSocket │ │
-│  │  (driftmgr)  │  │  (Port 8080) │  │   Client     │  │   Client   │ │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬─────┘ │
-└─────────┼──────────────────┼──────────────────┼────────────────┼───────┘
-          │                  │                  │                │
-          ▼                  ▼                  ▼                ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            API Gateway                                   │
-│  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │                     REST API & WebSocket Server                     │ │
-│  │                    (internal/api/rest/server.go)                   │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
-          │                                                      │
-          ▼                                                      ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Core Services                                   │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────────┐│
-│  │    Discovery     │  │  Drift Detection │  │    Remediation         ││
-│  │     Service      │  │     Service      │  │      Service           ││
-│  │                  │  │                  │  │                        ││
-│  │ • Auto-discovery │  │ • Smart filters  │  │ • Plan generation      ││
-│  │ • Multi-account  │  │ • Env thresholds │  │ • Auto-remediation     ││
-│  │ • Rate limiting  │  │ • Pattern match  │  │ • Approval workflows   ││
-│  └──────────────────┘  └──────────────────┘  └────────────────────────┘│
-│                                                                          │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────────┐│
-│  │ State Management │  │  Visualization   │  │   Cost Analysis        ││
-│  │     Service      │  │     Service      │  │      Service           ││
-│  │                  │  │                  │  │                        ││
-│  │ • TF state parse │  │ • HTML/SVG/ASCII │  │ • Resource costs       ││
-│  │ • Backend scan   │  │ • Mermaid/DOT    │  │ • Drift impact         ││
-│  │ • State inspect  │  │ • Terravision    │  │ • Optimization         ││
-│  └──────────────────┘  └──────────────────┘  └────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────────┘
-          │                                                      │
-          ▼                                                      ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Provider Abstraction                             │
-│  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │                    Unified Provider Interface                       │ │
-│  │              (internal/providers/provider_interface.go)            │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
-          │                    │                    │                │
-          ▼                    ▼                    ▼                ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        Cloud Provider Implementations                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │
-│  │     AWS      │  │    Azure     │  │     GCP      │  │DigitalOcean│ │
-│  │   Provider   │  │   Provider   │  │   Provider   │  │  Provider  │ │
-│  │              │  │              │  │              │  │            │ │
-│  │ • Direct SDK │  │ • Azure SDK  │  │ • GCP SDK    │  │ • DO SDK   │ │
-│  │ • All regions│  │ • All subs   │  │ • Projects   │  │ • Regions  │ │
-│  │ • 50+ types  │  │ • 40+ types  │  │ • 30+ types  │  │ • 10+ types │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
-          │                    │                    │                │
-          ▼                    ▼                    ▼                ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Cloud Infrastructure                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │
-│  │   AWS Cloud  │  │  Azure Cloud │  │  GCP Cloud   │  │ DO Cloud   │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
+ DriftMgr Architecture
+
+ Client Layer
+
+ CLI Tool Web Dashboard REST API WebSocket
+ (driftmgr) (Port 8080) Client Client
+
+ API Gateway
+
+ REST API & WebSocket Server
+ (internal/api/rest/server.go)
+
+ Core Services
+
+ Discovery Drift Detection Remediation
+ Service Service Service
+
+ • Auto-discovery • Smart filters • Plan generation
+ • Multi-account • Env thresholds • Auto-remediation
+ • Rate limiting • Pattern match • Approval workflows
+
+ State Management Visualization Cost Analysis
+ Service Service Service
+
+ • TF state parse • HTML/SVG/ASCII • Resource costs
+ • Backend scan • Mermaid/DOT • Drift impact
+ • State inspect • Terravision • Optimization
+
+ Provider Abstraction
+
+ Unified Provider Interface
+ (internal/providers/provider_interface.go)
+
+ Cloud Provider Implementations
+
+ AWS Azure GCP DigitalOcean
+ Provider Provider Provider Provider
+
+ • Direct SDK • Azure SDK • GCP SDK • DO SDK
+ • All regions • All subs • Projects • Regions
+ • 50+ types • 40+ types • 30+ types • 10+ types
+
+ Cloud Infrastructure
+
+ AWS Cloud Azure Cloud GCP Cloud DO Cloud
+
+```
+
+## Data Flow
+
+DriftMgr processes data through the following pipeline:
+
+### 1. Discovery Flow
+```
+User Request → CLI/API → Discovery Service → Provider Interface
+→ Cloud SDKs → Raw Resources → Normalization → Cache → Response
+```
+
+### 2. Drift Detection Flow
+```
+Terraform State → State Parser → Expected Configuration
+                                          ↓
+Live Resources → Discovery → Actual Configuration
+                                          ↓
+                              Drift Analyzer → Smart Filters
+                                          ↓
+                              Drift Report (JSON/HTML/CSV)
+```
+
+### 3. Remediation Flow
+```
+Drift Report → Remediation Planner → Impact Analysis
+                    ↓
+            Remediation Plan → Approval Workflow
+                    ↓
+            Execution Engine → Cloud APIs → Verification
+                    ↓
+            Result Report → Audit Log
+```
+
+### 4. Real-time Monitoring Flow
+```
+Cloud Events → WebSocket Server → Event Queue
+                    ↓
+            Dashboard Clients ← Server Push Updates
+                    ↓
+            Visualization → User Interface
+```
+
+### 5. Data Storage Flow
+```
+Discovery Results → Cache Layer (Redis) → TTL Expiry
+                        ↓
+                PostgreSQL Database → Historical Data
+                        ↓
+                  Analytics Engine → Reports
 ```
 
 ## Installation
@@ -155,12 +180,20 @@ sudo mv driftmgr /usr/local/bin/
 ```bash
 # Show status and auto-discover resources
 driftmgr status
+
+# Output:
+# DriftMgr System Status
+# ══════════════════════════════════════════
+# Cloud Credentials:
+# AWS:            ✓ Configured
+# Azure:          ✓ Configured
+# Total Resources Discovered: 145
 ```
 
 ### 2. Configure Cloud Credentials
 ```bash
 # View credential status
-driftmgr credentials
+driftmgr discover --credentials
 
 # AWS credentials (uses standard AWS CLI configuration)
 export AWS_ACCESS_KEY_ID=your-key-id
@@ -184,11 +217,12 @@ export DIGITALOCEAN_TOKEN=your-api-token
 # Auto-discover all configured providers
 driftmgr discover --auto
 
-# Discover specific provider with all accounts
-driftmgr discover --provider aws --all-accounts
-
-# Discover with output format
-driftmgr discover --provider azure --format json --output resources.json
+# Output:
+# Discovering resources from all providers...
+# [AWS] Found 89 resources in 2 regions
+# [Azure] Found 45 resources in 3 subscriptions
+# [GCP] Found 12 resources in 1 project
+# Total: 146 resources discovered in 8.3s
 ```
 
 ### 4. Detect Drift
@@ -196,14 +230,15 @@ driftmgr discover --provider azure --format json --output resources.json
 # Detect drift with smart defaults (75% noise reduction)
 driftmgr drift detect --provider aws
 
-# Use environment-specific thresholds
-driftmgr drift detect --environment production
-
-# Disable smart filtering to see all drift
-driftmgr drift detect --no-smart-defaults
-
-# Generate drift report
-driftmgr drift report --format html --output drift-report.html
+# Output:
+# Detecting drift for AWS resources...
+# Analyzing 89 resources...
+# 
+# CRITICAL: 1 security group exposed to 0.0.0.0/0
+# IMPORTANT: 2 configuration drifts detected
+# FILTERED: 12 harmless changes (80% noise reduction)
+# 
+# Total Drift: 3 items requiring attention
 ```
 
 ### 5. Remediate Drift
@@ -211,14 +246,18 @@ driftmgr drift report --format html --output drift-report.html
 # Generate remediation plan
 driftmgr drift fix --dry-run
 
-# Apply remediation (with confirmation)
-driftmgr drift fix --apply
-
-# Enable auto-remediation
-driftmgr auto-remediation enable --dry-run
+# Output:
+# Remediation Plan:
+# 1. Remove unsafe security group rule (CRITICAL)
+# 2. Revert instance type to t2.micro (saves $8/month)
+# 3. Re-enable S3 bucket encryption
+# 
+# This is a DRY RUN. To apply: driftmgr drift fix --apply
 ```
 
 ## Command Reference
+
+For detailed examples with full outputs, see [EXAMPLES_WITH_OUTPUT.md](docs/EXAMPLES_WITH_OUTPUT.md)
 
 ### Core Commands
 
@@ -226,7 +265,7 @@ driftmgr auto-remediation enable --dry-run
 |---------|-------------|---------|
 | `status` | Show system status and auto-discover | `driftmgr status` |
 | `discover` | Discover cloud resources | `driftmgr discover --auto` |
-| `credentials` | Show credential status | `driftmgr credentials` |
+| `discover --credentials` | Show credential status | `driftmgr discover --credentials` |
 
 ### Drift Commands
 
@@ -235,7 +274,7 @@ driftmgr auto-remediation enable --dry-run
 | `drift detect` | Detect infrastructure drift | `driftmgr drift detect --provider aws` |
 | `drift report` | Generate drift report | `driftmgr drift report --format html` |
 | `drift fix` | Generate/apply remediation | `driftmgr drift fix --dry-run` |
-| `auto-remediation` | Manage auto-remediation | `driftmgr auto-remediation enable` |
+| `drift auto-remediate` | Manage auto-remediation | `driftmgr drift auto-remediate enable` |
 
 ### State Commands
 
@@ -250,16 +289,16 @@ driftmgr auto-remediation enable --dry-run
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `dashboard` | Start web dashboard | `driftmgr dashboard --port 8080` |
-| `server` | Start REST API server | `driftmgr server --port 8081` |
-| `validate` | Validate discovery accuracy | `driftmgr validate --provider aws` |
+| `serve web` | Start web dashboard | `driftmgr serve web --port 8080` |
+| `serve api` | Start REST API server | `driftmgr serve api --port 8081` |
+| `verify` | Verify discovery accuracy | `driftmgr verify --provider aws` |
 
 ## Web Dashboard
 
 Start the interactive web dashboard:
 
 ```bash
-driftmgr dashboard --port 8080
+driftmgr serve web --port 8080
 ```
 
 Access at: http://localhost:8080
@@ -280,46 +319,46 @@ Create `driftmgr.yaml`:
 ```yaml
 # Provider configuration
 providers:
-  aws:
-    enabled: true
-    regions:
-      - us-east-1
-      - us-west-2
-    all_accounts: true
-  
-  azure:
-    enabled: true
-    subscriptions:
-      - all
-  
-  gcp:
-    enabled: true
-    projects:
-      - all
+ aws:
+ enabled: true
+ regions:
+ - us-east-1
+ - us-west-2
+ all_accounts: true
+
+ azure:
+ enabled: true
+ subscriptions:
+ - all
+
+ gcp:
+ enabled: true
+ projects:
+ - all
 
 # Drift detection settings
 drift:
-  smart_defaults: true
-  environment: production
-  thresholds:
-    production:
-      tag_changes: 0.8
-      metadata_changes: 0.9
-    staging:
-      tag_changes: 0.5
-      metadata_changes: 0.7
+ smart_defaults: true
+ environment: production
+ thresholds:
+ production:
+ tag_changes: 0.8
+ metadata_changes: 0.9
+ staging:
+ tag_changes: 0.5
+ metadata_changes: 0.7
 
 # Auto-remediation settings
 remediation:
-  auto_enabled: false
-  dry_run: true
-  approval_required: true
-  
+ auto_enabled: false
+ dry_run: true
+ approval_required: true
+
 # Performance settings
 performance:
-  parallelism: 10
-  rate_limit: 100
-  cache_ttl: 300
+ parallelism: 10
+ rate_limit: 100
+ cache_ttl: 300
 ```
 
 ### Environment Variables
@@ -365,7 +404,7 @@ vim /etc/driftmgr/config.yaml
 # Liveness probe
 curl http://localhost:8080/health/live
 
-# Readiness probe  
+# Readiness probe
 curl http://localhost:8080/health/ready
 
 # Full health status
@@ -381,15 +420,15 @@ curl http://localhost:8080/health
 ```yaml
 # docker-compose-ha.yml example
 services:
-  driftmgr:
-    deploy:
-      replicas: 3
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
+ driftmgr:
+ deploy:
+ replicas: 3
+ restart_policy:
+ condition: on-failure
+ resources:
+ limits:
+ cpus: '2'
+ memory: 2G
 ```
 
 ## Smart Drift Detection
@@ -418,7 +457,7 @@ All commands have been tested with live cloud data:
 [OK] **Core Commands**
 - `status` - Shows live AWS VPCs, Security Groups, Subnets
 - `discover` - Discovers 138 AWS + 7 Azure resources
-- `credentials` - Shows valid AWS and Azure credentials
+- `discover --credentials` - Shows valid AWS and Azure credentials
 
 [OK] **Drift Detection**
 - Smart filtering reduces noise by 75-85%
@@ -442,7 +481,7 @@ All commands have been tested with live cloud data:
 
 ## Performance
 
-After comprehensive refactoring:
+After complete refactoring:
 - **Repository size**: Reduced from 311MB to 138MB (56% reduction)
 - **Go files**: Reduced from 200+ to 83 (59% reduction)
 - **Code duplication**: Eliminated (was 40%)

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // Visualizer provides unified visualization capabilities

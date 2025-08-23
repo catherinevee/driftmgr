@@ -9,32 +9,32 @@ DriftMgr now includes an integrated Terminal User Interface (TUI) that launches 
 When you run `driftmgr.exe` or `driftmgr.exe --tui`, you get:
 
 ```
-╭─────────────────────────────────────────────────────────────────╮
-│  DriftMgr - Cloud Resource Discovery Tool                      │
-├─────────────────────────────────────────────────────────────────┤
-│  Discover, analyze, and manage your cloud infrastructure       │
-│                                                                 │
-│  ◎ Discover Resources                                          │
-│     Scan cloud providers for resources                         │
-│                                                                 │
-│  ▣ List Accounts                                               │
-│     View configured cloud accounts                             │
-│                                                                 │
-│  ⬇ Export Results                                              │
-│     Export discovery results to various formats                │
-│                                                                 │
-│  ⚙ Configuration                                               │
-│     Manage settings and credentials                            │
-│                                                                 │
-│  ? Help                                                         │
-│     View documentation and shortcuts                           │
-╰─────────────────────────────────────────────────────────────────╯
- DriftMgr v1.0.0                        Press ? for help | q to quit
+
+ DriftMgr - Cloud Resource Discovery Tool
+
+ Discover, analyze, and manage your cloud infrastructure
+
+ Discover Resources
+ Scan cloud providers for resources
+
+ List Accounts
+ View configured cloud accounts
+
+ Export Results
+ Export discovery results to various formats
+
+ Configuration
+ Manage settings and credentials
+
+ ? Help
+ View documentation and shortcuts
+
+ DriftMgr v1.0.0 Press ? for help | q to quit
 ```
 
 ### Navigation
 - **↑/k** - Move up
-- **↓/j** - Move down  
+- **↓/j** - Move down
 - **Enter** - Select item
 - **Esc/b** - Go back
 - **q** - Quit
@@ -42,56 +42,52 @@ When you run `driftmgr.exe` or `driftmgr.exe --tui`, you get:
 
 ### Discovery View
 ```
-╭─────────────────────────────────────────────────────────────────╮
-│  Resource Discovery Configuration                               │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Cloud Provider:                                                │
-│    ○ AWS                                                        │
-│    ● Azure                                                      │
-│    ○ GCP                                                        │
-│    ○ DigitalOcean                                              │
-│                                                                 │
-│  Regions:                                                       │
-│    ● All Regions                                                │
-│    ○ us-east-1                                                  │
-│    ○ us-west-2                                                  │
-│    ○ eu-west-1                                                  │
-│                                                                 │
-│  Options:                                                       │
-│    ☑ Enable cost analysis                                      │
-│    ☐ Include terminated resources                              │
-│    ☑ Parallel discovery                                        │
-│    ☐ Deep scan mode                                            │
-│                                                                 │
-│  Use arrow keys to navigate, space to select, enter to start   │
-╰─────────────────────────────────────────────────────────────────╯
+
+ Resource Discovery Configuration
+
+ Cloud Provider:
+ AWS
+ Azure
+ GCP
+ DigitalOcean
+
+ Regions:
+ All Regions
+ us-east-1
+ us-west-2
+ eu-west-1
+
+ Options:
+ Enable cost analysis
+ Include terminated resources
+ Parallel discovery
+ Deep scan mode
+
+ Use arrow keys to navigate, space to select, enter to start
+
 ```
 
 ### Simple TUI
 Run `driftmgr.exe --simple-tui` for a text-only interface:
 
 ```
-══════════════════════════════════════════════════════════════════════
-  DriftMgr - Cloud Resource Discovery & Analysis
-══════════════════════════════════════════════════════════════════════
 
-  Discover, analyze, and manage cloud resources across providers
-  with cost analysis and comprehensive export capabilities
+ DriftMgr - Cloud Resource Discovery & Analysis
 
-  MAIN MENU
-  ──────────────────────────────────────────────────────────────────
+ Discover, analyze, and manage cloud resources across providers
+ with cost analysis and complete export capabilities
 
-  [1] Discover Cloud Resources
-  [2] Resource Discovery with Cost Analysis
-  [3] Export Discovery Results
-  [4] List Cloud Accounts
-  [5] Configuration & Settings
-  [6] Help & Documentation
-  [7] Exit
+ MAIN MENU
 
-  ──────────────────────────────────────────────────────────────────
-  Select option: _
+ [1] Discover Cloud Resources
+ [2] Resource Discovery with Cost Analysis
+ [3] Export Discovery Results
+ [4] List Cloud Accounts
+ [5] Configuration & Settings
+ [6] Help & Documentation
+ [7] Exit
+
+ Select option: _
 ```
 
 ## Usage Modes
@@ -104,8 +100,8 @@ Launches the modern Bubble Tea TUI with full mouse and keyboard support.
 
 ### 2. Explicit TUI Mode
 ```bash
-driftmgr.exe --tui      # Modern TUI
-driftmgr.exe --simple-tui  # Simple text-based TUI
+driftmgr.exe --tui # Modern TUI
+driftmgr.exe --simple-tui # Simple text-based TUI
 ```
 
 ### 3. CLI Mode (With Arguments)

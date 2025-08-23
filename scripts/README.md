@@ -6,11 +6,11 @@ This directory contains scripts for building, testing, and deploying DriftMgr.
 
 ```
 scripts/
-├── build/          # Build scripts for different platforms
-├── deploy/         # Deployment and CI/CD scripts
-├── install/        # Installation scripts
-├── test/           # Test automation scripts
-└── tools/          # Development and utility tools
+ build/ # Build scripts for different platforms
+ deploy/ # Deployment and CI/CD scripts
+ install/ # Installation scripts
+ test/ # Test automation scripts
+ tools/ # Development and utility tools
 ```
 
 ## Main Scripts

@@ -31,7 +31,7 @@ DriftMgr wasn't displaying all resources from cloud accounts due to several issu
 - Individual service failures are logged but don't stop the entire discovery process
 
 ### 3. Insufficient Timeout Configuration
-**Issue**: The default 5-minute timeout was too short for comprehensive discovery across multiple services and regions.
+**Issue**: The default 5-minute timeout was too short for complete discovery across multiple services and regions.
 
 **Fix**: Increased timeout and added better configuration:
 - Increased discovery timeout from 5m to 10m
@@ -47,10 +47,10 @@ DriftMgr wasn't displaying all resources from cloud accounts due to several issu
 - Added success logging for each region/account
 - Changed logging level to debug for more detailed information
 
-### 5. Missing Configuration for Comprehensive Discovery
+### 5. Missing Configuration for Complete Discovery
 **Issue**: Default filters and quality thresholds were not configured for maximum resource discovery.
 
-**Fix**: Added comprehensive configuration:
+**Fix**: Added complete configuration:
 - Empty resource type filters (discover all types)
 - No age threshold filtering
 - Quality thresholds for completeness and accuracy

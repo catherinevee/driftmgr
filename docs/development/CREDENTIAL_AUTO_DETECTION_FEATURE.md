@@ -2,7 +2,7 @@
 
 ## Overview
 
-DriftMgr now includes comprehensive auto-detection capabilities for all four supported cloud providers: **AWS**, **Azure**, **GCP**, and **DigitalOcean**. This feature automatically discovers and configures credentials from standard locations and environment variables, significantly reducing manual setup time.
+DriftMgr now includes complete auto-detection capabilities for all four supported cloud providers: **AWS**, **Azure**, **GCP**, and **DigitalOcean**. This feature automatically discovers and configures credentials from standard locations and environment variables, significantly reducing manual setup time.
 
 ## Supported Providers
 
@@ -59,14 +59,14 @@ driftmgr credentials auto-detect
 Auto-detecting cloud provider credentials...
 =============================================
 
-Checking AWS credentials... ✓ Found in AWS CLI credentials file
-Checking Azure credentials... ✓ Found Azure CLI profile
-Checking GCP credentials... ✓ Found gcloud application default credentials
-Checking DigitalOcean credentials... ✓ Found in DigitalOcean CLI credentials file
+Checking AWS credentials... Found in AWS CLI credentials file
+Checking Azure credentials... Found Azure CLI profile
+Checking GCP credentials... Found gcloud application default credentials
+Checking DigitalOcean credentials... Found in DigitalOcean CLI credentials file
 
 Auto-detection Summary:
 =======================
-✓ Successfully detected 4 provider(s): AWS, Azure, GCP, DigitalOcean
+ Successfully detected 4 provider(s): AWS, Azure, GCP, DigitalOcean
 
 Detected credentials are now available for use with DriftMgr.
 You can verify the configuration by running: driftmgr credentials list
@@ -99,7 +99,7 @@ License: MIT
 
 Cloud Provider Credentials:
 ==========================
-✓ Detected 4 provider(s): AWS, Azure, GCP, DigitalOcean
+ Detected 4 provider(s): AWS, Azure, GCP, DigitalOcean
 
 Welcome to DriftMgr Interactive Shell!
 ...
@@ -121,7 +121,7 @@ Welcome to DriftMgr Interactive Shell!
 
 1. **Zero Configuration**: Automatically detects existing credentials without manual setup
 2. **Multi-Provider Support**: Handles all four major cloud providers seamlessly
-3. **Comprehensive Detection**: Checks multiple credential sources for each provider
+3. **Complete Detection**: Checks multiple credential sources for each provider
 4. **User-Friendly**: Clear feedback on what credentials were found and where
 5. **TUI Integration**: Shows credential status immediately upon startup
 6. **Cross-Platform**: Works on Windows, Linux, and macOS
@@ -145,7 +145,7 @@ The auto-detection follows this priority order for each provider:
 
 ## Testing
 
-Comprehensive test scripts are available to verify auto-detection functionality:
+Complete test scripts are available to verify auto-detection functionality:
 
 - **Linux/macOS**: `scripts/test-all-providers.sh`
 - **Windows**: `scripts/test-all-providers.ps1`
@@ -162,17 +162,17 @@ These scripts test:
 ### Common Issues
 
 1. **No Credentials Detected**
-   - Ensure you have installed and configured the respective cloud CLI tools
-   - Check that credential files exist in standard locations
-   - Verify environment variables are set correctly
+ - Ensure you have installed and configured the respective cloud CLI tools
+ - Check that credential files exist in standard locations
+ - Verify environment variables are set correctly
 
 2. **Partial Detection**
-   - Some providers may not be configured on your system
-   - Use `driftmgr credentials setup` to configure missing providers
+ - Some providers may not be configured on your system
+ - Use `driftmgr credentials setup` to configure missing providers
 
 3. **Permission Errors**
-   - Ensure DriftMgr has read access to credential directories
-   - Check file permissions on credential files
+ - Ensure DriftMgr has read access to credential directories
+ - Check file permissions on credential files
 
 ### Manual Setup
 

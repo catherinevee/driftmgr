@@ -8,25 +8,25 @@ DriftMgr includes a perspective feature that identifies resources that are "out 
 ### Resource Categories Detected by DriftMgr:
 
 1. **Managed Resources** (In State + In Cloud) [OK]
-   - Resources properly tracked in tfstate
-   - Under Terraform control
-   - Can be updated via `terraform apply`
+ - Resources properly tracked in tfstate
+ - Under Terraform control
+ - Can be updated via `terraform apply`
 
 2. **Missing Resources** (In State, Not in Cloud) [ERROR]
-   - Resources that were deleted outside Terraform
-   - Need to be recreated or removed from state
-   - `missing_count` in drift report
+ - Resources that were deleted outside Terraform
+ - Need to be recreated or removed from state
+ - `missing_count` in drift report
 
 3. **Unmanaged/Out-of-Band Resources** (Not in State, In Cloud) [WARNING]
-   - Resources created manually via console/CLI
-   - Not under Terraform control
-   - Show as `unmanaged_count` in drift report
-   - **This is the "perspective" feature**
+ - Resources created manually via console/CLI
+ - Not under Terraform control
+ - Show as `unmanaged_count` in drift report
+ - **This is the "perspective" feature**
 
-4. **Modified Resources** (In State + In Cloud, Different Config) 🔄
-   - Resources that exist but have been changed
-   - Need reconciliation
-   - `drifted_count` in drift report
+4. **Modified Resources** (In State + In Cloud, Different Config)
+ - Resources that exist but have been changed
+ - Need reconciliation
+ - `drifted_count` in drift report
 
 ## Using the Perspective Feature
 
@@ -38,10 +38,10 @@ driftmgr drift detect --state <tfstate-file> --provider <provider>
 ### Output Fields:
 ```json
 {
-  "unmanaged_count": 5,  // Resources NOT in tfstate but IN cloud
-  "missing_count": 2,    // Resources IN tfstate but NOT in cloud
-  "drifted_count": 3,    // Resources with configuration changes
-  "total_resources": 10  // Total resources discovered
+ "unmanaged_count": 5, // Resources NOT in tfstate but IN cloud
+ "missing_count": 2, // Resources IN tfstate but NOT in cloud
+ "drifted_count": 3, // Resources with configuration changes
+ "total_resources": 10 // Total resources discovered
 }
 ```
 
@@ -78,37 +78,37 @@ driftmgr drift detect --state production.tfstate --provider aws
 ## Benefits of Perspective Feature
 
 1. **Shadow IT Detection**
-   - Find resources created outside approved workflows
-   - Identify cost centers not tracked by IaC
+ - Find resources created outside approved workflows
+ - Identify cost centers not tracked by IaC
 
 2. **Compliance Auditing**
-   - Ensure all resources are under Terraform management
-   - Detect manual "hotfixes" that bypass change control
+ - Ensure all resources are under Terraform management
+ - Detect manual "hotfixes" that bypass change control
 
 3. **Cost Management**
-   - Discover forgotten or orphaned resources
-   - Find resources not tagged by Terraform
+ - Discover forgotten or orphaned resources
+ - Find resources not tagged by Terraform
 
 4. **Migration Planning**
-   - Identify resources to import into Terraform
-   - Plan infrastructure-as-code adoption
+ - Identify resources to import into Terraform
+ - Plan infrastructure-as-code adoption
 
 ## Remediation Options
 
 ### For Unmanaged Resources:
 
 1. **Import into Terraform**
-   ```bash
-   driftmgr import --resource <resource-id> --type <resource-type>
-   ```
+ ```bash
+ driftmgr import --resource <resource-id> --type <resource-type>
+ ```
 
 2. **Delete if Unauthorized**
-   ```bash
-   driftmgr delete --resource <resource-id>
-   ```
+ ```bash
+ driftmgr delete --resource <resource-id>
+ ```
 
 3. **Document as Exception**
-   - Add to excluded_resources in auto-remediation config
+ - Add to excluded_resources in auto-remediation config
 
 ## Auto-Remediation Rule
 
@@ -116,12 +116,12 @@ DriftMgr includes a built-in rule for unmanaged resources:
 
 ```yaml
 - name: import-unmanaged-resources
-  description: Import unmanaged resources into Terraform state
-  drift_types:
-    - unmanaged
-  action:
-    type: auto_fix
-    strategy: terraform
+ description: Import unmanaged resources into Terraform state
+ drift_types:
+ - unmanaged
+ action:
+ type: auto_fix
+ strategy: terraform
 ```
 
 ## Best Practices

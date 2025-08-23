@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // CompletionData holds all data needed for auto-completion

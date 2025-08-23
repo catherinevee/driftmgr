@@ -1,26 +1,26 @@
 # DriftMgr Testing Infrastructure
 
-This directory contains comprehensive testing infrastructure for the driftmgr project, including end-to-end tests, integration tests, and performance benchmarks.
+This directory contains thorough testing infrastructure for the driftmgr project, including end-to-end tests, integration tests, and performance benchmarks.
 
 ## Directory Structure
 
 ```
 tests/
-├── README.md                     # This file
-├── e2e/                         # End-to-end tests
-│   └── end_to_end_test.go      # Complete workflow testing
-├── integration/                 # Integration tests
-│   └── test_multi_cloud_discovery.go  # Multi-cloud discovery testing
-├── benchmarks/                  # Performance tests and benchmarks
-│   └── performance_test.go      # Load testing and profiling
-└── fixtures/                    # Test data and fixtures (auto-generated)
+ README.md # This file
+ e2e/ # End-to-end tests
+ end_to_end_test.go # Complete workflow testing
+ integration/ # Integration tests
+ test_multi_cloud_discovery.go # Multi-cloud discovery testing
+ benchmarks/ # Performance tests and benchmarks
+ performance_test.go # Load testing and profiling
+ fixtures/ # Test data and fixtures (auto-generated)
 ```
 
 ## Test Categories
 
 ### 1. End-to-End Tests (`tests/e2e/`)
 
-Comprehensive tests that verify complete workflows across the entire application:
+Complete tests that verify complete workflows across the entire application:
 
 - **Multi-provider workflows**: Complete AWS, Azure, and GCP discovery workflows
 - **State file processing**: Terraform state file parsing and analysis
@@ -57,7 +57,7 @@ Tests that verify integration between different components and cloud providers:
 
 ### 3. Performance Tests (`tests/benchmarks/`)
 
-Comprehensive performance testing and benchmarking:
+Complete performance testing and benchmarking:
 
 - **State file processing**: Performance with different file sizes (10 to 10,000 resources)
 - **Discovery throughput**: Resource discovery performance across providers
@@ -185,14 +185,14 @@ You can provide custom test data by placing files in the `tests/fixtures/` direc
 
 ```
 tests/fixtures/
-├── state-files/
-│   ├── small.tfstate
-│   ├── medium.tfstate
-│   └── large.tfstate
-├── configs/
-│   └── test-config.yaml
-└── mock-data/
-    └── resources.json
+ state-files/
+ small.tfstate
+ medium.tfstate
+ large.tfstate
+ configs/
+ test-config.yaml
+ mock-data/
+ resources.json
 ```
 
 ## Test Patterns and Best Practices
@@ -202,11 +202,11 @@ tests/fixtures/
 ```go
 result, err := discoverer.DiscoverResources(ctx, req)
 if err != nil {
-    if isCredentialError(err) {
-        t.Skip("Credentials not available for testing")
-        return
-    }
-    require.NoError(t, err)
+ if isCredentialError(err) {
+ t.Skip("Credentials not available for testing")
+ return
+ }
+ require.NoError(t, err)
 }
 ```
 
@@ -214,10 +214,10 @@ if err != nil {
 
 ```go
 for _, resource := range result.Resources {
-    assert.Equal(t, "aws", resource.Provider)
-    assert.NotEmpty(t, resource.ID)
-    assert.NotEmpty(t, resource.Type)
-    assert.Contains(t, validRegions, resource.Region)
+ assert.Equal(t, "aws", resource.Provider)
+ assert.NotEmpty(t, resource.ID)
+ assert.NotEmpty(t, resource.Type)
+ assert.Contains(t, validRegions, resource.Region)
 }
 ```
 
@@ -252,24 +252,24 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version: '1.23'
-      
-      - name: Run Tests
-        run: |
-          go test -v ./tests/e2e/
-          go test -v ./tests/integration/
-          
-      - name: Run Benchmarks
-        run: go test -bench=. -benchmem ./tests/benchmarks/
-        
-      - name: Run Performance Tests
-        run: go test -run=TestPerformance ./tests/benchmarks/
+ test:
+ runs-on: ubuntu-latest
+ steps:
+ - uses: actions/checkout@v3
+ - uses: actions/setup-go@v4
+ with:
+ go-version: '1.23'
+
+ - name: Run Tests
+ run: |
+ go test -v ./tests/e2e/
+ go test -v ./tests/integration/
+
+ - name: Run Benchmarks
+ run: go test -bench=. -benchmem ./tests/benchmarks/
+
+ - name: Run Performance Tests
+ run: go test -run=TestPerformance ./tests/benchmarks/
 ```
 
 ### Test Coverage
@@ -290,22 +290,22 @@ go tool cover -func=coverage.out
 ### Common Issues
 
 1. **Missing Dependencies**
-   ```bash
-   go mod download
-   go mod tidy
-   ```
+ ```bash
+ go mod download
+ go mod tidy
+ ```
 
 2. **Credential Errors**
-   - Tests will skip if credentials are not available
-   - Set `SKIP_CLOUD_TESTS=true` to skip all cloud-dependent tests
+ - Tests will skip if credentials are not available
+ - Set `SKIP_CLOUD_TESTS=true` to skip all cloud-dependent tests
 
 3. **Memory Issues**
-   - Increase available memory for large state file tests
-   - Use `-short` flag to skip memory-intensive tests
+ - Increase available memory for large state file tests
+ - Use `-short` flag to skip memory-intensive tests
 
 4. **Timeout Issues**
-   - Some tests may take longer in CI environments
-   - Adjust timeout values in test configuration
+ - Some tests may take longer in CI environments
+ - Adjust timeout values in test configuration
 
 ### Debug Mode
 

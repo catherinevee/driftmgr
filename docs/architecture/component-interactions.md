@@ -2,48 +2,30 @@
 
 ## Overview
 
-DriftMgr is a comprehensive cloud infrastructure drift detection and remediation tool with a modular architecture designed for extensibility and maintainability. The system consists of multiple interconnected components that work together to provide end-to-end drift management capabilities.
+DriftMgr is a complete cloud infrastructure drift detection and remediation tool with a modular architecture designed for extensibility and maintainability. The system consists of multiple interconnected components that work together to provide end-to-end drift management capabilities.
 
 ## Architecture Overview
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Main Entry    │    │   Web Dashboard │    │  CLI Client     │
-│   (main.go)     │    │   (web/)        │    │  (cmd/client/)  │
-└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
-          │                      │                      │
-          └──────────────────────┼──────────────────────┘
-                                 │
-                    ┌─────────────┴─────────────┐
-                    │      API Layer            │
-                    │   (HTTP/WebSocket)        │
-                    └─────────────┬─────────────┘
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │    Core Components        │
-                    └─────────────┬─────────────┘
-                                  │
-        ┌─────────────────────────┼─────────────────────────┐
-        │                         │                         │
-┌───────▼────────┐    ┌──────────▼──────────┐    ┌────────▼────────┐
-│   Discovery    │    │     Analysis        │    │   Remediation   │
-│   (internal/   │    │   (internal/        │    │   (internal/    │
-│   discovery/)  │    │   analysis/)        │    │   remediation/) │
-└────────────────┘    └─────────────────────┘    └─────────────────┘
-        │                         │                         │
-        └─────────────────────────┼─────────────────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │    Support Components     │
-                    └─────────────┬─────────────┘
-                                  │
-        ┌─────────────────────────┼─────────────────────────┐
-        │                         │                         │
-┌───────▼────────┐    ┌──────────▼──────────┐    ┌────────▼────────┐
-│   Models       │    │     Cache           │    │   Config        │
-│   (internal/   │    │   (internal/        │    │   (internal/    │
-│   models/)     │    │   cache/)           │    │   config/)      │
-└────────────────┘    └─────────────────────┘    └─────────────────┘
+
+ Main Entry Web Dashboard CLI Client
+ (main.go) (web/) (cmd/client/)
+
+ API Layer
+ (HTTP/WebSocket)
+
+ Core Components
+
+ Discovery Analysis Remediation
+ (internal/ (internal/ (internal/
+ discovery/) analysis/) remediation/)
+
+ Support Components
+
+ Models Cache Config
+ (internal/ (internal/ (internal/
+ models/) cache/) config/)
+
 ```
 
 ## Core Component Interactions
@@ -62,7 +44,7 @@ The main entry point orchestrates the overall application flow:
 ```go
 // Server management
 if !isServerRunning() {
-    startServer(exeDir)
+ startServer(exeDir)
 }
 
 // Client execution
@@ -88,18 +70,18 @@ The discovery component is responsible for finding and cataloging cloud resource
 #### Enhanced Discoverer (`enhanced_discovery.go`)
 ```go
 type EnhancedDiscoverer struct {
-    config          *config.Config
-    cache           *cache.DiscoveryCache
-    plugins         map[string]*DiscoveryPlugin
-    hierarchy       *ResourceHierarchy
-    filters         *DiscoveryFilter
-    progressTracker *ProgressTracker
-    visualizer      *DiscoveryVisualizer
-    errorHandler    *ErrorHandler
-    errorReporting  *EnhancedErrorReporting
-    advancedQuery   *AdvancedQuery
-    realTimeMonitor *RealTimeMonitor
-    sdkIntegration  *SDKIntegration
+ config *config.Config
+ cache *cache.DiscoveryCache
+ plugins map[string]*DiscoveryPlugin
+ hierarchy *ResourceHierarchy
+ filters *DiscoveryFilter
+ progressTracker *ProgressTracker
+ visualizer *DiscoveryVisualizer
+ errorHandler *ErrorHandler
+ errorReporting *EnhancedErrorReporting
+ advancedQuery *AdvancedQuery
+ realTimeMonitor *RealTimeMonitor
+ sdkIntegration *SDKIntegration
 }
 ```
 
@@ -112,25 +94,25 @@ type EnhancedDiscoverer struct {
 ```go
 // Multi-provider discovery
 func (ed *EnhancedDiscoverer) DiscoverAllResourcesEnhanced(ctx context.Context, providers []string, regions []string) ([]models.Resource, error) {
-    // Check cache first
-    if cached, found := ed.cache.Get(cacheKey); found {
-        return cached.([]models.Resource), nil
-    }
-    
-    // Discover by provider and region
-    for _, provider := range providers {
-        for _, region := range regions {
-            resources, err := ed.discoverProviderRegionEnhanced(ctx, provider, region)
-            // ...
-        }
-    }
-    
-    // Apply filters and build hierarchy
-    filteredResources := ed.applyFilters(allResources)
-    ed.buildResourceHierarchy(filteredResources)
-    
-    // Cache results
-    ed.cache.Set(cacheKey, filteredResources, ed.config.Discovery.CacheTTL)
+ // Check cache first
+ if cached, found := ed.cache.Get(cacheKey); found {
+ return cached.([]models.Resource), nil
+ }
+
+ // Discover by provider and region
+ for _, provider := range providers {
+ for _, region := range regions {
+ resources, err := ed.discoverProviderRegionEnhanced(ctx, provider, region)
+ // ...
+ }
+ }
+
+ // Apply filters and build hierarchy
+ filteredResources := ed.applyFilters(allResources)
+ ed.buildResourceHierarchy(filteredResources)
+
+ // Cache results
+ ed.cache.Set(cacheKey, filteredResources, ed.config.Discovery.CacheTTL)
 }
 ```
 
@@ -143,78 +125,78 @@ The analysis component performs drift detection and analysis between expected an
 #### Drift Analyzer (`analysis.go`)
 ```go
 type Analyzer struct {
-    config map[string]interface{}
+ config map[string]interface{}
 }
 
 type DriftAnalysis struct {
-    ResourceID    string
-    ResourceType  string
-    Provider      string
-    Region        string
-    DriftDetected bool
-    DriftType     string
-    Changes       []DriftChange
-    Severity      string
-    Timestamp     time.Time
-    Metadata      map[string]interface{}
+ ResourceID string
+ ResourceType string
+ Provider string
+ Region string
+ DriftDetected bool
+ DriftType string
+ Changes []DriftChange
+ Severity string
+ Timestamp time.Time
+ Metadata map[string]interface{}
 }
 ```
 
 **Analysis Process:**
 ```go
 func (a *Analyzer) AnalyzeResource(ctx context.Context, resource models.Resource, expectedState map[string]interface{}) (*DriftAnalysis, error) {
-    // Compare actual vs expected state
-    changes := a.detectChanges(resource, expectedState)
-    
-    if len(changes) > 0 {
-        analysis.DriftDetected = true
-        analysis.Changes = changes
-        analysis.DriftType = a.determineDriftType(changes)
-        analysis.Severity = a.calculateSeverity(changes)
-    }
+ // Compare actual vs expected state
+ changes := a.detectChanges(resource, expectedState)
+
+ if len(changes) > 0 {
+ analysis.DriftDetected = true
+ analysis.Changes = changes
+ analysis.DriftType = a.determineDriftType(changes)
+ analysis.Severity = a.calculateSeverity(changes)
+ }
 }
 ```
 
 #### Enhanced Drift Detector (`internal/drift/enhanced_detector.go`)
 ```go
 type AttributeDriftDetector struct {
-    SensitiveFields   map[string]bool
-    IgnoreFields      map[string]bool
-    Thresholds        DriftThresholds
-    CustomComparators map[string]AttributeComparator
-    SeverityRules     []SeverityRule
+ SensitiveFields map[string]bool
+ IgnoreFields map[string]bool
+ Thresholds DriftThresholds
+ CustomComparators map[string]AttributeComparator
+ SeverityRules []SeverityRule
 }
 ```
 
 **Drift Detection Process:**
 ```go
 func (d *AttributeDriftDetector) DetectDrift(stateResources, liveResources []models.Resource) models.AnalysisResult {
-    // Detect missing resources (in state but not in live)
-    for id, stateResource := range stateMap {
-        if _, exists := liveMap[id]; !exists {
-            driftResult := d.createDriftResult(stateResource, "missing", "high", "Resource exists in Terraform state but not in live infrastructure")
-            driftResults = append(driftResults, driftResult)
-        }
-    }
-    
-    // Detect extra resources (in live but not in state)
-    for id, liveResource := range liveMap {
-        if _, exists := stateMap[id]; !exists {
-            driftResult := d.createDriftResult(liveResource, "extra", "medium", "Resource exists in live infrastructure but not in Terraform state")
-            driftResults = append(driftResults, driftResult)
-        }
-    }
-    
-    // Detect modified resources (attribute-level drift)
-    for id, stateResource := range stateMap {
-        if liveResource, exists := liveMap[id]; exists {
-            attributeDrifts := d.detectAttributeDrift(stateResource, liveResource)
-            if len(attributeDrifts) > 0 {
-                driftResult := d.createAttributeDriftResult(stateResource, attributeDrifts)
-                driftResults = append(driftResults, driftResult)
-            }
-        }
-    }
+ // Detect missing resources (in state but not in live)
+ for id, stateResource := range stateMap {
+ if _, exists := liveMap[id]; !exists {
+ driftResult := d.createDriftResult(stateResource, "missing", "high", "Resource exists in Terraform state but not in live infrastructure")
+ driftResults = append(driftResults, driftResult)
+ }
+ }
+
+ // Detect extra resources (in live but not in state)
+ for id, liveResource := range liveMap {
+ if _, exists := stateMap[id]; !exists {
+ driftResult := d.createDriftResult(liveResource, "extra", "medium", "Resource exists in live infrastructure but not in Terraform state")
+ driftResults = append(driftResults, driftResult)
+ }
+ }
+
+ // Detect modified resources (attribute-level drift)
+ for id, stateResource := range stateMap {
+ if liveResource, exists := liveMap[id]; exists {
+ attributeDrifts := d.detectAttributeDrift(stateResource, liveResource)
+ if len(attributeDrifts) > 0 {
+ driftResult := d.createAttributeDriftResult(stateResource, attributeDrifts)
+ driftResults = append(driftResults, driftResult)
+ }
+ }
+ }
 }
 ```
 
@@ -227,61 +209,61 @@ The remediation component handles the correction of detected drifts through vari
 #### Terraform Remediation Engine (`terraform_remediation.go`)
 ```go
 type TerraformRemediationEngine struct {
-    workingDir    string
-    terraformPath string
+ workingDir string
+ terraformPath string
 }
 
 type TerraformRemediationPlan struct {
-    ID          string
-    Description string
-    Resources   []TerraformRemediationResource
-    PlanOutput  string
-    PlanFile    string
-    CreatedAt   time.Time
-    Status      string
+ ID string
+ Description string
+ Resources []TerraformRemediationResource
+ PlanOutput string
+ PlanFile string
+ CreatedAt time.Time
+ Status string
 }
 ```
 
 **Remediation Process:**
 ```go
 func (tre *TerraformRemediationEngine) GenerateTerraformConfiguration(drifts []models.DriftResult) (*TerraformRemediationPlan, error) {
-    // Group drifts by action type
-    createResources := []models.DriftResult{}
-    updateResources := []models.DriftResult{}
-    deleteResources := []models.DriftResult{}
-    importResources := []models.DriftResult{}
-    
-    for _, drift := range drifts {
-        switch drift.DriftType {
-        case "missing":
-            createResources = append(createResources, drift)
-        case "modified":
-            updateResources = append(updateResources, drift)
-        case "extra":
-            deleteResources = append(deleteResources, drift)
-        case "unmanaged":
-            importResources = append(importResources, drift)
-        }
-    }
-    
-    // Generate resources in dependency order
-    allResources := []TerraformRemediationResource{}
-    
-    // Handle imports first
-    for _, drift := range importResources {
-        resource := tre.createImportResource(drift)
-        allResources = append(allResources, resource)
-    }
-    
-    // Handle creates (dependencies first)
-    createResources = tre.sortByDependencies(createResources)
-    for _, drift := range createResources {
-        resource := tre.createResource(drift)
-        allResources = append(allResources, resource)
-    }
-    
-    // Handle updates and deletes
-    // ...
+ // Group drifts by action type
+ createResources := []models.DriftResult{}
+ updateResources := []models.DriftResult{}
+ deleteResources := []models.DriftResult{}
+ importResources := []models.DriftResult{}
+
+ for _, drift := range drifts {
+ switch drift.DriftType {
+ case "missing":
+ createResources = append(createResources, drift)
+ case "modified":
+ updateResources = append(updateResources, drift)
+ case "extra":
+ deleteResources = append(deleteResources, drift)
+ case "unmanaged":
+ importResources = append(importResources, drift)
+ }
+ }
+
+ // Generate resources in dependency order
+ allResources := []TerraformRemediationResource{}
+
+ // Handle imports first
+ for _, drift := range importResources {
+ resource := tre.createImportResource(drift)
+ allResources = append(allResources, resource)
+ }
+
+ // Handle creates (dependencies first)
+ createResources = tre.sortByDependencies(createResources)
+ for _, drift := range createResources {
+ resource := tre.createResource(drift)
+ allResources = append(allResources, resource)
+ }
+
+ // Handle updates and deletes
+ // ...
 }
 ```
 
@@ -294,64 +276,64 @@ The web dashboard provides a real-time interface for monitoring and managing dri
 #### Dashboard (`dashboard.go`)
 ```go
 type Dashboard struct {
-    router           *mux.Router
-    discoveryEngine  *discovery.EnhancedDiscoveryEngine
-    remediationEngine *remediation.AdvancedRemediationEngine
-    upgrader         websocket.Upgrader
-    clients          map[*websocket.Conn]bool
-    clientsMutex     sync.RWMutex
-    config           *DashboardConfig
+ router *mux.Router
+ discoveryEngine *discovery.EnhancedDiscoveryEngine
+ remediationEngine *remediation.AdvancedRemediationEngine
+ upgrader websocket.Upgrader
+ clients map[*websocket.Conn]bool
+ clientsMutex sync.RWMutex
+ config *DashboardConfig
 }
 ```
 
 **API Endpoints:**
 ```go
 func (d *Dashboard) setupRoutes() {
-    // API routes
-    api := d.router.PathPrefix("/api/v1").Subrouter()
-    api.HandleFunc("/resources", d.getResources).Methods("GET")
-    api.HandleFunc("/drift", d.getDrift).Methods("GET")
-    api.HandleFunc("/remediate", d.remediateDrift).Methods("POST")
-    api.HandleFunc("/costs", d.getCosts).Methods("GET")
-    api.HandleFunc("/security", d.getSecurity).Methods("GET")
-    api.HandleFunc("/compliance", d.getCompliance).Methods("GET")
-    api.HandleFunc("/metrics", d.getMetrics).Methods("GET")
-    
-    // WebSocket for real-time updates
-    d.router.HandleFunc("/ws", d.handleWebSocket)
+ // API routes
+ api := d.router.PathPrefix("/api/v1").Subrouter()
+ api.HandleFunc("/resources", d.getResources).Methods("GET")
+ api.HandleFunc("/drift", d.getDrift).Methods("GET")
+ api.HandleFunc("/remediate", d.remediateDrift).Methods("POST")
+ api.HandleFunc("/costs", d.getCosts).Methods("GET")
+ api.HandleFunc("/security", d.getSecurity).Methods("GET")
+ api.HandleFunc("/compliance", d.getCompliance).Methods("GET")
+ api.HandleFunc("/metrics", d.getMetrics).Methods("GET")
+
+ // WebSocket for real-time updates
+ d.router.HandleFunc("/ws", d.handleWebSocket)
 }
 ```
 
 **Real-time Updates:**
 ```go
 func (d *Dashboard) startRealTimeUpdates() {
-    ticker := time.NewTicker(d.config.RefreshInterval)
-    defer ticker.Stop()
-    
-    for range ticker.C {
-        d.broadcastUpdate()
-    }
+ ticker := time.NewTicker(d.config.RefreshInterval)
+ defer ticker.Stop()
+
+ for range ticker.C {
+ d.broadcastUpdate()
+ }
 }
 
 func (d *Dashboard) broadcastUpdate() {
-    update := DashboardUpdate{
-        Timestamp: time.Now(),
-        Type:      "update",
-        Data:      d.getDashboardData(),
-    }
-    
-    updateJSON, err := json.Marshal(update)
-    if err != nil {
-        return
-    }
-    
-    for client := range d.clients {
-        err := client.WriteMessage(websocket.TextMessage, updateJSON)
-        if err != nil {
-            client.Close()
-            delete(d.clients, client)
-        }
-    }
+ update := DashboardUpdate{
+ Timestamp: time.Now(),
+ Type: "update",
+ Data: d.getDashboardData(),
+ }
+
+ updateJSON, err := json.Marshal(update)
+ if err != nil {
+ return
+ }
+
+ for client := range d.clients {
+ err := client.WriteMessage(websocket.TextMessage, updateJSON)
+ if err != nil {
+ client.Close()
+ delete(d.clients, client)
+ }
+ }
 }
 ```
 
@@ -364,18 +346,18 @@ The CLI client provides command-line interface for interacting with the driftmgr
 #### DriftMgr Client (`main.go`)
 ```go
 type DriftMgrClient struct {
-    httpClient *http.Client
-    baseURL    string
+ httpClient *http.Client
+ baseURL string
 }
 
 type InteractiveShell struct {
-    client         *DriftMgrClient
-    reader         *bufio.Reader
-    history        []string
-    historyIndex   int
-    historyMutex   sync.RWMutex
-    enhancedReader *EnhancedInputReader
-    regionManager  *regions.RegionManager
+ client *DriftMgrClient
+ reader *bufio.Reader
+ history []string
+ historyIndex int
+ historyMutex sync.RWMutex
+ enhancedReader *EnhancedInputReader
+ regionManager *regions.RegionManager
 }
 ```
 
@@ -392,7 +374,7 @@ type InteractiveShell struct {
 
 ```
 User Request → CLI Client → Web Dashboard → Discovery Engine → Cloud Providers
-     ↓              ↓              ↓              ↓              ↓
+ ↓ ↓ ↓ ↓ ↓
 Cache Check ← API Response ← Discovery Results ← Resource Data ← Cloud APIs
 ```
 
@@ -409,7 +391,7 @@ Cache Check ← API Response ← Discovery Results ← Resource Data ← Cloud A
 
 ```
 State Files → Analysis Engine → Live Resources → Drift Detection → Results
-     ↓              ↓              ↓              ↓              ↓
+ ↓ ↓ ↓ ↓ ↓
 Terraform ← State Parser ← Cloud APIs ← Resource Comparison ← Drift Report
 ```
 
@@ -425,7 +407,7 @@ Terraform ← State Parser ← Cloud APIs ← Resource Comparison ← Drift Repo
 
 ```
 Drift Results → Remediation Engine → Terraform Plans → Execution → Verification
-     ↓              ↓              ↓              ↓              ↓
+ ↓ ↓ ↓ ↓ ↓
 User Approval ← Safety Checks ← Plan Generation ← Apply Changes ← State Update
 ```
 
@@ -443,10 +425,10 @@ User Approval ← Safety Checks ← Plan Generation ← Apply Changes ← State 
 All components use a shared caching layer for performance optimization:
 ```go
 type DiscoveryCache struct {
-    cache    map[string]interface{}
-    ttl      time.Duration
-    maxSize  int
-    mutex    sync.RWMutex
+ cache map[string]interface{}
+ ttl time.Duration
+ maxSize int
+ mutex sync.RWMutex
 }
 ```
 
@@ -454,21 +436,21 @@ type DiscoveryCache struct {
 Centralized configuration management across all components:
 ```go
 type Config struct {
-    Discovery   DiscoveryConfig
-    Analysis    AnalysisConfig
-    Remediation RemediationConfig
-    Cache       CacheConfig
-    Security    SecurityConfig
+ Discovery DiscoveryConfig
+ Analysis AnalysisConfig
+ Remediation RemediationConfig
+ Cache CacheConfig
+ Security SecurityConfig
 }
 ```
 
 ### 3. Error Handling
-Comprehensive error handling and reporting across all components:
+Complete error handling and reporting across all components:
 ```go
 type ErrorHandler struct {
-    retryConfig *RetryConfig
-    errorLogger *ErrorLogger
-    fallback    *FallbackHandler
+ retryConfig *RetryConfig
+ errorLogger *ErrorLogger
+ fallback *FallbackHandler
 }
 ```
 
@@ -476,10 +458,10 @@ type ErrorHandler struct {
 Real-time monitoring and metrics collection:
 ```go
 type MetricsCollector struct {
-    discoveryMetrics   *DiscoveryMetrics
-    analysisMetrics    *AnalysisMetrics
-    remediationMetrics *RemediationMetrics
-    performanceMetrics *PerformanceMetrics
+ discoveryMetrics *DiscoveryMetrics
+ analysisMetrics *AnalysisMetrics
+ remediationMetrics *RemediationMetrics
+ performanceMetrics *PerformanceMetrics
 }
 ```
 
@@ -536,4 +518,4 @@ type MetricsCollector struct {
 
 ## Conclusion
 
-The DriftMgr system demonstrates a well-architected, modular design with clear separation of concerns and strong component interactions. The system provides comprehensive drift detection and remediation capabilities while maintaining extensibility, performance, and security. The component interactions are designed to be loosely coupled yet highly cohesive, enabling easy maintenance and future enhancements.
+The DriftMgr system demonstrates a well-architected, modular design with clear separation of concerns and strong component interactions. The system provides complete drift detection and remediation capabilities while maintaining extensibility, performance, and security. The component interactions are designed to be loosely coupled yet highly cohesive, enabling easy maintenance and future enhancements.

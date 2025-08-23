@@ -2,7 +2,7 @@ package remediation
 
 import (
 	"fmt"
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 	"github.com/google/uuid"
 	"time"
 )

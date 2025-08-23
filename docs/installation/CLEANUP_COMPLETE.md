@@ -16,7 +16,7 @@
 - Removed 58 duplicate Go files
 - **Saved:** 40% code duplication
 
-### Phase 2: File Organization  
+### Phase 2: File Organization
 - Organized 97 root files into proper directories
 - Created docs/, test-data/, scripts/ structure
 - **Saved:** 83% root directory clutter
@@ -45,24 +45,24 @@
 
 ```
 driftmgr/
-├── cmd/
-│   ├── driftmgr/          # Main CLI
-│   └── driftmgr-client/   # Client app
-├── internal/              # 8 clean modules (was 30+)
-│   ├── api/               # REST & WebSocket APIs
-│   ├── config/            # Configuration
-│   ├── core/              # All business logic + utils
-│   ├── models/            # Data models
-│   ├── performance/       # Performance optimization
-│   ├── providers/         # Cloud providers (AWS, Azure, GCP, DO)
-│   ├── security/          # Security utilities
-│   └── storage/           # Storage abstraction
-├── configs/               # Configuration files
-├── scripts/               # Utility scripts
-├── tests/                 # Test suite
-├── docs/                  # Organized documentation
-├── ci-cd/                 # CI/CD configurations
-└── [Core files]           # go.mod, Makefile, LICENSE, etc.
+ cmd/
+ driftmgr/ # Main CLI
+ driftmgr-client/ # Client app
+ internal/ # 8 clean modules (was 30+)
+ api/ # REST & WebSocket APIs
+ config/ # Configuration
+ core/ # All business logic + utils
+ models/ # Data models
+ performance/ # Performance optimization
+ providers/ # Cloud providers (AWS, Azure, GCP, DO)
+ security/ # Security utilities
+ storage/ # Storage abstraction
+ configs/ # Configuration files
+ scripts/ # Utility scripts
+ tests/ # Test suite
+ docs/ # Organized documentation
+ ci-cd/ # CI/CD configurations
+ [Core files] # go.mod, Makefile, LICENSE, etc.
 ```
 
 ## Key Achievements

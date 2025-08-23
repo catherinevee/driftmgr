@@ -141,25 +141,25 @@ When running `driftmgr credentials auto-detect`, you'll see:
 Auto-detecting cloud provider credentials...
 =============================================
 
-Checking AWS credentials... ✓ Found in AWS CLI credentials file
-Checking Azure credentials... ✓ Found Azure CLI profile
-Checking GCP credentials... ✗ Not found
-Checking DigitalOcean credentials... ✗ Not found
+Checking AWS credentials... Found in AWS CLI credentials file
+Checking Azure credentials... Found Azure CLI profile
+Checking GCP credentials... Not found
+Checking DigitalOcean credentials... Not found
 
 Auto-detection Summary:
 =======================
-✓ Successfully detected 2 provider(s): AWS, Azure
+ Successfully detected 2 provider(s): AWS, Azure
 
 Detected credentials are now available for use with DriftMgr.
 You can verify the configuration by running: driftmgr credentials list
 
-⚠ No cloud provider credentials were auto-detected.
+ No cloud provider credentials were auto-detected.
 
 Common credential locations checked:
-  • AWS: ~/.aws/credentials, AWS_ACCESS_KEY_ID env var
-  • Azure: ~/.azure/credentials.json, az CLI, env vars
-  • GCP: ~/.config/gcloud/, GOOGLE_APPLICATION_CREDENTIALS env var
-  • DigitalOcean: ~/.digitalocean/credentials, DIGITALOCEAN_TOKEN env var
+ • AWS: ~/.aws/credentials, AWS_ACCESS_KEY_ID env var
+ • Azure: ~/.azure/credentials.json, az CLI, env vars
+ • GCP: ~/.config/gcloud/, GOOGLE_APPLICATION_CREDENTIALS env var
+ • DigitalOcean: ~/.digitalocean/credentials, DIGITALOCEAN_TOKEN env var
 
 To manually configure credentials, run: driftmgr credentials setup
 ```
@@ -169,19 +169,19 @@ To manually configure credentials, run: driftmgr credentials setup
 ### Files Modified
 
 1. **Credential Manager** (`internal/credentials/manager.go`)
-   - Added `AutoDetectCredentials()` method
-   - Added individual auto-detection methods for each provider
-   - Enhanced credential detection logic
+ - Added `AutoDetectCredentials()` method
+ - Added individual auto-detection methods for each provider
+ - Enhanced credential detection logic
 
 2. **CLI Handler** (`cmd/driftmgr-client/credentials.go`)
-   - Added `auto-detect` command to credentials handler
-   - Added `handleCredentialsAutoDetect()` function
-   - Updated help text and command structure
+ - Added `auto-detect` command to credentials handler
+ - Added `handleCredentialsAutoDetect()` function
+ - Updated help text and command structure
 
 3. **Install Scripts**
-   - **Main Install Script** (`install.sh`): Updated to use auto-detection
-   - **Windows Installer** (`installer/windows/install.ps1`): Updated to use auto-detection
-   - **Linux Installer** (`installer/linux/install.sh`): Updated to use auto-detection
+ - **Main Install Script** (`install.sh`): Updated to use auto-detection
+ - **Windows Installer** (`installer/windows/install.ps1`): Updated to use auto-detection
+ - **Linux Installer** (`installer/linux/install.sh`): Updated to use auto-detection
 
 ### Test Scripts
 
@@ -215,41 +215,41 @@ Both scripts test the functionality and provide usage examples.
 ### Common Issues
 
 1. **No Credentials Detected**
-   ```bash
-   # Check if credentials exist in standard locations
-   ls ~/.aws/credentials
-   ls ~/.azure/credentials.json
-   ls ~/.config/gcloud/
-   ls ~/.digitalocean/credentials
-   ```
+ ```bash
+ # Check if credentials exist in standard locations
+ ls ~/.aws/credentials
+ ls ~/.azure/credentials.json
+ ls ~/.config/gcloud/
+ ls ~/.digitalocean/credentials
+ ```
 
 2. **Environment Variables Not Set**
-   ```bash
-   # Check environment variables
-   echo $AWS_ACCESS_KEY_ID
-   echo $AZURE_CLIENT_ID
-   echo $GOOGLE_APPLICATION_CREDENTIALS
-   echo $DIGITALOCEAN_TOKEN
-   ```
+ ```bash
+ # Check environment variables
+ echo $AWS_ACCESS_KEY_ID
+ echo $AZURE_CLIENT_ID
+ echo $GOOGLE_APPLICATION_CREDENTIALS
+ echo $DIGITALOCEAN_TOKEN
+ ```
 
 3. **CLI Tools Not Installed**
-   ```bash
-   # Install CLI tools for auto-detection
-   # AWS CLI
-   curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-   unzip awscliv2.zip
-   sudo ./aws/install
-   
-   # Azure CLI
-   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-   
-   # Google Cloud CLI
-   curl https://sdk.cloud.google.com | bash
-   exec -l $SHELL
-   
-   # DigitalOcean CLI
-   snap install doctl
-   ```
+ ```bash
+ # Install CLI tools for auto-detection
+ # AWS CLI
+ curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+ unzip awscliv2.zip
+ sudo ./aws/install
+
+ # Azure CLI
+ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+ # Google Cloud CLI
+ curl https://sdk.cloud.google.com | bash
+ exec -l $SHELL
+
+ # DigitalOcean CLI
+ snap install doctl
+ ```
 
 ### Getting Help
 

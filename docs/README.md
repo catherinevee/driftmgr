@@ -1,12 +1,13 @@
 # DriftMgr Documentation
 
-Welcome to the DriftMgr documentation. This guide provides comprehensive information about using DriftMgr for Terraform drift detection and remediation.
+Welcome to the DriftMgr documentation! This complete guide covers installation, configuration, and usage of DriftMgr for cloud infrastructure drift detection and management.
 
-## Quick Start
+## Quick Links
 
-- [Installation Guide](installation.md) - How to install DriftMgr
-- [Getting Started](getting-started.md) - Your first steps with DriftMgr
-- [Basic Usage](basic-usage.md) - Core commands and workflows
+- [Installation Guide](./getting-started/installation.md) - Install DriftMgr on your system
+- [CLI Reference](./user-guide/cli-reference.md) - Complete command reference
+- [Configuration Guide](./reference/configuration.md) - Configuration options
+- [API Documentation](./api/versioning.md) - REST and WebSocket APIs
 
 ## Core Features
 

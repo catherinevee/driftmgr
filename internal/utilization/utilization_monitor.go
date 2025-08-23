@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // UtilizationMonitor tracks resource utilization and performance metrics

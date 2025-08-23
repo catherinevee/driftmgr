@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/config"
-	"github.com/catherinevee/driftmgr/internal/discovery"
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
+	"github.com/catherinevee/driftmgr/internal/core/discovery"
+	"github.com/catherinevee/driftmgr/internal/core/models"
+	awsprovider "github.com/catherinevee/driftmgr/internal/cloud/aws"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +45,7 @@ func TestEndToEndWorkflow(t *testing.T) {
 		discoverer := discovery.NewCloudDiscoverer()
 
 		// Add AWS provider
-		awsProvider, err := discovery.NewAWSProvider()
+		awsProvider, err := awsprovider.NewAWSProvider()
 		if err != nil {
 			t.Skipf("AWS provider not available: %v", err)
 			return

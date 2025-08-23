@@ -6,16 +6,16 @@ We successfully simulated infrastructure drift by making manual changes to AWS r
 ## Initial State (drift-test.tfstate)
 ```json
 {
-  "bucket": "driftmgr-test-bucket-1755579790",
-  "versioning": {
-    "enabled": false
-  },
-  "tags": {
-    "Name": "DriftMgr Test Bucket",
-    "Environment": "test",
-    "ManagedBy": "Terraform"
-  },
-  "lifecycle_rule": []
+ "bucket": "driftmgr-test-bucket-1755579790",
+ "versioning": {
+ "enabled": false
+ },
+ "tags": {
+ "Name": "DriftMgr Test Bucket",
+ "Environment": "test",
+ "ManagedBy": "Terraform"
+ },
+ "lifecycle_rule": []
 }
 ```
 
@@ -24,12 +24,12 @@ We successfully simulated infrastructure drift by making manual changes to AWS r
 ### 1. **Modified Tags** [ERROR] DRIFT
 ```bash
 aws s3api put-bucket-tagging --bucket driftmgr-test-bucket-1755579790 \
-  --tagging 'TagSet=[
-    {Key=Name,Value="Modified Bucket Name"},       # Changed from "DriftMgr Test Bucket"
-    {Key=Environment,Value=production},            # Changed from "test"
-    {Key=Team,Value=DevOps},                      # NEW TAG
-    {Key=ModifiedBy,Value=AWS-CLI}                # NEW TAG
-  ]'
+ --tagging 'TagSet=[
+ {Key=Name,Value="Modified Bucket Name"}, # Changed from "DriftMgr Test Bucket"
+ {Key=Environment,Value=production}, # Changed from "test"
+ {Key=Team,Value=DevOps}, # NEW TAG
+ {Key=ModifiedBy,Value=AWS-CLI} # NEW TAG
+ ]'
 ```
 **Result:** Tags no longer match Terraform state
 - [ERROR] `Name`: "DriftMgr Test Bucket" → "Modified Bucket Name"
@@ -41,14 +41,14 @@ aws s3api put-bucket-tagging --bucket driftmgr-test-bucket-1755579790 \
 ### 2. **Enabled Versioning** [ERROR] DRIFT
 ```bash
 aws s3api put-bucket-versioning --bucket driftmgr-test-bucket-1755579790 \
-  --versioning-configuration Status=Enabled
+ --versioning-configuration Status=Enabled
 ```
 **Result:** Versioning changed from `disabled` to `enabled`
 
 ### 3. **Added Lifecycle Rule** [ERROR] DRIFT
 ```bash
 aws s3api put-bucket-lifecycle-configuration --bucket driftmgr-test-bucket-1755579790 \
-  --lifecycle-configuration file://lifecycle.json
+ --lifecycle-configuration file://lifecycle.json
 ```
 **Result:** Lifecycle rule added (was empty in state)
 

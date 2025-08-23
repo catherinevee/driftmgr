@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/discovery"
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/core/discovery"
+	"github.com/catherinevee/driftmgr/internal/core/models"
+	awsprovider "github.com/catherinevee/driftmgr/internal/cloud/aws"
 	"github.com/catherinevee/driftmgr/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,7 +57,7 @@ func TestTerraformStateIntegration(t *testing.T) {
 		t.Log("Discovering actual cloud resources...")
 		discoverer := discovery.NewCloudDiscoverer()
 
-		awsProvider, err := discovery.NewAWSProvider()
+		awsProvider, err := awsprovider.NewAWSProvider()
 		if err == nil {
 			discoverer.AddProvider("aws", awsProvider)
 
