@@ -66,7 +66,7 @@ func (tp *TerragruntParser) FindTerragruntFiles() (*models.TerragruntDiscoveryRe
 				}
 
 				log.Printf("Found Terragrunt file: %s", path)
-				
+
 				terragruntFile, err := tp.parseTerragruntFile(path)
 				if err != nil {
 					log.Printf("Warning: Failed to parse Terragrunt file %s: %v", path, err)
@@ -235,11 +235,11 @@ func (tp *TerragruntParser) extractSource(content string) string {
 // extractInputs extracts inputs from Terragrunt configuration
 func (tp *TerragruntParser) extractInputs(content string) map[string]interface{} {
 	inputs := make(map[string]interface{})
-	
+
 	// Simple regex-based extraction for common input patterns
 	re := regexp.MustCompile(`(\w+)\s*=\s*["']([^"']+)["']`)
 	matches := re.FindAllStringSubmatch(content, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 2 {
 			key := strings.TrimSpace(match[1])
@@ -247,17 +247,17 @@ func (tp *TerragruntParser) extractInputs(content string) map[string]interface{}
 			inputs[key] = value
 		}
 	}
-	
+
 	return inputs
 }
 
 // extractIncludes extracts include blocks from Terragrunt configuration
 func (tp *TerragruntParser) extractIncludes(content string) []models.TerragruntInclude {
 	var includes []models.TerragruntInclude
-	
+
 	re := regexp.MustCompile(`include\s*"([^"]+)"\s*\{\s*path\s*=\s*["']([^"']+)["']`)
 	matches := re.FindAllStringSubmatch(content, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 2 {
 			include := models.TerragruntInclude{
@@ -267,17 +267,17 @@ func (tp *TerragruntParser) extractIncludes(content string) []models.TerragruntI
 			includes = append(includes, include)
 		}
 	}
-	
+
 	return includes
 }
 
 // extractGenerates extracts generate blocks from Terragrunt configuration
 func (tp *TerragruntParser) extractGenerates(content string) []models.TerragruntGenerate {
 	var generates []models.TerragruntGenerate
-	
+
 	re := regexp.MustCompile(`generate\s*"([^"]+)"\s*\{\s*path\s*=\s*["']([^"']+)["']`)
 	matches := re.FindAllStringSubmatch(content, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 2 {
 			generate := models.TerragruntGenerate{
@@ -286,7 +286,7 @@ func (tp *TerragruntParser) extractGenerates(content string) []models.Terragrunt
 			generates = append(generates, generate)
 		}
 	}
-	
+
 	return generates
 }
 
@@ -305,26 +305,26 @@ func (tp *TerragruntParser) extractRemoteState(content string) *models.Terragrun
 // extractDependencies extracts dependencies from Terragrunt configuration
 func (tp *TerragruntParser) extractDependencies(content string) []string {
 	var dependencies []string
-	
+
 	re := regexp.MustCompile(`dependency\s*"([^"]+)"\s*\{`)
 	matches := re.FindAllStringSubmatch(content, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 1 {
 			dependencies = append(dependencies, strings.TrimSpace(match[1]))
 		}
 	}
-	
+
 	return dependencies
 }
 
 // extractHooks extracts hooks from Terragrunt configuration
 func (tp *TerragruntParser) extractHooks(content, hookType string) []models.TerragruntHook {
 	var hooks []models.TerragruntHook
-	
+
 	re := regexp.MustCompile(fmt.Sprintf(`%s\s*"([^"]+)"\s*\{`, hookType))
 	matches := re.FindAllStringSubmatch(content, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 1 {
 			hook := models.TerragruntHook{
@@ -333,7 +333,7 @@ func (tp *TerragruntParser) extractHooks(content, hookType string) []models.Terr
 			hooks = append(hooks, hook)
 		}
 	}
-	
+
 	return hooks
 }
 
@@ -384,12 +384,12 @@ func (tp *TerragruntParser) isRootTerragruntFile(filePath string) bool {
 	// Root files are typically in the root directory or have specific patterns
 	dir := filepath.Dir(filePath)
 	fileName := filepath.Base(filePath)
-	
+
 	// Check if it's in the root directory
 	if dir == tp.rootPath {
 		return true
 	}
-	
+
 	// Check for common root file patterns
 	rootPatterns := []string{
 		"terragrunt.hcl",
@@ -398,13 +398,13 @@ func (tp *TerragruntParser) isRootTerragruntFile(filePath string) bool {
 		"account.hcl",
 		"env.hcl",
 	}
-	
+
 	for _, pattern := range rootPatterns {
 		if fileName == pattern {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -416,7 +416,7 @@ func (tp *TerragruntParser) buildTerragruntHierarchy(rootFiles *[]models.Terragr
 		rootFile := &(*rootFiles)[i]
 		for j := range *childFiles {
 			childFile := &(*childFiles)[j]
-			
+
 			// Check if child file includes the root file
 			if tp.fileIncludesRoot(childFile, rootFile) {
 				childFile.ParentPath = rootFile.Path
@@ -431,7 +431,7 @@ func (tp *TerragruntParser) fileIncludesRoot(childFile *models.TerragruntFile, r
 	// Simplified check - in reality, you'd parse the include blocks
 	childDir := filepath.Dir(childFile.Path)
 	rootDir := filepath.Dir(rootFile.Path)
-	
+
 	// Check if child is in a subdirectory of root
 	return strings.HasPrefix(childDir, rootDir) && childDir != rootDir
 }
@@ -439,10 +439,10 @@ func (tp *TerragruntParser) fileIncludesRoot(childFile *models.TerragruntFile, r
 // extractEnvironmentFromPath extracts environment from file path
 func (tp *TerragruntParser) extractEnvironmentFromPath(filePath string) string {
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
-	
+
 	// Look for common environment patterns in path
 	envPatterns := []string{"dev", "development", "staging", "prod", "production", "test", "qa"}
-	
+
 	for _, part := range pathParts {
 		for _, pattern := range envPatterns {
 			if strings.Contains(strings.ToLower(part), pattern) {
@@ -450,14 +450,14 @@ func (tp *TerragruntParser) extractEnvironmentFromPath(filePath string) string {
 			}
 		}
 	}
-	
+
 	return ""
 }
 
 // extractRegionFromPath extracts region from file path
 func (tp *TerragruntParser) extractRegionFromPath(filePath string) string {
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
-	
+
 	// Look for AWS region patterns in path
 	regionPatterns := []string{
 		"us-east-1", "us-east-2", "us-west-1", "us-west-2",
@@ -465,7 +465,7 @@ func (tp *TerragruntParser) extractRegionFromPath(filePath string) string {
 		"ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "ap-northeast-2",
 		"sa-east-1", "ca-central-1", "af-south-1", "me-south-1",
 	}
-	
+
 	for _, part := range pathParts {
 		for _, pattern := range regionPatterns {
 			if strings.Contains(part, pattern) {
@@ -473,33 +473,33 @@ func (tp *TerragruntParser) extractRegionFromPath(filePath string) string {
 			}
 		}
 	}
-	
+
 	return ""
 }
 
 // extractAccountFromPath extracts account from file path
 func (tp *TerragruntParser) extractAccountFromPath(filePath string) string {
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
-	
+
 	// Look for account patterns (typically numeric)
 	accountRe := regexp.MustCompile(`^\d{12}$`)
-	
+
 	for _, part := range pathParts {
 		if accountRe.MatchString(part) {
 			return part
 		}
 	}
-	
+
 	return ""
 }
 
 // extractModuleNameFromPath extracts module name from file path
 func (tp *TerragruntParser) extractModuleNameFromPath(filePath string) string {
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
-	
+
 	// Look for common module patterns
 	modulePatterns := []string{"vpc", "ec2", "rds", "eks", "s3", "lambda", "alb", "nlb"}
-	
+
 	for _, part := range pathParts {
 		for _, pattern := range modulePatterns {
 			if strings.Contains(strings.ToLower(part), pattern) {
@@ -507,7 +507,7 @@ func (tp *TerragruntParser) extractModuleNameFromPath(filePath string) string {
 			}
 		}
 	}
-	
+
 	return ""
 }
 
@@ -524,7 +524,7 @@ func appendIfNotExists(slice []string, item string) []string {
 // FindTerragruntStateFiles finds Terragrunt-managed state files
 func (tp *TerragruntParser) FindTerragruntStateFiles() []string {
 	var stateFiles []string
-	
+
 	// Look for state files in common Terragrunt locations
 	searchPaths := []string{
 		filepath.Join(tp.rootPath, ".terragrunt-cache"),
@@ -532,28 +532,28 @@ func (tp *TerragruntParser) FindTerragruntStateFiles() []string {
 		filepath.Join(tp.rootPath, "infrastructure"),
 		filepath.Join(tp.rootPath, "iac"),
 	}
-	
+
 	for _, searchPath := range searchPaths {
 		if _, err := os.Stat(searchPath); os.IsNotExist(err) {
 			continue
 		}
-		
+
 		err := filepath.Walk(searchPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
-			
+
 			if !info.IsDir() && strings.HasSuffix(info.Name(), ".tfstate") {
 				stateFiles = append(stateFiles, path)
 			}
-			
+
 			return nil
 		})
-		
+
 		if err != nil {
 			log.Printf("Warning: Error walking path %s: %v", searchPath, err)
 		}
 	}
-	
+
 	return stateFiles
 }

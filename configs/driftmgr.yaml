@@ -1,0 +1,63 @@
+# DriftMgr Main Configuration
+version: "1.0"
+
+# Server configuration
+server:
+  port: 8080
+  host: "0.0.0.0"
+  timeout: 30s
+
+# Discovery configuration
+discovery:
+  cache_ttl: 300s
+  cache_max_size: 1000
+  parallel_workers: 10
+  timeout: 60s
+  shield_timeout: 30s
+  skip_shield: false
+  regions:
+  - "us-east-1"
+  - "us-west-2"
+  - "eu-west-1"
+
+# Analysis configuration
+analysis:
+  drift_threshold: 0.1
+  timeout: 120s
+  severity_levels:
+  - "critical"
+  - "high"
+  - "medium"
+  - "low"
+
+# Remediation configuration
+remediation:
+  auto_approve: false
+  dry_run: true
+  max_concurrent: 5
+  timeout: 300s
+
+# Logging configuration
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+
+# Security configuration
+security:
+  enable_auth: true
+  jwt_secret: ""
+  cors_origins: [ "*" ]
+
+# Provider-specific configuration
+providers:
+  aws:
+    shield_timeout: 30s
+    skip_shield_discovery: false
+  gcp:
+    api_timeout: 45s
+    enable_apis_automatically: false
+  azure:
+    timeout: 60s
+  digitalocean:
+    timeout: 30s

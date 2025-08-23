@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/pkg/models"
+	"github.com/catherinevee/driftmgr/internal/models"
 	"github.com/gorilla/websocket"
 )
 
@@ -508,7 +508,7 @@ func (ds *DashboardServer) BroadcastDrift(drift models.DriftAnalysis) {
 			Region:       drift.Region,
 			DriftType:    drift.DriftType,
 			Severity:     drift.Severity,
-			Description:  drift.Description,
+			Description:  "Drift detected",
 			Timestamp:    drift.Timestamp,
 			Status:       "new",
 		},

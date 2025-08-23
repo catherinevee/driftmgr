@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go build:*)",
+      "Bash(rm:*)",
+      "Bash(go test:*)",
+      "Bash(go fmt:*)",
+      "Bash(sed:*)",
+      "Bash(go mod:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(go vet:*)",
+      "Bash(go doc:*)",
+      "Bash(go get:*)",
+      "Bash(find:*)",
+      "Bash(python:*)",
+      "Bash(chmod:*)",
+      "Bash(./remove_emojis.sh)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\c\\Users\\cathe\\OneDrive\\Desktop\\github\\driftmgr\\cmd",
+      "C:\\c\\Users\\cathe\\OneDrive\\Desktop\\github"
+    ]
+  }
+}

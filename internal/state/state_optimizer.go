@@ -27,15 +27,15 @@ type StateOptimizationOptions struct {
 
 // OptimizationResult represents the result of state optimization
 type OptimizationResult struct {
-	OriginalResourceCount int
+	OriginalResourceCount  int
 	OptimizedResourceCount int
-	RemovedResources      []string
-	RemovedModules        []string
-	RemovedDataSources    []string
-	SizeReduction         int64 // bytes
-	OptimizationTime      time.Duration
-	Warnings              []string
-	Errors                []string
+	RemovedResources       []string
+	RemovedModules         []string
+	RemovedDataSources     []string
+	SizeReduction          int64 // bytes
+	OptimizationTime       time.Duration
+	Warnings               []string
+	Errors                 []string
 }
 
 // NewStateOptimizer creates a new state optimizer
@@ -106,13 +106,13 @@ func (so *StateOptimizer) OptimizeState(stateFile *models.StateFile) (*models.St
 // copyStateFile creates a deep copy of a state file
 func (so *StateOptimizer) copyStateFile(original *models.StateFile) *models.StateFile {
 	copied := &models.StateFile{
-		Path:      original.Path,
-		Version:   original.Version,
-		TerraformVersion: original.TerraformVersion,
-		Serial:    original.Serial,
-		Lineage:   original.Lineage,
-		Outputs:   original.Outputs,
-		Resources: make([]models.TerraformResource, len(original.Resources)),
+		Path:                original.Path,
+		Version:             original.Version,
+		TerraformVersion:    original.TerraformVersion,
+		Serial:              original.Serial,
+		Lineage:             original.Lineage,
+		Outputs:             original.Outputs,
+		Resources:           make([]models.TerraformResource, len(original.Resources)),
 		ManagedByTerragrunt: original.ManagedByTerragrunt,
 		TerragruntConfig:    original.TerragruntConfig,
 	}
@@ -127,11 +127,11 @@ func (so *StateOptimizer) copyStateFile(original *models.StateFile) *models.Stat
 // copyTerraformResource creates a deep copy of a Terraform resource
 func (so *StateOptimizer) copyTerraformResource(original models.TerraformResource) models.TerraformResource {
 	copied := models.TerraformResource{
-		Name:       original.Name,
-		Type:       original.Type,
-		Mode:       original.Mode,
-		Provider:   original.Provider,
-		Instances:  make([]models.TerraformResourceInstance, len(original.Instances)),
+		Name:      original.Name,
+		Type:      original.Type,
+		Mode:      original.Mode,
+		Provider:  original.Provider,
+		Instances: make([]models.TerraformResourceInstance, len(original.Instances)),
 	}
 
 	for i, instance := range original.Instances {
@@ -160,7 +160,7 @@ func (so *StateOptimizer) copyTerraformInstance(original models.TerraformResourc
 func (so *StateOptimizer) removeUnusedResources(stateFile *models.StateFile, result *OptimizationResult) {
 	// Build dependency graph
 	dependencies := so.buildDependencyGraph(stateFile.Resources)
-	
+
 	// Find unused resources (resources with no incoming dependencies)
 	var unusedResources []int
 	for i, resource := range stateFile.Resources {
@@ -175,7 +175,7 @@ func (so *StateOptimizer) removeUnusedResources(stateFile *models.StateFile, res
 		if index < len(stateFile.Resources) {
 			resourceName := stateFile.Resources[index].Name
 			result.RemovedResources = append(result.RemovedResources, resourceName)
-			
+
 			if !so.options.DryRun {
 				stateFile.Resources = append(stateFile.Resources[:index], stateFile.Resources[index+1:]...)
 			}
@@ -186,7 +186,7 @@ func (so *StateOptimizer) removeUnusedResources(stateFile *models.StateFile, res
 // buildDependencyGraph builds a dependency graph for resources
 func (so *StateOptimizer) buildDependencyGraph(resources []models.TerraformResource) map[int][]int {
 	dependencies := make(map[int][]int)
-	
+
 	// Initialize empty dependency lists
 	for i := range resources {
 		dependencies[i] = []int{}
@@ -256,7 +256,7 @@ func (so *StateOptimizer) isRootResource(resource models.TerraformResource) bool
 func (so *StateOptimizer) removeEmptyModules(stateFile *models.StateFile, result *OptimizationResult) {
 	// Group resources by module
 	moduleResources := make(map[string][]int)
-	
+
 	for i, resource := range stateFile.Resources {
 		moduleName := so.extractModuleName(resource.Name)
 		if moduleName != "" {
@@ -296,7 +296,7 @@ func (so *StateOptimizer) extractModuleName(resourceName string) string {
 // removeOrphanedDataSources removes data sources that are not referenced
 func (so *StateOptimizer) removeOrphanedDataSources(stateFile *models.StateFile, result *OptimizationResult) {
 	var orphanedDataIndices []int
-	
+
 	for i, resource := range stateFile.Resources {
 		if resource.Mode == "data" {
 			// Check if this data source is referenced by any managed resource
@@ -307,7 +307,7 @@ func (so *StateOptimizer) removeOrphanedDataSources(stateFile *models.StateFile,
 					break
 				}
 			}
-			
+
 			if !isReferenced {
 				orphanedDataIndices = append(orphanedDataIndices, i)
 				result.RemovedDataSources = append(result.RemovedDataSources, resource.Name)
@@ -329,7 +329,7 @@ func (so *StateOptimizer) removeOrphanedDataSources(stateFile *models.StateFile,
 // referencesDataSource checks if a resource references a data source
 func (so *StateOptimizer) referencesDataSource(resource, dataSource models.TerraformResource) bool {
 	dataSourceRef := fmt.Sprintf("data.%s.%s", dataSource.Type, dataSource.Name)
-	
+
 	for _, instance := range resource.Instances {
 		for _, value := range instance.Attributes {
 			if strValue, ok := value.(string); ok {
@@ -356,7 +356,7 @@ func (so *StateOptimizer) compactAttributes(stateFile *models.StateFile, result 
 	for i := range stateFile.Resources {
 		for j := range stateFile.Resources[i].Instances {
 			instance := &stateFile.Resources[i].Instances[j]
-			
+
 			for _, attr := range removableAttributes {
 				if _, exists := instance.Attributes[attr]; exists {
 					delete(instance.Attributes, attr)
@@ -369,18 +369,18 @@ func (so *StateOptimizer) compactAttributes(stateFile *models.StateFile, result 
 // removeDeprecatedResources removes deprecated resource types
 func (so *StateOptimizer) removeDeprecatedResources(stateFile *models.StateFile, result *OptimizationResult) {
 	deprecatedTypes := []string{
-		"aws_autoscaling_policy", // replaced by aws_autoscaling_policy_v2
-		"aws_autoscaling_schedule", // replaced by aws_autoscaling_schedule_v2
+		"aws_autoscaling_policy",                // replaced by aws_autoscaling_policy_v2
+		"aws_autoscaling_schedule",              // replaced by aws_autoscaling_schedule_v2
 		"aws_cloudformation_stack_set_instance", // replaced by aws_cloudformation_stack_set_instance_v2
 	}
 
 	var deprecatedIndices []int
-	
+
 	for i, resource := range stateFile.Resources {
 		for _, deprecatedType := range deprecatedTypes {
 			if resource.Type == deprecatedType {
 				deprecatedIndices = append(deprecatedIndices, i)
-				result.Warnings = append(result.Warnings, 
+				result.Warnings = append(result.Warnings,
 					fmt.Sprintf("Deprecated resource type found: %s", resource.Type))
 				break
 			}
@@ -392,9 +392,9 @@ func (so *StateOptimizer) removeDeprecatedResources(stateFile *models.StateFile,
 		sort.Sort(sort.Reverse(sort.IntSlice(deprecatedIndices)))
 		for _, index := range deprecatedIndices {
 			if index < len(stateFile.Resources) {
-				result.RemovedResources = append(result.RemovedResources, 
+				result.RemovedResources = append(result.RemovedResources,
 					stateFile.Resources[index].Name)
-				stateFile.Resources = append(stateFile.Resources[:index], 
+				stateFile.Resources = append(stateFile.Resources[:index],
 					stateFile.Resources[index+1:]...)
 			}
 		}
@@ -406,9 +406,9 @@ func (so *StateOptimizer) AnalyzeStateOptimization(stateFile *models.StateFile) 
 	// Create a temporary optimizer with dry run enabled
 	tempOptions := *so.options
 	tempOptions.DryRun = true
-	
+
 	tempOptimizer := NewStateOptimizer(&tempOptions)
-	
+
 	_, result, err := tempOptimizer.OptimizeState(stateFile)
 	return result, err
 }
@@ -425,14 +425,14 @@ func (so *StateOptimizer) GetOptimizationRecommendations(stateFile *models.State
 
 	// Check for potential optimizations
 	if len(stateFile.Resources) > 1000 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"Large state file detected (>1000 resources). Consider splitting into multiple state files.")
 	}
 
 	// Check for unused resource types
 	for resourceType, count := range resourceTypeCount {
 		if count == 1 {
-			recommendations = append(recommendations, 
+			recommendations = append(recommendations,
 				fmt.Sprintf("Single instance of %s found. Consider if this resource is necessary.", resourceType))
 		}
 	}
@@ -446,7 +446,7 @@ func (so *StateOptimizer) GetOptimizationRecommendations(stateFile *models.State
 	}
 
 	if dataSourceCount > len(stateFile.Resources)/2 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"High ratio of data sources to managed resources. Consider if all data sources are necessary.")
 	}
 

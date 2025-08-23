@@ -1,0 +1,12 @@
+{
+  "Rules": [
+    {
+      "ID": "delete-old-objects",
+      "Status": "Enabled",
+      "Expiration": {
+        "Days": 90
+      },
+      "Filter": {}
+    }
+  ]
+}

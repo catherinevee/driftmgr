@@ -11,7 +11,9 @@ type Resource struct {
 	Type         string                 `json:"type"`
 	Provider     string                 `json:"provider"`
 	Region       string                 `json:"region"`
-	Tags         map[string]string      `json:"tags,omitempty"`
+	AccountID    string                 `json:"account_id,omitempty"`
+	AccountName  string                 `json:"account_name,omitempty"`
+	Tags         interface{}            `json:"tags,omitempty"` // Can be map[string]string or []string
 	State        string                 `json:"state,omitempty"`
 	Status       string                 `json:"status,omitempty"`
 	Created      time.Time              `json:"created,omitempty"`
@@ -20,6 +22,19 @@ type Resource struct {
 	LastModified time.Time              `json:"last_modified,omitempty"`
 	Attributes   map[string]interface{} `json:"attributes,omitempty"`
 	Properties   map[string]interface{} `json:"properties,omitempty"`
+	Metadata     map[string]string      `json:"metadata,omitempty"`
+	CostEstimate *CostEstimate          `json:"cost_estimate,omitempty"`
+}
+
+// CostEstimate provides cost estimation information for a resource
+type CostEstimate struct {
+	HourlyCost       float64   `json:"hourly_cost"`
+	MonthlyCost      float64   `json:"monthly_cost"`
+	YearlyCost       float64   `json:"yearly_cost"`
+	Currency         string    `json:"currency"`
+	EstimationMethod string    `json:"estimation_method"`
+	Confidence       string    `json:"confidence"` // high, medium, low
+	LastUpdated      time.Time `json:"last_updated"`
 }
 
 // DriftResult represents the result of a drift detection
@@ -40,10 +55,11 @@ type DriftResult struct {
 
 // DriftChange represents a specific change detected in a resource
 type DriftChange struct {
-	Field      string      `json:"field"`
-	OldValue   interface{} `json:"old_value,omitempty"`
-	NewValue   interface{} `json:"new_value,omitempty"`
-	ChangeType string      `json:"change_type"`
+	Field       string      `json:"field"`
+	OldValue    interface{} `json:"old_value,omitempty"`
+	NewValue    interface{} `json:"new_value,omitempty"`
+	ChangeType  string      `json:"change_type"`
+	Description string      `json:"description,omitempty"`
 }
 
 // DiscoveryResult represents the result of a resource discovery
@@ -117,6 +133,7 @@ type Drift struct {
 
 // StateFile represents a Terraform state file
 type StateFile struct {
+	ID               string                 `json:"id"`
 	Path             string                 `json:"path"`
 	Version          int                    `json:"version"`
 	TerraformVersion string                 `json:"terraform_version"`
@@ -124,9 +141,19 @@ type StateFile struct {
 	Lineage          string                 `json:"lineage"`
 	Outputs          map[string]interface{} `json:"outputs"`
 	Resources        []TerraformResource    `json:"resources"`
+	Modules          []StateModule          `json:"modules,omitempty"`
+	CreatedAt        time.Time              `json:"created_at"`
+	LastModified     time.Time              `json:"last_modified"`
 	// Terragrunt-specific fields
 	ManagedByTerragrunt bool              `json:"managed_by_terragrunt,omitempty"`
 	TerragruntConfig    *TerragruntConfig `json:"terragrunt_config,omitempty"`
+}
+
+// StateModule represents a module in the state
+type StateModule struct {
+	Path      []string               `json:"path,omitempty"`
+	Outputs   map[string]interface{} `json:"outputs,omitempty"`
+	Resources []TerraformResource    `json:"resources,omitempty"`
 }
 
 // TerragruntConfig represents a Terragrunt configuration file
@@ -212,11 +239,13 @@ type TerragruntDiscoveryResult struct {
 
 // TerraformResource represents a resource in a Terraform state file
 type TerraformResource struct {
-	Mode      string                      `json:"mode"`
-	Type      string                      `json:"type"`
-	Name      string                      `json:"name"`
-	Provider  string                      `json:"provider"`
-	Instances []TerraformResourceInstance `json:"instances"`
+	Mode       string                      `json:"mode"`
+	Type       string                      `json:"type"`
+	Name       string                      `json:"name"`
+	ID         string                      `json:"id,omitempty"`
+	Provider   string                      `json:"provider"`
+	Instances  []TerraformResourceInstance `json:"instances"`
+	Attributes map[string]interface{}      `json:"attributes,omitempty"`
 }
 
 // TerraformResourceInstance represents an instance of a Terraform resource
@@ -229,9 +258,10 @@ type TerraformResourceInstance struct {
 
 // DiscoveryRequest represents a resource discovery request
 type DiscoveryRequest struct {
-	Provider string   `json:"provider"`
-	Regions  []string `json:"regions"`
-	Account  string   `json:"account"`
+	Provider  string   `json:"provider"`
+	Providers []string `json:"providers,omitempty"`
+	Regions   []string `json:"regions"`
+	Account   string   `json:"account"`
 }
 
 // DiscoveryResponse represents a resource discovery response
@@ -239,6 +269,19 @@ type DiscoveryResponse struct {
 	Resources []Resource    `json:"resources"`
 	Total     int           `json:"total"`
 	Duration  time.Duration `json:"duration"`
+}
+
+// TestDiscoveryResponse represents the response from a discovery test
+type TestDiscoveryResponse struct {
+	Provider         string        `json:"provider"`
+	Region           string        `json:"region"`
+	CredentialStatus string        `json:"credential_status"`
+	CredentialError  string        `json:"credential_error,omitempty"`
+	DiscoveryStatus  string        `json:"discovery_status"`
+	DiscoveryError   string        `json:"discovery_error,omitempty"`
+	ResourceCount    int           `json:"resource_count"`
+	Duration         time.Duration `json:"duration"`
+	Timestamp        time.Time     `json:"timestamp"`
 }
 
 // AnalysisRequest represents a drift analysis request
@@ -481,4 +524,137 @@ type RollbackResult struct {
 	RolledBack   bool      `json:"rolled_back"`
 	Timestamp    time.Time `json:"timestamp"`
 	ErrorMessage string    `json:"error_message,omitempty"`
+}
+
+// VisualizationResult represents the result of a visualization generation
+type VisualizationResult struct {
+	StateFileID string    `json:"state_file_id"`
+	OutputPath  string    `json:"output_path"`
+	Diagrams    []Diagram `json:"diagrams"`
+	GeneratedAt time.Time `json:"generated_at"`
+}
+
+// Diagram represents a single visualization diagram
+type Diagram struct {
+	Type        string    `json:"type"`
+	StateFileID string    `json:"state_file_id"`
+	Content     string    `json:"content"`
+	FilePath    string    `json:"file_path,omitempty"`
+	GeneratedAt time.Time `json:"generated_at"`
+}
+
+// DriftItem represents a single drift detection result
+type DriftItem struct {
+	ID           string                 `json:"id"`
+	ResourceID   string                 `json:"resource_id"`
+	ResourceType string                 `json:"resource_type"`
+	ResourceName string                 `json:"resource_name"`
+	Provider     string                 `json:"provider"`
+	Region       string                 `json:"region"`
+	DriftType    string                 `json:"drift_type"`
+	Description  string                 `json:"description"`
+	Severity     string                 `json:"severity"`
+	Status       string                 `json:"status"`
+	Module       string                 `json:"module"`
+	Before       map[string]interface{} `json:"before,omitempty"`
+	After        map[string]interface{} `json:"after,omitempty"`
+	Changes      []DriftChange          `json:"changes,omitempty"`
+	Details      map[string]interface{} `json:"details,omitempty"`
+	DetectedAt   time.Time              `json:"detected_at"`
+	FixedAt      *time.Time             `json:"fixed_at,omitempty"`
+	Reason       string                 `json:"reason,omitempty"`
+}
+
+// DriftAnalysis represents a comprehensive drift analysis result
+type DriftAnalysis struct {
+	ResourceID    string                 `json:"resource_id"`
+	ResourceType  string                 `json:"resource_type"`
+	Provider      string                 `json:"provider"`
+	Region        string                 `json:"region"`
+	DriftDetected bool                   `json:"drift_detected"`
+	DriftType     string                 `json:"drift_type,omitempty"`
+	Changes       []DriftChange          `json:"changes,omitempty"`
+	Severity      string                 `json:"severity"`
+	Timestamp     time.Time              `json:"timestamp"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// DriftDetectionRequest represents a drift detection request
+type DriftDetectionRequest struct {
+	StateFile string   `json:"state_file,omitempty"`
+	Backend   string   `json:"backend,omitempty"`
+	Providers []string `json:"providers,omitempty"`
+	Regions   []string `json:"regions,omitempty"`
+	Module    string   `json:"module,omitempty"`
+	Workspace string   `json:"workspace,omitempty"`
+}
+
+// ExecuteRemediationRequest represents a request to execute remediation
+type ExecuteRemediationRequest struct {
+	RemediationRequest RemediationRequest `json:"remediation_request"`
+	DryRun             bool               `json:"dry_run"`
+	Force              bool               `json:"force"`
+}
+
+// CostAnalysisRequest represents a request for cost analysis
+type CostAnalysisRequest struct {
+	Provider  string   `json:"provider"`
+	Regions   []string `json:"regions,omitempty"`
+	TimeRange string   `json:"time_range,omitempty"`
+	GroupBy   string   `json:"group_by,omitempty"`
+}
+
+// ImpactAnalysisRequest represents a request for impact analysis
+type ImpactAnalysisRequest struct {
+	ResourceID string `json:"resource_id"`
+	ChangeType string `json:"change_type"`
+	Scope      string `json:"scope,omitempty"`
+}
+
+// DependencyAnalysisRequest represents a request for dependency analysis
+type DependencyAnalysisRequest struct {
+	ResourceID string `json:"resource_id"`
+	Depth      int    `json:"depth,omitempty"`
+	Direction  string `json:"direction,omitempty"`
+}
+
+// AutoRemediationRequest represents a request for auto-remediation
+type AutoRemediationRequest struct {
+	Enabled  bool   `json:"enabled"`
+	DryRun   bool   `json:"dry_run"`
+	Schedule string `json:"schedule,omitempty"`
+	Severity string `json:"severity,omitempty"`
+}
+
+// StateImportRequest represents a request to import state
+type StateImportRequest struct {
+	Source string                 `json:"source"`
+	Type   string                 `json:"type"`
+	Config map[string]interface{} `json:"config,omitempty"`
+}
+
+// ImportResult represents the result of an import operation
+type ImportResult struct {
+	Successful int             `json:"successful"`
+	Failed     int             `json:"failed"`
+	Duration   time.Duration   `json:"duration"`
+	Commands   []ImportCommand `json:"commands"`
+	Errors     []ImportError   `json:"errors"`
+}
+
+// ImportCommand represents a Terraform import command
+type ImportCommand struct {
+	Provider     string `json:"provider"`
+	ResourceType string `json:"resource_type"`
+	ResourceName string `json:"resource_name"`
+	ResourceID   string `json:"resource_id"`
+	Command      string `json:"command"`
+	Success      bool   `json:"success"`
+	Error        string `json:"error,omitempty"`
+}
+
+// ImportError represents an error during import
+type ImportError struct {
+	Resource string `json:"resource"`
+	Error    string `json:"error"`
 }

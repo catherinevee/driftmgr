@@ -58,11 +58,11 @@ type SecurityRecommendation struct {
 
 // ComplianceResult represents compliance checking results
 type ComplianceResult struct {
-	Framework      string
-	OverallScore   int
-	Compliant      bool
-	Violations     []ComplianceViolation
-	LastChecked    time.Time
+	Framework    string
+	OverallScore int
+	Compliant    bool
+	Violations   []ComplianceViolation
+	LastChecked  time.Time
 }
 
 // ComplianceViolation represents a compliance violation

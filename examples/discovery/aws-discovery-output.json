@@ -1,0 +1,16 @@
+Discovering aws resources...
+🔍 Discovering resources with Amazon Web Services provider...
+  [AWS] Discovering resources using AWS SDK...
+  [AWS] Scanning region: us-west-2
+  [AWS] Found 3 resources
+
+=== Discovery Summary ===
+Total Resources: 3
+
+By Provider:
+  aws: 3
+
+Top Resource Types:
+  aws_vpc: 1
+  aws_security_group: 1
+  aws_s3_bucket: 1

@@ -1,0 +1,947 @@
+#!/usr/bin/env groovy
+
+/**
+ * Jenkins Pipeline for DriftMgr
+ * Infrastructure Drift Detection and Management Tool
+ * 
+ * This pipeline provides comprehensive CI/CD capabilities including:
+ * - Multi-platform builds
+ * - Comprehensive testing (unit, integration, security)
+ * - Drift detection across multiple cloud providers
+ * - Automated remediation with approvals
+ * - Security scanning and compliance checks
+ * - Release automation
+ * - Notification integrations
+ */
+
+@Library('shared-library') _
+
+pipeline {
+    agent {
+        label 'linux && docker'
+    }
+    
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['staging', 'production', 'development'],
+            description: 'Environment to check for drift'
+        )
+        choice(
+            name: 'PROVIDER',
+            choices: ['all', 'aws', 'azure', 'gcp', 'digitalocean'],
+            description: 'Cloud provider to scan'
+        )
+        choice(
+            name: 'PIPELINE_TYPE',
+            choices: ['full', 'drift-only', 'test-only', 'build-only'],
+            description: 'Type of pipeline execution'
+        )
+        booleanParam(
+            name: 'AUTO_REMEDIATE',
+            defaultValue: false,
+            description: 'Automatically remediate detected drift'
+        )
+        booleanParam(
+            name: 'DRY_RUN',
+            defaultValue: true,
+            description: 'Run remediation in dry-run mode'
+        )
+        booleanParam(
+            name: 'FORCE_FULL_SCAN',
+            defaultValue: false,
+            description: 'Force full infrastructure scan'
+        )
+        string(
+            name: 'DRIFT_THRESHOLD',
+            defaultValue: '10',
+            description: 'Maximum allowed drift count before failing'
+        )
+        string(
+            name: 'NOTIFICATION_CHANNELS',
+            defaultValue: '#infrastructure-alerts',
+            description: 'Slack channels for notifications'
+        )
+    }
+    
+    environment {
+        GO_VERSION = '1.23.8'
+        DOCKER_REGISTRY = 'registry.hub.docker.com'
+        IMAGE_NAME = 'driftmgr'
+        REPORTS_DIR = "${WORKSPACE}/reports"
+        ARTIFACTS_DIR = "${WORKSPACE}/artifacts"
+        
+        // Build information
+        BUILD_VERSION = "${env.BUILD_NUMBER}"
+        GIT_COMMIT_SHORT = "${env.GIT_COMMIT.take(8)}"
+        
+        // Cloud credentials from Jenkins credentials store
+        AWS_CREDENTIALS = credentials('aws-credentials')
+        AZURE_CREDENTIALS = credentials('azure-service-principal')
+        GCP_CREDENTIALS = credentials('gcp-service-account')
+        DO_TOKEN = credentials('digitalocean-token')
+        
+        // Container registry credentials
+        DOCKER_REGISTRY_CREDS = credentials('docker-registry')
+        
+        // Notification settings
+        SLACK_WEBHOOK = credentials('slack-webhook-url')
+        EMAIL_RECIPIENTS = 'devops@company.com,infrastructure@company.com'
+        
+        // Security and compliance
+        SONAR_TOKEN = credentials('sonarqube-token')
+        SNYK_TOKEN = credentials('snyk-api-token')
+        
+        // Terraform Cloud
+        TFC_TOKEN = credentials('terraform-cloud-token')
+    }
+    
+    triggers {
+        // Run drift detection every 6 hours
+        cron('H */6 * * *')
+        
+        // Trigger on GitHub events
+        githubPush()
+        
+        // Trigger on pull requests
+        githubPullRequest(
+            orgWhitelist: ['your-org'],
+            cron: 'H/5 * * * *',
+            triggerPhrase: '(?i).*test\\s+this.*',
+            onlyTriggerPhrase: false,
+            useGitHubHooks: true,
+            permitAll: false,
+            autoCloseFailedPullRequests: false,
+            displayBuildErrorsOnDownstreamBuilds: true,
+            whiteListTargetBranches: ['main', 'develop']
+        )
+    }
+    
+    stages {
+        stage('Initialize') {
+            steps {
+                script {
+                    // Clean workspace for fresh start
+                    deleteDir()
+                    
+                    // Checkout source code
+                    checkout scm
+                    
+                    // Create necessary directories
+                    sh """
+                        mkdir -p ${env.REPORTS_DIR}
+                        mkdir -p ${env.ARTIFACTS_DIR}
+                        mkdir -p ${env.ARTIFACTS_DIR}/binaries
+                        mkdir -p ${env.ARTIFACTS_DIR}/docker
+                    """
+                    
+                    // Set build description and display name
+                    currentBuild.description = "Pipeline: ${params.PIPELINE_TYPE} | Env: ${params.ENVIRONMENT} | Provider: ${params.PROVIDER}"
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} - ${params.ENVIRONMENT}"
+                    
+                    // Print build information
+                    echo """
+                    ==========================================
+                    DriftMgr CI/CD Pipeline
+                    ==========================================
+                    Build Number: ${env.BUILD_NUMBER}
+                    Git Commit: ${env.GIT_COMMIT_SHORT}
+                    Pipeline Type: ${params.PIPELINE_TYPE}
+                    Environment: ${params.ENVIRONMENT}
+                    Provider: ${params.PROVIDER}
+                    Auto Remediate: ${params.AUTO_REMEDIATE}
+                    Dry Run: ${params.DRY_RUN}
+                    ==========================================
+                    """
+                }
+            }
+        }
+        
+        stage('Setup Environment') {
+            parallel {
+                stage('Install Dependencies') {
+                    steps {
+                        script {
+                            // Install Go
+                            sh """
+                                # Install Go ${env.GO_VERSION}
+                                wget -q https://go.dev/dl/go${env.GO_VERSION}.linux-amd64.tar.gz
+                                sudo rm -rf /usr/local/go
+                                sudo tar -C /usr/local -xzf go${env.GO_VERSION}.linux-amd64.tar.gz
+                                export PATH=/usr/local/go/bin:\$PATH
+                                go version
+                                
+                                # Install additional tools
+                                sudo apt-get update -qq
+                                sudo apt-get install -y jq curl unzip
+                            """
+                            
+                            // Install cloud CLIs
+                            sh """
+                                # Install AWS CLI
+                                curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                                unzip -q awscliv2.zip
+                                sudo ./aws/install --update
+                                
+                                # Install Azure CLI
+                                curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+                                
+                                # Install GCP CLI
+                                echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+                                curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+                                sudo apt-get update && sudo apt-get install -y google-cloud-cli
+                                
+                                # Install doctl for DigitalOcean
+                                wget -q https://github.com/digitalocean/doctl/releases/download/v1.94.0/doctl-1.94.0-linux-amd64.tar.gz
+                                tar xf doctl-1.94.0-linux-amd64.tar.gz
+                                sudo mv doctl /usr/local/bin
+                            """
+                        }
+                    }
+                }
+                
+                stage('Security Tools Setup') {
+                    steps {
+                        script {
+                            // Install security scanning tools
+                            sh """
+                                # Install gosec
+                                go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+                                
+                                # Install govulncheck
+                                go install golang.org/x/vuln/cmd/govulncheck@latest
+                                
+                                # Install Trivy
+                                wget -q https://github.com/aquasecurity/trivy/releases/download/v0.45.0/trivy_0.45.0_Linux-64bit.tar.gz
+                                tar zxf trivy_0.45.0_Linux-64bit.tar.gz
+                                sudo mv trivy /usr/local/bin/
+                                
+                                # Install Snyk CLI
+                                curl -Lo snyk https://static.snyk.io/cli/latest/snyk-linux
+                                chmod +x snyk
+                                sudo mv snyk /usr/local/bin/
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Code Quality & Security') {
+            when {
+                anyOf {
+                    expression { params.PIPELINE_TYPE == 'full' }
+                    expression { params.PIPELINE_TYPE == 'test-only' }
+                    changeRequest()
+                }
+            }
+            parallel {
+                stage('Static Analysis') {
+                    steps {
+                        script {
+                            sh """
+                                export PATH=/usr/local/go/bin:\$PATH
+                                export GOPATH=\$HOME/go
+                                export PATH=\$PATH:\$GOPATH/bin
+                                
+                                # Format check
+                                go fmt -l . | tee ${env.REPORTS_DIR}/format-issues.txt
+                                if [ -s ${env.REPORTS_DIR}/format-issues.txt ]; then
+                                    echo "Code formatting issues found"
+                                    cat ${env.REPORTS_DIR}/format-issues.txt
+                                    exit 1
+                                fi
+                                
+                                # Vet check
+                                go vet ./... | tee ${env.REPORTS_DIR}/vet-issues.txt
+                                
+                                # Gosec security scan
+                                gosec -fmt sarif -out ${env.REPORTS_DIR}/gosec-report.sarif ./...
+                                gosec -fmt json -out ${env.REPORTS_DIR}/gosec-report.json ./...
+                            """
+                        }
+                    }
+                    post {
+                        always {
+                            // Publish security scan results
+                            recordIssues(
+                                enabledForFailure: true,
+                                tools: [sarif(pattern: "${env.REPORTS_DIR}/gosec-report.sarif")]
+                            )
+                        }
+                    }
+                }
+                
+                stage('Vulnerability Scan') {
+                    steps {
+                        script {
+                            sh """
+                                export PATH=/usr/local/go/bin:\$PATH
+                                export GOPATH=\$HOME/go
+                                export PATH=\$PATH:\$GOPATH/bin
+                                
+                                # Go vulnerability check
+                                govulncheck ./... | tee ${env.REPORTS_DIR}/vulncheck-report.txt
+                                
+                                # Snyk security scan
+                                snyk auth \$SNYK_TOKEN || true
+                                snyk test --json > ${env.REPORTS_DIR}/snyk-report.json || true
+                            """
+                        }
+                    }
+                }
+                
+                stage('License Compliance') {
+                    steps {
+                        script {
+                            sh """
+                                export PATH=/usr/local/go/bin:\$PATH
+                                
+                                # Install go-licenses
+                                go install github.com/google/go-licenses@latest
+                                
+                                # Generate license report
+                                go-licenses report ./... > ${env.REPORTS_DIR}/licenses.txt || true
+                                
+                                # Check for forbidden licenses
+                                if grep -E "(GPL-2|GPL-3|AGPL|LGPL)" ${env.REPORTS_DIR}/licenses.txt; then
+                                    echo "Forbidden licenses detected!"
+                                    exit 1
+                                fi
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Test') {
+            when {
+                anyOf {
+                    expression { params.PIPELINE_TYPE == 'full' }
+                    expression { params.PIPELINE_TYPE == 'test-only' }
+                    changeRequest()
+                }
+            }
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        script {
+                            sh """
+                                export PATH=/usr/local/go/bin:\$PATH
+                                
+                                # Run unit tests with coverage
+                                go test -v -race -coverprofile=${env.REPORTS_DIR}/coverage.out ./... | tee ${env.REPORTS_DIR}/test-results.txt
+                                
+                                # Generate coverage report
+                                go tool cover -html=${env.REPORTS_DIR}/coverage.out -o ${env.REPORTS_DIR}/coverage.html
+                                go tool cover -func=${env.REPORTS_DIR}/coverage.out | grep total | awk '{print \$3}' > ${env.REPORTS_DIR}/coverage.txt
+                                
+                                # Convert to JUnit format for Jenkins
+                                go install github.com/jstemmer/go-junit-report/v2@latest
+                                cat ${env.REPORTS_DIR}/test-results.txt | go-junit-report > ${env.REPORTS_DIR}/junit.xml
+                            """
+                        }
+                    }
+                    post {
+                        always {
+                            // Publish test results
+                            junit "${env.REPORTS_DIR}/junit.xml"
+                            
+                            // Publish coverage report
+                            publishHTML([
+                                allowMissing: false,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: env.REPORTS_DIR,
+                                reportFiles: 'coverage.html',
+                                reportName: 'Coverage Report'
+                            ])
+                        }
+                    }
+                }
+                
+                stage('Integration Tests') {
+                    steps {
+                        script {
+                            sh """
+                                export PATH=/usr/local/go/bin:\$PATH
+                                
+                                # Start test dependencies (if needed)
+                                docker-compose -f tests/docker-compose.test.yml up -d || true
+                                sleep 10
+                                
+                                # Run integration tests
+                                go test -v -tags=integration ./tests/integration/... | tee ${env.REPORTS_DIR}/integration-test-results.txt
+                                
+                                # Cleanup test dependencies
+                                docker-compose -f tests/docker-compose.test.yml down || true
+                            """
+                        }
+                    }
+                }
+                
+                stage('Benchmark Tests') {
+                    steps {
+                        script {
+                            sh """
+                                export PATH=/usr/local/go/bin:\$PATH
+                                
+                                # Run benchmark tests
+                                go test -bench=. -benchmem ./... | tee ${env.REPORTS_DIR}/benchmark-results.txt
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build Artifacts') {
+            when {
+                anyOf {
+                    expression { params.PIPELINE_TYPE == 'full' }
+                    expression { params.PIPELINE_TYPE == 'build-only' }
+                    branch 'main'
+                    tag 'v*'
+                }
+            }
+            parallel {
+                stage('Build Binaries') {
+                    matrix {
+                        axes {
+                            axis {
+                                name 'GOOS'
+                                values 'linux', 'windows', 'darwin'
+                            }
+                            axis {
+                                name 'GOARCH'
+                                values 'amd64', 'arm64'
+                            }
+                        }
+                        excludes {
+                            exclude {
+                                axis {
+                                    name 'GOOS'
+                                    values 'windows'
+                                }
+                                axis {
+                                    name 'GOARCH'
+                                    values 'arm64'
+                                }
+                            }
+                        }
+                    }
+                    steps {
+                        script {
+                            def suffix = (env.GOOS == 'windows') ? '.exe' : ''
+                            def ldflags = "-s -w -X main.version=${env.BUILD_VERSION} -X main.commit=${env.GIT_COMMIT_SHORT} -X main.date=\$(date -u '+%Y-%m-%d_%H:%M:%S')"
+                            
+                            sh """
+                                export PATH=/usr/local/go/bin:\$PATH
+                                export CGO_ENABLED=0
+                                export GOOS=${env.GOOS}
+                                export GOARCH=${env.GOARCH}
+                                
+                                # Build main binary
+                                go build -ldflags="${ldflags}" -o ${env.ARTIFACTS_DIR}/binaries/driftmgr-${env.GOOS}-${env.GOARCH}${suffix} ./cmd/driftmgr
+                                
+                                # Build server binary
+                                go build -ldflags="${ldflags}" -o ${env.ARTIFACTS_DIR}/binaries/driftmgr-server-${env.GOOS}-${env.GOARCH}${suffix} ./cmd/server
+                                
+                                # Build validation binary
+                                go build -ldflags="${ldflags}" -o ${env.ARTIFACTS_DIR}/binaries/validate-discovery-${env.GOOS}-${env.GOARCH}${suffix} ./cmd/validate
+                                
+                                # Create archive
+                                cd ${env.ARTIFACTS_DIR}/binaries
+                                if [ "${env.GOOS}" = "windows" ]; then
+                                    zip -r driftmgr-${env.GOOS}-${env.GOARCH}.zip *${env.GOOS}-${env.GOARCH}*
+                                else
+                                    tar -czf driftmgr-${env.GOOS}-${env.GOARCH}.tar.gz *${env.GOOS}-${env.GOARCH}*
+                                fi
+                            """
+                        }
+                    }
+                }
+                
+                stage('Build Docker Image') {
+                    steps {
+                        script {
+                            def imageTag = env.BRANCH_NAME == 'main' ? 'latest' : env.BRANCH_NAME
+                            def fullImageName = "${env.DOCKER_REGISTRY}/${env.IMAGE_NAME}:${imageTag}"
+                            
+                            sh """
+                                # Build Docker image
+                                docker build \
+                                    --build-arg VERSION=${env.BUILD_VERSION} \
+                                    --build-arg COMMIT=${env.GIT_COMMIT_SHORT} \
+                                    --build-arg DATE=\$(date -u '+%Y-%m-%d_%H:%M:%S') \
+                                    -t ${fullImageName} \
+                                    -f deployments/docker/Dockerfile .
+                                
+                                # Save image for later use
+                                docker save ${fullImageName} > ${env.ARTIFACTS_DIR}/docker/driftmgr-${imageTag}.tar
+                                
+                                # Security scan of Docker image
+                                trivy image --format sarif --output ${env.REPORTS_DIR}/trivy-docker-report.sarif ${fullImageName}
+                            """
+                            
+                            // Push to registry if on main branch or tag
+                            if (env.BRANCH_NAME == 'main' || env.TAG_NAME) {
+                                withCredentials([usernamePassword(credentialsId: 'docker-registry', 
+                                                                usernameVariable: 'DOCKER_USER', 
+                                                                passwordVariable: 'DOCKER_PASS')]) {
+                                    sh """
+                                        echo \$DOCKER_PASS | docker login ${env.DOCKER_REGISTRY} -u \$DOCKER_USER --password-stdin
+                                        docker push ${fullImageName}
+                                    """
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Infrastructure Drift Detection') {
+            when {
+                anyOf {
+                    expression { params.PIPELINE_TYPE == 'full' }
+                    expression { params.PIPELINE_TYPE == 'drift-only' }
+                    triggeredBy 'TimerTrigger'
+                }
+            }
+            steps {
+                script {
+                    // Configure cloud providers
+                    configureCloudProviders()
+                    
+                    // Build driftmgr for drift detection
+                    sh """
+                        export PATH=/usr/local/go/bin:\$PATH
+                        go build -o driftmgr ./cmd/driftmgr
+                        chmod +x driftmgr
+                    """
+                    
+                    // Run drift detection
+                    def driftResults = runDriftDetection()
+                    
+                    // Store results for later stages
+                    env.DRIFT_DETECTED = driftResults.detected
+                    env.DRIFT_COUNT = driftResults.count
+                    env.DRIFT_COST_IMPACT = driftResults.costImpact
+                    
+                    // Generate reports
+                    generateDriftReports()
+                    
+                    // Update build status based on drift
+                    if (driftResults.detected) {
+                        currentBuild.result = 'UNSTABLE'
+                        if (driftResults.count > params.DRIFT_THRESHOLD.toInteger()) {
+                            error("Drift count (${driftResults.count}) exceeds threshold (${params.DRIFT_THRESHOLD})")
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    // Publish drift reports
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: env.REPORTS_DIR,
+                        reportFiles: 'drift-report.html',
+                        reportName: 'Drift Detection Report'
+                    ])
+                    
+                    // Archive drift artifacts
+                    archiveArtifacts artifacts: "${env.REPORTS_DIR}/drift-*.json", allowEmptyArchive: true
+                }
+            }
+        }
+        
+        stage('Automated Remediation') {
+            when {
+                allOf {
+                    expression { params.AUTO_REMEDIATE == true }
+                    expression { env.DRIFT_DETECTED == 'true' }
+                    anyOf {
+                        expression { params.PIPELINE_TYPE == 'full' }
+                        expression { params.PIPELINE_TYPE == 'drift-only' }
+                    }
+                }
+            }
+            stages {
+                stage('Remediation Planning') {
+                    steps {
+                        script {
+                            sh """
+                                # Generate remediation plan
+                                ./driftmgr remediation plan \
+                                    --drift-report ${env.REPORTS_DIR}/drift-report.json \
+                                    --output ${env.REPORTS_DIR}/remediation-plan.json \
+                                    --environment ${params.ENVIRONMENT}
+                                
+                                # Generate impact analysis
+                                ./driftmgr remediation analyze \
+                                    --plan ${env.REPORTS_DIR}/remediation-plan.json \
+                                    --output ${env.REPORTS_DIR}/remediation-impact.json
+                            """
+                            
+                            def plan = readJSON file: "${env.REPORTS_DIR}/remediation-plan.json"
+                            def impact = readJSON file: "${env.REPORTS_DIR}/remediation-impact.json"
+                            
+                            echo """
+                            Remediation Plan Summary:
+                            - Resources to remediate: ${plan.resources?.size() ?: 0}
+                            - Estimated cost impact: \$${impact.cost_impact ?: 0}
+                            - Risk level: ${impact.risk_level ?: 'Unknown'}
+                            """
+                        }
+                    }
+                }
+                
+                stage('Approval Gate') {
+                    when {
+                        anyOf {
+                            expression { params.ENVIRONMENT == 'production' }
+                            expression { env.DRIFT_COST_IMPACT.toFloat() > 1000 }
+                        }
+                    }
+                    steps {
+                        script {
+                            def userInput = input(
+                                message: "Approve remediation for ${env.DRIFT_COUNT} resources in ${params.ENVIRONMENT}?",
+                                parameters: [
+                                    choice(
+                                        name: 'APPROVAL',
+                                        choices: ['Approve', 'Reject'],
+                                        description: 'Approve or reject the remediation'
+                                    ),
+                                    text(
+                                        name: 'COMMENT',
+                                        defaultValue: '',
+                                        description: 'Optional comment for audit trail'
+                                    )
+                                ],
+                                submitter: 'devops-team,platform-team',
+                                submitterParameter: 'APPROVER'
+                            )
+                            
+                            if (userInput.APPROVAL != 'Approve') {
+                                error("Remediation rejected by ${userInput.APPROVER}")
+                            }
+                            
+                            echo "Remediation approved by ${userInput.APPROVER}: ${userInput.COMMENT}"
+                        }
+                    }
+                }
+                
+                stage('Execute Remediation') {
+                    steps {
+                        script {
+                            def dryRunFlag = params.DRY_RUN ? '--dry-run' : ''
+                            
+                            sh """
+                                # Create backup before remediation
+                                ./driftmgr backup create \
+                                    --environment ${params.ENVIRONMENT} \
+                                    --output ${env.REPORTS_DIR}/backup-${env.BUILD_NUMBER}.json
+                                
+                                # Execute remediation
+                                ./driftmgr remediation execute \
+                                    ${dryRunFlag} \
+                                    --plan ${env.REPORTS_DIR}/remediation-plan.json \
+                                    --output ${env.REPORTS_DIR}/remediation-result.json \
+                                    --environment ${params.ENVIRONMENT}
+                            """
+                            
+                            def result = readJSON file: "${env.REPORTS_DIR}/remediation-result.json"
+                            
+                            if (!result.success) {
+                                error("Remediation failed: ${result.error}")
+                            }
+                            
+                            echo "Remediation completed successfully"
+                        }
+                    }
+                }
+                
+                stage('Verification') {
+                    steps {
+                        script {
+                            // Wait for changes to propagate
+                            sleep(time: 30, unit: 'SECONDS')
+                            
+                            // Re-run drift detection to verify
+                            sh """
+                                ./driftmgr drift detect \
+                                    --provider ${params.PROVIDER} \
+                                    --environment ${params.ENVIRONMENT} \
+                                    --output-format json \
+                                    --output-file ${env.REPORTS_DIR}/post-remediation-drift-report.json
+                            """
+                            
+                            def postReport = readJSON file: "${env.REPORTS_DIR}/post-remediation-drift-report.json"
+                            def remainingDrift = postReport.summary?.total_drift_resources ?: 0
+                            
+                            if (remainingDrift > 0) {
+                                unstable("${remainingDrift} resources still show drift after remediation")
+                            } else {
+                                echo "All drift successfully remediated"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Release') {
+            when {
+                tag 'v*'
+            }
+            steps {
+                script {
+                    // Create GitHub release
+                    sh """
+                        # Generate changelog
+                        git log --pretty=format:"- %s (%h)" \$(git describe --tags --abbrev=0 HEAD^)..HEAD > CHANGELOG.md
+                        
+                        # Create release
+                        gh release create ${env.TAG_NAME} \
+                            --title "Release ${env.TAG_NAME}" \
+                            --notes-file CHANGELOG.md \
+                            ${env.ARTIFACTS_DIR}/binaries/*.tar.gz \
+                            ${env.ARTIFACTS_DIR}/binaries/*.zip
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                anyOf {
+                    branch 'main'
+                    tag 'v*'
+                }
+            }
+            parallel {
+                stage('Deploy to Staging') {
+                    when {
+                        branch 'main'
+                    }
+                    steps {
+                        script {
+                            deployToEnvironment('staging')
+                        }
+                    }
+                }
+                
+                stage('Deploy to Production') {
+                    when {
+                        tag 'v*'
+                    }
+                    steps {
+                        script {
+                            input message: 'Deploy to production?', ok: 'Deploy', submitter: 'platform-team'
+                            deployToEnvironment('production')
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                // Archive all artifacts
+                archiveArtifacts artifacts: 'reports/**/*,artifacts/**/*', allowEmptyArchive: true
+                
+                // Clean up Docker images
+                sh 'docker system prune -f || true'
+                
+                // Clean up credentials
+                sh '''
+                    rm -f \$HOME/.aws/credentials || true
+                    rm -f \$HOME/.azure/credentials || true
+                    rm -f \$HOME/.config/gcloud/credentials.db || true
+                '''
+            }
+        }
+        
+        success {
+            script {
+                sendNotification('success', 'Pipeline completed successfully')
+            }
+        }
+        
+        failure {
+            script {
+                sendNotification('danger', 'Pipeline failed')
+            }
+        }
+        
+        unstable {
+            script {
+                def message = "Infrastructure drift detected in ${params.ENVIRONMENT}"
+                if (env.DRIFT_COUNT) {
+                    message += " - ${env.DRIFT_COUNT} resources affected"
+                }
+                sendNotification('warning', message)
+                
+                // Create Jira ticket for drift
+                if (env.DRIFT_DETECTED == 'true') {
+                    createJiraTicket()
+                }
+            }
+        }
+    }
+}
+
+// Helper Functions
+
+def configureCloudProviders() {
+    // Configure AWS
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+        sh 'aws configure set region us-east-1'
+    }
+    
+    // Configure Azure
+    withCredentials([azureServicePrincipal('azure-service-principal')]) {
+        sh '''
+            az login --service-principal \
+                -u \$AZURE_CLIENT_ID \
+                -p \$AZURE_CLIENT_SECRET \
+                --tenant \$AZURE_TENANT_ID
+        '''
+    }
+    
+    // Configure GCP
+    withCredentials([file(credentialsId: 'gcp-service-account', variable: 'GCP_KEY_FILE')]) {
+        sh '''
+            gcloud auth activate-service-account --key-file=\$GCP_KEY_FILE
+            gcloud config set project \$GCP_PROJECT_ID
+        '''
+    }
+    
+    // Configure DigitalOcean
+    withCredentials([string(credentialsId: 'digitalocean-token', variable: 'DIGITALOCEAN_TOKEN')]) {
+        sh 'doctl auth init --access-token \$DIGITALOCEAN_TOKEN'
+    }
+}
+
+def runDriftDetection() {
+    def scanFlags = params.FORCE_FULL_SCAN ? '--full-scan' : ''
+    
+    sh """
+        ./driftmgr drift detect \
+            --provider ${params.PROVIDER} \
+            --environment ${params.ENVIRONMENT} \
+            --output-format json \
+            --output-file ${env.REPORTS_DIR}/drift-report.json \
+            ${scanFlags} \
+            --verbose
+    """
+    
+    def driftReport = readJSON file: "${env.REPORTS_DIR}/drift-report.json"
+    def driftCount = driftReport.summary?.total_drift_resources ?: 0
+    def costImpact = driftReport.cost_analysis?.total_impact ?: 0
+    
+    return [
+        detected: driftCount > 0,
+        count: driftCount,
+        costImpact: costImpact
+    ]
+}
+
+def generateDriftReports() {
+    sh """
+        # Generate HTML report
+        ./driftmgr drift analyze \
+            --input ${env.REPORTS_DIR}/drift-report.json \
+            --output ${env.REPORTS_DIR}/drift-report.html \
+            --format html \
+            --include-recommendations
+        
+        # Generate CSV for further analysis
+        ./driftmgr drift export \
+            --input ${env.REPORTS_DIR}/drift-report.json \
+            --output ${env.REPORTS_DIR}/drift-export.csv \
+            --format csv
+    """
+}
+
+def deployToEnvironment(environment) {
+    echo "Deploying to ${environment} environment"
+    
+    withCredentials([kubeconfigFile(credentialsId: "kubeconfig-${environment}", variable: 'KUBECONFIG')]) {
+        sh """
+            kubectl set image deployment/driftmgr \
+                driftmgr=${env.DOCKER_REGISTRY}/${env.IMAGE_NAME}:${env.BRANCH_NAME == 'main' ? 'latest' : env.TAG_NAME} \
+                -n ${environment}
+            
+            kubectl rollout status deployment/driftmgr -n ${environment} --timeout=300s
+            kubectl get pods -n ${environment}
+        """
+    }
+}
+
+def sendNotification(color, message) {
+    def fullMessage = """
+    ${message}
+    
+    Environment: ${params.ENVIRONMENT}
+    Provider: ${params.PROVIDER}
+    Build: ${env.BUILD_URL}
+    Commit: ${env.GIT_COMMIT_SHORT}
+    """
+    
+    // Send Slack notification
+    if (env.SLACK_WEBHOOK) {
+        slackSend(
+            channel: params.NOTIFICATION_CHANNELS,
+            color: color,
+            message: fullMessage
+        )
+    }
+    
+    // Send email notification
+    emailext(
+        subject: "DriftMgr Pipeline - ${currentBuild.currentResult}",
+        body: fullMessage,
+        to: env.EMAIL_RECIPIENTS
+    )
+}
+
+def createJiraTicket() {
+    if (env.JIRA_ENABLED == 'true') {
+        def summary = "Infrastructure Drift Detected - ${params.ENVIRONMENT} - ${env.DRIFT_COUNT} resources"
+        def description = """
+        Infrastructure drift has been detected in the ${params.ENVIRONMENT} environment.
+        
+        Details:
+        - Drift Count: ${env.DRIFT_COUNT}
+        - Cost Impact: \$${env.DRIFT_COST_IMPACT ?: 'Unknown'}
+        - Provider: ${params.PROVIDER}
+        - Jenkins Build: ${env.BUILD_URL}
+        - Git Commit: ${env.GIT_COMMIT_SHORT}
+        
+        Please review the drift report and take appropriate action.
+        """
+        
+        jiraNewIssue(
+            site: 'JIRA',
+            issue: [
+                fields: [
+                    project: [key: 'INFRA'],
+                    issuetype: [name: 'Task'],
+                    summary: summary,
+                    description: description,
+                    priority: [name: 'High'],
+                    labels: ['drift-detection', 'automated', params.ENVIRONMENT]
+                ]
+            ]
+        )
+    }
+}

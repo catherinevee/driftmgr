@@ -3,428 +3,572 @@ package performance
 import (
 	"context"
 	"fmt"
-	"math"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// AdaptiveConcurrency provides adaptive concurrency control
-type AdaptiveConcurrency struct {
-	loadMonitor     *LoadMonitor
-	concurrencyManager *ConcurrencyManager
-	config          *AdaptiveConfig
+// AdaptiveConcurrencyManager manages dynamic concurrency levels based on system load
+type AdaptiveConcurrencyManager struct {
+	mu                 sync.RWMutex
+	maxConcurrency     int32
+	currentConcurrency int32
+	activeTasks        int32
+	resourcePool       *ResourcePool
+	backpressure       *BackpressureHandler
+
+	// Configuration
+	minConcurrency    int32
+	maxConcurrencyLim int32
+	adjustmentFactor  float64
+	monitorInterval   time.Duration
+
+	// System metrics
+	cpuThreshold   float64
+	memThreshold   float64
+	lastAdjustment time.Time
+
+	// Statistics
+	totalTasks      int64
+	completedTasks  int64
+	failedTasks     int64
+	avgResponseTime time.Duration
+
+	// Metrics
+	metrics *ConcurrencyMetrics
+
+	// Context for graceful shutdown
+	ctx    context.Context
+	cancel context.CancelFunc
+	done   chan struct{}
+}
+
+// ConcurrencyMetrics holds Prometheus metrics for concurrency management
+type ConcurrencyMetrics struct {
+	activeTasks        prometheus.Gauge
+	completedTasks     prometheus.Counter
+	failedTasks        prometheus.Counter
+	concurrencyLevel   prometheus.Gauge
+	responseTime       prometheus.Histogram
+	resourcePoolSize   prometheus.Gauge
+	backpressureEvents prometheus.Counter
+}
+
+// ResourcePool manages a pool of reusable resources
+type ResourcePool struct {
+	mu        sync.RWMutex
+	resources chan Resource
+	factory   ResourceFactory
+	destroyer ResourceDestroyer
+	maxSize   int32
+	current   int32
+	metrics   *ResourcePoolMetrics
+}
+
+// Resource represents a pooled resource
+type Resource interface {
+	Close() error
+	IsValid() bool
+	Reset() error
+}
+
+// ResourceFactory creates new resources
+type ResourceFactory func() (Resource, error)
+
+// ResourceDestroyer cleans up resources
+type ResourceDestroyer func(Resource) error
+
+// ResourcePoolMetrics holds metrics for resource pool
+type ResourcePoolMetrics struct {
+	poolSize    prometheus.Gauge
+	hitRate     prometheus.Counter
+	missRate    prometheus.Counter
+	createTime  prometheus.Histogram
+	destroyTime prometheus.Histogram
+}
+
+// BackpressureHandler manages system backpressure
+type BackpressureHandler struct {
 	mu              sync.RWMutex
+	enabled         bool
+	threshold       float64
+	currentPressure float64
+	windowSize      time.Duration
+	samples         []float64
+	lastSample      time.Time
+	metrics         *BackpressureMetrics
 }
 
-// AdaptiveConfig defines adaptive concurrency behavior
-type AdaptiveConfig struct {
-	Enabled           bool          `yaml:"enabled"`
-	MinConcurrency    int           `yaml:"min_concurrency"`
-	MaxConcurrency    int           `yaml:"max_concurrency"`
-	TargetCPUPercent  float64       `yaml:"target_cpu_percent"`
-	TargetMemoryPercent float64     `yaml:"target_memory_percent"`
-	AdjustmentInterval time.Duration `yaml:"adjustment_interval"`
-	StabilizationPeriod time.Duration `yaml:"stabilization_period"`
-	LoadThreshold     float64       `yaml:"load_threshold"`
+// BackpressureMetrics holds metrics for backpressure handling
+type BackpressureMetrics struct {
+	pressureLevel prometheus.Gauge
+	rejectedTasks prometheus.Counter
+	delayedTasks  prometheus.Counter
+	adaptations   prometheus.Counter
 }
 
-// LoadMetrics represents system load metrics
-type LoadMetrics struct {
-	Timestamp       time.Time `json:"timestamp"`
-	CPUPercent      float64   `json:"cpu_percent"`
-	MemoryPercent   float64   `json:"memory_percent"`
-	GoroutineCount  int       `json:"goroutine_count"`
-	LoadAverage     float64   `json:"load_average"`
-	ResponseTime    time.Duration `json:"response_time"`
-	Throughput      float64   `json:"throughput"`
+// Task represents a unit of work to be executed
+type Task interface {
+	Execute(ctx context.Context) error
+	Priority() int
+	EstimatedDuration() time.Duration
 }
 
-// ConcurrencyState represents current concurrency state
-type ConcurrencyState struct {
-	CurrentConcurrency int           `json:"current_concurrency"`
-	TargetConcurrency  int           `json:"target_concurrency"`
-	LastAdjustment    time.Time      `json:"last_adjustment"`
-	AdjustmentReason  string         `json:"adjustment_reason"`
-	LoadMetrics       *LoadMetrics   `json:"load_metrics"`
-	StabilityScore    float64        `json:"stability_score"`
+// ConcurrencyConfig holds configuration for adaptive concurrency
+type ConcurrencyConfig struct {
+	MinConcurrency   int32
+	MaxConcurrency   int32
+	CPUThreshold     float64
+	MemoryThreshold  float64
+	AdjustmentFactor float64
+	MonitorInterval  time.Duration
 }
 
-// NewAdaptiveConcurrency creates a new adaptive concurrency controller
-func NewAdaptiveConcurrency(config *AdaptiveConfig) *AdaptiveConcurrency {
-	if config == nil {
-		config = &AdaptiveConfig{
-			Enabled:           true,
-			MinConcurrency:    1,
-			MaxConcurrency:    runtime.NumCPU() * 4,
-			TargetCPUPercent:  70.0,
-			TargetMemoryPercent: 80.0,
-			AdjustmentInterval: 30 * time.Second,
-			StabilizationPeriod: 2 * time.Minute,
-			LoadThreshold:     0.8,
+// NewAdaptiveConcurrencyManager creates a new adaptive concurrency manager
+func NewAdaptiveConcurrencyManager(config ConcurrencyConfig) *AdaptiveConcurrencyManager {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	metrics := &ConcurrencyMetrics{
+		activeTasks: promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "driftmgr_active_tasks_total",
+			Help: "Number of currently active tasks",
+		}),
+		completedTasks: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "driftmgr_completed_tasks_total",
+			Help: "Total number of completed tasks",
+		}),
+		failedTasks: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "driftmgr_failed_tasks_total",
+			Help: "Total number of failed tasks",
+		}),
+		concurrencyLevel: promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "driftmgr_concurrency_level",
+			Help: "Current concurrency level",
+		}),
+		responseTime: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name:    "driftmgr_task_duration_seconds",
+			Help:    "Task execution duration",
+			Buckets: prometheus.DefBuckets,
+		}),
+		resourcePoolSize: promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "driftmgr_resource_pool_size",
+			Help: "Current resource pool size",
+		}),
+		backpressureEvents: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "driftmgr_backpressure_events_total",
+			Help: "Total number of backpressure events",
+		}),
+	}
+
+	poolMetrics := &ResourcePoolMetrics{
+		poolSize: promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "driftmgr_pool_size",
+			Help: "Current pool size",
+		}),
+		hitRate: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "driftmgr_pool_hits_total",
+			Help: "Total pool hits",
+		}),
+		missRate: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "driftmgr_pool_misses_total",
+			Help: "Total pool misses",
+		}),
+		createTime: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name: "driftmgr_resource_create_duration_seconds",
+			Help: "Resource creation duration",
+		}),
+		destroyTime: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name: "driftmgr_resource_destroy_duration_seconds",
+			Help: "Resource destruction duration",
+		}),
+	}
+
+	backpressureMetrics := &BackpressureMetrics{
+		pressureLevel: promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "driftmgr_backpressure_level",
+			Help: "Current backpressure level",
+		}),
+		rejectedTasks: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "driftmgr_rejected_tasks_total",
+			Help: "Total number of rejected tasks due to backpressure",
+		}),
+		delayedTasks: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "driftmgr_delayed_tasks_total",
+			Help: "Total number of delayed tasks due to backpressure",
+		}),
+		adaptations: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "driftmgr_concurrency_adaptations_total",
+			Help: "Total number of concurrency adaptations",
+		}),
+	}
+
+	manager := &AdaptiveConcurrencyManager{
+		maxConcurrency:     config.MinConcurrency,
+		currentConcurrency: config.MinConcurrency,
+		minConcurrency:     config.MinConcurrency,
+		maxConcurrencyLim:  config.MaxConcurrency,
+		adjustmentFactor:   config.AdjustmentFactor,
+		monitorInterval:    config.MonitorInterval,
+		cpuThreshold:       config.CPUThreshold,
+		memThreshold:       config.MemoryThreshold,
+		metrics:            metrics,
+		ctx:                ctx,
+		cancel:             cancel,
+		done:               make(chan struct{}),
+	}
+
+	// Initialize resource pool
+	manager.resourcePool = &ResourcePool{
+		resources: make(chan Resource, config.MaxConcurrency),
+		maxSize:   config.MaxConcurrency,
+		metrics:   poolMetrics,
+	}
+
+	// Initialize backpressure handler
+	manager.backpressure = &BackpressureHandler{
+		enabled:    true,
+		threshold:  0.8,
+		windowSize: time.Minute,
+		samples:    make([]float64, 0, 60),
+		metrics:    backpressureMetrics,
+	}
+
+	// Start monitoring goroutine
+	go manager.monitor()
+
+	return manager
+}
+
+// Execute executes a task with adaptive concurrency control
+func (acm *AdaptiveConcurrencyManager) Execute(ctx context.Context, task Task) error {
+	// Check backpressure
+	if acm.backpressure.ShouldReject() {
+		acm.backpressure.metrics.rejectedTasks.Inc()
+		return ErrBackpressureRejection
+	}
+
+	// Acquire concurrency slot
+	if !acm.acquireSlot(ctx) {
+		return ErrConcurrencyLimitReached
+	}
+	defer acm.releaseSlot()
+
+	// Get resource from pool
+	resource, err := acm.resourcePool.Get(ctx)
+	if err != nil {
+		return err
+	}
+	defer acm.resourcePool.Put(resource)
+
+	// Execute task
+	start := time.Now()
+	atomic.AddInt64(&acm.totalTasks, 1)
+	acm.metrics.activeTasks.Inc()
+
+	err = task.Execute(ctx)
+
+	duration := time.Since(start)
+	acm.metrics.responseTime.Observe(duration.Seconds())
+	acm.metrics.activeTasks.Dec()
+
+	if err != nil {
+		atomic.AddInt64(&acm.failedTasks, 1)
+		acm.metrics.failedTasks.Inc()
+		return err
+	}
+
+	atomic.AddInt64(&acm.completedTasks, 1)
+	acm.metrics.completedTasks.Inc()
+
+	// Update average response time
+	acm.updateAvgResponseTime(duration)
+
+	return nil
+}
+
+// acquireSlot attempts to acquire a concurrency slot
+func (acm *AdaptiveConcurrencyManager) acquireSlot(ctx context.Context) bool {
+	for {
+		current := atomic.LoadInt32(&acm.activeTasks)
+		max := atomic.LoadInt32(&acm.maxConcurrency)
+
+		if current >= max {
+			// Check if we should wait or reject
+			select {
+			case <-ctx.Done():
+				return false
+			case <-time.After(time.Millisecond * 10):
+				continue
+			}
+		}
+
+		if atomic.CompareAndSwapInt32(&acm.activeTasks, current, current+1) {
+			return true
+		}
+	}
+}
+
+// releaseSlot releases a concurrency slot
+func (acm *AdaptiveConcurrencyManager) releaseSlot() {
+	atomic.AddInt32(&acm.activeTasks, -1)
+}
+
+// monitor continuously monitors system metrics and adjusts concurrency
+func (acm *AdaptiveConcurrencyManager) monitor() {
+	ticker := time.NewTicker(acm.monitorInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-acm.ctx.Done():
+			close(acm.done)
+			return
+		case <-ticker.C:
+			acm.adjustConcurrency()
+			acm.updateBackpressure()
+		}
+	}
+}
+
+// adjustConcurrency adjusts the concurrency level based on system metrics
+func (acm *AdaptiveConcurrencyManager) adjustConcurrency() {
+	cpuUsage := getCPUUsage()
+	memUsage := getMemoryUsage()
+
+	current := atomic.LoadInt32(&acm.maxConcurrency)
+	var newConcurrency int32
+
+	// Adjust based on CPU and memory usage
+	if cpuUsage > acm.cpuThreshold || memUsage > acm.memThreshold {
+		// Decrease concurrency
+		newConcurrency = int32(float64(current) * (1.0 - acm.adjustmentFactor))
+	} else {
+		// Increase concurrency
+		newConcurrency = int32(float64(current) * (1.0 + acm.adjustmentFactor))
+	}
+
+	// Apply bounds
+	if newConcurrency < acm.minConcurrency {
+		newConcurrency = acm.minConcurrency
+	}
+	if newConcurrency > acm.maxConcurrencyLim {
+		newConcurrency = acm.maxConcurrencyLim
+	}
+
+	// Update if changed
+	if newConcurrency != current {
+		atomic.StoreInt32(&acm.maxConcurrency, newConcurrency)
+		acm.metrics.concurrencyLevel.Set(float64(newConcurrency))
+		acm.lastAdjustment = time.Now()
+	}
+}
+
+// updateBackpressure updates backpressure measurements
+func (acm *AdaptiveConcurrencyManager) updateBackpressure() {
+	acm.backpressure.mu.Lock()
+	defer acm.backpressure.mu.Unlock()
+
+	now := time.Now()
+	if now.Sub(acm.backpressure.lastSample) < time.Second {
+		return
+	}
+
+	// Calculate current pressure based on active tasks vs capacity
+	pressure := float64(atomic.LoadInt32(&acm.activeTasks)) / float64(atomic.LoadInt32(&acm.maxConcurrency))
+
+	// Add to sliding window
+	acm.backpressure.samples = append(acm.backpressure.samples, pressure)
+	if len(acm.backpressure.samples) > 60 { // Keep 60 seconds of samples
+		acm.backpressure.samples = acm.backpressure.samples[1:]
+	}
+
+	// Calculate average pressure
+	var sum float64
+	for _, sample := range acm.backpressure.samples {
+		sum += sample
+	}
+	acm.backpressure.currentPressure = sum / float64(len(acm.backpressure.samples))
+
+	acm.backpressure.metrics.pressureLevel.Set(acm.backpressure.currentPressure)
+	acm.backpressure.lastSample = now
+}
+
+// updateAvgResponseTime updates the rolling average response time
+func (acm *AdaptiveConcurrencyManager) updateAvgResponseTime(duration time.Duration) {
+	acm.mu.Lock()
+	defer acm.mu.Unlock()
+
+	// Simple exponential moving average
+	alpha := 0.1
+	if acm.avgResponseTime == 0 {
+		acm.avgResponseTime = duration
+	} else {
+		acm.avgResponseTime = time.Duration(float64(acm.avgResponseTime)*(1-alpha) + float64(duration)*alpha)
+	}
+}
+
+// ShouldReject determines if a request should be rejected due to backpressure
+func (bp *BackpressureHandler) ShouldReject() bool {
+	bp.mu.RLock()
+	defer bp.mu.RUnlock()
+
+	if !bp.enabled {
+		return false
+	}
+
+	return bp.currentPressure > bp.threshold
+}
+
+// Get retrieves a resource from the pool
+func (rp *ResourcePool) Get(ctx context.Context) (Resource, error) {
+	select {
+	case resource := <-rp.resources:
+		if resource.IsValid() {
+			rp.metrics.hitRate.Inc()
+			return resource, nil
+		}
+		// Resource is invalid, destroy it
+		if rp.destroyer != nil {
+			rp.destroyer(resource)
+		}
+		// Create new resource since cached one was invalid
+		rp.metrics.missRate.Inc()
+		if rp.factory == nil {
+			return nil, ErrNoResourceFactory
+		}
+
+		start := time.Now()
+		newResource, err := rp.factory()
+		rp.metrics.createTime.Observe(time.Since(start).Seconds())
+
+		return newResource, err
+	default:
+		rp.metrics.missRate.Inc()
+		// Create new resource
+		if rp.factory == nil {
+			return nil, ErrNoResourceFactory
+		}
+
+		start := time.Now()
+		resource, err := rp.factory()
+		rp.metrics.createTime.Observe(time.Since(start).Seconds())
+
+		return resource, err
+	}
+}
+
+// Put returns a resource to the pool
+func (rp *ResourcePool) Put(resource Resource) {
+	if resource == nil || !resource.IsValid() {
+		return
+	}
+
+	// Reset resource state
+	if err := resource.Reset(); err != nil {
+		// Failed to reset, destroy the resource
+		if rp.destroyer != nil {
+			start := time.Now()
+			rp.destroyer(resource)
+			rp.metrics.destroyTime.Observe(time.Since(start).Seconds())
+		}
+		return
+	}
+
+	select {
+	case rp.resources <- resource:
+		// Successfully returned to pool
+	default:
+		// Pool is full, destroy the resource
+		if rp.destroyer != nil {
+			start := time.Now()
+			rp.destroyer(resource)
+			rp.metrics.destroyTime.Observe(time.Since(start).Seconds())
 		}
 	}
 
-	ac := &AdaptiveConcurrency{
-		loadMonitor:       NewLoadMonitor(),
-		concurrencyManager: NewConcurrencyManager(config),
-		config:            config,
-	}
-
-	// Start monitoring and adjustment loop
-	go ac.adjustmentLoop()
-
-	return ac
+	rp.metrics.poolSize.Set(float64(len(rp.resources)))
 }
 
-// GetOptimalConcurrency returns the optimal concurrency level
-func (ac *AdaptiveConcurrency) GetOptimalConcurrency() int {
-	ac.mu.RLock()
-	defer ac.mu.RUnlock()
-
-	return ac.concurrencyManager.GetCurrentConcurrency()
+// SetResourceFactory sets the resource factory function
+func (rp *ResourcePool) SetResourceFactory(factory ResourceFactory) {
+	rp.mu.Lock()
+	defer rp.mu.Unlock()
+	rp.factory = factory
 }
 
-// AdjustConcurrency manually adjusts concurrency
-func (ac *AdaptiveConcurrency) AdjustConcurrency(delta int, reason string) {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	ac.concurrencyManager.AdjustConcurrency(delta, reason)
+// SetResourceDestroyer sets the resource destroyer function
+func (rp *ResourcePool) SetResourceDestroyer(destroyer ResourceDestroyer) {
+	rp.mu.Lock()
+	defer rp.mu.Unlock()
+	rp.destroyer = destroyer
 }
 
-// GetLoadMetrics returns current load metrics
-func (ac *AdaptiveConcurrency) GetLoadMetrics() *LoadMetrics {
-	return ac.loadMonitor.GetCurrentMetrics()
-}
+// GetStats returns current statistics
+func (acm *AdaptiveConcurrencyManager) GetStats() ConcurrencyStats {
+	acm.mu.RLock()
+	defer acm.mu.RUnlock()
 
-// GetConcurrencyState returns current concurrency state
-func (ac *AdaptiveConcurrency) GetConcurrencyState() *ConcurrencyState {
-	ac.mu.RLock()
-	defer ac.mu.RUnlock()
-
-	return ac.concurrencyManager.GetState()
-}
-
-// adjustmentLoop continuously monitors and adjusts concurrency
-func (ac *AdaptiveConcurrency) adjustmentLoop() {
-	ticker := time.NewTicker(ac.config.AdjustmentInterval)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		ac.performAdjustment()
+	return ConcurrencyStats{
+		MaxConcurrency:    atomic.LoadInt32(&acm.maxConcurrency),
+		ActiveTasks:       atomic.LoadInt32(&acm.activeTasks),
+		TotalTasks:        atomic.LoadInt64(&acm.totalTasks),
+		CompletedTasks:    atomic.LoadInt64(&acm.completedTasks),
+		FailedTasks:       atomic.LoadInt64(&acm.failedTasks),
+		AvgResponseTime:   acm.avgResponseTime,
+		BackpressureLevel: acm.backpressure.currentPressure,
+		ResourcePoolSize:  int32(len(acm.resourcePool.resources)),
+		LastAdjustment:    acm.lastAdjustment,
 	}
 }
 
-// performAdjustment performs automatic concurrency adjustment
-func (ac *AdaptiveConcurrency) performAdjustment() {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
+// ConcurrencyStats holds statistics about concurrency management
+type ConcurrencyStats struct {
+	MaxConcurrency    int32
+	ActiveTasks       int32
+	TotalTasks        int64
+	CompletedTasks    int64
+	FailedTasks       int64
+	AvgResponseTime   time.Duration
+	BackpressureLevel float64
+	ResourcePoolSize  int32
+	LastAdjustment    time.Time
+}
 
-	metrics := ac.loadMonitor.GetCurrentMetrics()
-	state := ac.concurrencyManager.GetState()
+// Shutdown gracefully shuts down the concurrency manager
+func (acm *AdaptiveConcurrencyManager) Shutdown(ctx context.Context) error {
+	acm.cancel()
 
-	// Calculate adjustment based on load metrics
-	adjustment := ac.calculateAdjustment(metrics, state)
-	
-	if adjustment != 0 {
-		reason := ac.determineAdjustmentReason(metrics, state)
-		ac.concurrencyManager.AdjustConcurrency(adjustment, reason)
-		
-		fmt.Printf("Adaptive concurrency adjustment: %+d (reason: %s, CPU: %.1f%%, Memory: %.1f%%)\n",
-			adjustment, reason, metrics.CPUPercent, metrics.MemoryPercent)
+	select {
+	case <-acm.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
-// calculateAdjustment calculates the required concurrency adjustment
-func (ac *AdaptiveConcurrency) calculateAdjustment(metrics *LoadMetrics, state *ConcurrencyState) int {
-	// Calculate load scores
-	cpuScore := metrics.CPUPercent / ac.config.TargetCPUPercent
-	memoryScore := metrics.MemoryPercent / ac.config.TargetMemoryPercent
-	
-	// Use the higher score to determine adjustment
-	loadScore := math.Max(cpuScore, memoryScore)
-	
-	// Calculate stability score
-	stabilityScore := ac.calculateStabilityScore(metrics, state)
-	
-	// Determine adjustment based on load and stability
-	if loadScore > 1.2 && stabilityScore > 0.7 {
-		// High load, stable system - decrease concurrency
-		return -1
-	} else if loadScore < 0.8 && stabilityScore > 0.7 {
-		// Low load, stable system - increase concurrency
-		return 1
-	} else if loadScore > 1.5 {
-		// Very high load - significant decrease
-		return -2
-	} else if loadScore < 0.5 {
-		// Very low load - significant increase
-		return 2
-	}
-	
-	return 0
+// getCPUUsage returns current CPU usage percentage
+func getCPUUsage() float64 {
+	// Simplified CPU usage calculation
+	// In production, use proper CPU monitoring
+	return float64(runtime.NumGoroutine()) / float64(runtime.NumCPU()) * 10.0
 }
 
-// calculateStabilityScore calculates system stability score
-func (ac *AdaptiveConcurrency) calculateStabilityScore(metrics *LoadMetrics, state *ConcurrencyState) float64 {
-	// Factors for stability:
-	// - Response time consistency
-	// - Throughput stability
-	// - Resource usage consistency
-	
-	// For now, use a simplified stability calculation
-	// In a real implementation, this would analyze historical metrics
-	
-	// Check if metrics are within reasonable bounds
-	cpuStable := metrics.CPUPercent > 0 && metrics.CPUPercent < 95
-	memoryStable := metrics.MemoryPercent > 0 && metrics.MemoryPercent < 95
-	responseStable := metrics.ResponseTime > 0 && metrics.ResponseTime < 10*time.Second
-	
-	stabilityFactors := 0
-	if cpuStable {
-		stabilityFactors++
-	}
-	if memoryStable {
-		stabilityFactors++
-	}
-	if responseStable {
-		stabilityFactors++
-	}
-	
-	return float64(stabilityFactors) / 3.0
-}
-
-// determineAdjustmentReason determines the reason for adjustment
-func (ac *AdaptiveConcurrency) determineAdjustmentReason(metrics *LoadMetrics, state *ConcurrencyState) string {
-	cpuScore := metrics.CPUPercent / ac.config.TargetCPUPercent
-	memoryScore := metrics.MemoryPercent / ac.config.TargetMemoryPercent
-	
-	if cpuScore > 1.2 {
-		return fmt.Sprintf("High CPU usage (%.1f%%)", metrics.CPUPercent)
-	} else if memoryScore > 1.2 {
-		return fmt.Sprintf("High memory usage (%.1f%%)", metrics.MemoryPercent)
-	} else if cpuScore < 0.8 && memoryScore < 0.8 {
-		return "Low resource utilization"
-	} else if metrics.ResponseTime > 5*time.Second {
-		return "High response time"
-	}
-	
-	return "Load balancing"
-}
-
-// LoadMonitor monitors system load
-type LoadMonitor struct {
-	metrics     *LoadMetrics
-	mu          sync.RWMutex
-	lastUpdate  time.Time
-}
-
-// NewLoadMonitor creates a new load monitor
-func NewLoadMonitor() *LoadMonitor {
-	lm := &LoadMonitor{
-		metrics: &LoadMetrics{
-			Timestamp: time.Now(),
-		},
-	}
-	
-	// Start monitoring
-	go lm.monitoringLoop()
-	
-	return lm
-}
-
-// GetCurrentMetrics returns current load metrics
-func (lm *LoadMonitor) GetCurrentMetrics() *LoadMetrics {
-	lm.mu.RLock()
-	defer lm.mu.RUnlock()
-	
-	return lm.metrics
-}
-
-// monitoringLoop continuously monitors system load
-func (lm *LoadMonitor) monitoringLoop() {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-	
-	for range ticker.C {
-		lm.updateMetrics()
-	}
-}
-
-// updateMetrics updates current load metrics
-func (lm *LoadMonitor) updateMetrics() {
-	lm.mu.Lock()
-	defer lm.mu.Unlock()
-	
-	metrics := &LoadMetrics{
-		Timestamp:      time.Now(),
-		CPUPercent:     lm.getCPUPercent(),
-		MemoryPercent:  lm.getMemoryPercent(),
-		GoroutineCount: runtime.NumGoroutine(),
-		LoadAverage:    lm.getLoadAverage(),
-		ResponseTime:   lm.getAverageResponseTime(),
-		Throughput:     lm.getThroughput(),
-	}
-	
-	lm.metrics = metrics
-	lm.lastUpdate = time.Now()
-}
-
-// getCPUPercent gets current CPU usage percentage
-func (lm *LoadMonitor) getCPUPercent() float64 {
-	// In a real implementation, this would use system calls
-	// For now, return a simulated value based on goroutine count
-	goroutines := runtime.NumGoroutine()
-	cpuCores := runtime.NumCPU()
-	
-	// Simulate CPU usage based on active goroutines
-	cpuPercent := float64(goroutines) / float64(cpuCores*10) * 100
-	return math.Min(cpuPercent, 100.0)
-}
-
-// getMemoryPercent gets current memory usage percentage
-func (lm *LoadMonitor) getMemoryPercent() float64 {
+// getMemoryUsage returns current memory usage percentage
+func getMemoryUsage() float64 {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
-	// Calculate memory usage percentage
-	totalMemory := m.Sys
-	usedMemory := m.Alloc + m.StackInuse + m.HeapInuse
-	
-	if totalMemory == 0 {
-		return 0.0
-	}
-	
-	return float64(usedMemory) / float64(totalMemory) * 100
+
+	// Simplified memory usage calculation
+	return float64(m.Alloc) / float64(m.Sys) * 100.0
 }
 
-// getLoadAverage gets system load average
-func (lm *LoadMonitor) getLoadAverage() float64 {
-	// In a real implementation, this would read from /proc/loadavg
-	// For now, simulate based on goroutine count
-	goroutines := runtime.NumGoroutine()
-	cpuCores := runtime.NumCPU()
-	
-	return float64(goroutines) / float64(cpuCores)
-}
-
-// getAverageResponseTime gets average response time
-func (lm *LoadMonitor) getAverageResponseTime() time.Duration {
-	// In a real implementation, this would track actual response times
-	// For now, simulate based on load
-	load := lm.getLoadAverage()
-	
-	// Simulate response time increase with load
-	baseTime := 100 * time.Millisecond
-	loadFactor := 1.0 + (load * 0.5)
-	
-	return time.Duration(float64(baseTime) * loadFactor)
-}
-
-// getThroughput gets current throughput
-func (lm *LoadMonitor) getThroughput() float64 {
-	// In a real implementation, this would track actual throughput
-	// For now, simulate based on concurrency and response time
-	goroutines := runtime.NumGoroutine()
-	responseTime := lm.getAverageResponseTime()
-	
-	if responseTime == 0 {
-		return 0.0
-	}
-	
-	// Throughput = concurrency / response_time
-	return float64(goroutines) / responseTime.Seconds()
-}
-
-// ConcurrencyManager manages concurrency levels
-type ConcurrencyManager struct {
-	config           *AdaptiveConfig
-	currentConcurrency int32
-	targetConcurrency  int32
-	lastAdjustment    time.Time
-	adjustmentReason  string
-	loadHistory       []*LoadMetrics
-	mu                sync.RWMutex
-}
-
-// NewConcurrencyManager creates a new concurrency manager
-func NewConcurrencyManager(config *AdaptiveConfig) *ConcurrencyManager {
-	return &ConcurrencyManager{
-		config:            config,
-		currentConcurrency: int32(config.MinConcurrency),
-		targetConcurrency:  int32(config.MinConcurrency),
-		lastAdjustment:    time.Now(),
-		loadHistory:       make([]*LoadMetrics, 0, 100),
-	}
-}
-
-// GetCurrentConcurrency returns current concurrency level
-func (cm *ConcurrencyManager) GetCurrentConcurrency() int {
-	return int(atomic.LoadInt32(&cm.currentConcurrency))
-}
-
-// AdjustConcurrency adjusts concurrency level
-func (cm *ConcurrencyManager) AdjustConcurrency(delta int, reason string) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-	
-	current := int(atomic.LoadInt32(&cm.currentConcurrency))
-	newConcurrency := current + delta
-	
-	// Apply bounds
-	if newConcurrency < cm.config.MinConcurrency {
-		newConcurrency = cm.config.MinConcurrency
-	} else if newConcurrency > cm.config.MaxConcurrency {
-		newConcurrency = cm.config.MaxConcurrency
-	}
-	
-	// Update concurrency
-	atomic.StoreInt32(&cm.currentConcurrency, int32(newConcurrency))
-	atomic.StoreInt32(&cm.targetConcurrency, int32(newConcurrency))
-	
-	cm.lastAdjustment = time.Now()
-	cm.adjustmentReason = reason
-}
-
-// GetState returns current concurrency state
-func (cm *ConcurrencyManager) GetState() *ConcurrencyState {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-	
-	return &ConcurrencyState{
-		CurrentConcurrency: int(atomic.LoadInt32(&cm.currentConcurrency)),
-		TargetConcurrency:  int(atomic.LoadInt32(&cm.targetConcurrency)),
-		LastAdjustment:    cm.lastAdjustment,
-		AdjustmentReason:  cm.adjustmentReason,
-		StabilityScore:    0.8, // Placeholder
-	}
-}
-
-// GetStatistics returns concurrency statistics
-func (cs *ConcurrencyState) GetStatistics() map[string]interface{} {
-	return map[string]interface{}{
-		"current_concurrency": cs.CurrentConcurrency,
-		"target_concurrency":  cs.TargetConcurrency,
-		"last_adjustment":     cs.LastAdjustment,
-		"adjustment_reason":   cs.AdjustmentReason,
-		"stability_score":     cs.StabilityScore,
-	}
-}
-
-// GetStatistics returns concurrency statistics
-func (cm *ConcurrencyManager) GetStatistics() map[string]interface{} {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-	
-	return map[string]interface{}{
-		"current_concurrency": int(atomic.LoadInt32(&cm.currentConcurrency)),
-		"target_concurrency":  int(atomic.LoadInt32(&cm.targetConcurrency)),
-		"min_concurrency":     cm.config.MinConcurrency,
-		"max_concurrency":     cm.config.MaxConcurrency,
-		"last_adjustment":     cm.lastAdjustment,
-		"adjustment_reason":   cm.adjustmentReason,
-		"load_history_size":   len(cm.loadHistory),
-	}
-}
+// Error definitions
+var (
+	ErrBackpressureRejection   = fmt.Errorf("request rejected due to backpressure")
+	ErrConcurrencyLimitReached = fmt.Errorf("concurrency limit reached")
+	ErrNoResourceFactory       = fmt.Errorf("no resource factory configured")
+)

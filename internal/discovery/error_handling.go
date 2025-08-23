@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/pkg/models"
+	"github.com/catherinevee/driftmgr/internal/models"
 )
 
 // ErrorType defines the type of error

@@ -76,7 +76,7 @@ jobs:
             if [ -f "drift-report.json" ]; then
               CRITICAL_COUNT=$(jq '.drift_results | map(select(.severity == "critical")) | length' drift-report.json)
               if [ "$CRITICAL_COUNT" -gt 0 ]; then
-                echo "❌ Critical drift detected! Please review and fix before committing."
+                echo "[ERROR] Critical drift detected! Please review and fix before committing."
                 exit 1
               fi
             fi
@@ -98,7 +98,7 @@ jobs:
               # Run terraform validate (if terraform is available)
               if command -v terraform &> /dev/null; then
                 (cd "$(dirname "$file")" && terraform validate) || {
-                  echo "❌ Validation failed for $file"
+                  echo "[ERROR] Validation failed for $file"
                   exit 1
                 }
               fi
@@ -116,7 +116,7 @@ jobs:
             
             # Basic syntax check (you could add more sophisticated checks here)
             if ! grep -q "terraform\|remote_state\|inputs" "$file"; then
-              echo "❌ Invalid Terragrunt configuration: $file"
+              echo "[ERROR] Invalid Terragrunt configuration: $file"
               exit 1
             fi
           done
@@ -137,9 +137,9 @@ jobs:
               const infoCount = driftData.drift_results?.filter(d => d.severity === 'info').length || 0;
               
               comment += `### Drift Summary\n`;
-              comment += `- ❌ Critical: ${criticalCount}\n`;
-              comment += `- ⚠️  Warnings: ${warningCount}\n`;
-              comment += `- ℹ️  Info: ${infoCount}\n\n`;
+              comment += `- [ERROR] Critical: ${criticalCount}\n`;
+              comment += `- [WARNING]  Warnings: ${warningCount}\n`;
+              comment += `- [INFO]  Info: ${infoCount}\n\n`;
               
               if (criticalCount > 0) {
                 comment += `**🚨 Critical drift detected! Please review and fix before merging.**\n\n`;
@@ -148,7 +148,7 @@ jobs:
               if (driftData.drift_results && driftData.drift_results.length > 0) {
                 comment += `### Drift Details\n`;
                 driftData.drift_results.slice(0, 10).forEach(drift => {
-                  const emoji = drift.severity === 'critical' ? '❌' : drift.severity === 'warning' ? '⚠️' : 'ℹ️';
+                  const emoji = drift.severity === 'critical' ? '[ERROR]' : drift.severity === 'warning' ? '[WARNING]' : '[INFO]';
                   comment += `${emoji} **${drift.resource_type}** (${drift.provider}/${drift.region}): ${drift.message}\n`;
                 });
                 
@@ -157,7 +157,7 @@ jobs:
                 }
               }
             } else {
-              comment += `✅ No drift detected in changed infrastructure.\n`;
+              comment += `[OK] No drift detected in changed infrastructure.\n`;
             }
             
             comment += `\n### Changed Files\n`;

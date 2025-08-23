@@ -21,13 +21,13 @@ type CompressionManager struct {
 
 // CompressionConfig defines compression behavior
 type CompressionConfig struct {
-	Enabled           bool          `yaml:"enabled"`
-	Algorithm         string        `yaml:"algorithm"` // gzip, zlib, lz4
-	CompressionLevel  int           `yaml:"compression_level"`
-	MinSizeThreshold  int           `yaml:"min_size_threshold"`
-	MaxSizeThreshold  int           `yaml:"max_size_threshold"`
-	CacheCompressed   bool          `yaml:"cache_compressed"`
-	AutoOptimize      bool          `yaml:"auto_optimize"`
+	Enabled          bool   `yaml:"enabled"`
+	Algorithm        string `yaml:"algorithm"` // gzip, zlib, lz4
+	CompressionLevel int    `yaml:"compression_level"`
+	MinSizeThreshold int    `yaml:"min_size_threshold"`
+	MaxSizeThreshold int    `yaml:"max_size_threshold"`
+	CacheCompressed  bool   `yaml:"cache_compressed"`
+	AutoOptimize     bool   `yaml:"auto_optimize"`
 }
 
 // CompressionStats tracks compression statistics
@@ -43,12 +43,12 @@ type CompressionStats struct {
 
 // CompressedData represents compressed data with metadata
 type CompressedData struct {
-	Data            []byte    `json:"data"`
-	OriginalSize    int       `json:"original_size"`
-	CompressedSize  int       `json:"compressed_size"`
-	Algorithm       string    `json:"algorithm"`
+	Data            []byte        `json:"data"`
+	OriginalSize    int           `json:"original_size"`
+	CompressedSize  int           `json:"compressed_size"`
+	Algorithm       string        `json:"algorithm"`
 	CompressionTime time.Duration `json:"compression_time"`
-	Timestamp       time.Time `json:"timestamp"`
+	Timestamp       time.Time     `json:"timestamp"`
 }
 
 // NewCompressionManager creates a new compression manager
@@ -58,7 +58,7 @@ func NewCompressionManager(config *CompressionConfig) *CompressionManager {
 			Enabled:          true,
 			Algorithm:        "gzip",
 			CompressionLevel: 6,
-			MinSizeThreshold: 1024, // 1KB
+			MinSizeThreshold: 1024,             // 1KB
 			MaxSizeThreshold: 10 * 1024 * 1024, // 10MB
 			CacheCompressed:  true,
 			AutoOptimize:     true,
@@ -102,10 +102,10 @@ func (cm *CompressionManager) Compress(data []byte) (*CompressedData, error) {
 	}
 
 	start := time.Now()
-	
+
 	var compressed []byte
 	var err error
-	
+
 	switch cm.config.Algorithm {
 	case "gzip":
 		compressed, err = cm.compressGzip(data)
@@ -114,16 +114,16 @@ func (cm *CompressionManager) Compress(data []byte) (*CompressedData, error) {
 	default:
 		compressed, err = cm.compressGzip(data)
 	}
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("compression failed: %w", err)
 	}
 
 	compressionTime := time.Since(start)
-	
+
 	// Update statistics
 	cm.updateStats(len(data), len(compressed), compressionTime)
-	
+
 	return &CompressedData{
 		Data:            compressed,
 		OriginalSize:    len(data),
@@ -141,10 +141,10 @@ func (cm *CompressionManager) Decompress(compressedData *CompressedData) ([]byte
 	}
 
 	start := time.Now()
-	
+
 	var decompressed []byte
 	var err error
-	
+
 	switch compressedData.Algorithm {
 	case "gzip":
 		decompressed, err = cm.decompressGzip(compressedData.Data)
@@ -153,19 +153,19 @@ func (cm *CompressionManager) Decompress(compressedData *CompressedData) ([]byte
 	default:
 		return nil, fmt.Errorf("unsupported compression algorithm: %s", compressedData.Algorithm)
 	}
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("decompression failed: %w", err)
 	}
 
-	decompressionTime := time.Since(start)
-	
+	_ = time.Since(start) // decompressionTime not used yet
+
 	// Verify size
 	if len(decompressed) != compressedData.OriginalSize {
-		return nil, fmt.Errorf("decompressed size %d doesn't match original size %d", 
+		return nil, fmt.Errorf("decompressed size %d doesn't match original size %d",
 			len(decompressed), compressedData.OriginalSize)
 	}
-	
+
 	return decompressed, nil
 }
 
@@ -175,7 +175,7 @@ func (cm *CompressionManager) CompressJSON(data interface{}) (*CompressedData, e
 	if err != nil {
 		return nil, fmt.Errorf("JSON marshaling failed: %w", err)
 	}
-	
+
 	return cm.Compress(jsonData)
 }
 
@@ -185,12 +185,12 @@ func (cm *CompressionManager) DecompressJSON(compressedData *CompressedData, tar
 	if err != nil {
 		return err
 	}
-	
+
 	err = json.Unmarshal(decompressed, target)
 	if err != nil {
 		return fmt.Errorf("JSON unmarshaling failed: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -231,12 +231,12 @@ func (cm *CompressionManager) GetStatistics() *CompressionStats {
 	defer cm.mu.RUnlock()
 
 	stats := *cm.stats
-	
+
 	// Calculate compression ratio
 	if stats.TotalUncompressed > 0 {
 		stats.CompressionRatio = float64(stats.TotalCompressed) / float64(stats.TotalUncompressed)
 	}
-	
+
 	return &stats
 }
 
@@ -253,23 +253,23 @@ func (cm *CompressionManager) ResetStatistics() {
 // compressGzip compresses data using gzip
 func (cm *CompressionManager) compressGzip(data []byte) ([]byte, error) {
 	var buf bytes.Buffer
-	
+
 	writer, err := gzip.NewWriterLevel(&buf, cm.config.CompressionLevel)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	_, err = writer.Write(data)
 	if err != nil {
 		writer.Close()
 		return nil, err
 	}
-	
+
 	err = writer.Close()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -280,36 +280,36 @@ func (cm *CompressionManager) decompressGzip(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer reader.Close()
-	
+
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, reader)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }
 
 // compressZlib compresses data using zlib
 func (cm *CompressionManager) compressZlib(data []byte) ([]byte, error) {
 	var buf bytes.Buffer
-	
+
 	writer, err := zlib.NewWriterLevel(&buf, cm.config.CompressionLevel)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	_, err = writer.Write(data)
 	if err != nil {
 		writer.Close()
 		return nil, err
 	}
-	
+
 	err = writer.Close()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -320,13 +320,13 @@ func (cm *CompressionManager) decompressZlib(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer reader.Close()
-	
+
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, reader)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -337,7 +337,7 @@ func (cm *CompressionManager) updateStats(originalSize, compressedSize int, comp
 
 	cm.stats.TotalUncompressed += int64(originalSize)
 	cm.stats.TotalCompressed += int64(compressedSize)
-	
+
 	// Update average time
 	totalCount := cm.stats.HitCount + cm.stats.MissCount
 	if totalCount > 0 {
@@ -346,7 +346,7 @@ func (cm *CompressionManager) updateStats(originalSize, compressedSize int, comp
 	} else {
 		cm.stats.AverageTime = compressionTime
 	}
-	
+
 	cm.stats.HitCount++
 }
 
@@ -367,7 +367,7 @@ func NewCompressionPool(config *CompressionConfig) *CompressionPool {
 func (cp *CompressionPool) GetCompressionLevel() int {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
-	
+
 	return cp.config.CompressionLevel
 }
 
@@ -376,81 +376,81 @@ func (cp *CompressionPool) SetCompressionLevel(level int) error {
 	if level < 1 || level > 9 {
 		return fmt.Errorf("compression level must be between 1 and 9")
 	}
-	
+
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
-	
+
 	cp.config.CompressionLevel = level
 	return nil
 }
 
 // CompressionBenchmark benchmarks compression performance
 type CompressionBenchmark struct {
-	Algorithm       string        `json:"algorithm"`
-	Level           int           `json:"level"`
-	OriginalSize    int           `json:"original_size"`
-	CompressedSize  int           `json:"compressed_size"`
-	CompressionTime time.Duration `json:"compression_time"`
+	Algorithm         string        `json:"algorithm"`
+	Level             int           `json:"level"`
+	OriginalSize      int           `json:"original_size"`
+	CompressedSize    int           `json:"compressed_size"`
+	CompressionTime   time.Duration `json:"compression_time"`
 	DecompressionTime time.Duration `json:"decompression_time"`
-	Ratio           float64       `json:"ratio"`
-	Speed           float64       `json:"speed_mbps"`
+	Ratio             float64       `json:"ratio"`
+	Speed             float64       `json:"speed_mbps"`
 }
 
 // BenchmarkCompression benchmarks compression algorithms
 func (cm *CompressionManager) BenchmarkCompression(data []byte) ([]*CompressionBenchmark, error) {
 	algorithms := []string{"gzip", "zlib"}
 	levels := []int{1, 6, 9}
-	
+
 	var benchmarks []*CompressionBenchmark
-	
+
 	for _, algorithm := range algorithms {
 		for _, level := range levels {
 			// Temporarily set compression level
 			originalLevel := cm.config.CompressionLevel
 			cm.config.CompressionLevel = level
-			
+
 			// Benchmark compression
 			start := time.Now()
 			compressed, err := cm.Compress(data)
 			compressionTime := time.Since(start)
-			
+
 			if err != nil {
 				cm.config.CompressionLevel = originalLevel
 				continue
 			}
-			
+
 			// Benchmark decompression
 			start = time.Now()
 			_, err = cm.Decompress(compressed)
 			decompressionTime := time.Since(start)
-			
+
 			if err != nil {
 				cm.config.CompressionLevel = originalLevel
 				continue
 			}
-			
+
 			// Calculate metrics
 			ratio := float64(compressed.CompressedSize) / float64(compressed.OriginalSize)
 			speed := float64(compressed.OriginalSize) / compressionTime.Seconds() / 1024 / 1024 // MB/s
-			
+
 			benchmark := &CompressionBenchmark{
-				Algorithm:        algorithm,
-				Level:            level,
-				OriginalSize:     compressed.OriginalSize,
-				CompressedSize:   compressed.CompressedSize,
-				CompressionTime:  compressionTime,
+				Algorithm:         algorithm,
+				Level:             level,
+				OriginalSize:      compressed.OriginalSize,
+				CompressedSize:    compressed.CompressedSize,
+				CompressionTime:   compressionTime,
 				DecompressionTime: decompressionTime,
-				Ratio:            ratio,
-				Speed:            speed,
+				Ratio:             ratio,
+				Speed:             speed,
 			}
-			
+
 			benchmarks = append(benchmarks, benchmark)
-			
+
 			// Restore original level
 			cm.config.CompressionLevel = originalLevel
 		}
 	}
-	
+
 	return benchmarks, nil
 }
 
@@ -458,7 +458,7 @@ func (cm *CompressionManager) BenchmarkCompression(data []byte) ([]*CompressionB
 func (cm *CompressionManager) GetOptimalSettings(dataSize int, dataType string) (string, int) {
 	// Simple heuristic for optimal settings
 	// In a real implementation, this would use machine learning or historical data
-	
+
 	if dataSize < 1024 {
 		return "gzip", 1 // Fast compression for small data
 	} else if dataSize < 1024*1024 {

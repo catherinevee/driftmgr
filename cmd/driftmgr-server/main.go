@@ -193,26 +193,26 @@ func main() {
 		port = "8080"
 	}
 
-		// Initialize security components
+	// Initialize security components
 	secretKey := make([]byte, 32)
 	if _, err := rand.Read(secretKey); err != nil {
 		log.Fatalf("Failed to generate secret key: %v", err)
 	}
-	
+
 	// Initialize database-backed authentication
 	dbPath := os.Getenv("DRIFT_DB_PATH")
 	if dbPath == "" {
 		dbPath = "./driftmgr.db"
 	}
-	
+
 	authManager, err := security.NewAuthManager(secretKey, dbPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize authentication manager: %v", err)
 	}
-	
+
 	rateLimiter := security.NewRateLimiter(1000, time.Minute) // 1000 requests per minute
 	securityMiddleware := security.NewMiddleware(authManager, rateLimiter)
-	
+
 	log.Printf("Enhanced security components initialized successfully")
 	log.Printf("Database path: %s", dbPath)
 
@@ -1166,7 +1166,8 @@ func handleDiscover(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Load AWS configuration
-	cfg, err := awsconfig.LoadDefaultConfig(context.TODO())
+	ctx := r.Context()
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to load AWS config: %v", err), http.StatusInternalServerError)
 		return

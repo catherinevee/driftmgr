@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/models"
@@ -340,14 +341,107 @@ func (dl *DeletionLogger) ExportLogs(format string) ([]byte, error) {
 
 // convertToCSV converts JSON logs to CSV format
 func (dl *DeletionLogger) convertToCSV(logData []byte) ([]byte, error) {
-	// Implementation for CSV conversion
-	// This would parse the JSON logs and convert to CSV format
-	return nil, fmt.Errorf("CSV export not implemented")
+	var entries []LogEntry
+	lines := strings.Split(string(logData), "\n")
+	
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		var entry LogEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue // Skip malformed lines
+		}
+		entries = append(entries, entry)
+	}
+	
+	// Create CSV header
+	var csv strings.Builder
+	csv.WriteString("Timestamp,Level,Message,ResourceID,ResourceType,Provider,Error\n")
+	
+	// Add data rows
+	for _, entry := range entries {
+		csv.WriteString(fmt.Sprintf("%s,%s,%q,%s,%s,%s,%q\n",
+			entry.Timestamp.Format(time.RFC3339),
+			entry.Level,
+			entry.Message,
+			entry.ResourceID,
+			entry.ResourceType,
+			entry.Provider,
+			entry.Error,
+		))
+	}
+	
+	return []byte(csv.String()), nil
 }
 
 // generateSummary generates a summary of the deletion operation
 func (dl *DeletionLogger) generateSummary(logData []byte) ([]byte, error) {
-	// Implementation for summary generation
-	// This would analyze the logs and generate a summary report
-	return nil, fmt.Errorf("Summary generation not implemented")
+	var entries []LogEntry
+	lines := strings.Split(string(logData), "\n")
+	
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		var entry LogEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue
+		}
+		entries = append(entries, entry)
+	}
+	
+	// Analyze logs for summary
+	summary := struct {
+		SessionID      string                 `json:"session_id"`
+		StartTime      time.Time              `json:"start_time"`
+		EndTime        time.Time              `json:"end_time"`
+		Duration       string                 `json:"duration"`
+		TotalResources int                    `json:"total_resources"`
+		SuccessCount   int                    `json:"success_count"`
+		FailureCount   int                    `json:"failure_count"`
+		ErrorCount     int                    `json:"error_count"`
+		ByProvider     map[string]int         `json:"by_provider"`
+		ByResourceType map[string]int         `json:"by_resource_type"`
+		Errors         []string               `json:"errors"`
+	}{
+		SessionID:      dl.sessionID,
+		ByProvider:     make(map[string]int),
+		ByResourceType: make(map[string]int),
+		Errors:         []string{},
+	}
+	
+	if len(entries) > 0 {
+		summary.StartTime = entries[0].Timestamp
+		summary.EndTime = entries[len(entries)-1].Timestamp
+		summary.Duration = summary.EndTime.Sub(summary.StartTime).String()
+	}
+	
+	// Count statistics
+	resourcesSeen := make(map[string]bool)
+	for _, entry := range entries {
+		if entry.ResourceID != "" {
+			resourcesSeen[entry.ResourceID] = true
+			summary.ByProvider[entry.Provider]++
+			summary.ByResourceType[entry.ResourceType]++
+		}
+		
+		if entry.Level == "ERROR" {
+			summary.ErrorCount++
+			if entry.Error != "" {
+				summary.Errors = append(summary.Errors, entry.Error)
+			}
+		}
+		
+		// Count success/failure based on message patterns
+		if strings.Contains(entry.Message, "deleted successfully") {
+			summary.SuccessCount++
+		} else if strings.Contains(entry.Message, "failed") {
+			summary.FailureCount++
+		}
+	}
+	
+	summary.TotalResources = len(resourcesSeen)
+	
+	return json.MarshalIndent(summary, "", "  ")
 }

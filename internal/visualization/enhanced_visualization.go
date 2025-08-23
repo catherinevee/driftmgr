@@ -58,22 +58,22 @@ type VisualizationOptions struct {
 
 // VisualizationData represents data for visualization
 type VisualizationData struct {
-	Resources    []models.Resource `json:"resources"`
-	DriftResults []models.DriftResult `json:"drift_results"`
+	Resources    []models.Resource      `json:"resources"`
+	DriftResults []models.DriftResult   `json:"drift_results"`
 	Metrics      map[string]interface{} `json:"metrics"`
-	Timeline     []TimelineEvent   `json:"timeline"`
-	Network      NetworkData       `json:"network"`
+	Timeline     []TimelineEvent        `json:"timeline"`
+	Network      NetworkData            `json:"network"`
 	Metadata     map[string]interface{} `json:"metadata"`
 }
 
 // TimelineEvent represents a timeline event
 type TimelineEvent struct {
-	Timestamp time.Time              `json:"timestamp"`
-	Type      string                 `json:"type"`
-	Title     string                 `json:"title"`
-	Description string               `json:"description"`
-	Severity  string                 `json:"severity"`
-	Data      map[string]interface{} `json:"data"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Type        string                 `json:"type"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	Severity    string                 `json:"severity"`
+	Data        map[string]interface{} `json:"data"`
 }
 
 // NetworkData represents network topology data
@@ -94,11 +94,11 @@ type NetworkNode struct {
 
 // NetworkEdge represents a network edge
 type NetworkEdge struct {
-	From     string                 `json:"from"`
-	To       string                 `json:"to"`
-	Label    string                 `json:"label"`
-	Type     string                 `json:"type"`
-	Data     map[string]interface{} `json:"data"`
+	From  string                 `json:"from"`
+	To    string                 `json:"to"`
+	Label string                 `json:"label"`
+	Type  string                 `json:"type"`
+	Data  map[string]interface{} `json:"data"`
 }
 
 // Position represents a 2D position
@@ -290,11 +290,11 @@ func (ev *EnhancedVisualization) buildNetworkData(resources []models.Resource) *
 				Y: float64(i * 100),
 			},
 			Data: map[string]interface{}{
-				"region":   resource.Region,
-				"state":    resource.State,
-				"tags":     resource.Tags,
-				"created":  resource.Created,
-				"updated":  resource.Updated,
+				"region":  resource.Region,
+				"state":   resource.State,
+				"tags":    resource.Tags,
+				"created": resource.Created,
+				"updated": resource.Updated,
 			},
 		}
 		nodes = append(nodes, node)
@@ -338,7 +338,7 @@ func (ev *EnhancedVisualization) buildDependencyData(resources []models.Resource
 	// Analyze dependencies (simplified example)
 	for _, resource := range resources {
 		deps := make([]string, 0)
-		
+
 		// Add dependencies based on resource type and tags
 		for _, other := range resources {
 			if resource.ID != other.ID {
@@ -348,7 +348,7 @@ func (ev *EnhancedVisualization) buildDependencyData(resources []models.Resource
 				}
 			}
 		}
-		
+
 		dependencies[resource.ID] = deps
 	}
 
@@ -368,10 +368,10 @@ func (ev *EnhancedVisualization) buildDriftData(driftResults []models.DriftResul
 	for _, drift := range driftResults {
 		// Group by severity
 		driftBySeverity[drift.Severity] = append(driftBySeverity[drift.Severity], drift)
-		
+
 		// Group by type
 		driftByType[drift.DriftType] = append(driftByType[drift.DriftType], drift)
-		
+
 		// Group by provider
 		driftByProvider[drift.Provider] = append(driftByProvider[drift.Provider], drift)
 	}
@@ -712,21 +712,21 @@ func (ev *EnhancedVisualization) generateDriftHTML(driftData map[string]interfac
 	}
 
 	data := struct {
-		Title       string
-		Description string
-		Theme       string
-		DriftData   map[string]interface{}
+		Title         string
+		Description   string
+		Theme         string
+		DriftData     map[string]interface{}
 		DriftDataJSON string
-		CustomCSS   template.CSS
-		CustomJS    template.JS
+		CustomCSS     template.CSS
+		CustomJS      template.JS
 	}{
-		Title:       options.Title,
-		Description: options.Description,
-		Theme:       options.Theme,
-		DriftData:   driftData,
+		Title:         options.Title,
+		Description:   options.Description,
+		Theme:         options.Theme,
+		DriftData:     driftData,
 		DriftDataJSON: string(driftDataJSON),
-		CustomCSS:   template.CSS(options.CustomCSS),
-		CustomJS:    template.JS(options.CustomJS),
+		CustomCSS:     template.CSS(options.CustomCSS),
+		CustomJS:      template.JS(options.CustomJS),
 	}
 
 	// Parse and execute template
@@ -804,21 +804,21 @@ func (ev *EnhancedVisualization) generateTimelineHTML(timeline []TimelineEvent, 
 	}
 
 	data := struct {
-		Title       string
-		Description string
-		Theme       string
-		Timeline    []TimelineEvent
+		Title        string
+		Description  string
+		Theme        string
+		Timeline     []TimelineEvent
 		TimelineJSON string
-		CustomCSS   template.CSS
-		CustomJS    template.JS
+		CustomCSS    template.CSS
+		CustomJS     template.JS
 	}{
-		Title:       options.Title,
-		Description: options.Description,
-		Theme:       options.Theme,
-		Timeline:    timeline,
+		Title:        options.Title,
+		Description:  options.Description,
+		Theme:        options.Theme,
+		Timeline:     timeline,
 		TimelineJSON: string(timelineJSON),
-		CustomCSS:   template.CSS(options.CustomCSS),
-		CustomJS:    template.JS(options.CustomJS),
+		CustomCSS:    template.CSS(options.CustomCSS),
+		CustomJS:     template.JS(options.CustomJS),
 	}
 
 	// Parse and execute template
@@ -1028,9 +1028,9 @@ func (ev *EnhancedVisualization) loadTemplates() error {
 func (ev *EnhancedVisualization) UpdateRealTimeData(key string, data interface{}) {
 	ev.mu.Lock()
 	defer ev.mu.Unlock()
-	
+
 	ev.realTimeData[key] = data
-	
+
 	// Notify subscribers
 	if subscribers, exists := ev.subscribers[key]; exists {
 		for _, ch := range subscribers {
@@ -1047,10 +1047,10 @@ func (ev *EnhancedVisualization) UpdateRealTimeData(key string, data interface{}
 func (ev *EnhancedVisualization) SubscribeToRealTimeData(key string) chan interface{} {
 	ev.mu.Lock()
 	defer ev.mu.Unlock()
-	
+
 	ch := make(chan interface{}, 100)
 	ev.subscribers[key] = append(ev.subscribers[key], ch)
-	
+
 	return ch
 }
 
@@ -1058,7 +1058,7 @@ func (ev *EnhancedVisualization) SubscribeToRealTimeData(key string) chan interf
 func (ev *EnhancedVisualization) UnsubscribeFromRealTimeData(key string, ch chan interface{}) {
 	ev.mu.Lock()
 	defer ev.mu.Unlock()
-	
+
 	if subscribers, exists := ev.subscribers[key]; exists {
 		for i, subscriber := range subscribers {
 			if subscriber == ch {
@@ -1074,7 +1074,7 @@ func (ev *EnhancedVisualization) UnsubscribeFromRealTimeData(key string, ch chan
 func (ev *EnhancedVisualization) GetRealTimeData(key string) (interface{}, bool) {
 	ev.mu.RLock()
 	defer ev.mu.RUnlock()
-	
+
 	data, exists := ev.realTimeData[key]
 	return data, exists
 }
@@ -1111,9 +1111,9 @@ func (ev *EnhancedVisualization) convertToSVG(htmlData []byte, filepath string) 
 	// This is a simplified implementation
 	// In a real implementation, you would use a headless browser like Puppeteer or Playwright
 	// to render the HTML and capture it as SVG
-	
+
 	svgFilepath := strings.TrimSuffix(filepath, ".html") + ".svg"
-	
+
 	// For now, just create a placeholder SVG
 	svgContent := `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
@@ -1125,7 +1125,7 @@ func (ev *EnhancedVisualization) convertToSVG(htmlData []byte, filepath string) 
     (SVG export functionality requires headless browser integration)
   </text>
 </svg>`
-	
+
 	return os.WriteFile(svgFilepath, []byte(svgContent), 0644)
 }
 
@@ -1134,12 +1134,12 @@ func (ev *EnhancedVisualization) convertToPNG(htmlData []byte, filepath string) 
 	// This is a simplified implementation
 	// In a real implementation, you would use a headless browser like Puppeteer or Playwright
 	// to render the HTML and capture it as PNG
-	
+
 	pngFilepath := strings.TrimSuffix(filepath, ".html") + ".png"
-	
+
 	// For now, just create a placeholder file
 	placeholderContent := "PNG export functionality requires headless browser integration"
-	
+
 	return os.WriteFile(pngFilepath, []byte(placeholderContent), 0644)
 }
 
@@ -1147,15 +1147,15 @@ func (ev *EnhancedVisualization) convertToPNG(htmlData []byte, filepath string) 
 func (ev *EnhancedVisualization) extractAsJSON(htmlData []byte, filepath string) error {
 	// This is a simplified implementation
 	// In a real implementation, you would parse the HTML and extract the embedded JSON data
-	
+
 	jsonFilepath := strings.TrimSuffix(filepath, ".html") + ".json"
-	
+
 	// For now, just create a placeholder JSON
 	jsonContent := `{
   "message": "JSON extraction functionality requires HTML parsing implementation",
   "original_file": "` + filepath + `",
   "timestamp": "` + time.Now().Format(time.RFC3339) + `"
 }`
-	
+
 	return os.WriteFile(jsonFilepath, []byte(jsonContent), 0644)
 }

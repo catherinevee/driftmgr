@@ -32,7 +32,7 @@ jobs:
         echo "Building DriftMgr..."
         go build -o driftmgr ./cmd/main.go
         chmod +x driftmgr
-        echo "✅ DriftMgr built successfully"
+        echo "[OK] DriftMgr built successfully"
 
     - name: Test Basic Functionality
       if: github.event.inputs.test_type == 'basic'
@@ -40,7 +40,7 @@ jobs:
         echo "Testing basic DriftMgr functionality..."
         echo "DriftMgr binary exists and is executable"
         ls -la driftmgr
-        echo "✅ Basic functionality test passed"
+        echo "[OK] Basic functionality test passed"
 
     - name: Test GitHub Actions Integration
       if: github.event.inputs.test_type == 'validation'
@@ -48,7 +48,7 @@ jobs:
         echo "Testing GitHub Actions integration..."
         ./driftmgr github-actions validate-inputs || echo "Expected failure - no environment variables"
         ./driftmgr github-actions setup-env
-        echo "✅ GitHub Actions integration test passed"
+        echo "[OK] GitHub Actions integration test passed"
 
     - name: Test Report Generation
       if: github.event.inputs.test_type == 'report'
@@ -56,10 +56,10 @@ jobs:
         echo "Testing report generation..."
         ./driftmgr github-actions generate-report --output test-report.md
         if [ -f "test-report.md" ]; then
-          echo "✅ Report generated successfully"
+          echo "[OK] Report generated successfully"
           cat test-report.md
         else
-          echo "❌ Report generation failed"
+          echo "[ERROR] Report generation failed"
           exit 1
         fi
 
@@ -78,5 +78,5 @@ jobs:
         echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Test Type:** ${{ github.event.inputs.test_type }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Status:** ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** [OK] All tests passed" >> $GITHUB_STEP_SUMMARY
         echo "**Execution Time:** $(date)" >> $GITHUB_STEP_SUMMARY

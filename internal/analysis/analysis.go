@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/catherinevee/driftmgr/pkg/models"
+	"github.com/catherinevee/driftmgr/internal/models"
 )
 
 // DriftAnalysis represents the result of drift analysis

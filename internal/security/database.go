@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // UserDB represents the database interface for user management
@@ -15,7 +15,7 @@ type UserDB struct {
 
 // NewUserDB creates a new database connection for user management
 func NewUserDB(dbPath string) (*UserDB, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -110,21 +110,21 @@ func (udb *UserDB) CreateUser(user *User) error {
 		INSERT INTO users (id, username, password_hash, role, created_at, password_changed_at, email)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
-	
-	_, err := udb.db.Exec(query, 
-		user.ID, 
-		user.Username, 
-		user.Password, 
-		user.Role, 
-		user.Created, 
+
+	_, err := udb.db.Exec(query,
+		user.ID,
+		user.Username,
+		user.Password,
+		user.Role,
+		user.Created,
 		time.Now(),
 		user.Email,
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -135,30 +135,30 @@ func (udb *UserDB) GetUserByUsername(username string) (*User, error) {
 		       failed_login_attempts, locked_until, mfa_enabled
 		FROM users WHERE username = ?
 	`
-	
+
 	var user User
 	var lastLogin, lockedUntil sql.NullTime
-	
+
 	err := udb.db.QueryRow(query, username).Scan(
 		&user.ID, &user.Username, &user.Password, &user.Role, &user.Created,
 		&lastLogin, &user.Email, &user.FailedLoginAttempts, &lockedUntil, &user.MFAEnabled,
 	)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
-	
+
 	if lastLogin.Valid {
 		user.LastLogin = lastLogin.Time
 	}
-	
+
 	if lockedUntil.Valid {
 		user.LockedUntil = &lockedUntil.Time
 	}
-	
+
 	return &user, nil
 }
 
@@ -170,21 +170,21 @@ func (udb *UserDB) UpdateUser(user *User) error {
 		    locked_until = ?, mfa_enabled = ?, mfa_secret = ?
 		WHERE id = ?
 	`
-	
+
 	var lockedUntil interface{}
 	if user.LockedUntil != nil {
 		lockedUntil = user.LockedUntil
 	}
-	
+
 	_, err := udb.db.Exec(query,
 		user.Password, user.Role, user.LastLogin, user.FailedLoginAttempts,
 		lockedUntil, user.MFAEnabled, user.MFASecret, user.ID,
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -194,16 +194,16 @@ func (udb *UserDB) CreateSession(session *UserSession) error {
 		INSERT INTO user_sessions (id, user_id, token_hash, created_at, expires_at, ip_address, user_agent)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
-	
+
 	_, err := udb.db.Exec(query,
 		session.ID, session.UserID, session.TokenHash, session.CreatedAt,
 		session.ExpiresAt, session.IPAddress, session.UserAgent,
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -213,44 +213,44 @@ func (udb *UserDB) GetSession(tokenHash string) (*UserSession, error) {
 		SELECT id, user_id, token_hash, created_at, expires_at, ip_address, user_agent
 		FROM user_sessions WHERE token_hash = ?
 	`
-	
+
 	var session UserSession
 	err := udb.db.QueryRow(query, tokenHash).Scan(
 		&session.ID, &session.UserID, &session.TokenHash, &session.CreatedAt,
 		&session.ExpiresAt, &session.IPAddress, &session.UserAgent,
 	)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("session not found")
 		}
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
-	
+
 	return &session, nil
 }
 
 // DeleteSession deletes a session
 func (udb *UserDB) DeleteSession(sessionID string) error {
 	query := `DELETE FROM user_sessions WHERE id = ?`
-	
+
 	_, err := udb.db.Exec(query, sessionID)
 	if err != nil {
 		return fmt.Errorf("failed to delete session: %w", err)
 	}
-	
+
 	return nil
 }
 
 // CleanupExpiredSessions removes expired sessions
 func (udb *UserDB) CleanupExpiredSessions() error {
 	query := `DELETE FROM user_sessions WHERE expires_at < ?`
-	
+
 	_, err := udb.db.Exec(query, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to cleanup expired sessions: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -260,16 +260,16 @@ func (udb *UserDB) LogAuditEvent(event *AuditEvent) error {
 		INSERT INTO audit_logs (user_id, action, resource, ip_address, user_agent, timestamp, details)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
-	
+
 	_, err := udb.db.Exec(query,
 		event.UserID, event.Action, event.Resource, event.IPAddress,
 		event.UserAgent, event.Timestamp, event.Details,
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to log audit event: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -280,18 +280,18 @@ func (udb *UserDB) GetPasswordPolicy() (*PasswordPolicy, error) {
 		       require_special_chars, max_age_days, prevent_reuse_count, lockout_threshold, lockout_duration_minutes
 		FROM password_policies LIMIT 1
 	`
-	
+
 	var policy PasswordPolicy
 	err := udb.db.QueryRow(query).Scan(
 		&policy.MinLength, &policy.RequireUppercase, &policy.RequireLowercase,
 		&policy.RequireNumbers, &policy.RequireSpecialChars, &policy.MaxAgeDays,
 		&policy.PreventReuseCount, &policy.LockoutThreshold, &policy.LockoutDurationMinutes,
 	)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get password policy: %w", err)
 	}
-	
+
 	return &policy, nil
 }
 
@@ -302,13 +302,13 @@ func (udb *UserDB) Close() error {
 
 // UserSession represents a user session in the database
 type UserSession struct {
-	ID         string    `json:"id"`
-	UserID     string    `json:"user_id"`
-	TokenHash  string    `json:"token_hash"`
-	CreatedAt  time.Time `json:"created_at"`
-	ExpiresAt  time.Time `json:"expires_at"`
-	IPAddress  string    `json:"ip_address"`
-	UserAgent  string    `json:"user_agent"`
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	TokenHash string    `json:"token_hash"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	IPAddress string    `json:"ip_address"`
+	UserAgent string    `json:"user_agent"`
 }
 
 // AuditEvent represents an audit log entry
@@ -324,13 +324,13 @@ type AuditEvent struct {
 
 // PasswordPolicy represents password policy settings
 type PasswordPolicy struct {
-	MinLength              int `json:"min_length"`
+	MinLength              int  `json:"min_length"`
 	RequireUppercase       bool `json:"require_uppercase"`
 	RequireLowercase       bool `json:"require_lowercase"`
 	RequireNumbers         bool `json:"require_numbers"`
 	RequireSpecialChars    bool `json:"require_special_chars"`
-	MaxAgeDays             int `json:"max_age_days"`
-	PreventReuseCount      int `json:"prevent_reuse_count"`
-	LockoutThreshold       int `json:"lockout_threshold"`
-	LockoutDurationMinutes int `json:"lockout_duration_minutes"`
+	MaxAgeDays             int  `json:"max_age_days"`
+	PreventReuseCount      int  `json:"prevent_reuse_count"`
+	LockoutThreshold       int  `json:"lockout_threshold"`
+	LockoutDurationMinutes int  `json:"lockout_duration_minutes"`
 }

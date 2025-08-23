@@ -34,19 +34,26 @@ type ServerConfig struct {
 
 // DiscoveryConfig contains discovery-related configuration
 type DiscoveryConfig struct {
-	ConcurrencyLimit     int               `yaml:"concurrency_limit" env:"DRIFT_DISCOVERY_CONCURRENCY_LIMIT"`
-	Timeout              time.Duration     `yaml:"timeout" env:"DRIFT_DISCOVERY_TIMEOUT"`
-	RetryAttempts        int               `yaml:"retry_attempts" env:"DRIFT_DISCOVERY_RETRY_ATTEMPTS"`
-	RetryDelay           time.Duration     `yaml:"retry_delay" env:"DRIFT_DISCOVERY_RETRY_DELAY"`
-	BatchSize            int               `yaml:"batch_size" env:"DRIFT_DISCOVERY_BATCH_SIZE"`
-	EnableCaching        bool              `yaml:"enable_caching" env:"DRIFT_DISCOVERY_ENABLE_CACHING"`
-	CacheTTL             time.Duration     `yaml:"cache_ttl" env:"DRIFT_DISCOVERY_CACHE_TTL"`
-	CacheMaxSize         int               `yaml:"cache_max_size" env:"DRIFT_DISCOVERY_CACHE_MAX_SIZE"`
-	MaxConcurrentRegions int               `yaml:"max_concurrent_regions" env:"DRIFT_DISCOVERY_MAX_CONCURRENT_REGIONS"`
-	APITimeout           time.Duration     `yaml:"api_timeout" env:"DRIFT_DISCOVERY_API_TIMEOUT"`
-	Regions              []string          `yaml:"regions" env:"DRIFT_DISCOVERY_REGIONS"`
-	QualityThresholds    QualityThresholds `yaml:"quality_thresholds"`
-	DefaultFilters       DiscoveryFilters  `yaml:"default_filters"`
+	ConcurrencyLimit     int                   `yaml:"concurrency_limit" env:"DRIFT_DISCOVERY_CONCURRENCY_LIMIT"`
+	Timeout              time.Duration         `yaml:"timeout" env:"DRIFT_DISCOVERY_TIMEOUT"`
+	RetryAttempts        int                   `yaml:"retry_attempts" env:"DRIFT_DISCOVERY_RETRY_ATTEMPTS"`
+	RetryDelay           time.Duration         `yaml:"retry_delay" env:"DRIFT_DISCOVERY_RETRY_DELAY"`
+	BatchSize            int                   `yaml:"batch_size" env:"DRIFT_DISCOVERY_BATCH_SIZE"`
+	EnableCaching        bool                  `yaml:"enable_caching" env:"DRIFT_DISCOVERY_ENABLE_CACHING"`
+	CacheTTL             time.Duration         `yaml:"cache_ttl" env:"DRIFT_DISCOVERY_CACHE_TTL"`
+	CacheMaxSize         int                   `yaml:"cache_max_size" env:"DRIFT_DISCOVERY_CACHE_MAX_SIZE"`
+	MaxConcurrentRegions int                   `yaml:"max_concurrent_regions" env:"DRIFT_DISCOVERY_MAX_CONCURRENT_REGIONS"`
+	APITimeout           time.Duration         `yaml:"api_timeout" env:"DRIFT_DISCOVERY_API_TIMEOUT"`
+	ShieldTimeout        time.Duration         `yaml:"shield_timeout" env:"DRIFT_DISCOVERY_SHIELD_TIMEOUT"`
+	SkipShield           bool                  `yaml:"skip_shield" env:"DRIFT_DISCOVERY_SKIP_SHIELD"`
+	Regions              []string              `yaml:"regions" env:"DRIFT_DISCOVERY_REGIONS"`
+	AWSProfile           string                `yaml:"aws_profile" env:"DRIFT_DISCOVERY_AWS_PROFILE"`
+	AzureProfile         string                `yaml:"azure_profile" env:"DRIFT_DISCOVERY_AZURE_PROFILE"`
+	GCPProject           string                `yaml:"gcp_project" env:"DRIFT_DISCOVERY_GCP_PROJECT"`
+	DigitalOceanToken    string                `yaml:"digitalocean_token" env:"DRIFT_DISCOVERY_DIGITALOCEAN_TOKEN"`
+	QualityThresholds    QualityThresholds     `yaml:"quality_thresholds"`
+	DefaultFilters       DiscoveryFilters      `yaml:"default_filters"`
+	CLIVerification      CLIVerificationConfig `yaml:"cli_verification"`
 }
 
 // QualityThresholds defines quality metrics for discovery
@@ -66,6 +73,14 @@ type DiscoveryFilters struct {
 	CostThreshold float64           `yaml:"cost_threshold"`
 	SecurityScore int               `yaml:"security_score"`
 	Environment   string            `yaml:"environment"`
+}
+
+// CLIVerificationConfig defines CLI verification settings
+type CLIVerificationConfig struct {
+	Enabled        bool `yaml:"enabled" env:"DRIFT_CLI_VERIFICATION_ENABLED"`
+	TimeoutSeconds int  `yaml:"timeout_seconds" env:"DRIFT_CLI_VERIFICATION_TIMEOUT_SECONDS"`
+	MaxRetries     int  `yaml:"max_retries" env:"DRIFT_CLI_VERIFICATION_MAX_RETRIES"`
+	Verbose        bool `yaml:"verbose" env:"DRIFT_CLI_VERIFICATION_VERBOSE"`
 }
 
 // CacheConfig contains cache-related configuration

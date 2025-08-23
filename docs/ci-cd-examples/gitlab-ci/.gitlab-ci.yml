@@ -1,0 +1,232 @@
+stages:
+- validate
+- test
+- deploy
+- verify
+
+variables:
+  DRIFT_CONFIG_FILE: "driftmgr.yaml"
+  DRIFT_OUTPUT_FORMAT: "json"
+  DRIFT_FAIL_ON_DRIFT: "true"
+  DRIFT_AUTO_REMEDIATE: "false"
+
+# Cache DriftMgr installation
+cache:
+  paths:
+  - driftmgr/
+
+before_script:
+- |
+  if [ ! -d "driftmgr" ]; then
+    git clone https://github.com/catherinevee/driftmgr.git
+    cd driftmgr
+    make build
+    cd ..
+  fi
+- export PATH="$PWD/driftmgr/bin:$PATH"
+
+drift-validation:
+  stage: validate
+  image: golang:1.21
+  script:
+  - echo "Validating infrastructure configuration"
+  - |
+    cat > driftmgr.yaml << EOF
+    providers:
+      aws:
+        regions: [us-east-1, us-west-2]
+      azure:
+        regions: [eastus, westus]
+      gcp:
+        regions: [us-central1, us-east1]
+    ci_cd:
+      enabled: true
+      fail_on_drift: $DRIFT_FAIL_ON_DRIFT
+      auto_remediate: $DRIFT_AUTO_REMEDIATE
+      severity_threshold: high
+    EOF
+  - driftmgr discover aws us-east-1,us-west-2
+  - driftmgr discover azure eastus,westus
+  - driftmgr discover gcp us-central1,us-east1
+  artifacts:
+    reports:
+      drift: drift-validation-report.json
+    paths:
+    - driftmgr.yaml
+    - drift-validation-report.json
+    expire_in: 1 week
+  only:
+  - merge_requests
+  - main
+  - develop
+
+drift-test:
+  stage: test
+  image: golang:1.21
+  script:
+  - echo "Testing drift detection"
+  - driftmgr analyze terraform.tfstate --output $DRIFT_OUTPUT_FORMAT > drift-test-report.json
+  - |
+    # Parse drift count and fail if drift detected
+    DRIFT_COUNT=$(jq '.drift_count // 0' drift-test-report.json)
+    if [ "$DRIFT_COUNT" -gt 0 ]; then
+      echo "[ERROR] Drift detected: $DRIFT_COUNT resources"
+      exit 1
+    else
+      echo "[OK] No drift detected"
+    fi
+  artifacts:
+    reports:
+      drift: drift-test-report.json
+    paths:
+    - drift-test-report.json
+    expire_in: 1 week
+  only:
+  - merge_requests
+  - main
+  - develop
+
+deploy:
+  stage: deploy
+  image: hashicorp/terraform:latest
+  script:
+  - echo "Deploying infrastructure"
+  - terraform init
+  - terraform plan -out=tfplan
+  - terraform apply tfplan
+  environment:
+    name: production
+  only:
+  - main
+  when: manual
+
+drift-verification:
+  stage: verify
+  image: golang:1.21
+  script:
+  - echo "Verifying deployment"
+  - driftmgr discover aws us-east-1,us-west-2
+  - driftmgr perspective terraform.tfstate aws
+  - |
+    # Check for post-deployment drift
+    driftmgr analyze terraform.tfstate --output $DRIFT_OUTPUT_FORMAT > drift-verify-report.json
+    DRIFT_COUNT=$(jq '.drift_count // 0' drift-verify-report.json)
+    if [ "$DRIFT_COUNT" -gt 0 ]; then
+      echo "[WARNING] Post-deployment drift detected: $DRIFT_COUNT resources"
+      # Don't fail the pipeline, just warn
+    else
+      echo "[OK] Deployment verified successfully"
+    fi
+  artifacts:
+    reports:
+      drift: drift-verify-report.json
+    paths:
+    - drift-verify-report.json
+    expire_in: 1 week
+  only:
+  - main
+  dependencies:
+  - deploy
+
+drift-remediation:
+  stage: verify
+  image: golang:1.21
+  script:
+  - echo "Remediating detected drift"
+  - driftmgr remediate-batch terraform --auto
+  - echo "Verifying remediation"
+  - driftmgr discover aws us-east-1,us-west-2
+  - driftmgr analyze terraform.tfstate
+  only:
+  - main
+  when: manual
+  dependencies:
+  - drift-verification
+
+# Scheduled drift monitoring
+drift-monitoring:
+  stage: test
+  image: golang:1.21
+  script:
+  - echo "Running scheduled drift monitoring"
+  - driftmgr discover aws us-east-1,us-west-2
+  - driftmgr analyze terraform.tfstate --output $DRIFT_OUTPUT_FORMAT > drift-monitoring-report.json
+  - |
+    DRIFT_COUNT=$(jq '.drift_count // 0' drift-monitoring-report.json)
+    if [ "$DRIFT_COUNT" -gt 0 ]; then
+      echo "🚨 Drift detected in scheduled monitoring: $DRIFT_COUNT resources"
+      # Send notification
+      driftmgr notify slack "Scheduled Drift Alert" "Drift detected in production infrastructure"
+      exit 1
+    else
+      echo "[OK] Scheduled monitoring: No drift detected"
+    fi
+  artifacts:
+    reports:
+      drift: drift-monitoring-report.json
+    paths:
+    - drift-monitoring-report.json
+    expire_in: 1 month
+  only:
+  - schedules
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule"
+
+# Environment-specific configurations
+.drift-template: &drift-template
+  image: golang:1.21
+  before_script:
+  - |
+    if [ ! -d "driftmgr" ]; then
+      git clone https://github.com/catherinevee/driftmgr.git
+      cd driftmgr
+      make build
+      cd ..
+    fi
+  - export PATH="$PWD/driftmgr/bin:$PATH"
+
+drift-development:
+  <<: *drift-template
+  stage: test
+  script:
+  - echo "Development environment drift check"
+  - |
+    cat > driftmgr.yaml << EOF
+    providers:
+      aws:
+        regions: [us-east-1]
+    ci_cd:
+      enabled: true
+      fail_on_drift: false
+      auto_remediate: true
+      severity_threshold: medium
+    EOF
+  - driftmgr discover aws us-east-1
+  - driftmgr analyze terraform.tfstate
+  environment:
+    name: development
+  only:
+  - develop
+
+drift-staging:
+  <<: *drift-template
+  stage: test
+  script:
+  - echo "Staging environment drift check"
+  - |
+    cat > driftmgr.yaml << EOF
+    providers:
+      aws:
+        regions: [us-east-1, us-west-2]
+    ci_cd:
+      enabled: true
+      fail_on_drift: true
+      auto_remediate: false
+      severity_threshold: high
+    EOF
+  - driftmgr discover aws us-east-1,us-west-2
+  - driftmgr analyze terraform.tfstate
+  environment:
+    name: staging
+  only:
+  - main

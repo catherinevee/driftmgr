@@ -303,6 +303,6 @@ if [ $FAILED -eq 0 ]; then
     echo -e "\n${GREEN}🎉 All functionality tests passed! DriftMgr is working correctly.${NC}"
     exit 0
 else
-    echo -e "\n${RED}⚠️  ${FAILED} functionality test(s) failed. Please review and fix the issues.${NC}"
+    echo -e "\n${RED}[WARNING]  ${FAILED} functionality test(s) failed. Please review and fix the issues.${NC}"
     exit 1
 fi

@@ -1,367 +1,377 @@
-# DriftMgr Testing Guide
+# DriftMgr Testing Infrastructure
 
-This document provides comprehensive information about the testing infrastructure for DriftMgr, including how to run tests, understand test results, and troubleshoot common issues.
+This directory contains comprehensive testing infrastructure for the driftmgr project, including end-to-end tests, integration tests, and performance benchmarks.
 
-## Test Overview
+## Directory Structure
 
-DriftMgr includes a comprehensive testing suite with **95%+ test success rate** across multiple test categories:
-
-- **Unit Tests**: Individual component testing
-- **Integration Tests**: Component interaction testing  
-- **Benchmark Tests**: Performance validation
-- **End-to-End Tests**: Complete workflow validation
+```
+tests/
+├── README.md                     # This file
+├── e2e/                         # End-to-end tests
+│   └── end_to_end_test.go      # Complete workflow testing
+├── integration/                 # Integration tests
+│   └── test_multi_cloud_discovery.go  # Multi-cloud discovery testing
+├── benchmarks/                  # Performance tests and benchmarks
+│   └── performance_test.go      # Load testing and profiling
+└── fixtures/                    # Test data and fixtures (auto-generated)
+```
 
 ## Test Categories
 
-### Unit Tests (`tests/unit/`)
+### 1. End-to-End Tests (`tests/e2e/`)
 
-**Status**: 9/9 tests passing (1 skipped due to CGO requirement)
+Comprehensive tests that verify complete workflows across the entire application:
 
-Unit tests focus on individual components and functions:
+- **Multi-provider workflows**: Complete AWS, Azure, and GCP discovery workflows
+- **State file processing**: Terraform state file parsing and analysis
+- **Drift detection**: End-to-end drift analysis
+- **Visualization generation**: Diagram and visualization creation
+- **Export functionality**: Data export in various formats
+- **Error handling and recovery**: Graceful failure scenarios
+- **Configuration variations**: Different configuration scenarios
 
-#### Security Tests (`security_test.go`)
-- ✅ **TokenManager**: JWT token generation, validation, and revocation
-- ✅ **TokenExpiration**: Proper token expiration handling
-- ✅ **RateLimiter**: Rate limiting functionality with window-based limits
-- ✅ **PasswordValidator**: Password policy validation
-- ✅ **PasswordHashing**: Secure password hashing and comparison
-- ✅ **PasswordGeneration**: Secure password generation with strength validation
-- ✅ **SecurityMiddleware**: Middleware creation and basic functionality
-- ⏭️ **AuthManager**: Skipped due to SQLite CGO requirement
+**Key Features:**
+- Uses test fixtures and mock data for reproducible results
+- Gracefully handles missing cloud credentials in CI/CD environments
+- Tests both success and failure scenarios
+- Validates data consistency across operations
 
-#### Deletion Tests (`deletion_test.go`)
-- ✅ **Provider Registration**: AWS, Azure, GCP provider registration
-- ✅ **Deletion Options**: Configuration and validation
-- ✅ **Safety Checks**: Critical resource type detection
-- ✅ **Progress Tracking**: Deletion progress monitoring
-- ✅ **Deletion Safety**: Critical resource and tag protection
-- ✅ **Deletion Order**: Proper resource deletion sequencing
+### 2. Integration Tests (`tests/integration/`)
 
-### Integration Tests (`tests/integration_test.go`)
+Tests that verify integration between different components and cloud providers:
 
-**Status**: 6/6 tests passing
+- **Multi-cloud discovery**: AWS, Azure, GCP, and DigitalOcean integration
+- **Provider-specific testing**: Each cloud provider's unique characteristics
+- **Parallel discovery**: Concurrent resource discovery across providers
+- **Resource correlation**: Cross-provider resource relationships
+- **Credential management**: Authentication and authorization testing
+- **Resource filtering**: Tag-based and type-based filtering
+- **Error handling**: Provider-specific error scenarios
 
-Integration tests verify component interactions:
+**Key Features:**
+- Mock cloud responses for consistent testing
+- Parallel execution testing
+- Credential validation with graceful fallbacks
+- Resource type discovery validation
+- Performance metrics collection
 
-#### Cache Integration
-- ✅ **Basic Operations**: Set/Get functionality with different data types
-- ✅ **Expiration**: TTL-based cache expiration
-- ✅ **Type Safety**: Proper type assertion and validation
-- ✅ **Concurrent Access**: Thread-safe operations with multiple goroutines
-- ✅ **Performance**: Fast operations (completed in ~1ms for 1000 operations)
+### 3. Performance Tests (`tests/benchmarks/`)
 
-#### Worker Pool Integration
-- ✅ **Task Processing**: All 10 tasks completed successfully
-- ✅ **Concurrency**: Proper parallel task execution
-- ✅ **Shutdown**: Graceful pool shutdown with timeout handling
+Comprehensive performance testing and benchmarking:
 
-#### Security Integration
-- ✅ **Token Management**: JWT token generation, validation, and revocation
-- ✅ **Rate Limiting**: IP-based request rate limiting
-- ✅ **Password Operations**: Hashing, validation, and policy enforcement
+- **State file processing**: Performance with different file sizes (10 to 10,000 resources)
+- **Discovery throughput**: Resource discovery performance across providers
+- **Memory usage**: Memory leak detection and usage profiling
+- **Concurrency testing**: High-concurrency scenario testing
+- **Load testing**: Stress testing under heavy load
+- **Resource throughput**: Processing speed for large resource sets
 
-#### Semaphore Integration
-- ✅ **Acquire/Release**: Basic semaphore functionality
-- ✅ **Capacity Limits**: Proper capacity enforcement
-- ✅ **Timeout Handling**: Timeout-based acquisition
-
-#### Performance Tests
-- ✅ **Concurrent Cache Access**: 1000 operations across 10 goroutines
-- ✅ **Cache Performance**: 1000 operations completed in ~1ms
-
-### Benchmark Tests (`tests/benchmarks/`)
-
-**Status**: Infrastructure implemented, ready for execution
-
-Performance benchmarks for core components:
-
-- **CachePerformance**: Set/Get operations
-- **SecurityOperations**: Token generation and validation
-- **RateLimiter**: Request rate limiting
-- **PasswordOperations**: Validation, hashing, and generation
-- **ConcurrentOperations**: Parallel cache access
-- **MemoryUsage**: Large dataset handling
-
-### End-to-End Tests (`tests/e2e/`)
-
-**Status**: Infrastructure implemented, needs cloud credentials
-
-Complete workflow validation:
-
-- **Complete Workflow**: Full drift detection and remediation cycle
-- **Multi-Cloud Workflow**: Cross-provider testing
-- **Concurrent Operations**: System behavior under load
-- **Error Handling**: Graceful failure handling
-- **Performance Under Load**: Sustained operation testing
-- **Security Features**: Authentication and authorization
-- **Data Integrity**: Consistency validation
+**Key Features:**
+- Memory tracking and leak detection
+- CPU usage monitoring
+- Throughput measurements
+- Stress testing capabilities
+- Benchmark comparisons
+- Resource usage profiling
 
 ## Running Tests
 
-### Quick Start
+### Prerequisites
+
+1. **Go 1.23.8 or higher**
+2. **Dependencies**: Run `go mod download` to install all dependencies
+3. **Optional Cloud Credentials**: For real cloud provider testing (tests will skip gracefully if not available)
+
+### Running All Tests
 
 ```bash
 # Run all tests
-make test
+go test ./tests/...
 
-# Run comprehensive test suite
-powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1
+# Run tests with verbose output
+go test -v ./tests/...
+
+# Run tests in short mode (skips long-running tests)
+go test -short ./tests/...
 ```
 
-### Specific Test Categories
+### Running Specific Test Categories
 
 ```bash
-# Unit tests
-make test-unit
-# or
-go test ./tests/unit/... -v
+# End-to-end tests only
+go test ./tests/e2e/...
 
-# Integration tests
-make test-integration
-# or
-go test ./tests/integration_test.go -v
+# Integration tests only
+go test ./tests/integration/...
 
-# Benchmark tests
-make test-benchmark
-# or
-go test -bench=. ./tests/benchmarks/...
-
-# End-to-end tests
-go test ./tests/e2e/... -v
+# Performance tests and benchmarks
+go test ./tests/benchmarks/...
 ```
 
-### Test with Coverage
+### Running Benchmarks
 
 ```bash
-# Run tests with coverage reporting
-go test ./tests/... -cover
+# Run all benchmarks
+go test -bench=. ./tests/benchmarks/
 
-# Generate detailed coverage report
-go test ./tests/... -coverprofile=coverage.out
-go tool cover -html=coverage.out -o coverage.html
+# Run specific benchmarks
+go test -bench=BenchmarkStateFile ./tests/benchmarks/
+go test -bench=BenchmarkDiscovery ./tests/benchmarks/
+
+# Run benchmarks with memory profiling
+go test -bench=. -benchmem ./tests/benchmarks/
+
+# Run benchmarks multiple times for better accuracy
+go test -bench=. -count=5 ./tests/benchmarks/
 ```
 
-### Verbose Output
+### Running Performance Tests
 
 ```bash
-# Run with verbose output for debugging
-go test ./tests/... -v
+# Run performance tests (not benchmarks)
+go test -run=TestPerformance ./tests/benchmarks/
 
-# Run with race detection
-go test ./tests/... -race
+# Run load tests
+go test -run=TestHighVolume ./tests/benchmarks/
+go test -run=TestStress ./tests/benchmarks/
 
-# Run with timeout
-go test ./tests/... -timeout 30s
+# Run memory leak detection
+go test -run=TestMemoryLeak ./tests/benchmarks/
 ```
 
-## CGO Requirement
+## Test Configuration
 
-Some tests require **CGO (C Go)** to be enabled for SQLite database functionality:
+### Environment Variables
 
-### Checking CGO Status
+The tests respect several environment variables for configuration:
 
 ```bash
-# Check if CGO is enabled
-go env CGO_ENABLED
+# Skip credential-dependent tests
+export SKIP_CLOUD_TESTS=true
+
+# Use specific test configuration
+export DRIFTMGR_TEST_CONFIG=/path/to/test-config.yaml
+
+# Enable debug logging in tests
+export DRIFTMGR_TEST_DEBUG=true
+
+# Specify temporary directory for test artifacts
+export DRIFTMGR_TEST_TMPDIR=/tmp/driftmgr-tests
 ```
 
-### Enabling CGO
+### Cloud Provider Credentials
 
-**Windows:**
-```bash
-set CGO_ENABLED=1
-go test ./tests/unit/...
+Tests will attempt to use cloud provider credentials if available:
+
+- **AWS**: Uses standard AWS credential chain (AWS CLI, environment variables, IAM roles)
+- **Azure**: Uses Azure CLI authentication or environment variables
+- **GCP**: Uses service account keys or gcloud authentication
+
+If credentials are not available, tests will skip cloud-dependent operations gracefully.
+
+## Test Data and Fixtures
+
+### Automatic Test Data Generation
+
+The testing infrastructure automatically generates test data:
+
+- **State files**: Various sizes from 10 to 10,000 resources
+- **Mock resources**: Realistic cloud resource data
+- **Configuration files**: Different configuration scenarios
+
+### Custom Test Data
+
+You can provide custom test data by placing files in the `tests/fixtures/` directory:
+
+```
+tests/fixtures/
+├── state-files/
+│   ├── small.tfstate
+│   ├── medium.tfstate
+│   └── large.tfstate
+├── configs/
+│   └── test-config.yaml
+└── mock-data/
+    └── resources.json
 ```
 
-**Linux/macOS:**
-```bash
-export CGO_ENABLED=1
-go test ./tests/unit/...
+## Test Patterns and Best Practices
+
+### 1. Graceful Credential Handling
+
+```go
+result, err := discoverer.DiscoverResources(ctx, req)
+if err != nil {
+    if isCredentialError(err) {
+        t.Skip("Credentials not available for testing")
+        return
+    }
+    require.NoError(t, err)
+}
 ```
 
-### Why CGO is Required
+### 2. Resource Validation
 
-The `TestAuthManager` test requires CGO because:
-
-1. **SQLite Dependency**: Uses `github.com/mattn/go-sqlite3` driver
-2. **C Library**: SQLite is a C-based database library
-3. **Go Wrapper**: The driver is a Go wrapper around the C library
-4. **CGO Bridge**: CGO enables Go to call C libraries
-
-### Alternative Solutions
-
-**Option 1: Use Pure Go SQLite**
-Replace `github.com/mattn/go-sqlite3` with `modernc.org/sqlite`
-
-**Option 2: Mock Database**
-Use in-memory mocks for testing
-
-**Option 3: Skip Test (Current)**
-Gracefully skip when CGO is not available
-
-## Troubleshooting
-
-### Common Test Issues
-
-#### Tests Skipping Due to CGO
-
-**Problem**: Tests show "SKIP" status due to CGO requirement.
-
-**Solution**:
-```bash
-# Enable CGO
-set CGO_ENABLED=1
-go test ./tests/unit/...
+```go
+for _, resource := range result.Resources {
+    assert.Equal(t, "aws", resource.Provider)
+    assert.NotEmpty(t, resource.ID)
+    assert.NotEmpty(t, resource.Type)
+    assert.Contains(t, validRegions, resource.Region)
+}
 ```
 
-#### Missing Dependencies
+### 3. Memory Tracking
 
-**Problem**: Tests fail with import errors.
+```go
+memStats := startMemoryTracking()
+// ... perform operations ...
+finishMemoryTracking(&memStats)
 
-**Solution**:
-```bash
-# Update dependencies
-go mod tidy
-go get github.com/mattn/go-sqlite3
+assert.Less(t, memStats.PeakHeap, maxMemoryUsage)
 ```
 
-#### Integration Test Timeouts
+### 4. Timeout Handling
 
-**Problem**: Worker pool tests timeout.
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
 
-**Solution**:
-```bash
-# Run with longer timeout
-go test ./tests/integration_test.go -v -timeout 30s
+result, err := discoverer.DiscoverResources(ctx, req)
+// Handle timeout errors appropriately
 ```
-
-#### Cache Test Failures
-
-**Problem**: Cache tests fail due to timing issues.
-
-**Solution**:
-```bash
-# Run with race detection
-go test ./tests/integration_test.go -race
-```
-
-### Performance Issues
-
-#### Slow Test Execution
-
-**Problem**: Tests take too long to run.
-
-**Solutions**:
-```bash
-# Run tests in parallel
-go test ./tests/... -parallel 4
-
-# Skip slow tests
-go test ./tests/... -short
-```
-
-#### Memory Issues
-
-**Problem**: Tests consume too much memory.
-
-**Solutions**:
-```bash
-# Run with memory profiling
-go test ./tests/... -memprofile=mem.out
-
-# Limit memory usage
-go test ./tests/... -benchmem
-```
-
-## Test Infrastructure
-
-### Automated Test Runners
-
-- **PowerShell Script**: `scripts/test/run_comprehensive_tests.ps1`
-- **Bash Script**: `scripts/test/run_comprehensive_tests.sh`
-- **Makefile Integration**: `make test-unit`, `make test-integration`, etc.
-
-### Test Environment
-
-- **Go Version**: 1.21+
-- **Platform**: Windows, Linux, macOS
-- **Dependencies**: See `go.mod` for required packages
-- **CGO**: Required for SQLite tests
-
-### Test Data
-
-- **Fixtures**: `tests/fixtures/` - Test data and configurations
-- **Mocks**: In-memory mocks for external dependencies
-- **Samples**: Example configurations and scenarios
 
 ## Continuous Integration
 
-### GitHub Actions
+### GitHub Actions Integration
 
-Tests are automatically run on:
-- Pull requests
-- Push to main branch
-- Scheduled runs
+Add to your `.github/workflows/test.yml`:
 
-### Local Development
+```yaml
+name: Tests
+on: [push, pull_request]
 
-```bash
-# Pre-commit testing
-make test
-
-# Full test suite
-powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+      
+      - name: Run Tests
+        run: |
+          go test -v ./tests/e2e/
+          go test -v ./tests/integration/
+          
+      - name: Run Benchmarks
+        run: go test -bench=. -benchmem ./tests/benchmarks/
+        
+      - name: Run Performance Tests
+        run: go test -run=TestPerformance ./tests/benchmarks/
 ```
 
-## Test Results
+### Test Coverage
 
-### Current Status
+```bash
+# Generate test coverage report
+go test -coverprofile=coverage.out ./tests/...
 
-- **Total Tests**: 25+ tests across multiple categories
-- **Passing Tests**: 95%+ success rate
-- **Unit Tests**: 9/9 passing (1 skipped due to CGO)
-- **Integration Tests**: 6/6 passing
-- **Performance**: Sub-millisecond cache operations
-- **Concurrency**: 10 concurrent tasks processed successfully
+# View coverage in HTML
+go tool cover -html=coverage.out -o coverage.html
 
-### Detailed Results
+# Check coverage percentage
+go tool cover -func=coverage.out
+```
 
-For comprehensive test execution results, see [TEST_EXECUTION_RESULTS.md](../TEST_EXECUTION_RESULTS.md).
+## Troubleshooting
+
+### Common Issues
+
+1. **Missing Dependencies**
+   ```bash
+   go mod download
+   go mod tidy
+   ```
+
+2. **Credential Errors**
+   - Tests will skip if credentials are not available
+   - Set `SKIP_CLOUD_TESTS=true` to skip all cloud-dependent tests
+
+3. **Memory Issues**
+   - Increase available memory for large state file tests
+   - Use `-short` flag to skip memory-intensive tests
+
+4. **Timeout Issues**
+   - Some tests may take longer in CI environments
+   - Adjust timeout values in test configuration
+
+### Debug Mode
+
+Enable debug logging for detailed test output:
+
+```bash
+export DRIFTMGR_TEST_DEBUG=true
+go test -v ./tests/...
+```
 
 ## Contributing to Tests
 
 ### Adding New Tests
 
-1. **Unit Tests**: Add to appropriate package in `tests/unit/`
-2. **Integration Tests**: Add to `tests/integration_test.go`
-3. **Benchmark Tests**: Add to `tests/benchmarks/`
-4. **E2E Tests**: Add to `tests/e2e/`
+1. **End-to-End Tests**: Add to `tests/e2e/` for complete workflow testing
+2. **Integration Tests**: Add to `tests/integration/` for component integration testing
+3. **Performance Tests**: Add to `tests/benchmarks/` for performance-critical functionality
 
-### Test Guidelines
+### Test Naming Conventions
 
-- **Naming**: Use descriptive test names
-- **Coverage**: Aim for high test coverage
-- **Isolation**: Tests should be independent
-- **Performance**: Keep tests fast
-- **Documentation**: Add comments for complex tests
+- Test functions: `TestFunctionality`
+- Benchmark functions: `BenchmarkFunctionality`
+- Test suites: `FunctionalityTestSuite`
 
-### Test Best Practices
+### Test Documentation
 
-- Use table-driven tests for multiple scenarios
-- Mock external dependencies
-- Test both success and failure cases
-- Include edge cases and error conditions
-- Use appropriate assertions and matchers
+Document new tests with:
+- Purpose and scope
+- Prerequisites and setup requirements
+- Expected behavior and validation criteria
+- Performance characteristics (for benchmarks)
 
-## Support
+## Performance Baselines
 
-For test-related issues:
+### Typical Performance Expectations
 
-- **Documentation**: This README and [TEST_EXECUTION_RESULTS.md](../TEST_EXECUTION_RESULTS.md)
-- **Issues**: [GitHub Issues](https://github.com/catherinevee/driftmgr/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/catherinevee/driftmgr/discussions)
+- **Small state files (10 resources)**: < 100ms processing time
+- **Medium state files (100 resources)**: < 500ms processing time
+- **Large state files (1,000 resources)**: < 2s processing time
+- **Huge state files (10,000 resources)**: < 10s processing time
+- **Memory usage**: Should not exceed 2x the size of processed data
+- **Discovery throughput**: > 10 resources/second per provider
 
----
+### Benchmarking Guidelines
 
-**Last Updated**: December 2024
-**Test Status**: ✅ 95%+ Success Rate
+Run benchmarks multiple times for accurate results:
+
+```bash
+go test -bench=. -count=10 ./tests/benchmarks/ | tee benchmark.txt
+benchstat benchmark.txt
+```
+
+## Test Maintenance
+
+### Regular Maintenance Tasks
+
+1. **Update test data**: Refresh mock data to reflect current cloud services
+2. **Review performance baselines**: Ensure expectations remain realistic
+3. **Update credentials**: Rotate test credentials periodically
+4. **Clean up test artifacts**: Remove temporary files and databases
+
+### Monitoring Test Health
+
+- Monitor test execution time trends
+- Track test flakiness and failure rates
+- Review resource usage patterns
+- Update test environments regularly
+
+For questions or issues with the testing infrastructure, please refer to the main project documentation or open an issue in the project repository.

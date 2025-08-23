@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/pkg/models"
+	"github.com/catherinevee/driftmgr/internal/models"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -179,8 +179,9 @@ func (dv *DiscoveryVisualizer) PrintDetailedTable() {
 
 	for _, resource := range dv.resources {
 		// Format tags
-		tags := make([]string, 0, len(resource.Tags))
-		for k, v := range resource.Tags {
+		resourceTags := resource.GetTagsAsMap()
+		tags := make([]string, 0, len(resourceTags))
+		for k, v := range resourceTags {
 			tags = append(tags, fmt.Sprintf("%s=%s", k, v))
 		}
 		tagsStr := strings.Join(tags, ", ")
@@ -268,8 +269,9 @@ func (dv *DiscoveryVisualizer) PrintCSV() {
 	// Print data
 	for _, resource := range dv.resources {
 		// Format tags
-		tags := make([]string, 0, len(resource.Tags))
-		for k, v := range resource.Tags {
+		resourceTags := resource.GetTagsAsMap()
+		tags := make([]string, 0, len(resourceTags))
+		for k, v := range resourceTags {
 			tags = append(tags, fmt.Sprintf("%s=%s", k, v))
 		}
 		tagsStr := strings.Join(tags, ";")

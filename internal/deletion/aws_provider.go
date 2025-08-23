@@ -12,22 +12,28 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/aws-sdk-go-v2/service/wafv2"
+	"github.com/aws/aws-sdk-go-v2/service/wafv2/types"
+	secretsmanagertypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/catherinevee/driftmgr/internal/models"
 )
 
@@ -207,6 +213,11 @@ func (ap *AWSProvider) ListResources(ctx context.Context, accountID string) ([]m
 }
 
 // DeleteResources deletes AWS resources in the correct order
+// DeleteResource implements the CloudProvider interface for single resource deletion
+func (ap *AWSProvider) DeleteResource(ctx context.Context, resource models.Resource) error {
+	return ap.deleteResource(ctx, resource, DeletionOptions{})
+}
+
 func (ap *AWSProvider) DeleteResources(ctx context.Context, accountID string, options DeletionOptions) (*DeletionResult, error) {
 	startTime := time.Now()
 	result := &DeletionResult{
@@ -1056,29 +1067,208 @@ func (ap *AWSProvider) discoverLoadBalancerResources(ctx context.Context, accoun
 	return resources, nil
 }
 
-// Stub methods for remaining AWS services (to be implemented as needed)
+// Additional AWS service discovery methods
 func (ap *AWSProvider) discoverCloudWatchResources(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
+
+	for _, region := range ap.regions {
+		regionalCfg := ap.cfg.Copy()
+		regionalCfg.Region = region
+
+		client := cloudwatch.NewFromConfig(regionalCfg)
+
+		// List CloudWatch alarms
+		result, err := client.DescribeAlarms(ctx, &cloudwatch.DescribeAlarmsInput{})
+		if err != nil {
+			log.Printf("Failed to discover CloudWatch alarms in %s: %v", region, err)
+			continue
+		}
+
+		for _, alarm := range result.MetricAlarms {
+			resources = append(resources, models.Resource{
+				ID:       aws.ToString(alarm.AlarmArn),
+				Name:     aws.ToString(alarm.AlarmName),
+				Type:     "aws_cloudwatch_metric_alarm",
+				Provider: "aws",
+				Region:   region,
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AWSProvider) discoverKMSResources(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
+
+	for _, region := range ap.regions {
+		regionalCfg := ap.cfg.Copy()
+		regionalCfg.Region = region
+
+		client := kms.NewFromConfig(regionalCfg)
+
+		// List KMS keys
+		paginator := kms.NewListKeysPaginator(client, &kms.ListKeysInput{})
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				log.Printf("Failed to discover KMS keys in %s: %v", region, err)
+				break
+			}
+
+			for _, key := range page.Keys {
+				// Get key metadata to check if it's customer managed
+				metadata, err := client.DescribeKey(ctx, &kms.DescribeKeyInput{
+					KeyId: key.KeyId,
+				})
+				if err != nil {
+					continue
+				}
+
+				// Only include customer-managed keys
+				if metadata.KeyMetadata != nil && metadata.KeyMetadata.KeyManager == "CUSTOMER" {
+					resources = append(resources, models.Resource{
+						ID:       aws.ToString(key.KeyArn),
+						Name:     aws.ToString(key.KeyId),
+						Type:     "aws_kms_key",
+						Provider: "aws",
+						Region:   region,
+					})
+				}
+			}
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AWSProvider) discoverSecretsManagerResources(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
+
+	for _, region := range ap.regions {
+		regionalCfg := ap.cfg.Copy()
+		regionalCfg.Region = region
+
+		client := secretsmanager.NewFromConfig(regionalCfg)
+
+		// List secrets
+		paginator := secretsmanager.NewListSecretsPaginator(client, &secretsmanager.ListSecretsInput{})
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				log.Printf("Failed to discover Secrets Manager secrets in %s: %v", region, err)
+				break
+			}
+
+			for _, secret := range page.SecretList {
+				resources = append(resources, models.Resource{
+					ID:       aws.ToString(secret.ARN),
+					Name:     aws.ToString(secret.Name),
+					Type:     "aws_secretsmanager_secret",
+					Provider: "aws",
+					Region:   region,
+					Tags:     convertSecretsManagerTags(secret.Tags),
+				})
+			}
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AWSProvider) discoverSystemsManagerResources(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
+
+	for _, region := range ap.regions {
+		regionalCfg := ap.cfg.Copy()
+		regionalCfg.Region = region
+
+		client := ssm.NewFromConfig(regionalCfg)
+
+		// List SSM parameters
+		paginator := ssm.NewDescribeParametersPaginator(client, &ssm.DescribeParametersInput{})
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				log.Printf("Failed to discover SSM parameters in %s: %v", region, err)
+				break
+			}
+
+			for _, param := range page.Parameters {
+				resources = append(resources, models.Resource{
+					ID:       aws.ToString(param.Name),
+					Name:     aws.ToString(param.Name),
+					Type:     "aws_ssm_parameter",
+					Provider: "aws",
+					Region:   region,
+				})
+			}
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AWSProvider) discoverWAFResources(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
+
+	// WAFv2 is regional and global (CloudFront)
+	for _, scope := range []string{"REGIONAL", "CLOUDFRONT"} {
+		region := "us-east-1" // CLOUDFRONT scope must use us-east-1
+		if scope == "REGIONAL" {
+			for _, r := range ap.regions {
+				region = r
+				regionalCfg := ap.cfg.Copy()
+				regionalCfg.Region = region
+
+				client := wafv2.NewFromConfig(regionalCfg)
+
+				// List WAFv2 Web ACLs
+				result, err := client.ListWebACLs(ctx, &wafv2.ListWebACLsInput{
+					Scope: types.Scope(scope),
+				})
+				if err != nil {
+					log.Printf("Failed to discover WAFv2 Web ACLs in %s: %v", region, err)
+					continue
+				}
+
+				for _, webACL := range result.WebACLs {
+					resources = append(resources, models.Resource{
+						ID:       aws.ToString(webACL.ARN),
+						Name:     aws.ToString(webACL.Name),
+						Type:     "aws_wafv2_web_acl",
+						Provider: "aws",
+						Region:   region,
+					})
+				}
+			}
+		} else {
+			// CLOUDFRONT scope (global)
+			regionalCfg := ap.cfg.Copy()
+			regionalCfg.Region = region
+
+			client := wafv2.NewFromConfig(regionalCfg)
+
+			result, err := client.ListWebACLs(ctx, &wafv2.ListWebACLsInput{
+				Scope: types.Scope(scope),
+			})
+			if err != nil {
+				log.Printf("Failed to discover WAFv2 CloudFront Web ACLs: %v", err)
+				continue
+			}
+
+			for _, webACL := range result.WebACLs {
+				resources = append(resources, models.Resource{
+					ID:       aws.ToString(webACL.ARN),
+					Name:     aws.ToString(webACL.Name),
+					Type:     "aws_wafv2_web_acl",
+					Provider: "aws",
+					Region:   "global",
+				})
+			}
+		}
+	}
+
 	return resources, nil
 }
 
@@ -1670,20 +1860,20 @@ func (ap *AWSProvider) deleteResourceWithDependencies(ctx context.Context, resou
 // getResourceDeletionHandler returns the appropriate deletion handler for a resource type
 func (ap *AWSProvider) getResourceDeletionHandler(resourceType string) func(context.Context, models.Resource) error {
 	handlers := map[string]func(context.Context, models.Resource) error{
-		"ec2_instance":        ap.deleteEC2Instance,
-		"s3_bucket":          ap.deleteS3Bucket,
-		"rds_instance":       ap.deleteRDSInstance,
-		"lambda_function":    ap.deleteLambdaFunction,
-		"eks_cluster":        ap.deleteEKSClusterDirect,
-		"ecs_cluster":        ap.deleteECSCluster,
-		"dynamodb_table":     ap.deleteDynamoDBTable,
-		"elasticache_cluster": ap.deleteElastiCacheCluster,
-		"sns_topic":          ap.deleteSNSTopic,
-		"sqs_queue":          ap.deleteSQSQueue,
-		"iam_role":           ap.deleteIAMRole,
-		"iam_policy":         ap.deleteIAMPolicy,
-		"iam_user":           ap.deleteIAMUser,
-		"route53_hosted_zone": ap.deleteRoute53HostedZone,
+		"ec2_instance":         ap.deleteEC2Instance,
+		"s3_bucket":            ap.deleteS3Bucket,
+		"rds_instance":         ap.deleteRDSInstance,
+		"lambda_function":      ap.deleteLambdaFunction,
+		"eks_cluster":          ap.deleteEKSClusterDirect,
+		"ecs_cluster":          ap.deleteECSCluster,
+		"dynamodb_table":       ap.deleteDynamoDBTable,
+		"elasticache_cluster":  ap.deleteElastiCacheCluster,
+		"sns_topic":            ap.deleteSNSTopic,
+		"sqs_queue":            ap.deleteSQSQueue,
+		"iam_role":             ap.deleteIAMRole,
+		"iam_policy":           ap.deleteIAMPolicy,
+		"iam_user":             ap.deleteIAMUser,
+		"route53_hosted_zone":  ap.deleteRoute53HostedZone,
 		"cloudformation_stack": ap.deleteCloudFormationStack,
 	}
 
@@ -1725,10 +1915,11 @@ func (ap *AWSProvider) checkResourceState(ctx context.Context, resource models.R
 // checkProductionIndicators warns about production/critical resources
 func (ap *AWSProvider) checkProductionIndicators(resource models.Resource) {
 	// Check for production tags
-	for key, value := range resource.Tags {
+	tags := resource.GetTagsAsMap()
+	for key, value := range tags {
 		keyLower := strings.ToLower(key)
 		valueLower := strings.ToLower(value)
-		
+
 		if keyLower == "environment" && valueLower == "production" {
 			fmt.Printf("Warning: Resource %s is tagged as production environment\n", resource.Name)
 		}
@@ -1826,7 +2017,7 @@ func (ap *AWSProvider) handleEKSNodegroupDependencies(ctx context.Context, resou
 	// Delete each nodegroup
 	for _, nodegroupName := range nodegroups.Nodegroups {
 		fmt.Printf("Deleting EKS nodegroup: %s\n", nodegroupName)
-		
+
 		// Start nodegroup deletion
 		_, err := eksClient.DeleteNodegroup(ctx, &eks.DeleteNodegroupInput{
 			ClusterName:   &clusterName,
@@ -1994,6 +2185,17 @@ func (ap *AWSProvider) convertTags(tags []ec2types.Tag) map[string]string {
 	result := make(map[string]string)
 	for _, tag := range tags {
 		result[*tag.Key] = *tag.Value
+	}
+	return result
+}
+
+// convertSecretsManagerTags converts Secrets Manager tags to map[string]string
+func convertSecretsManagerTags(tags []secretsmanagertypes.Tag) map[string]string {
+	result := make(map[string]string)
+	for _, tag := range tags {
+		if tag.Key != nil && tag.Value != nil {
+			result[*tag.Key] = *tag.Value
+		}
 	}
 	return result
 }

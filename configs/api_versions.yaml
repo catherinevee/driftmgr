@@ -1,0 +1,221 @@
+# API Versioning Configuration
+# This file defines the supported API versions and their lifecycle
+
+api_versioning:
+  # Default version to use when no version is specified
+  default_version: "1.1.0"
+  
+  # Latest stable version
+  latest_version: "2.0.0"
+  
+  # Supported versions with their lifecycle information
+  versions:
+    - version: "1.0.0"
+      status: "deprecated"
+      release_date: "2024-01-01T00:00:00Z"
+      deprecation_date: "2025-06-01T00:00:00Z"
+      sunset_date: "2026-01-01T00:00:00Z"
+      description: "Initial stable API release"
+      migration_guide: "https://docs.driftmgr.io/migration/v1.0-to-v1.1"
+      changelog:
+        - "Basic resource discovery"
+        - "Multi-cloud provider support"
+        - "Account management"
+        - "Simple filtering capabilities"
+      
+    - version: "1.1.0"
+      status: "stable"
+      release_date: "2024-06-01T00:00:00Z"
+      description: "Enhanced API with plugin support"
+      migration_guide: "https://docs.driftmgr.io/migration/v1.1-to-v2.0"
+      changelog:
+        - "Plugin architecture support"
+        - "Dynamic provider loading"
+        - "Enhanced configuration system"
+        - "Improved error handling"
+        - "Advanced filtering and pagination"
+      
+    - version: "2.0.0"
+      status: "beta"
+      release_date: "2024-12-01T00:00:00Z"
+      description: "Microservices architecture and streaming APIs"
+      changelog:
+        - "Microservices architecture"
+        - "Streaming API endpoints"
+        - "Advanced caching strategies"
+        - "GraphQL support"
+        - "Enhanced observability"
+        - "Real-time resource updates"
+        - "Relationship mapping"
+        - "Advanced analytics"
+      
+    - version: "3.0.0"
+      status: "alpha"
+      release_date: "2025-06-01T00:00:00Z"
+      description: "AI-powered discovery and automation"
+      planned_features:
+        - "AI-powered resource discovery"
+        - "Predictive drift detection"
+        - "Automated remediation workflows"
+        - "Natural language query interface"
+        - "Advanced cost optimization"
+        - "Security compliance automation"
+
+  # Version negotiation settings
+  negotiation:
+    # How to handle version conflicts
+    strategy: "backward_compatible"  # options: strict, backward_compatible, forward_compatible
+    
+    # Whether to allow automatic version upgrades
+    auto_upgrade: false
+    
+    # Whether to provide migration hints in responses
+    migration_hints: true
+
+  # Deprecation policy
+  deprecation_policy:
+    # Minimum notice period before deprecation
+    notice_period: "6 months"
+    
+    # Support period after deprecation announcement
+    support_period: "12 months"
+    
+    # Warning headers for deprecated versions
+    warning_headers: true
+    
+    # Migration assistance
+    migration_assistance:
+      documentation: "https://docs.driftmgr.io/api/versioning"
+      support_email: "api-support@driftmgr.io"
+      migration_tools: true
+
+  # Compatibility matrix
+  compatibility:
+    # Which versions can serve requests for other versions
+    backward_compatible:
+      "1.1.0": ["1.0.0"]
+      "2.0.0": []  # v2 is not backward compatible with v1
+    
+    forward_compatible:
+      "1.0.0": []  # v1.0 cannot serve v1.1 requests
+      "1.1.0": []  # v1.1 cannot serve v2.0 requests
+
+  # Version-specific features
+  features:
+    "1.0.0":
+      - basic_discovery
+      - multi_cloud_support
+      - account_management
+      
+    "1.1.0":
+      - basic_discovery
+      - multi_cloud_support
+      - account_management
+      - plugin_architecture
+      - enhanced_configuration
+      - advanced_filtering
+      
+    "2.0.0":
+      - basic_discovery
+      - multi_cloud_support
+      - account_management
+      - plugin_architecture
+      - enhanced_configuration
+      - advanced_filtering
+      - microservices_architecture
+      - streaming_apis
+      - advanced_caching
+      - graphql_support
+      - real_time_updates
+      - relationship_mapping
+      
+    "3.0.0":
+      - all_v2_features
+      - ai_powered_discovery
+      - predictive_analytics
+      - automated_remediation
+      - natural_language_queries
+
+  # Content type mappings for different versions
+  content_types:
+    "1.0.0":
+      - "application/json"
+      - "application/vnd.driftmgr.v1+json"
+      
+    "1.1.0":
+      - "application/json"
+      - "application/vnd.driftmgr.v1.1+json"
+      
+    "2.0.0":
+      - "application/json"
+      - "application/vnd.driftmgr.v2+json"
+      - "application/vnd.driftmgr.v2+stream"
+      - "application/graphql"
+
+  # Response format transformations
+  transformations:
+    # Fields added in each version
+    added_fields:
+      "1.1.0":
+        - "plugin_info"
+        - "enhanced_metadata"
+        
+      "2.0.0":
+        - "_metadata"
+        - "relationships"
+        - "streaming_support"
+        - "performance_metrics"
+        
+    # Fields removed/deprecated in each version
+    deprecated_fields:
+      "2.0.0":
+        - "legacy_format"
+        - "v1_compatibility_mode"
+        
+    # Field renames between versions
+    field_mappings:
+      "1.0.0_to_1.1.0":
+        "simple_metadata": "enhanced_metadata"
+        
+      "1.1.0_to_2.0.0":
+        "metadata": "_metadata.legacy"
+
+  # Error handling for version mismatches
+  error_handling:
+    # Return detailed version info in errors
+    detailed_errors: true
+    
+    # Suggest alternative versions
+    suggest_alternatives: true
+    
+    # Include migration paths in error responses
+    include_migration_paths: true
+
+  # Monitoring and analytics
+  monitoring:
+    # Track version usage statistics
+    track_usage: true
+    
+    # Alert on deprecated version usage spikes
+    deprecation_alerts: true
+    
+    # Monitor migration success rates
+    migration_metrics: true
+    
+    # Track compatibility issues
+    compatibility_monitoring: true
+
+# Runtime configuration
+runtime:
+  # Cache version information
+  cache_version_info: true
+  cache_ttl: "1h"
+  
+  # Preload version handlers
+  preload_handlers: true
+  
+  # Enable version metrics collection
+  collect_metrics: true
+  
+  # Log version negotiation details
+  log_negotiation: true

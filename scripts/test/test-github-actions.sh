@@ -16,7 +16,7 @@ chmod +x driftmgr
 # Test 1: Validate inputs (should fail without environment variables)
 echo ""
 echo "🔍 Test 1: Validate inputs (should fail)"
-./driftmgr github-actions validate-inputs || echo "✅ Expected failure - no environment variables set"
+./driftmgr github-actions validate-inputs || echo "[OK] Expected failure - no environment variables set"
 
 # Test 2: Setup environment
 echo ""
@@ -42,11 +42,11 @@ echo "📊 Test 4: Generate report"
 ./driftmgr github-actions generate-report --output test-report.md
 
 if [ -f "test-report.md" ]; then
-    echo "✅ Report generated successfully"
+    echo "[OK] Report generated successfully"
     echo "📄 Report preview:"
     head -20 test-report.md
 else
-    echo "❌ Report generation failed"
+    echo "[ERROR] Report generation failed"
 fi
 
 # Test 5: Workflow dispatch (dry run)
@@ -61,7 +61,7 @@ ls -la driftmgr-data/ 2>/dev/null || echo "No driftmgr-data directory found (exp
 ls -la *.md 2>/dev/null || echo "No markdown files found"
 
 echo ""
-echo "✅ All tests completed!"
+echo "[OK] All tests completed!"
 echo ""
 echo "📋 Summary:"
 echo "- GitHub Actions integration is working"

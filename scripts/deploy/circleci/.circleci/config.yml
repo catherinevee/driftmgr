@@ -1,0 +1,334 @@
+version: 2.1
+
+orbs:
+  go: circleci/go@2.0
+
+executors:
+  driftmgr:
+    docker:
+      - image: cimg/go:1.21
+
+jobs:
+  drift-validation:
+    executor: driftmgr
+    steps:
+      - checkout
+      - go/install-packages:
+          pkg-manager: go-mod
+      - run:
+          name: Install DriftMgr
+          command: |
+            git clone https://github.com/catherinevee/driftmgr.git
+            cd driftmgr
+            make build
+            cd ..
+            sudo cp driftmgr/bin/driftmgr /usr/local/bin/
+            sudo cp driftmgr/bin/driftmgr-client /usr/local/bin/
+      - run:
+          name: Create DriftMgr Configuration
+          command: |
+            cat > driftmgr.yaml << EOF
+            providers:
+              aws:
+                regions: [us-east-1, us-west-2]
+              azure:
+                regions: [eastus, westus]
+              gcp:
+                regions: [us-central1, us-east1]
+            ci_cd:
+              enabled: true
+              fail_on_drift: true
+              auto_remediate: false
+              severity_threshold: high
+            EOF
+      - run:
+          name: Discover AWS Resources
+          command: |
+            driftmgr discover aws us-east-1,us-west-2
+          environment:
+            AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+      - run:
+          name: Discover Azure Resources
+          command: |
+            driftmgr discover azure eastus,westus
+          environment:
+            AZURE_CLIENT_ID: $AZURE_CLIENT_ID
+            AZURE_CLIENT_SECRET: $AZURE_CLIENT_SECRET
+            AZURE_TENANT_ID: $AZURE_TENANT_ID
+      - run:
+          name: Discover GCP Resources
+          command: |
+            driftmgr discover gcp us-central1,us-east1
+          environment:
+            GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS
+      - run:
+          name: Analyze Drift
+          command: |
+            mkdir -p drift-reports
+            driftmgr analyze terraform.tfstate --output json > drift-reports/drift-validation.json
+            
+            # Parse drift count
+            DRIFT_COUNT=$(jq '.drift_count // 0' drift-reports/drift-validation.json)
+            echo "export DRIFT_COUNT=$DRIFT_COUNT" >> $BASH_ENV
+            
+            if [ "$DRIFT_COUNT" -gt 0 ]; then
+              echo "[ERROR] Drift detected: $DRIFT_COUNT resources"
+              exit 1
+            else
+              echo "[OK] No drift detected"
+            fi
+      - store_artifacts:
+          path: drift-reports/
+          destination: drift-validation-reports
+
+  drift-test:
+    executor: driftmgr
+    steps:
+      - checkout
+      - go/install-packages:
+          pkg-manager: go-mod
+      - run:
+          name: Install DriftMgr
+          command: |
+            git clone https://github.com/catherinevee/driftmgr.git
+            cd driftmgr
+            make build
+            cd ..
+            sudo cp driftmgr/bin/driftmgr /usr/local/bin/
+      - run:
+          name: Run Comprehensive Drift Test
+          command: |
+            mkdir -p drift-reports
+            driftmgr analyze terraform.tfstate --output json > drift-reports/drift-test.json
+            
+            # Generate additional reports
+            driftmgr export terraform html --output drift-reports/drift-report.html
+            driftmgr export terraform json --output drift-reports/drift-report.json
+            driftmgr export terraform csv --output drift-reports/drift-report.csv
+          environment:
+            AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+      - store_artifacts:
+          path: drift-reports/
+          destination: drift-test-reports
+
+  deploy:
+    executor: driftmgr
+    steps:
+      - checkout
+      - run:
+          name: Install Terraform
+          command: |
+            curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+            sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+            sudo apt-get update && sudo apt-get install terraform
+      - run:
+          name: Deploy Infrastructure
+          command: |
+            terraform init
+            terraform plan -out=tfplan
+            terraform apply tfplan
+          environment:
+            AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+
+  verify-deployment:
+    executor: driftmgr
+    steps:
+      - checkout
+      - go/install-packages:
+          pkg-manager: go-mod
+      - run:
+          name: Install DriftMgr
+          command: |
+            git clone https://github.com/catherinevee/driftmgr.git
+            cd driftmgr
+            make build
+            cd ..
+            sudo cp driftmgr/bin/driftmgr /usr/local/bin/
+      - run:
+          name: Verify Deployment
+          command: |
+            mkdir -p drift-reports
+            
+            # Discover resources after deployment
+            driftmgr discover aws us-east-1,us-west-2
+            driftmgr perspective terraform.tfstate aws
+            
+            # Check for post-deployment drift
+            driftmgr analyze terraform.tfstate --output json > drift-reports/post-deployment-drift.json
+            
+            POST_DRIFT_COUNT=$(jq '.drift_count // 0' drift-reports/post-deployment-drift.json)
+            echo "export POST_DRIFT_COUNT=$POST_DRIFT_COUNT" >> $BASH_ENV
+            
+            if [ "$POST_DRIFT_COUNT" -gt 0 ]; then
+              echo "[WARNING] Post-deployment drift detected: $POST_DRIFT_COUNT resources"
+              # Send notification
+              driftmgr notify slack "Post-Deployment Drift" "Drift detected after deployment"
+            else
+              echo "[OK] Deployment verified successfully"
+            fi
+          environment:
+            AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+            SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+      - store_artifacts:
+          path: drift-reports/
+          destination: deployment-verification-reports
+
+  remediate-drift:
+    executor: driftmgr
+    steps:
+      - checkout
+      - go/install-packages:
+          pkg-manager: go-mod
+      - run:
+          name: Install DriftMgr
+          command: |
+            git clone https://github.com/catherinevee/driftmgr.git
+            cd driftmgr
+            make build
+            cd ..
+            sudo cp driftmgr/bin/driftmgr /usr/local/bin/
+      - run:
+          name: Remediate Drift
+          command: |
+            echo "Remediating detected drift"
+            if [ "$DRIFT_AUTO_REMEDIATE" = "true" ]; then
+              driftmgr remediate-batch terraform --auto
+              
+              # Verify remediation
+              driftmgr discover aws us-east-1,us-west-2
+              driftmgr analyze terraform.tfstate
+              
+              echo "[OK] Remediation completed"
+            else
+              echo "Auto-remediation disabled. Manual intervention required."
+            fi
+          environment:
+            AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+      - run:
+          name: Send Remediation Notification
+          command: |
+            driftmgr notify slack "Remediation Complete" "Drift remediation completed successfully"
+          environment:
+            SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+
+  scheduled-drift-check:
+    executor: driftmgr
+    steps:
+      - checkout
+      - go/install-packages:
+          pkg-manager: go-mod
+      - run:
+          name: Install DriftMgr
+          command: |
+            git clone https://github.com/catherinevee/driftmgr.git
+            cd driftmgr
+            make build
+            cd ..
+            sudo cp driftmgr/bin/driftmgr /usr/local/bin/
+      - run:
+          name: Scheduled Drift Check
+          command: |
+            mkdir -p drift-reports
+            driftmgr discover aws us-east-1,us-west-2
+            driftmgr analyze terraform.tfstate --output json > drift-reports/scheduled-drift.json
+            
+            DRIFT_COUNT=$(jq '.drift_count // 0' drift-reports/scheduled-drift.json)
+            
+            if [ "$DRIFT_COUNT" -gt 0 ]; then
+              echo "🚨 Scheduled drift check: $DRIFT_COUNT resources with drift"
+              driftmgr notify slack "Scheduled Drift Alert" "Drift detected in production infrastructure"
+              exit 1
+            else
+              echo "[OK] Scheduled drift check: No drift detected"
+            fi
+          environment:
+            AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+            SLACK_WEBHOOK_URL: $SLACK_WEBHOOK_URL
+      - store_artifacts:
+          path: drift-reports/
+          destination: scheduled-monitoring-reports
+
+workflows:
+  version: 2
+  
+  drift-detection:
+    jobs:
+      - drift-validation:
+          filters:
+            branches:
+              only:
+                - main
+                - develop
+      - drift-test:
+          requires:
+            - drift-validation
+          filters:
+            branches:
+              only:
+                - main
+                - develop
+      - deploy:
+          requires:
+            - drift-test
+          filters:
+            branches:
+              only:
+                - main
+      - verify-deployment:
+          requires:
+            - deploy
+          filters:
+            branches:
+              only:
+                - main
+      - remediate-drift:
+          requires:
+            - verify-deployment
+          filters:
+            branches:
+              only:
+                - main
+            # Only run if post-deployment drift was detected
+            # This would need to be configured based on the verify-deployment job output
+
+  scheduled-monitoring:
+    triggers:
+      - schedule:
+          cron: "0 2 * * *"  # Daily at 2 AM UTC
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - scheduled-drift-check
+
+  # Environment-specific workflows
+  development:
+    jobs:
+      - drift-validation:
+          name: development-drift-check
+          filters:
+            branches:
+              only:
+                - develop
+          environment:
+            DRIFT_FAIL_ON_DRIFT: false
+            DRIFT_AUTO_REMEDIATE: true
+
+  staging:
+    jobs:
+      - drift-validation:
+          name: staging-drift-check
+          filters:
+            branches:
+              only:
+                - staging
+          environment:
+            DRIFT_FAIL_ON_DRIFT: true
+            DRIFT_AUTO_REMEDIATE: false

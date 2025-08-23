@@ -595,151 +595,151 @@ func (awc *AzureWindowsCLI) discoverGenericResource(ctx context.Context, args ..
 }
 
 func (awc *AzureWindowsCLI) discoverContainerInstancesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverSignalRViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverCognitiveServicesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverMachineLearningWorkspacesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverDataFactoriesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverSynapseWorkspacesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverDatabricksWorkspacesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverHDInsightClustersViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverStreamAnalyticsJobsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverEventGridTopicsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverServiceFabricClustersViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverSpringCloudServicesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverOpenShiftClustersViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverBatchAccountsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverMediaServicesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverSearchServicesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverPowerBIDedicatedViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverAnalysisServicesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverDataLakeAnalyticsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverDataLakeStoreViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverHPCClustersViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverLabServicesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverDevTestLabsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverSharedImageGalleriesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverImageDefinitionsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverImageVersionsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverProximityPlacementGroupsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverAvailabilitySetsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverVMScaleSetsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverVMImagesViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverSnapshotsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverRestorePointCollectionsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverCapacityReservationsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverDedicatedHostsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverDedicatedHostGroupsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverGalleryApplicationsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 func (awc *AzureWindowsCLI) discoverGalleryApplicationVersionsViaCLI(ctx context.Context) ([]models.Resource, error) {
-	return []models.Resource{}, nil // TODO: Implement
+	return nil, fmt.Errorf("CLI-based discovery not yet implemented for this resource type")
 }
 
 // Helper functions

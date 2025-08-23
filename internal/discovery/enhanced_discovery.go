@@ -84,7 +84,7 @@ func NewEnhancedDiscoverer(cfg *config.Config) *EnhancedDiscoverer {
 
 	return &EnhancedDiscoverer{
 		config:          cfg,
-		cache:           cache.NewDiscoveryCache(cfg.Discovery.CacheTTL, cfg.Discovery.CacheMaxSize),
+		cache:           cache.NewDiscoveryCache(),
 		plugins:         make(map[string]*DiscoveryPlugin),
 		hierarchy:       &ResourceHierarchy{},
 		filters:         &DiscoveryFilter{},
@@ -92,6 +92,103 @@ func NewEnhancedDiscoverer(cfg *config.Config) *EnhancedDiscoverer {
 		errorHandler:    NewErrorHandler(nil), // Use default retry config
 		errorReporting:  NewEnhancedErrorReporting(),
 		sdkIntegration:  NewSDKIntegration(),
+	}
+}
+
+// DiscoverResources performs resource discovery across all configured providers
+func (ed *EnhancedDiscoverer) DiscoverResources(ctx context.Context) ([]models.Resource, error) {
+	ed.mu.RLock()
+	defer ed.mu.RUnlock()
+
+	var allResources []models.Resource
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	errChan := make(chan error, 10)
+
+	// Check cache first
+	if ed.cache != nil {
+		if cached, found := ed.cache.Get("all_resources"); found {
+			if resources, ok := cached.([]models.Resource); ok {
+				log.Printf("Returning %d cached resources", len(resources))
+				return resources, nil
+			}
+		}
+	}
+
+	providers := []string{"aws", "azure", "gcp"}
+	regions := ed.config.Discovery.Regions
+	if len(regions) == 0 {
+		regions = []string{"us-east-1", "us-west-2", "eu-west-1"}
+	}
+
+	// Discover resources for each provider in parallel
+	for _, provider := range providers {
+		for _, region := range regions {
+			wg.Add(1)
+			go func(p, r string) {
+				defer wg.Done()
+				
+				// Use context with timeout
+				discoverCtx, cancel := context.WithTimeout(ctx, ed.config.Discovery.Timeout)
+				defer cancel()
+				
+				resources, err := ed.discoverProviderResources(discoverCtx, p, r)
+				if err != nil {
+					select {
+					case errChan <- fmt.Errorf("discovery failed for %s/%s: %w", p, r, err):
+					default:
+					}
+					return
+				}
+				
+				mu.Lock()
+				allResources = append(allResources, resources...)
+				mu.Unlock()
+			}(provider, region)
+		}
+	}
+
+	// Wait for all discoveries to complete
+	wg.Wait()
+	close(errChan)
+
+	// Collect errors
+	var errors []error
+	for err := range errChan {
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 && len(allResources) == 0 {
+		return nil, fmt.Errorf("discovery failed: %v", errors)
+	}
+
+	// Cache results
+	if ed.cache != nil {
+		ed.cache.Set("all_resources", allResources)
+	}
+
+	log.Printf("Discovered %d total resources across all providers", len(allResources))
+	return allResources, nil
+}
+
+// discoverProviderResources discovers resources for a specific provider and region
+func (ed *EnhancedDiscoverer) discoverProviderResources(ctx context.Context, provider, region string) ([]models.Resource, error) {
+	// Check if we have a plugin for this provider
+	if plugin, exists := ed.plugins[provider]; exists && plugin.Enabled {
+		return plugin.DiscoveryFn(ctx, provider, region)
+	}
+
+	// Fallback to built-in discovery - placeholder for now
+	// In production, these would be implemented
+	switch provider {
+	case "aws":
+		return []models.Resource{}, nil // Placeholder
+	case "azure":
+		return []models.Resource{}, nil // Placeholder
+	case "gcp":
+		return []models.Resource{}, nil // Placeholder
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
 }
 
@@ -143,7 +240,7 @@ func (ed *EnhancedDiscoverer) DiscoverAllResourcesEnhanced(ctx context.Context, 
 	ed.buildResourceHierarchy(filteredResources)
 
 	// Cache results
-	ed.cache.Set(cacheKey, filteredResources, ed.config.Discovery.CacheTTL)
+	ed.cache.Set(cacheKey, filteredResources)
 
 	log.Printf("Enhanced discovery completed in %v. Found %d resources", time.Since(start), len(filteredResources))
 
@@ -322,8 +419,9 @@ func (ed *EnhancedDiscoverer) shouldIncludeResource(resource models.Resource) bo
 
 	// Check include tags
 	if len(filter.IncludeTags) > 0 {
+		resourceTags := resource.GetTagsAsMap()
 		for key, value := range filter.IncludeTags {
-			if resource.Tags[key] != value {
+			if resourceValue, exists := resourceTags[key]; !exists || resourceValue != value {
 				return false
 			}
 		}
@@ -331,8 +429,9 @@ func (ed *EnhancedDiscoverer) shouldIncludeResource(resource models.Resource) bo
 
 	// Check exclude tags
 	if len(filter.ExcludeTags) > 0 {
+		resourceTags := resource.GetTagsAsMap()
 		for key, value := range filter.ExcludeTags {
-			if resource.Tags[key] == value {
+			if resourceValue, exists := resourceTags[key]; exists && resourceValue == value {
 				return false
 			}
 		}
@@ -347,7 +446,8 @@ func (ed *EnhancedDiscoverer) shouldIncludeResource(resource models.Resource) bo
 
 	// Check environment filter
 	if filter.Environment != "" {
-		if resource.Tags["Environment"] != filter.Environment {
+		resourceTags := resource.GetTagsAsMap()
+		if envValue, exists := resourceTags["Environment"]; !exists || envValue != filter.Environment {
 			return false
 		}
 	}
@@ -382,7 +482,8 @@ func (ed *EnhancedDiscoverer) buildResourceHierarchy(resources []models.Resource
 			// Find subnets in this VPC
 			if subnets, exists := resourceMap["aws_subnet"]; exists {
 				for _, subnet := range subnets {
-					if subnet.Tags["VPC"] == vpc.ID {
+					subnetTags := subnet.GetTagsAsMap()
+					if vpcTag, exists := subnetTags["VPC"]; exists && vpcTag == vpc.ID {
 						vpcHierarchy.Children = append(vpcHierarchy.Children, &ResourceHierarchy{Parent: &subnet, Level: 2})
 					}
 				}
@@ -391,7 +492,8 @@ func (ed *EnhancedDiscoverer) buildResourceHierarchy(resources []models.Resource
 			// Find EC2 instances in this VPC
 			if instances, exists := resourceMap["aws_instance"]; exists {
 				for _, instance := range instances {
-					if instance.Tags["VPC"] == vpc.ID {
+					instanceTags := instance.GetTagsAsMap()
+					if vpcTag, exists := instanceTags["VPC"]; exists && vpcTag == vpc.ID {
 						vpcHierarchy.Children = append(vpcHierarchy.Children, &ResourceHierarchy{Parent: &instance, Level: 2})
 					}
 				}

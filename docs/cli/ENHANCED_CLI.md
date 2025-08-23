@@ -75,7 +75,7 @@ Error: State file ID required for analyze command
 * Usage: driftmgr-client analyze <statefile_id>
 ```
 
-### ✅ Enhanced Success Messages
+### [OK] Enhanced Success Messages
 
 #### Before Enhancement
 ```

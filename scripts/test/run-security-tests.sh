@@ -223,6 +223,6 @@ if [ $FAILED -eq 0 ]; then
     echo -e "\n${GREEN}🎉 All security tests passed! DriftMgr appears to be secure.${NC}"
     exit 0
 else
-    echo -e "\n${RED}⚠️  ${FAILED} security test(s) failed. Please review and fix the issues.${NC}"
+    echo -e "\n${RED}[WARNING]  ${FAILED} security test(s) failed. Please review and fix the issues.${NC}"
     exit 1
 fi

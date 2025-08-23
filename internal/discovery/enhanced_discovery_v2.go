@@ -310,19 +310,20 @@ func (ede *EnhancedDiscoveryEngine) getOwnerInfo(ctx context.Context, resource m
 	}
 
 	// Extract owner info from tags
-	if team, exists := resource.Tags["Team"]; exists {
+	resourceTags := resource.GetTagsAsMap()
+	if team, exists := resourceTags["Team"]; exists {
 		owner.Team = team
 	}
-	if contact, exists := resource.Tags["Contact"]; exists {
+	if contact, exists := resourceTags["Contact"]; exists {
 		owner.Contact = contact
 	}
-	if dept, exists := resource.Tags["Department"]; exists {
+	if dept, exists := resourceTags["Department"]; exists {
 		owner.Department = dept
 	}
-	if project, exists := resource.Tags["Project"]; exists {
+	if project, exists := resourceTags["Project"]; exists {
 		owner.Project = project
 	}
-	if costCenter, exists := resource.Tags["CostCenter"]; exists {
+	if costCenter, exists := resourceTags["CostCenter"]; exists {
 		owner.CostCenter = costCenter
 	}
 

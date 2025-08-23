@@ -1,0 +1,222 @@
+# Auto-Remediation Configuration for DriftMgr
+# This file configures automatic remediation of infrastructure drift
+
+# Global settings
+enabled: false                    # Enable/disable auto-remediation
+dry_run: true                    # Run in dry-run mode (no actual changes)
+max_concurrent: 5                # Maximum concurrent remediations
+scan_interval: 15m               # How often to scan for drift
+
+# Safety configuration
+safety:
+  max_remediations_per_hour: 20      # Rate limiting
+  max_cost_impact: 1000.0            # Maximum cost impact in dollars
+  require_backup: true               # Require backup before remediation
+  require_snapshot: true             # Require snapshot before remediation
+  enable_rollback: true              # Enable automatic rollback on failure
+  rollback_timeout: 10m              # Timeout for rollback operations
+  critical_resource_protection: true # Protect critical resources
+
+# Approval workflow
+approval:
+  enabled: true
+  default_timeout: 30m
+  approval_methods:
+    - slack
+    - email
+  approvers:
+    - ops-team@example.com
+    - platform-team@example.com
+  escalation:
+    enabled: true
+    levels:
+      - after: 15m
+        notify:
+          - senior-ops@example.com
+      - after: 25m
+        notify:
+          - engineering-manager@example.com
+
+# Notification settings
+notifications:
+  enabled: true
+  on_success: false      # Notify on successful remediation
+  on_failure: true       # Notify on failed remediation
+  on_approval: true      # Notify when approval is needed
+  on_rollback: true      # Notify when rollback occurs
+  channels:
+    - type: slack
+      config:
+        webhook_url: ${SLACK_WEBHOOK_URL}
+        channel: "#infrastructure-alerts"
+      severity:
+        - critical
+        - high
+    - type: email
+      config:
+        smtp_server: smtp.example.com
+        from: driftmgr@example.com
+        to:
+          - ops-team@example.com
+      severity:
+        - critical
+
+# Remediation rules
+rules:
+  # Rule 1: Auto-fix missing or incorrect tags
+  - name: auto-fix-tags
+    description: Automatically fix missing or incorrect tags
+    enabled: true
+    priority: 1
+    drift_types:
+      - modified
+    resource_types:
+      - "*"  # All resource types
+    max_risk_level: low
+    action:
+      type: auto_fix
+      strategy: terraform
+      retry:
+        max_attempts: 3
+        initial_delay: 30s
+        max_delay: 5m
+        backoff_factor: 2
+    requires_approval: false
+    conditions:
+      - field: resource_name
+        operator: regex
+        value: ".*tag.*"
+    pre_checks:
+      - name: verify_terraform_state
+        type: health_check
+        timeout: 30s
+        required: true
+    post_checks:
+      - name: verify_tags_applied
+        type: health_check
+        timeout: 30s
+        required: true
+
+  # Rule 2: Recreate missing resources
+  - name: recreate-missing-resources
+    description: Recreate missing resources with approval
+    enabled: true
+    priority: 2
+    drift_types:
+      - missing
+    max_risk_level: medium
+    action:
+      type: auto_fix
+      strategy: terraform
+      rollback_on_failure: true
+    requires_approval: true
+    approval_timeout: 30m
+    pre_checks:
+      - name: dependency_check
+        type: dependency_check
+        timeout: 1m
+        required: true
+      - name: cost_estimate
+        type: cost_check
+        timeout: 30s
+        required: false
+
+  # Rule 3: Import unmanaged resources
+  - name: import-unmanaged-resources
+    description: Import unmanaged resources into Terraform state
+    enabled: true
+    priority: 3
+    drift_types:
+      - unmanaged
+    max_risk_level: low
+    action:
+      type: auto_fix
+      strategy: terraform
+    requires_approval: false
+    regions:
+      - us-east-1
+      - us-west-2
+      - eu-west-1
+
+  # Rule 4: Notify about extra resources (never auto-delete)
+  - name: notify-extra-resources
+    description: Notify about extra resources (never auto-delete)
+    enabled: true
+    priority: 4
+    drift_types:
+      - extra
+    max_risk_level: critical  # Set to critical to prevent auto-deletion
+    action:
+      type: notify
+      strategy: ""
+    requires_approval: false
+
+  # Rule 5: Fix security group modifications
+  - name: fix-security-groups
+    description: Automatically fix security group rule modifications
+    enabled: false  # Disabled by default for safety
+    priority: 5
+    drift_types:
+      - modified
+    resource_types:
+      - aws_security_group
+      - aws_security_group_rule
+      - azure_network_security_group
+      - gcp_firewall
+    max_risk_level: high
+    action:
+      type: auto_fix
+      strategy: api  # Use API for faster remediation
+      rollback_on_failure: true
+    requires_approval: true
+    approval_timeout: 15m
+    conditions:
+      - field: severity
+        operator: greater_than
+        value: medium
+
+# Maintenance windows (when auto-remediation can run)
+maintenance_windows:
+  - name: weekday_nights
+    start_time: "22:00"
+    end_time: "06:00"
+    days_of_week:
+      - Monday
+      - Tuesday
+      - Wednesday
+      - Thursday
+      - Friday
+    timezone: UTC
+  
+  - name: weekend
+    start_time: "00:00"
+    end_time: "23:59"
+    days_of_week:
+      - Saturday
+      - Sunday
+    timezone: UTC
+
+# Resources excluded from auto-remediation
+excluded_resources:
+  # Production databases - never auto-remediate
+  - resource_type: aws_rds_instance
+    tags:
+      environment: production
+    reason: Critical production database
+  
+  # Main VPCs
+  - resource_type: aws_vpc
+    tags:
+      name: main-vpc
+    reason: Core networking infrastructure
+  
+  # IAM roles with admin privileges
+  - resource_type: aws_iam_role
+    tags:
+      privilege_level: admin
+    reason: High-privilege IAM resource
+  
+  # Temporary exclusion
+  - resource_id: i-1234567890abcdef0
+    reason: Under manual investigation
+    expires_at: 2024-12-31T23:59:59Z

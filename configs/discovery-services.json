@@ -1,0 +1,57 @@
+{
+  "services": {
+    "aws": {
+      "enabled": true,
+      "regions": ["us-east-1", "us-west-2", "eu-west-1"],
+      "timeout": 300,
+      "max_retries": 3,
+      "services": [
+        "ec2",
+        "s3", 
+        "rds",
+        "lambda",
+        "dynamodb",
+        "vpc",
+        "iam",
+        "cloudformation"
+      ]
+    },
+    "azure": {
+      "enabled": true,
+      "timeout": 300,
+      "max_retries": 3,
+      "resource_groups": [],
+      "subscriptions": []
+    },
+    "gcp": {
+      "enabled": true,
+      "projects": [],
+      "timeout": 300,
+      "max_retries": 3,
+      "services": [
+        "compute",
+        "storage",
+        "sql",
+        "functions"
+      ]
+    },
+    "digitalocean": {
+      "enabled": true,
+      "timeout": 300,
+      "max_retries": 3
+    }
+  },
+  "discovery": {
+    "parallel": true,
+    "max_workers": 10,
+    "cache_enabled": true,
+    "cache_ttl": 3600,
+    "output_format": "json",
+    "verbose": false
+  },
+  "cli_verification": {
+    "enabled": false,
+    "timeout": 30,
+    "max_retries": 3
+  }
+}

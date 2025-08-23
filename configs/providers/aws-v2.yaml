@@ -1,0 +1,413 @@
+# AWS Provider Configuration v2.0
+# This configuration drives AWS resource discovery and can be hot-reloaded
+
+apiVersion: v2
+kind: ProviderConfig
+metadata:
+  name: aws
+  version: "2.0.0"
+  description: "Amazon Web Services provider configuration"
+  maintainer: "DriftMgr Team"
+  documentation: "https://docs.driftmgr.io/providers/aws"
+  tags: ["cloud", "aws", "compute", "storage"]
+
+spec:
+  provider:
+    name: aws
+    displayName: "Amazon Web Services"
+    authentication:
+      methods:
+        - type: aws_credentials
+          description: "AWS Access Key and Secret Key"
+          required: ["access_key_id", "secret_access_key"]
+          optional: ["session_token"]
+        - type: aws_profile
+          description: "AWS CLI Profile"
+          required: ["profile_name"]
+        - type: aws_role
+          description: "AWS IAM Role"
+          required: ["role_arn"]
+          optional: ["external_id", "session_name"]
+        - type: ec2_instance_profile
+          description: "EC2 Instance Profile"
+          scopes: ["ec2:DescribeInstances"]
+
+  regions:
+    discovery:
+      enabled: true
+      source: "aws ec2 describe-regions"
+      cache_ttl: "1h"
+    defaults:
+      - us-east-1
+      - us-west-2
+      - eu-west-1
+    groups:
+      us_regions:
+        - us-east-1
+        - us-east-2
+        - us-west-1
+        - us-west-2
+      eu_regions:
+        - eu-west-1
+        - eu-west-2
+        - eu-central-1
+      ap_regions:
+        - ap-southeast-1
+        - ap-southeast-2
+        - ap-northeast-1
+
+  accounts:
+    discovery:
+      enabled: true
+      methods:
+        - organizations
+        - sts_caller_identity
+        - profiles
+    organization:
+      enabled: true
+      command: "aws organizations list-accounts"
+      requires_permissions: ["organizations:ListAccounts"]
+
+  resource_types:
+    # Compute Resources
+    - name: ec2_instance
+      displayName: "EC2 Instance"
+      category: compute
+      api_version: "2016-11-15"
+      discovery:
+        method: aws_cli
+        command: "aws ec2 describe-instances"
+        pagination: true
+        parallel_regions: true
+        rate_limit:
+          requests_per_second: 10
+      schema:
+        identifier: "InstanceId"
+        name_field: "Tags[?Key=='Name'].Value | [0]"
+        fields:
+          - name: instance_id
+            type: string
+            source: "InstanceId"
+            required: true
+          - name: instance_type
+            type: string
+            source: "InstanceType"
+          - name: state
+            type: string
+            source: "State.Name"
+          - name: vpc_id
+            type: string
+            source: "VpcId"
+          - name: subnet_id
+            type: string
+            source: "SubnetId"
+          - name: security_groups
+            type: array
+            source: "SecurityGroups[*].GroupId"
+          - name: public_ip
+            type: string
+            source: "PublicIpAddress"
+          - name: private_ip
+            type: string
+            source: "PrivateIpAddress"
+      relationships:
+        - type: belongs_to
+          target: vpc
+          field: vpc_id
+        - type: belongs_to
+          target: subnet
+          field: subnet_id
+        - type: references
+          target: security_group
+          field: security_groups
+      tags:
+        source: "Tags"
+        key_field: "Key"
+        value_field: "Value"
+
+    - name: s3_bucket
+      displayName: "S3 Bucket"
+      category: storage
+      api_version: "2006-03-01"
+      discovery:
+        method: aws_cli
+        command: "aws s3api list-buckets"
+        global_resource: true
+        enrichment:
+          - command: "aws s3api get-bucket-location --bucket {bucket_name}"
+            field: location
+          - command: "aws s3api get-bucket-versioning --bucket {bucket_name}"
+            field: versioning
+          - command: "aws s3api get-bucket-encryption --bucket {bucket_name}"
+            field: encryption
+            optional: true
+      schema:
+        identifier: "Name"
+        name_field: "Name"
+        fields:
+          - name: name
+            type: string
+            source: "Name"
+            required: true
+          - name: creation_date
+            type: datetime
+            source: "CreationDate"
+          - name: location
+            type: string
+            source: "enrichment.location.LocationConstraint"
+          - name: versioning_status
+            type: string
+            source: "enrichment.versioning.Status"
+          - name: encryption_type
+            type: string
+            source: "enrichment.encryption.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm"
+
+    - name: rds_instance
+      displayName: "RDS Database Instance"
+      category: database
+      api_version: "2014-10-31"
+      discovery:
+        method: aws_cli
+        command: "aws rds describe-db-instances"
+        pagination: true
+        parallel_regions: true
+      schema:
+        identifier: "DBInstanceIdentifier"
+        name_field: "DBInstanceIdentifier"
+        fields:
+          - name: db_instance_identifier
+            type: string
+            source: "DBInstanceIdentifier"
+            required: true
+          - name: db_instance_class
+            type: string
+            source: "DBInstanceClass"
+          - name: engine
+            type: string
+            source: "Engine"
+          - name: engine_version
+            type: string
+            source: "EngineVersion"
+          - name: status
+            type: string
+            source: "DBInstanceStatus"
+          - name: allocated_storage
+            type: integer
+            source: "AllocatedStorage"
+          - name: multi_az
+            type: boolean
+            source: "MultiAZ"
+          - name: vpc_id
+            type: string
+            source: "DBSubnetGroup.VpcId"
+      relationships:
+        - type: belongs_to
+          target: vpc
+          field: vpc_id
+
+    - name: lambda_function
+      displayName: "Lambda Function"
+      category: compute
+      api_version: "2015-03-31"
+      discovery:
+        method: aws_cli
+        command: "aws lambda list-functions"
+        pagination: true
+        parallel_regions: true
+        enrichment:
+          - command: "aws lambda get-function --function-name {function_name}"
+            field: configuration
+      schema:
+        identifier: "FunctionName"
+        name_field: "FunctionName"
+        fields:
+          - name: function_name
+            type: string
+            source: "FunctionName"
+            required: true
+          - name: runtime
+            type: string
+            source: "Runtime"
+          - name: handler
+            type: string
+            source: "Handler"
+          - name: code_size
+            type: integer
+            source: "CodeSize"
+          - name: memory_size
+            type: integer
+            source: "MemorySize"
+          - name: timeout
+            type: integer
+            source: "Timeout"
+          - name: last_modified
+            type: datetime
+            source: "LastModified"
+
+    - name: vpc
+      displayName: "Virtual Private Cloud"
+      category: networking
+      api_version: "2016-11-15"
+      discovery:
+        method: aws_cli
+        command: "aws ec2 describe-vpcs"
+        parallel_regions: true
+      schema:
+        identifier: "VpcId"
+        name_field: "Tags[?Key=='Name'].Value | [0]"
+        fields:
+          - name: vpc_id
+            type: string
+            source: "VpcId"
+            required: true
+          - name: cidr_block
+            type: string
+            source: "CidrBlock"
+          - name: state
+            type: string
+            source: "State"
+          - name: is_default
+            type: boolean
+            source: "IsDefault"
+      relationships:
+        - type: contains
+          target: subnet
+          reverse_field: vpc_id
+
+    - name: security_group
+      displayName: "Security Group"
+      category: networking
+      api_version: "2016-11-15"
+      discovery:
+        method: aws_cli
+        command: "aws ec2 describe-security-groups"
+        parallel_regions: true
+      schema:
+        identifier: "GroupId"
+        name_field: "GroupName"
+        fields:
+          - name: group_id
+            type: string
+            source: "GroupId"
+            required: true
+          - name: group_name
+            type: string
+            source: "GroupName"
+          - name: description
+            type: string
+            source: "Description"
+          - name: vpc_id
+            type: string
+            source: "VpcId"
+          - name: ingress_rules
+            type: array
+            source: "IpPermissions"
+          - name: egress_rules
+            type: array
+            source: "IpPermissionsEgress"
+      relationships:
+        - type: belongs_to
+          target: vpc
+          field: vpc_id
+
+  discovery:
+    parallelism:
+      max_regions: 10
+      max_accounts: 5
+      max_resource_types: 20
+    caching:
+      enabled: true
+      ttl: "30m"
+      strategy: "per_region_per_type"
+    retry_policy:
+      max_attempts: 3
+      initial_delay: "1s"
+      max_delay: "30s"
+      backoff_multiplier: 2.0
+      retry_on:
+        - "ThrottlingException"
+        - "RequestLimitExceeded"
+        - "ServiceUnavailable"
+    error_handling:
+      ignore_missing_permissions: true
+      continue_on_error: true
+      max_errors_per_region: 10
+
+  cost_estimation:
+    enabled: true
+    api_calls:
+      describe_instances: 0.001  # $0.001 per 1000 requests
+      list_buckets: 0.0005
+      describe_db_instances: 0.001
+    resource_limits:
+      max_resources_per_discovery: 10000
+      warning_threshold: 5000
+
+  compliance:
+    tags:
+      required:
+        - Environment
+        - Owner
+        - Project
+      recommended:
+        - CostCenter
+        - Application
+    encryption:
+      required_for:
+        - s3_bucket
+        - rds_instance
+        - ebs_volume
+
+  monitoring:
+    metrics:
+      enabled: true
+      interval: "1m"
+      include:
+        - discovery_duration
+        - resources_discovered
+        - api_calls_made
+        - errors_encountered
+        - cache_hit_ratio
+    alerts:
+      - name: high_discovery_time
+        condition: "discovery_duration > 300s"
+        severity: warning
+      - name: api_rate_limit_hit
+        condition: "api_errors.ThrottlingException > 10"
+        severity: critical
+      - name: low_cache_hit_ratio
+        condition: "cache_hit_ratio < 0.5"
+        severity: info
+
+  # Feature flags for gradual rollout
+  features:
+    enhanced_discovery: true
+    cross_region_analysis: true
+    auto_remediation: false
+    drift_prediction: true
+    cost_optimization: true
+    security_scanning: true
+
+  # Version compatibility
+  compatibility:
+    min_api_version: "1.0"
+    max_api_version: "3.0"
+    deprecated_features:
+      - v1_discovery_method  # Will be removed in v3.0
+    migration_guides:
+      v1_to_v2: "https://docs.driftmgr.io/migration/v1-to-v2"
+
+  # Custom hooks for extensibility
+  hooks:
+    pre_discovery:
+      - validate_credentials
+      - check_quotas
+      - warm_cache
+    post_discovery:
+      - update_cache
+      - send_metrics
+      - trigger_analysis
+    on_error:
+      - log_error
+      - send_alert
+      - fallback_discovery

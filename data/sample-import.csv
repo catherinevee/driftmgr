@@ -1,0 +1,5 @@
+provider,type,name,id
+aws,aws_instance,test-server,i-1234567890
+aws,aws_s3_bucket,my-data-bucket,my-data-bucket
+azure,azurerm_resource_group,main-rg,/subscriptions/12345/resourceGroups/main-rg
+digitalocean,digitalocean_droplet,web-server,123456789

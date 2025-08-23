@@ -14,7 +14,7 @@ Write-Host "🔍 Test 1: Validate inputs (should fail)" -ForegroundColor Yellow
 try {
     .\driftmgr.exe github-actions validate-inputs
 } catch {
-    Write-Host "✅ Expected failure - no environment variables set" -ForegroundColor Green
+    Write-Host "[OK] Expected failure - no environment variables set" -ForegroundColor Green
 }
 
 # Test 2: Setup environment
@@ -41,11 +41,11 @@ Write-Host "📊 Test 4: Generate report" -ForegroundColor Yellow
 .\driftmgr.exe github-actions generate-report --output test-report.md
 
 if (Test-Path "test-report.md") {
-    Write-Host "✅ Report generated successfully" -ForegroundColor Green
+    Write-Host "[OK] Report generated successfully" -ForegroundColor Green
     Write-Host "📄 Report preview:" -ForegroundColor Yellow
     Get-Content test-report.md | Select-Object -First 20
 } else {
-    Write-Host "❌ Report generation failed" -ForegroundColor Red
+    Write-Host "[ERROR] Report generation failed" -ForegroundColor Red
 }
 
 # Test 5: Workflow dispatch (dry run)
@@ -71,7 +71,7 @@ if ($markdownFiles) {
 }
 
 Write-Host ""
-Write-Host "✅ All tests completed!" -ForegroundColor Green
+Write-Host "[OK] All tests completed!" -ForegroundColor Green
 Write-Host ""
 Write-Host "📋 Summary:" -ForegroundColor Cyan
 Write-Host "- GitHub Actions integration is working" -ForegroundColor Green

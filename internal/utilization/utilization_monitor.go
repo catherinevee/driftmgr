@@ -21,23 +21,23 @@ type UtilizationProvider interface {
 
 // UtilizationMetrics represents resource utilization data
 type UtilizationMetrics struct {
-	ResourceID      string
-	CPUUtilization  float64
-	MemoryUtilization float64
-	DiskUtilization  float64
+	ResourceID         string
+	CPUUtilization     float64
+	MemoryUtilization  float64
+	DiskUtilization    float64
 	NetworkUtilization float64
-	LastUpdated     time.Time
-	Trend           UtilizationTrend
+	LastUpdated        time.Time
+	Trend              UtilizationTrend
 }
 
 // PerformanceMetrics represents performance data
 type PerformanceMetrics struct {
-	ResourceID      string
-	ResponseTime    time.Duration
-	Throughput      float64
-	ErrorRate       float64
-	Availability    float64
-	LastUpdated     time.Time
+	ResourceID   string
+	ResponseTime time.Duration
+	Throughput   float64
+	ErrorRate    float64
+	Availability float64
+	LastUpdated  time.Time
 }
 
 // UtilizationTrend shows utilization movement over time

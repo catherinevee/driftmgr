@@ -6,17 +6,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/analysis"
 	"github.com/catherinevee/driftmgr/internal/discovery"
+	"github.com/catherinevee/driftmgr/internal/models"
+	"github.com/catherinevee/driftmgr/internal/performance"
 	"github.com/catherinevee/driftmgr/internal/remediation"
 )
 
 // MultiCloudManager provides unified multi-cloud resource management
 type MultiCloudManager struct {
-	providers       map[string]CloudProvider
-	discoveryEngine *discovery.EnhancedDiscoveryEngine
-	remediationEngine *remediation.AdvancedRemediationEngine
-	mu              sync.RWMutex
+	providers         map[string]CloudProvider
+	discoveryEngine   *discovery.EnhancedDiscoveryEngine
+	remediationEngine *remediation.RemediationEngine
+	mu                sync.RWMutex
 }
 
 // CloudProvider interface for unified multi-cloud support
@@ -25,23 +27,23 @@ type CloudProvider interface {
 	GetName() string
 	GetRegions() []string
 	GetResourceTypes() []string
-	
+
 	// Discovery operations
 	DiscoverResources(ctx context.Context, regions []string) ([]models.Resource, error)
 	GetResourceMetadata(ctx context.Context, resource models.Resource) (*discovery.ResourceMetadata, error)
 	GetCrossRegionRefs(ctx context.Context, resource models.Resource) ([]discovery.CrossRegionReference, error)
 	GetDependencies(ctx context.Context, resource models.Resource) ([]string, error)
-	
+
 	// Remediation operations
-	RemediateDrift(ctx context.Context, drift remediation.DriftAnalysis, strategy remediation.RemediationStrategy) error
-	CreateSnapshot(ctx context.Context, resource models.Resource) (*remediation.ResourceSnapshot, error)
-	RollbackToSnapshot(ctx context.Context, snapshot *remediation.ResourceSnapshot) error
-	ValidateRemediation(ctx context.Context, resource models.Resource, validationSteps []remediation.ValidationStep) error
-	
+	RemediateDrift(ctx context.Context, drift analysis.DriftAnalysis, strategy remediation.RemediationStrategy) error
+	CreateSnapshot(ctx context.Context, resource models.Resource) (*performance.ResourceSnapshot, error)
+	RollbackToSnapshot(ctx context.Context, snapshot *performance.ResourceSnapshot) error
+	ValidateRemediation(ctx context.Context, resource models.Resource, validationSteps []string) error
+
 	// Cost operations
 	GetCostData(ctx context.Context, resource models.Resource) (*CostData, error)
 	GetOptimizationRecommendations(ctx context.Context, resource models.Resource) ([]OptimizationRecommendation, error)
-	
+
 	// Security operations
 	GetSecurityAssessment(ctx context.Context, resource models.Resource) (*SecurityAssessment, error)
 	GetComplianceStatus(ctx context.Context, resource models.Resource, framework string) (*ComplianceStatus, error)
@@ -49,12 +51,12 @@ type CloudProvider interface {
 
 // CostData represents cost information for a resource
 type CostData struct {
-	ResourceID      string
-	MonthlyCost     float64
-	DailyCost       float64
-	Currency        string
-	CostBreakdown   []CostBreakdown
-	LastUpdated     time.Time
+	ResourceID    string
+	MonthlyCost   float64
+	DailyCost     float64
+	Currency      string
+	CostBreakdown []CostBreakdown
+	LastUpdated   time.Time
 }
 
 // CostBreakdown represents cost breakdown by service/dimension
@@ -102,11 +104,11 @@ type SecurityRecommendation struct {
 
 // ComplianceStatus represents compliance status
 type ComplianceStatus struct {
-	Framework      string
-	OverallScore   int
-	Compliant      bool
-	Violations     []ComplianceViolation
-	LastChecked    time.Time
+	Framework    string
+	OverallScore int
+	Compliant    bool
+	Violations   []ComplianceViolation
+	LastChecked  time.Time
 }
 
 // ComplianceViolation represents a compliance violation
@@ -120,7 +122,7 @@ type ComplianceViolation struct {
 // NewMultiCloudManager creates a new multi-cloud manager
 func NewMultiCloudManager(
 	discoveryEngine *discovery.EnhancedDiscoveryEngine,
-	remediationEngine *remediation.AdvancedRemediationEngine,
+	remediationEngine *remediation.RemediationEngine,
 ) *MultiCloudManager {
 	return &MultiCloudManager{
 		providers:         make(map[string]CloudProvider),
@@ -148,7 +150,7 @@ func (mcm *MultiCloudManager) GetProvider(name string) (CloudProvider, bool) {
 func (mcm *MultiCloudManager) ListProviders() []string {
 	mcm.mu.RLock()
 	defer mcm.mu.RUnlock()
-	
+
 	var providers []string
 	for name := range mcm.providers {
 		providers = append(providers, name)
@@ -164,13 +166,13 @@ func (mcm *MultiCloudManager) DiscoverResourcesMultiCloud(
 	options discovery.DiscoveryOptions,
 ) (map[string][]*discovery.EnhancedResource, error) {
 	results := make(map[string][]*discovery.EnhancedResource)
-	
+
 	for _, providerName := range providers {
-		provider, exists := mcm.GetProvider(providerName)
+		_, exists := mcm.GetProvider(providerName)
 		if !exists {
 			return nil, fmt.Errorf("provider %s not registered", providerName)
 		}
-		
+
 		// Use enhanced discovery engine for each provider
 		resources, err := mcm.discoveryEngine.DiscoverResourcesEnhanced(
 			ctx,
@@ -181,29 +183,29 @@ func (mcm *MultiCloudManager) DiscoverResourcesMultiCloud(
 		if err != nil {
 			return nil, fmt.Errorf("failed to discover resources for provider %s: %w", providerName, err)
 		}
-		
+
 		results[providerName] = resources
 	}
-	
+
 	return results, nil
 }
 
 // RemediateDriftMultiCloud performs drift remediation across multiple providers
 func (mcm *MultiCloudManager) RemediateDriftMultiCloud(
 	ctx context.Context,
-	drifts map[string][]remediation.DriftAnalysis,
-	options remediation.RemediationOptions,
+	drifts map[string][]analysis.DriftAnalysis,
+	options map[string]interface{}, // RemediationOptions not defined
 ) (map[string][]*remediation.RemediationResult, error) {
 	results := make(map[string][]*remediation.RemediationResult)
-	
+
 	for providerName, providerDrifts := range drifts {
-		provider, exists := mcm.GetProvider(providerName)
+		_, exists := mcm.GetProvider(providerName)
 		if !exists {
 			return nil, fmt.Errorf("provider %s not registered", providerName)
 		}
-		
+
 		var providerResults []*remediation.RemediationResult
-		
+
 		for _, drift := range providerDrifts {
 			// Create a mock resource for the drift
 			resource := models.Resource{
@@ -211,18 +213,18 @@ func (mcm *MultiCloudManager) RemediateDriftMultiCloud(
 				Provider: providerName,
 				Type:     "unknown", // Would be determined from drift analysis
 			}
-			
+
 			result, err := mcm.remediationEngine.RemediateDrift(ctx, drift, resource, options)
 			if err != nil {
 				return nil, fmt.Errorf("failed to remediate drift for provider %s: %w", providerName, err)
 			}
-			
+
 			providerResults = append(providerResults, result)
 		}
-		
+
 		results[providerName] = providerResults
 	}
-	
+
 	return results, nil
 }
 
@@ -232,15 +234,15 @@ func (mcm *MultiCloudManager) GetCostAnalysisMultiCloud(
 	resources map[string][]models.Resource,
 ) (map[string][]*CostData, error) {
 	results := make(map[string][]*CostData)
-	
+
 	for providerName, providerResources := range resources {
-		provider, exists := mcm.GetProvider(providerName)
+		_, exists := mcm.GetProvider(providerName)
 		if !exists {
 			return nil, fmt.Errorf("provider %s not registered", providerName)
 		}
-		
+
 		var providerCosts []*CostData
-		
+
 		for _, resource := range providerResources {
 			costData, err := provider.GetCostData(ctx, resource)
 			if err != nil {
@@ -248,13 +250,13 @@ func (mcm *MultiCloudManager) GetCostAnalysisMultiCloud(
 				fmt.Printf("Warning: Failed to get cost data for resource %s: %v\n", resource.ID, err)
 				continue
 			}
-			
+
 			providerCosts = append(providerCosts, costData)
 		}
-		
+
 		results[providerName] = providerCosts
 	}
-	
+
 	return results, nil
 }
 
@@ -264,15 +266,15 @@ func (mcm *MultiCloudManager) GetSecurityAssessmentMultiCloud(
 	resources map[string][]models.Resource,
 ) (map[string][]*SecurityAssessment, error) {
 	results := make(map[string][]*SecurityAssessment)
-	
+
 	for providerName, providerResources := range resources {
-		provider, exists := mcm.GetProvider(providerName)
+		_, exists := mcm.GetProvider(providerName)
 		if !exists {
 			return nil, fmt.Errorf("provider %s not registered", providerName)
 		}
-		
+
 		var providerAssessments []*SecurityAssessment
-		
+
 		for _, resource := range providerResources {
 			assessment, err := provider.GetSecurityAssessment(ctx, resource)
 			if err != nil {
@@ -280,13 +282,13 @@ func (mcm *MultiCloudManager) GetSecurityAssessmentMultiCloud(
 				fmt.Printf("Warning: Failed to get security assessment for resource %s: %v\n", resource.ID, err)
 				continue
 			}
-			
+
 			providerAssessments = append(providerAssessments, assessment)
 		}
-		
+
 		results[providerName] = providerAssessments
 	}
-	
+
 	return results, nil
 }
 
@@ -297,15 +299,15 @@ func (mcm *MultiCloudManager) GetComplianceStatusMultiCloud(
 	framework string,
 ) (map[string][]*ComplianceStatus, error) {
 	results := make(map[string][]*ComplianceStatus)
-	
+
 	for providerName, providerResources := range resources {
-		provider, exists := mcm.GetProvider(providerName)
+		_, exists := mcm.GetProvider(providerName)
 		if !exists {
 			return nil, fmt.Errorf("provider %s not registered", providerName)
 		}
-		
+
 		var providerCompliance []*ComplianceStatus
-		
+
 		for _, resource := range providerResources {
 			compliance, err := provider.GetComplianceStatus(ctx, resource, framework)
 			if err != nil {
@@ -313,13 +315,13 @@ func (mcm *MultiCloudManager) GetComplianceStatusMultiCloud(
 				fmt.Printf("Warning: Failed to get compliance status for resource %s: %v\n", resource.ID, err)
 				continue
 			}
-			
+
 			providerCompliance = append(providerCompliance, compliance)
 		}
-		
+
 		results[providerName] = providerCompliance
 	}
-	
+
 	return results, nil
 }
 
@@ -329,7 +331,7 @@ func (mcm *MultiCloudManager) GetCrossCloudDependencies(
 	resources map[string][]models.Resource,
 ) ([]CrossCloudDependency, error) {
 	var dependencies []CrossCloudDependency
-	
+
 	// Build resource map for quick lookup
 	resourceMap := make(map[string]models.Resource)
 	for providerName, providerResources := range resources {
@@ -337,32 +339,32 @@ func (mcm *MultiCloudManager) GetCrossCloudDependencies(
 			resourceMap[resource.ID] = resource
 		}
 	}
-	
+
 	// Check for cross-cloud dependencies
 	for providerName, providerResources := range resources {
-		provider, exists := mcm.GetProvider(providerName)
+		_, exists := mcm.GetProvider(providerName)
 		if !exists {
 			continue
 		}
-		
+
 		for _, resource := range providerResources {
 			// Get cross-region references (which might include cross-cloud)
 			crossRegionRefs, err := provider.GetCrossRegionRefs(ctx, resource)
 			if err != nil {
 				continue
 			}
-			
+
 			for _, ref := range crossRegionRefs {
 				// Check if the referenced resource exists in another provider
 				if referencedResource, exists := resourceMap[ref.ResourceID]; exists {
 					if referencedResource.Provider != providerName {
 						dependency := CrossCloudDependency{
-							SourceProvider:      providerName,
-							SourceResource:      resource,
-							TargetProvider:      referencedResource.Provider,
-							TargetResource:      referencedResource,
-							Relationship:        ref.Relationship,
-							CrossRegionRef:      ref,
+							SourceProvider: providerName,
+							SourceResource: resource,
+							TargetProvider: referencedResource.Provider,
+							TargetResource: referencedResource,
+							Relationship:   ref.Relationship,
+							CrossRegionRef: ref,
 						}
 						dependencies = append(dependencies, dependency)
 					}
@@ -370,16 +372,16 @@ func (mcm *MultiCloudManager) GetCrossCloudDependencies(
 			}
 		}
 	}
-	
+
 	return dependencies, nil
 }
 
 // CrossCloudDependency represents a dependency between resources in different cloud providers
 type CrossCloudDependency struct {
-	SourceProvider      string
-	SourceResource      models.Resource
-	TargetProvider      string
-	TargetResource      models.Resource
-	Relationship        string
-	CrossRegionRef      discovery.CrossRegionReference
+	SourceProvider string
+	SourceResource models.Resource
+	TargetProvider string
+	TargetResource models.Resource
+	Relationship   string
+	CrossRegionRef discovery.CrossRegionReference
 }

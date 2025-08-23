@@ -3,10 +3,12 @@ package deletion
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/catherinevee/driftmgr/internal/constants"
 	"github.com/catherinevee/driftmgr/internal/models"
 )
 
@@ -19,6 +21,7 @@ type DeletionEngine struct {
 // CloudProvider interface for different cloud providers
 type CloudProvider interface {
 	DeleteResources(ctx context.Context, accountID string, options DeletionOptions) (*DeletionResult, error)
+	DeleteResource(ctx context.Context, resource models.Resource) error
 	ListResources(ctx context.Context, accountID string) ([]models.Resource, error)
 	ValidateCredentials(ctx context.Context, accountID string) error
 }
@@ -126,16 +129,16 @@ func (de *DeletionEngine) DeleteAccountResources(ctx context.Context, provider, 
 
 	// Set default options
 	if options.Timeout == 0 {
-		options.Timeout = 30 * time.Minute
+		options.Timeout = constants.DefaultDeletionTimeout
 	}
 	if options.BatchSize == 0 {
-		options.BatchSize = 10
+		options.BatchSize = constants.DefaultBatchSize
 	}
 	if options.MaxRetries == 0 {
-		options.MaxRetries = 3
+		options.MaxRetries = constants.DefaultMaxRetries
 	}
 	if options.RetryDelay == 0 {
-		options.RetryDelay = 5 * time.Second
+		options.RetryDelay = constants.DefaultRetryDelay
 	}
 
 	// Create context with timeout
@@ -204,9 +207,61 @@ func (de *DeletionEngine) retryFailedResources(ctx context.Context, provider Clo
 
 // retrySingleResource retries deletion of a single resource
 func (de *DeletionEngine) retrySingleResource(ctx context.Context, provider CloudProvider, accountID string, options DeletionOptions, err DeletionError) error {
-	// This would need to be implemented in each provider
-	// For now, return the original error
-	return fmt.Errorf("retry not implemented for resource %s", err.ResourceID)
+	maxRetries := constants.DefaultMaxRetries
+	backoffMs := int(constants.DefaultRetryDelay.Milliseconds())
+
+	log.Printf("Retrying deletion of resource %s (type: %s)", err.ResourceID, err.ResourceType)
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Wait with exponential backoff
+		time.Sleep(time.Duration(backoffMs*attempt) * time.Millisecond)
+
+		// List resources to find the specific one
+		resources, listErr := provider.ListResources(ctx, accountID)
+		if listErr != nil {
+			log.Printf("Retry %d/%d: Failed to list resources: %v", attempt, maxRetries, listErr)
+			continue
+		}
+
+		// Find the resource that failed
+		var targetResource *models.Resource
+		for _, r := range resources {
+			if r.ID == err.ResourceID {
+				targetResource = &r
+				break
+			}
+		}
+
+		if targetResource == nil {
+			// Resource might have been deleted already
+			log.Printf("Resource %s not found - may have been deleted", err.ResourceID)
+			return nil
+		}
+
+		// Attempt deletion again
+		deleteErr := provider.DeleteResource(ctx, *targetResource)
+		if deleteErr == nil {
+			log.Printf("Retry %d/%d: Successfully deleted resource %s", attempt, maxRetries, err.ResourceID)
+			return nil
+		}
+
+		// Check if error is retryable
+		errStr := strings.ToLower(deleteErr.Error())
+		isRetryable := strings.Contains(errStr, "throttl") ||
+			strings.Contains(errStr, "rate limit") ||
+			strings.Contains(errStr, "timeout") ||
+			strings.Contains(errStr, "temporary") ||
+			strings.Contains(errStr, "try again")
+
+		if !isRetryable {
+			log.Printf("Retry %d/%d: Non-retryable error for resource %s: %v", attempt, maxRetries, err.ResourceID, deleteErr)
+			return deleteErr
+		}
+
+		log.Printf("Retry %d/%d: Retryable error for resource %s: %v", attempt, maxRetries, err.ResourceID, deleteErr)
+	}
+
+	return fmt.Errorf("failed to delete resource %s after %d retries: %v", err.ResourceID, maxRetries, err.Error)
 }
 
 // performEnhancedSafetyChecks performs comprehensive safety validations
@@ -224,8 +279,7 @@ func (de *DeletionEngine) performEnhancedSafetyChecks(ctx context.Context, provi
 	}
 
 	// Check resource count with configurable threshold
-	maxResources := 1000
-	if len(resources) > maxResources && !options.Force {
+	if len(resources) > constants.MaxResourcesWarning && !options.Force {
 		return fmt.Errorf("large number of resources (%d) would be deleted. Use --force to override", len(resources))
 	}
 
@@ -250,7 +304,8 @@ func (de *DeletionEngine) identifyProductionResources(resources []models.Resourc
 
 	for _, resource := range resources {
 		// Check for production tags
-		if de.hasProductionTags(resource.Tags) {
+		tags := resource.GetTagsAsMap()
+		if de.hasProductionTags(tags) {
 			production = append(production, fmt.Sprintf("%s (production tags)", resource.Name))
 		}
 
@@ -348,7 +403,8 @@ func (de *DeletionEngine) identifyCriticalResources(resources []models.Resource)
 		}
 
 		// Check for critical tags
-		if de.hasCriticalTags(resource.Tags) {
+		tags := resource.GetTagsAsMap()
+		if de.hasCriticalTags(tags) {
 			critical = append(critical, fmt.Sprintf("%s (critical tags)", resource.Name))
 		}
 	}

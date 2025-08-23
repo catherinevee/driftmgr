@@ -15,43 +15,43 @@ type ImpactAnalyzer struct {
 
 // ImpactAnalysisConfig defines impact analysis configuration
 type ImpactAnalysisConfig struct {
-	EnableBusinessImpact bool
-	EnableCostImpact     bool
-	EnableSecurityImpact bool
+	EnableBusinessImpact    bool
+	EnableCostImpact        bool
+	EnableSecurityImpact    bool
 	EnablePerformanceImpact bool
-	EnableComplianceImpact bool
-	RiskThresholds        map[string]float64
-	BusinessRules         []BusinessRule
+	EnableComplianceImpact  bool
+	RiskThresholds          map[string]float64
+	BusinessRules           []BusinessRule
 }
 
 // BusinessRule defines a business rule for impact analysis
 type BusinessRule struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	ResourceType string                `json:"resource_type"`
-	Condition   string                 `json:"condition"`
-	Impact      string                 `json:"impact"` // high, medium, low
-	Weight      float64                `json:"weight"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	ID           string                 `json:"id"`
+	Name         string                 `json:"name"`
+	Description  string                 `json:"description"`
+	ResourceType string                 `json:"resource_type"`
+	Condition    string                 `json:"condition"`
+	Impact       string                 `json:"impact"` // high, medium, low
+	Weight       float64                `json:"weight"`
+	Metadata     map[string]interface{} `json:"metadata"`
 }
 
 // ImpactAnalysisResult represents the result of impact analysis
 type ImpactAnalysisResult struct {
-	ResourceID        string                    `json:"resource_id"`
-	ResourceName      string                    `json:"resource_name"`
-	ResourceType      string                    `json:"resource_type"`
-	ChangeType        string                    `json:"change_type"`
-	BusinessImpact    BusinessImpact            `json:"business_impact"`
-	CostImpact        CostImpact                `json:"cost_impact"`
-	SecurityImpact    SecurityImpact            `json:"security_impact"`
-	PerformanceImpact PerformanceImpact         `json:"performance_impact"`
-	ComplianceImpact  ComplianceImpact          `json:"compliance_impact"`
-	AffectedResources []string                  `json:"affected_resources"`
-	Dependencies      []DependencyImpact        `json:"dependencies"`
-	RiskScore         float64                   `json:"risk_score"`
-	Recommendations   []string                  `json:"recommendations"`
-	Timestamp         time.Time                 `json:"timestamp"`
+	ResourceID        string             `json:"resource_id"`
+	ResourceName      string             `json:"resource_name"`
+	ResourceType      string             `json:"resource_type"`
+	ChangeType        string             `json:"change_type"`
+	BusinessImpact    BusinessImpact     `json:"business_impact"`
+	CostImpact        CostImpact         `json:"cost_impact"`
+	SecurityImpact    SecurityImpact     `json:"security_impact"`
+	PerformanceImpact PerformanceImpact  `json:"performance_impact"`
+	ComplianceImpact  ComplianceImpact   `json:"compliance_impact"`
+	AffectedResources []string           `json:"affected_resources"`
+	Dependencies      []DependencyImpact `json:"dependencies"`
+	RiskScore         float64            `json:"risk_score"`
+	Recommendations   []string           `json:"recommendations"`
+	Timestamp         time.Time          `json:"timestamp"`
 }
 
 // BusinessImpact represents business impact analysis
@@ -66,21 +66,21 @@ type BusinessImpact struct {
 
 // CostImpact represents cost impact analysis
 type CostImpact struct {
-	Level        string  `json:"level"`
-	MonthlyCost  float64 `json:"monthly_cost"`
-	AnnualCost   float64 `json:"annual_cost"`
-	CostChange   float64 `json:"cost_change"`
-	Currency     string  `json:"currency"`
-	Description  string  `json:"description"`
+	Level       string  `json:"level"`
+	MonthlyCost float64 `json:"monthly_cost"`
+	AnnualCost  float64 `json:"annual_cost"`
+	CostChange  float64 `json:"cost_change"`
+	Currency    string  `json:"currency"`
+	Description string  `json:"description"`
 }
 
 // SecurityImpact represents security impact analysis
 type SecurityImpact struct {
-	Level        string   `json:"level"`
-	RiskFactors  []string `json:"risk_factors"`
+	Level           string   `json:"level"`
+	RiskFactors     []string `json:"risk_factors"`
 	Vulnerabilities []string `json:"vulnerabilities"`
-	Compliance   []string `json:"compliance"`
-	Description  string   `json:"description"`
+	Compliance      []string `json:"compliance"`
+	Description     string   `json:"description"`
 }
 
 // PerformanceImpact represents performance impact analysis
@@ -114,11 +114,11 @@ type DependencyImpact struct {
 func NewImpactAnalyzer(config *ImpactAnalysisConfig) *ImpactAnalyzer {
 	if config == nil {
 		config = &ImpactAnalysisConfig{
-			EnableBusinessImpact: true,
-			EnableCostImpact:     true,
-			EnableSecurityImpact: true,
+			EnableBusinessImpact:    true,
+			EnableCostImpact:        true,
+			EnableSecurityImpact:    true,
 			EnablePerformanceImpact: true,
-			EnableComplianceImpact: true,
+			EnableComplianceImpact:  true,
 			RiskThresholds: map[string]float64{
 				"critical": 0.9,
 				"high":     0.7,
@@ -198,7 +198,7 @@ func (ia *ImpactAnalyzer) analyzeBusinessImpact(drift models.DriftResult, stateF
 		impact.Level = "high"
 		impact.Description = "Compute resource change may affect application availability"
 		impact.Services = []string{"application", "api", "web"}
-		impact.Users = 1000 // Estimate
+		impact.Users = 1000      // Estimate
 		impact.Revenue = 10000.0 // Estimate
 		impact.Downtime = "5-15 minutes"
 
@@ -206,7 +206,7 @@ func (ia *ImpactAnalyzer) analyzeBusinessImpact(drift models.DriftResult, stateF
 		impact.Level = "critical"
 		impact.Description = "Database change may cause data loss or service interruption"
 		impact.Services = []string{"database", "data", "storage"}
-		impact.Users = 5000 // Estimate
+		impact.Users = 5000      // Estimate
 		impact.Revenue = 50000.0 // Estimate
 		impact.Downtime = "30-60 minutes"
 
@@ -214,7 +214,7 @@ func (ia *ImpactAnalyzer) analyzeBusinessImpact(drift models.DriftResult, stateF
 		impact.Level = "high"
 		impact.Description = "Network change may affect connectivity and security"
 		impact.Services = []string{"network", "security", "connectivity"}
-		impact.Users = 2000 // Estimate
+		impact.Users = 2000      // Estimate
 		impact.Revenue = 20000.0 // Estimate
 		impact.Downtime = "10-30 minutes"
 
@@ -222,7 +222,7 @@ func (ia *ImpactAnalyzer) analyzeBusinessImpact(drift models.DriftResult, stateF
 		impact.Level = "medium"
 		impact.Description = "Storage/CDN change may affect data access and performance"
 		impact.Services = []string{"storage", "cdn", "static-content"}
-		impact.Users = 500 // Estimate
+		impact.Users = 500      // Estimate
 		impact.Revenue = 5000.0 // Estimate
 		impact.Downtime = "2-10 minutes"
 	}
@@ -300,11 +300,11 @@ func (ia *ImpactAnalyzer) analyzeCostImpact(drift models.DriftResult, stateFile 
 // analyzeSecurityImpact analyzes security impact of changes
 func (ia *ImpactAnalyzer) analyzeSecurityImpact(drift models.DriftResult, stateFile *models.StateFile) SecurityImpact {
 	impact := SecurityImpact{
-		Level:         "low",
-		RiskFactors:   []string{},
+		Level:           "low",
+		RiskFactors:     []string{},
 		Vulnerabilities: []string{},
-		Compliance:    []string{},
-		Description:   "Minimal security impact",
+		Compliance:      []string{},
+		Description:     "Minimal security impact",
 	}
 
 	// Analyze security impact based on resource type
@@ -361,28 +361,28 @@ func (ia *ImpactAnalyzer) analyzePerformanceImpact(drift models.DriftResult, sta
 	switch drift.ResourceType {
 	case "aws_instance":
 		impact.Level = "medium"
-		impact.Latency = 50.0 // ms
+		impact.Latency = 50.0      // ms
 		impact.Throughput = 1000.0 // requests/sec
 		impact.Availability = 99.5
 		impact.Description = "Instance changes may affect application performance"
 
 	case "aws_rds_instance":
 		impact.Level = "high"
-		impact.Latency = 100.0 // ms
+		impact.Latency = 100.0    // ms
 		impact.Throughput = 500.0 // queries/sec
 		impact.Availability = 99.0
 		impact.Description = "Database changes may affect data access performance"
 
 	case "aws_cloudfront_distribution":
 		impact.Level = "medium"
-		impact.Latency = 20.0 // ms
+		impact.Latency = 20.0      // ms
 		impact.Throughput = 5000.0 // requests/sec
 		impact.Availability = 99.9
 		impact.Description = "CDN changes may affect content delivery performance"
 
 	case "aws_lambda_function":
 		impact.Level = "low"
-		impact.Latency = 200.0 // ms
+		impact.Latency = 200.0    // ms
 		impact.Throughput = 100.0 // invocations/sec
 		impact.Availability = 99.9
 		impact.Description = "Lambda changes may affect function performance"
@@ -566,41 +566,41 @@ func (ia *ImpactAnalyzer) generateRecommendations(result *ImpactAnalysisResult) 
 
 	// Business impact recommendations
 	if result.BusinessImpact.Level == "critical" {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"Schedule maintenance window for this change")
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"Notify stakeholders about potential service impact")
 	}
 
 	// Security impact recommendations
 	if result.SecurityImpact.Level == "critical" {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"Review security implications before applying changes")
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"Consider security team approval for this change")
 	}
 
 	// Cost impact recommendations
 	if result.CostImpact.CostChange > 0 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			fmt.Sprintf("This change will increase costs by $%.2f/month", result.CostImpact.CostChange))
 	}
 
 	// Performance impact recommendations
 	if result.PerformanceImpact.Level == "high" {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"Monitor performance metrics after applying changes")
 	}
 
 	// Dependency recommendations
 	if len(result.Dependencies) > 0 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			fmt.Sprintf("This change affects %d dependent resources", len(result.Dependencies)))
 	}
 
 	// General recommendations
 	if result.RiskScore > 0.7 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"High-risk change - consider testing in non-production first")
 	}
 

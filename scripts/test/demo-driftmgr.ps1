@@ -7,9 +7,9 @@ Write-Host ""
 
 # Check if driftmgr.exe exists
 if (Test-Path ".\driftmgr.exe") {
-    Write-Host "✅ Found driftmgr.exe executable" -ForegroundColor Green
+    Write-Host "[OK] Found driftmgr.exe executable" -ForegroundColor Green
 } else {
-    Write-Host "❌ driftmgr.exe not found!" -ForegroundColor Red
+    Write-Host "[ERROR] driftmgr.exe not found!" -ForegroundColor Red
     exit 1
 }
 
@@ -75,7 +75,7 @@ Write-Host ""
 Write-Host ""
 
 # Summary
-Write-Host "✅ Demo completed! The single driftmgr.exe features:" -ForegroundColor Green
+Write-Host "[OK] Demo completed! The single driftmgr.exe features:" -ForegroundColor Green
 Write-Host "   • ASCII characters (^, +, !, *, >, |, -) for visual separation" -ForegroundColor White
 Write-Host "   • Color-coded output for better visual separation" -ForegroundColor White
 Write-Host "   • Enhanced error messages with usage hints" -ForegroundColor White

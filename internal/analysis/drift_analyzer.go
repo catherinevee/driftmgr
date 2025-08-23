@@ -70,7 +70,8 @@ func (da *DriftAnalyzer) Analyze(resources []models.Resource) []AnalysisResult {
 		// Basic drift detection
 		if da.config.EnableMLPrediction {
 			// Simulate ML-based prediction
-			if resource.Tags != nil && resource.Tags["public"] == "true" {
+			resourceTags := resource.GetTagsAsMap()
+			if publicTag, exists := resourceTags["public"]; exists && publicTag == "true" {
 				results = append(results, AnalysisResult{
 					ResourceID:   resource.ID,
 					ResourceName: resource.Name,

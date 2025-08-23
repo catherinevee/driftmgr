@@ -12,9 +12,29 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/apimanagement/armapimanagement"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appservice/armappservice"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/automation/armautomation"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerregistry/armcontainerregistry"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/cosmos/armcosmos"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/eventhub/armeventhub"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/keyvault/armkeyvault"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/logic/armlogic"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/machinelearning/armmachinelearning"
+	// "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor" // Not used after removing Application Insights
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/notificationhubs/armnotificationhubs"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/recoveryservices/armrecoveryservices"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/redis/armredis"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/relay/armrelay"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/search/armsearch"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/servicebus/armservicebus"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/signalr/armsignalr"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/sql/armsql"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 
 	"github.com/catherinevee/driftmgr/internal/models"
@@ -25,6 +45,20 @@ type AzureProvider struct {
 	cred           azcore.TokenCredential
 	client         *armresources.Client
 	subscriptionID string
+}
+
+// convertTags converts Azure tags (map[string]*string) to map[string]string
+func convertTags(tags map[string]*string) map[string]string {
+	if tags == nil {
+		return nil
+	}
+	result := make(map[string]string)
+	for k, v := range tags {
+		if v != nil {
+			result[k] = *v
+		}
+	}
+	return result
 }
 
 // NewAzureProvider creates a new Azure provider
@@ -251,6 +285,11 @@ func (ap *AzureProvider) DeleteResources(ctx context.Context, accountID string, 
 }
 
 // deleteResource deletes a single Azure resource
+// DeleteResource implements the CloudProvider interface for single resource deletion
+func (ap *AzureProvider) DeleteResource(ctx context.Context, resource models.Resource) error {
+	return ap.deleteResource(ctx, resource, DeletionOptions{})
+}
+
 func (ap *AzureProvider) deleteResource(ctx context.Context, resource models.Resource, options DeletionOptions) error {
 	switch resource.Type {
 	case "microsoft.compute/virtualmachines":
@@ -444,196 +483,809 @@ func (ap *AzureProvider) discoverResourceGroups(ctx context.Context, accountID s
 // Additional discovery methods would be implemented similarly for other Azure services
 func (ap *AzureProvider) discoverNetworkInterfaces(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
-	// Implementation for Network Interfaces
+
+	client, err := armnetwork.NewInterfacesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListAllPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, nic := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *nic.ID,
+				Name:     *nic.Name,
+				Type:     "microsoft.network/networkinterfaces",
+				Provider: "azure",
+				Region:   *nic.Location,
+				Tags:     convertTags(nic.Tags),
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AzureProvider) discoverPublicIPAddresses(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
-	// Implementation for Public IP Addresses
+
+	client, err := armnetwork.NewPublicIPAddressesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListAllPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, pip := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *pip.ID,
+				Name:     *pip.Name,
+				Type:     "microsoft.network/publicipaddresses",
+				Provider: "azure",
+				Region:   *pip.Location,
+				Tags:     convertTags(pip.Tags),
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AzureProvider) discoverLoadBalancers(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
-	// Implementation for Load Balancers
+
+	client, err := armnetwork.NewLoadBalancersClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListAllPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, lb := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *lb.ID,
+				Name:     *lb.Name,
+				Type:     "microsoft.network/loadbalancers",
+				Provider: "azure",
+				Region:   *lb.Location,
+				Tags:     convertTags(lb.Tags),
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AzureProvider) discoverApplicationGateways(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
-	// Implementation for Application Gateways
+
+	client, err := armnetwork.NewApplicationGatewaysClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListAllPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ag := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *ag.ID,
+				Name:     *ag.Name,
+				Type:     "microsoft.network/applicationgateways",
+				Provider: "azure",
+				Region:   *ag.Location,
+				Tags:     convertTags(ag.Tags),
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AzureProvider) discoverKeyVaults(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
-	// Implementation for Key Vaults
+
+	client, err := armkeyvault.NewVaultsClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListBySubscriptionPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, vault := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *vault.ID,
+				Name:     *vault.Name,
+				Type:     "microsoft.keyvault/vaults",
+				Provider: "azure",
+				Region:   *vault.Location,
+				Tags:     convertTags(vault.Tags),
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AzureProvider) discoverAppServices(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
-	// Implementation for App Services
+
+	client, err := armappservice.NewWebAppsClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, app := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *app.ID,
+				Name:     *app.Name,
+				Type:     "microsoft.web/sites",
+				Provider: "azure",
+				Region:   *app.Location,
+				Tags:     convertTags(app.Tags),
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AzureProvider) discoverContainerRegistries(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
-	// Implementation for Container Registries
+
+	client, err := armcontainerregistry.NewRegistriesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, registry := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *registry.ID,
+				Name:     *registry.Name,
+				Type:     "microsoft.containerregistry/registries",
+				Provider: "azure",
+				Region:   *registry.Location,
+				Tags:     convertTags(registry.Tags),
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 func (ap *AzureProvider) discoverKubernetesServices(ctx context.Context, accountID string) ([]models.Resource, error) {
 	var resources []models.Resource
-	// Implementation for Kubernetes Services
+
+	client, err := armcontainerservice.NewManagedClustersClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, cluster := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *cluster.ID,
+				Name:     *cluster.Name,
+				Type:     "microsoft.containerservice/managedclusters",
+				Provider: "azure",
+				Region:   *cluster.Location,
+				Tags:     convertTags(cluster.Tags),
+			})
+		}
+	}
+
 	return resources, nil
 }
 
 // Missing discovery methods
 func (ap *AzureProvider) discoverSQLServers(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armsql.NewServersClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, server := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *server.ID,
+				Name:     *server.Name,
+				Type:     "microsoft.sql/servers",
+				Provider: "azure",
+				Region:   *server.Location,
+				Tags:     convertTags(server.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverSQLDatabases(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	// First get all SQL servers
+	serversClient, err := armsql.NewServersClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	serversPager := serversClient.NewListPager(nil)
+	for serversPager.More() {
+		serversPage, err := serversPager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, server := range serversPage.Value {
+			// Get databases for each server
+			dbClient, err := armsql.NewDatabasesClient(ap.subscriptionID, ap.cred, nil)
+			if err != nil {
+				continue
+			}
+
+			resourceGroup := ap.extractResourceGroupName(*server.ID)
+			dbPager := dbClient.NewListByServerPager(resourceGroup, *server.Name, nil)
+			
+			for dbPager.More() {
+				dbPage, err := dbPager.NextPage(ctx)
+				if err != nil {
+					break
+				}
+
+				for _, db := range dbPage.Value {
+					resources = append(resources, models.Resource{
+						ID:       *db.ID,
+						Name:     *db.Name,
+						Type:     "microsoft.sql/servers/databases",
+						Provider: "azure",
+						Region:   *db.Location,
+						Tags:     convertTags(db.Tags),
+					})
+				}
+			}
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverRedisCaches(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armredis.NewClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListBySubscriptionPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, cache := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *cache.ID,
+				Name:     *cache.Name,
+				Type:     "microsoft.cache/redis",
+				Provider: "azure",
+				Region:   *cache.Location,
+				Tags:     convertTags(cache.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverCosmosDBAccounts(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armcosmos.NewDatabaseAccountsClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, account := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *account.ID,
+				Name:     *account.Name,
+				Type:     "microsoft.documentdb/databaseaccounts",
+				Provider: "azure",
+				Region:   *account.Location,
+				Tags:     convertTags(account.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverEventHubs(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armeventhub.NewNamespacesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, namespace := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *namespace.ID,
+				Name:     *namespace.Name,
+				Type:     "microsoft.eventhub/namespaces",
+				Provider: "azure",
+				Region:   *namespace.Location,
+				Tags:     convertTags(namespace.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverServiceBusNamespaces(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armservicebus.NewNamespacesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, namespace := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *namespace.ID,
+				Name:     *namespace.Name,
+				Type:     "microsoft.servicebus/namespaces",
+				Provider: "azure",
+				Region:   *namespace.Location,
+				Tags:     convertTags(namespace.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverLogicApps(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armlogic.NewWorkflowsClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListBySubscriptionPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, workflow := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *workflow.ID,
+				Name:     *workflow.Name,
+				Type:     "microsoft.logic/workflows",
+				Provider: "azure",
+				Region:   *workflow.Location,
+				Tags:     convertTags(workflow.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverAPIManagement(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armapimanagement.NewServiceClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, service := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *service.ID,
+				Name:     *service.Name,
+				Type:     "microsoft.apimanagement/service",
+				Provider: "azure",
+				Region:   *service.Location,
+				Tags:     convertTags(service.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverSearchServices(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armsearch.NewServicesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListBySubscriptionPager(nil, nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, service := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *service.ID,
+				Name:     *service.Name,
+				Type:     "microsoft.search/searchservices",
+				Provider: "azure",
+				Region:   *service.Location,
+				Tags:     convertTags(service.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverMachineLearning(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armmachinelearning.NewWorkspacesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListBySubscriptionPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, workspace := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *workspace.ID,
+				Name:     *workspace.Name,
+				Type:     "microsoft.machinelearningservices/workspaces",
+				Provider: "azure",
+				Region:   *workspace.Location,
+				Tags:     convertTags(workspace.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverAutomationAccounts(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armautomation.NewAccountClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, account := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *account.ID,
+				Name:     *account.Name,
+				Type:     "microsoft.automation/automationaccounts",
+				Provider: "azure",
+				Region:   *account.Location,
+				Tags:     convertTags(account.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverRecoveryServices(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armrecoveryservices.NewVaultsClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListBySubscriptionIDPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, vault := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *vault.ID,
+				Name:     *vault.Name,
+				Type:     "microsoft.recoveryservices/vaults",
+				Provider: "azure",
+				Region:   *vault.Location,
+				Tags:     convertTags(vault.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverApplicationInsights(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
+	// Application Insights discovery not implemented yet
+	// The armmonitor package doesn't have ComponentsClient
+	// This would require the applicationinsights package
 	return []models.Resource{}, nil
 }
 
 func (ap *AzureProvider) discoverLogAnalyticsWorkspaces(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armoperationalinsights.NewWorkspacesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, workspace := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *workspace.ID,
+				Name:     *workspace.Name,
+				Type:     "microsoft.operationalinsights/workspaces",
+				Provider: "azure",
+				Region:   *workspace.Location,
+				Tags:     convertTags(workspace.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverNotificationHubs(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armnotificationhubs.NewNamespacesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager("", nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, namespace := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *namespace.ID,
+				Name:     *namespace.Name,
+				Type:     "microsoft.notificationhubs/namespaces",
+				Provider: "azure",
+				Region:   *namespace.Location,
+				Tags:     convertTags(namespace.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverRelayNamespaces(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armrelay.NewNamespacesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, namespace := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *namespace.ID,
+				Name:     *namespace.Name,
+				Type:     "microsoft.relay/namespaces",
+				Provider: "azure",
+				Region:   *namespace.Location,
+				Tags:     convertTags(namespace.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverSignalR(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	var resources []models.Resource
+
+	client, err := armsignalr.NewClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pager := client.NewListBySubscriptionPager(nil)
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, signalr := range page.Value {
+			resources = append(resources, models.Resource{
+				ID:       *signalr.ID,
+				Name:     *signalr.Name,
+				Type:     "microsoft.signalrservice/signalr",
+				Provider: "azure",
+				Region:   *signalr.Location,
+				Tags:     convertTags(signalr.Tags),
+			})
+		}
+	}
+
+	return resources, nil
 }
 
 func (ap *AzureProvider) discoverCommunicationServices(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Communication Services requires specialized SDK
+	return nil, fmt.Errorf("Azure Communication Services discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverDesktopVirtualization(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Desktop Virtualization requires specialized SDK
+	return nil, fmt.Errorf("Azure Desktop Virtualization discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverHealthcareAPIs(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Healthcare APIs require specialized SDK
+	return nil, fmt.Errorf("Azure Healthcare APIs discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverIoTCentral(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// IoT Central requires specialized SDK
+	return nil, fmt.Errorf("Azure IoT Central discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverIoTSecurity(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// IoT Security requires specialized SDK
+	return nil, fmt.Errorf("Azure IoT Security discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverMapsAccounts(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Maps requires specialized SDK
+	return nil, fmt.Errorf("Azure Maps discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverMixedReality(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Mixed Reality requires specialized SDK
+	return nil, fmt.Errorf("Azure Mixed Reality discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverQuantumWorkspaces(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Quantum requires specialized SDK
+	return nil, fmt.Errorf("Azure Quantum discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverVisualStudio(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Visual Studio requires specialized SDK
+	return nil, fmt.Errorf("Azure Visual Studio discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverVMwareCloudSimple(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// VMware CloudSimple requires specialized SDK
+	return nil, fmt.Errorf("Azure VMware CloudSimple discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverWindowsESU(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Windows ESU requires specialized SDK
+	return nil, fmt.Errorf("Azure Windows ESU discovery requires specialized configuration")
 }
 
 func (ap *AzureProvider) discoverWindowsIoT(ctx context.Context, accountID string) ([]models.Resource, error) {
-	// Placeholder implementation
-	return []models.Resource{}, nil
+	// Windows IoT requires specialized SDK
+	return nil, fmt.Errorf("Azure Windows IoT discovery requires specialized configuration")
 }
 
 // Helper methods for resource deletion
@@ -701,43 +1353,153 @@ func (ap *AzureProvider) deleteResourceGroup(ctx context.Context, resource model
 
 // Additional deletion methods would be implemented for other Azure services
 func (ap *AzureProvider) deleteNetworkInterface(ctx context.Context, resource models.Resource) error {
-	// Implementation for Network Interface deletion
-	return nil
+	client, err := armnetwork.NewInterfacesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return err
+	}
+
+	resourceGroup, resourceName, err := ap.extractResourceGroupAndName(resource.ID)
+	if err != nil {
+		return err
+	}
+
+	poller, err := client.BeginDelete(ctx, resourceGroup, resourceName, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = poller.PollUntilDone(ctx, nil)
+	return err
 }
 
 func (ap *AzureProvider) deletePublicIPAddress(ctx context.Context, resource models.Resource) error {
-	// Implementation for Public IP Address deletion
-	return nil
+	client, err := armnetwork.NewPublicIPAddressesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return err
+	}
+
+	resourceGroup, resourceName, err := ap.extractResourceGroupAndName(resource.ID)
+	if err != nil {
+		return err
+	}
+
+	poller, err := client.BeginDelete(ctx, resourceGroup, resourceName, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = poller.PollUntilDone(ctx, nil)
+	return err
 }
 
 func (ap *AzureProvider) deleteLoadBalancer(ctx context.Context, resource models.Resource) error {
-	// Implementation for Load Balancer deletion
-	return nil
+	client, err := armnetwork.NewLoadBalancersClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return err
+	}
+
+	resourceGroup, resourceName, err := ap.extractResourceGroupAndName(resource.ID)
+	if err != nil {
+		return err
+	}
+
+	poller, err := client.BeginDelete(ctx, resourceGroup, resourceName, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = poller.PollUntilDone(ctx, nil)
+	return err
 }
 
 func (ap *AzureProvider) deleteApplicationGateway(ctx context.Context, resource models.Resource) error {
-	// Implementation for Application Gateway deletion
-	return nil
+	client, err := armnetwork.NewApplicationGatewaysClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return err
+	}
+
+	resourceGroup, resourceName, err := ap.extractResourceGroupAndName(resource.ID)
+	if err != nil {
+		return err
+	}
+
+	poller, err := client.BeginDelete(ctx, resourceGroup, resourceName, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = poller.PollUntilDone(ctx, nil)
+	return err
 }
 
 func (ap *AzureProvider) deleteKeyVault(ctx context.Context, resource models.Resource) error {
-	// Implementation for Key Vault deletion
-	return nil
+	client, err := armkeyvault.NewVaultsClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return err
+	}
+
+	resourceGroup, resourceName, err := ap.extractResourceGroupAndName(resource.ID)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.Delete(ctx, resourceGroup, resourceName, nil)
+	return err
 }
 
 func (ap *AzureProvider) deleteAppService(ctx context.Context, resource models.Resource) error {
-	// Implementation for App Service deletion
-	return nil
+	client, err := armappservice.NewWebAppsClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return err
+	}
+
+	resourceGroup, resourceName, err := ap.extractResourceGroupAndName(resource.ID)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.Delete(ctx, resourceGroup, resourceName, nil)
+	return err
 }
 
 func (ap *AzureProvider) deleteContainerRegistry(ctx context.Context, resource models.Resource) error {
-	// Implementation for Container Registry deletion
-	return nil
+	client, err := armcontainerregistry.NewRegistriesClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return err
+	}
+
+	resourceGroup, resourceName, err := ap.extractResourceGroupAndName(resource.ID)
+	if err != nil {
+		return err
+	}
+
+	poller, err := client.BeginDelete(ctx, resourceGroup, resourceName, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = poller.PollUntilDone(ctx, nil)
+	return err
 }
 
 func (ap *AzureProvider) deleteKubernetesService(ctx context.Context, resource models.Resource) error {
-	// Implementation for Kubernetes Service deletion
-	return nil
+	client, err := armcontainerservice.NewManagedClustersClient(ap.subscriptionID, ap.cred, nil)
+	if err != nil {
+		return err
+	}
+
+	resourceGroup, resourceName, err := ap.extractResourceGroupAndName(resource.ID)
+	if err != nil {
+		return err
+	}
+
+	poller, err := client.BeginDelete(ctx, resourceGroup, resourceName, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = poller.PollUntilDone(ctx, nil)
+	return err
 }
 
 // Helper utility methods

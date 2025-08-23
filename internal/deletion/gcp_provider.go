@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -26,8 +27,14 @@ type GCPProvider struct {
 func NewGCPProvider() (*GCPProvider, error) {
 	ctx := context.Background()
 
-	// Get project ID from environment or default
-	projectID := "your-project-id" // This should be configurable
+	// Get project ID from environment
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	if projectID == "" {
+		projectID = os.Getenv("GCP_PROJECT")
+	}
+	if projectID == "" {
+		return nil, fmt.Errorf("GCP project ID not configured. Please set GOOGLE_CLOUD_PROJECT or GCP_PROJECT environment variable")
+	}
 
 	// Initialize storage client
 	storageClient, err := storage.NewClient(ctx)
@@ -114,6 +121,11 @@ func (gp *GCPProvider) ListResources(ctx context.Context, accountID string) ([]m
 }
 
 // DeleteResources deletes GCP resources in the correct order
+// DeleteResource implements the CloudProvider interface for single resource deletion
+func (gp *GCPProvider) DeleteResource(ctx context.Context, resource models.Resource) error {
+	return gp.deleteResource(ctx, resource, DeletionOptions{})
+}
+
 func (gp *GCPProvider) DeleteResources(ctx context.Context, accountID string, options DeletionOptions) (*DeletionResult, error) {
 	startTime := time.Now()
 	result := &DeletionResult{

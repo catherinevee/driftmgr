@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/pkg/models"
+	"github.com/catherinevee/driftmgr/internal/models"
 )
 
 // AdvancedFilter provides sophisticated filtering capabilities
@@ -240,8 +240,9 @@ func (afe *AdvancedFilterEngine) matchesFilter(resource models.Resource, filter 
 
 	// Tag filter
 	if len(filter.Tags) > 0 {
+		resourceTags := resource.GetTagsAsMap()
 		for key, value := range filter.Tags {
-			if resource.Tags[key] != value {
+			if resourceValue, exists := resourceTags[key]; !exists || resourceValue != value {
 				return false
 			}
 		}
@@ -519,23 +520,68 @@ func (sdk *SDKIntegration) DiscoverWithSDK(ctx context.Context, provider, region
 
 // discoverAWSSDK performs AWS discovery using SDK
 func (sdk *SDKIntegration) discoverAWSSDK(ctx context.Context, region, service string) ([]models.Resource, error) {
-	// This would implement actual AWS SDK calls
-	// For now, it's a placeholder
-	return nil, fmt.Errorf("AWS SDK integration not implemented")
+	// Create AWS provider
+	provider, err := NewAWSProvider()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AWS provider: %w", err)
+	}
+
+	config := Config{
+		Regions:      []string{region},
+		ResourceType: service,
+	}
+
+	// Use the existing AWS discovery implementation
+	resources, err := provider.Discover(config)
+	if err != nil {
+		return nil, fmt.Errorf("AWS discovery failed: %w", err)
+	}
+
+	return resources, nil
 }
 
 // discoverAzureSDK performs Azure discovery using SDK
 func (sdk *SDKIntegration) discoverAzureSDK(ctx context.Context, region, service string) ([]models.Resource, error) {
-	// This would implement actual Azure SDK calls
-	// For now, it's a placeholder
-	return nil, fmt.Errorf("Azure SDK integration not implemented")
+	// Create Azure provider
+	provider, err := NewAzureProvider()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure provider: %w", err)
+	}
+
+	config := Config{
+		Regions:      []string{region},
+		ResourceType: service,
+	}
+
+	// Use the existing Azure discovery implementation
+	resources, err := provider.Discover(config)
+	if err != nil {
+		return nil, fmt.Errorf("Azure discovery failed: %w", err)
+	}
+
+	return resources, nil
 }
 
 // discoverGCPSDK performs GCP discovery using SDK
 func (sdk *SDKIntegration) discoverGCPSDK(ctx context.Context, region, service string) ([]models.Resource, error) {
-	// This would implement actual GCP SDK calls
-	// For now, it's a placeholder
-	return nil, fmt.Errorf("GCP SDK integration not implemented")
+	// Create GCP provider
+	provider, err := NewGCPProvider()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCP provider: %w", err)
+	}
+
+	config := Config{
+		Regions:      []string{region},
+		ResourceType: service,
+	}
+
+	// Use the existing GCP discovery implementation
+	resources, err := provider.Discover(config)
+	if err != nil {
+		return nil, fmt.Errorf("GCP discovery failed: %w", err)
+	}
+
+	return resources, nil
 }
 
 // AdvancedQuery provides advanced querying capabilities

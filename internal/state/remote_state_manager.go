@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
 	"path"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"cloud.google.com/go/storage"
 	"github.com/catherinevee/driftmgr/internal/models"
 )
 
@@ -21,15 +26,15 @@ type RemoteStateManager struct {
 
 // RemoteStateConfig represents remote state configuration
 type RemoteStateConfig struct {
-	Backend     string            `json:"backend"`
-	Config      map[string]string `json:"config"`
-	Workspace   string            `json:"workspace,omitempty"`
-	Key         string            `json:"key"`
-	Region      string            `json:"region,omitempty"`
-	Bucket      string            `json:"bucket,omitempty"`
-	StorageAccount string         `json:"storage_account,omitempty"`
-	Container   string            `json:"container,omitempty"`
-	Project     string            `json:"project,omitempty"`
+	Backend        string            `json:"backend"`
+	Config         map[string]string `json:"config"`
+	Workspace      string            `json:"workspace,omitempty"`
+	Key            string            `json:"key"`
+	Region         string            `json:"region,omitempty"`
+	Bucket         string            `json:"bucket,omitempty"`
+	StorageAccount string            `json:"storage_account,omitempty"`
+	Container      string            `json:"container,omitempty"`
+	Project        string            `json:"project,omitempty"`
 }
 
 // NewRemoteStateManager creates a new remote state manager
@@ -89,16 +94,80 @@ func (rsm *RemoteStateManager) parseS3State(config *RemoteStateConfig) (*models.
 
 // parseAzureState parses Terraform state from Azure Storage
 func (rsm *RemoteStateManager) parseAzureState(config *RemoteStateConfig) (*models.StateFile, error) {
-	// TODO: Implement Azure Storage client
-	// This would use Azure Storage SDK to fetch state files
-	return nil, fmt.Errorf("Azure Storage support not yet implemented")
+	ctx := context.Background()
+
+	// Create Azure credential
+	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
+	}
+
+	// Create blob service client
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", config.StorageAccount)
+	client, err := azblob.NewClient(serviceURL, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure blob client: %w", err)
+	}
+
+	// Determine the state file blob name
+	blobName := config.Key
+	if config.Workspace != "" && config.Workspace != "default" {
+		blobName = fmt.Sprintf("env:%s/%s", config.Workspace, config.Key)
+	}
+
+	// Download the blob
+	downloadResponse, err := client.DownloadStream(ctx, config.Container, blobName, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download state file from Azure: %w", err)
+	}
+	defer downloadResponse.Body.Close()
+
+	// Read the state file
+	stateData, err := io.ReadAll(downloadResponse.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read state file: %w", err)
+	}
+
+	return rsm.parseStateData(stateData, fmt.Sprintf("azurerm://%s/%s/%s", config.StorageAccount, config.Container, blobName))
 }
 
 // parseGCSState parses Terraform state from Google Cloud Storage
 func (rsm *RemoteStateManager) parseGCSState(config *RemoteStateConfig) (*models.StateFile, error) {
-	// TODO: Implement GCS client
-	// This would use Google Cloud Storage SDK to fetch state files
-	return nil, fmt.Errorf("Google Cloud Storage support not yet implemented")
+	ctx := context.Background()
+
+	// Create GCS client
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCS client: %w", err)
+	}
+	defer client.Close()
+
+	// Determine the state file object name
+	objectName := config.Key
+	if config.Workspace != "" && config.Workspace != "default" {
+		objectName = fmt.Sprintf("env:%s/%s", config.Workspace, config.Key)
+	}
+
+	// Get the bucket handle
+	bucket := client.Bucket(config.Bucket)
+	
+	// Get the object handle
+	obj := bucket.Object(objectName)
+	
+	// Read the object
+	reader, err := obj.NewReader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read state file from GCS: %w", err)
+	}
+	defer reader.Close()
+
+	// Read the state file
+	stateData, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read state file: %w", err)
+	}
+
+	return rsm.parseStateData(stateData, fmt.Sprintf("gcs://%s/%s", config.Bucket, objectName))
 }
 
 // parseStateData parses state file data and converts to our model
@@ -236,12 +305,91 @@ func (rsm *RemoteStateManager) listS3States(config *RemoteStateConfig) ([]string
 
 // listAzureStates lists available state files in Azure Storage
 func (rsm *RemoteStateManager) listAzureStates(config *RemoteStateConfig) ([]string, error) {
-	// TODO: Implement Azure Storage listing
-	return nil, fmt.Errorf("Azure Storage listing not yet implemented")
+	// Get Azure credentials
+	accountName := os.Getenv("ARM_STORAGE_ACCOUNT_NAME")
+	if accountName == "" {
+		accountName = os.Getenv("AZURE_STORAGE_ACCOUNT")
+	}
+	
+	accountKey := os.Getenv("ARM_ACCESS_KEY")
+	if accountKey == "" {
+		accountKey = os.Getenv("AZURE_STORAGE_ACCESS_KEY")
+	}
+	
+	if accountName == "" || accountKey == "" {
+		// Try using Azure CLI
+		cmd := exec.Command("az", "storage", "blob", "list",
+			"--container-name", config.Container,
+			"--account-name", config.StorageAccount,
+			"--query", "[?ends_with(name, '.tfstate')].name",
+			"--output", "json")
+		
+		output, err := cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list Azure blobs via CLI: %w", err)
+		}
+		
+		var stateFiles []string
+		if err := json.Unmarshal(output, &stateFiles); err != nil {
+			return nil, fmt.Errorf("failed to parse Azure CLI output: %w", err)
+		}
+		
+		return stateFiles, nil
+	}
+	
+	// Use Azure SDK if credentials are available
+	// Note: This requires adding Azure Storage SDK dependency
+	// For now, we'll use the CLI approach as primary method
+	return nil, fmt.Errorf("Azure SDK implementation pending - use Azure CLI")
 }
 
 // listGCSStates lists available state files in GCS
 func (rsm *RemoteStateManager) listGCSStates(config *RemoteStateConfig) ([]string, error) {
-	// TODO: Implement GCS listing
-	return nil, fmt.Errorf("GCS listing not yet implemented")
+	// Try using gcloud CLI first
+	cmd := exec.Command("gcloud", "storage", "ls",
+		fmt.Sprintf("gs://%s/", config.Bucket),
+		"--format=json")
+	
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to gsutil
+		cmd = exec.Command("gsutil", "ls", 
+			fmt.Sprintf("gs://%s/*.tfstate", config.Bucket))
+		output, err = cmd.Output()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list GCS objects via CLI: %w", err)
+		}
+		
+		// Parse gsutil output (one file per line)
+		lines := strings.Split(string(output), "\n")
+		var stateFiles []string
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasSuffix(line, ".tfstate") {
+				// Extract just the filename from the full GCS path
+				parts := strings.Split(line, "/")
+				if len(parts) > 0 {
+					stateFiles = append(stateFiles, parts[len(parts)-1])
+				}
+			}
+		}
+		return stateFiles, nil
+	}
+	
+	// Parse gcloud JSON output
+	var objects []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(output, &objects); err != nil {
+		return nil, fmt.Errorf("failed to parse gcloud output: %w", err)
+	}
+	
+	var stateFiles []string
+	for _, obj := range objects {
+		if strings.HasSuffix(obj.Name, ".tfstate") {
+			stateFiles = append(stateFiles, obj.Name)
+		}
+	}
+	
+	return stateFiles, nil
 }

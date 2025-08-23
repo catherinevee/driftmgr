@@ -171,152 +171,35 @@ func (pd *ParallelDiscoverer) discoverProviderRegion(ctx context.Context, provid
 
 // performDiscovery performs the actual resource discovery
 func (pd *ParallelDiscoverer) performDiscovery(ctx context.Context, provider, region string) ([]models.Resource, error) {
-	// This would integrate with the existing discovery logic
-	// For now, we'll create a mock implementation
+	// Create a discovery config for the region
+	config := Config{
+		Regions: []string{region},
+	}
 
 	switch provider {
 	case "aws":
-		return pd.discoverAWSResources(ctx, region)
+		awsProvider, err := NewAWSProvider()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AWS provider: %w", err)
+		}
+		return awsProvider.Discover(config)
 	case "azure":
-		return pd.discoverAzureResources(ctx, region)
+		azureProvider, err := NewAzureProvider()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Azure provider: %w", err)
+		}
+		return azureProvider.Discover(config)
 	case "gcp":
-		return pd.discoverGCPResources(ctx, region)
+		gcpProvider, err := NewGCPProvider()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GCP provider: %w", err)
+		}
+		return gcpProvider.Discover(config)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
 }
 
-// discoverAWSResources discovers AWS resources with batching
-func (pd *ParallelDiscoverer) discoverAWSResources(ctx context.Context, region string) ([]models.Resource, error) {
-	var allResources []models.Resource
-
-	// Define resource types to discover
-	resourceTypes := []string{
-		"ec2", "rds", "s3", "lambda", "iam", "cloudformation",
-		"elasticache", "ecs", "eks", "route53", "sqs", "sns", "dynamodb",
-	}
-
-	// Discover resources in batches
-	for i := 0; i < len(resourceTypes); i += pd.config.BatchSize {
-		end := i + pd.config.BatchSize
-		if end > len(resourceTypes) {
-			end = len(resourceTypes)
-		}
-
-		batch := resourceTypes[i:end]
-		resources, err := pd.discoverAWSBatch(ctx, region, batch)
-		if err != nil {
-			return nil, fmt.Errorf("failed to discover batch %d-%d: %w", i, end, err)
-		}
-
-		allResources = append(allResources, resources...)
-	}
-
-	return allResources, nil
-}
-
-// discoverAWSBatch discovers a batch of AWS resource types
-func (pd *ParallelDiscoverer) discoverAWSBatch(ctx context.Context, region string, resourceTypes []string) ([]models.Resource, error) {
-	var allResources []models.Resource
-	var mu sync.Mutex
-
-	// Create a worker pool for this batch
-	batchPool := concurrency.NewWorkerPool(len(resourceTypes))
-	defer batchPool.Shutdown(30 * time.Second)
-
-	// Submit discovery tasks
-	for _, resourceType := range resourceTypes {
-		rt := resourceType // Capture for closure
-		err := batchPool.Submit(func() {
-			resources, err := pd.discoverAWSResourceType(ctx, region, rt)
-			if err != nil {
-				// Log error but continue with other resource types
-				fmt.Printf("Failed to discover %s in %s: %v\n", rt, region, err)
-				return
-			}
-
-			mu.Lock()
-			allResources = append(allResources, resources...)
-			mu.Unlock()
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to submit discovery task for %s: %w", rt, err)
-		}
-	}
-
-	return allResources, nil
-}
-
-// discoverAWSResourceType discovers a specific AWS resource type
-func (pd *ParallelDiscoverer) discoverAWSResourceType(ctx context.Context, region, resourceType string) ([]models.Resource, error) {
-	// This would integrate with the existing AWS discovery logic
-	// For now, return mock data
-	switch resourceType {
-	case "ec2":
-		return []models.Resource{
-			{
-				ID:       "i-mock1234567890",
-				Name:     "mock-instance",
-				Type:     "aws_instance",
-				Provider: "aws",
-				Region:   region,
-				State:    "running",
-				Created:  time.Now().Add(-24 * time.Hour),
-				Updated:  time.Now(),
-			},
-		}, nil
-	case "s3":
-		return []models.Resource{
-			{
-				ID:       "mock-bucket-123",
-				Name:     "mock-bucket",
-				Type:     "aws_s3_bucket",
-				Provider: "aws",
-				Region:   "global",
-				State:    "active",
-				Created:  time.Now().Add(-24 * time.Hour),
-				Updated:  time.Now(),
-			},
-		}, nil
-	default:
-		return []models.Resource{}, nil
-	}
-}
-
-// discoverAzureResources discovers Azure resources
-func (pd *ParallelDiscoverer) discoverAzureResources(ctx context.Context, region string) ([]models.Resource, error) {
-	// Mock implementation for Azure
-	return []models.Resource{
-		{
-			ID:       "azure-vm-123",
-			Name:     "mock-azure-vm",
-			Type:     "azurerm_virtual_machine",
-			Provider: "azure",
-			Region:   region,
-			State:    "running",
-			Created:  time.Now().Add(-24 * time.Hour),
-			Updated:  time.Now(),
-		},
-	}, nil
-}
-
-// discoverGCPResources discovers GCP resources
-func (pd *ParallelDiscoverer) discoverGCPResources(ctx context.Context, region string) ([]models.Resource, error) {
-	// Mock implementation for GCP
-	return []models.Resource{
-		{
-			ID:       "gcp-instance-123",
-			Name:     "mock-gcp-instance",
-			Type:     "google_compute_instance",
-			Provider: "gcp",
-			Region:   region,
-			State:    "running",
-			Created:  time.Now().Add(-24 * time.Hour),
-			Updated:  time.Now(),
-		},
-	}, nil
-}
 
 // GetMetrics returns discovery metrics
 func (pd *ParallelDiscoverer) GetMetrics() DiscoveryMetrics {

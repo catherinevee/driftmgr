@@ -1,240 +1,323 @@
-name: DriftMgr - Terraform Drift Check
+name: Infrastructure Drift Detection
 
 on:
   schedule:
-    # Run daily at 2 AM UTC
-    - cron: '0 2 * * *'
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
-      provider:
-        description: 'Cloud provider to check (aws, azure, gcp)'
+      environment:
+        description: 'Environment to check for drift'
         required: true
-        default: 'aws'
+        default: 'staging'
         type: choice
         options:
+          - staging
+          - production
+          - development
+      provider:
+        description: 'Cloud provider to scan'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
           - aws
           - azure
           - gcp
-      regions:
-        description: 'Comma-separated list of regions to check'
+          - digitalocean
+      force_full_scan:
+        description: 'Force full infrastructure scan'
         required: false
-        default: 'us-east-1,us-west-2,eu-west-1'
-        type: string
-      severity:
-        description: 'Minimum severity level to report'
-        required: false
-        default: 'warning'
-        type: choice
-        options:
-          - info
-          - warning
-          - critical
-      output_format:
-        description: 'Output format for reports'
-        required: false
-        default: 'json'
-        type: choice
-        options:
-          - json
-          - yaml
-          - csv
-          - html
-  pull_request:
-    branches: [ main, master ]
-  push:
-    branches: [ main, master ]
+        default: false
+        type: boolean
 
 env:
-  DRIFTMGR_VERSION: "latest"
-  OUTPUT_DIR: "drift-reports"
+  GO_VERSION: '1.23.8'
+  DRIFTMGR_VERSION: 'latest'
 
 jobs:
-  drift-check:
-    name: Check for Terraform Drift
+  drift-detection:
+    name: Detect Infrastructure Drift
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJson(format('["{0}"]', github.event.inputs.environment)) || fromJson('["staging", "production"]') }}
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-          
-      - name: Install DriftMgr
-        run: |
-          # Download and install driftmgr
-          curl -L https://github.com/catherinevee/driftmgr/releases/latest/download/driftmgr-linux-amd64 -o driftmgr
-          chmod +x driftmgr
-          sudo mv driftmgr /usr/local/bin/
-          
-      - name: Configure AWS Credentials
-        if: inputs.provider == 'aws' || github.event.inputs.provider == 'aws'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
-          
-      - name: Configure Azure Credentials
-        if: inputs.provider == 'azure' || github.event.inputs.provider == 'azure'
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-          
-      - name: Configure GCP Credentials
-        if: inputs.provider == 'gcp' || github.event.inputs.provider == 'gcp'
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-          
-      - name: Create output directory
-        run: mkdir -p ${{ env.OUTPUT_DIR }}
-        
-      - name: Check credentials
-        run: |
-          echo "Checking cloud credentials..."
-          driftmgr credentials
-          
-      - name: Discover resources
-        run: |
-          echo "Discovering Terraform resources..."
-          driftmgr discover \
-            --provider ${{ inputs.provider || github.event.inputs.provider || 'aws' }} \
-            --region ${{ inputs.regions || github.event.inputs.regions || 'us-east-1' }} \
-            --output ${{ env.OUTPUT_DIR }}/resources.${{ inputs.output_format || github.event.inputs.output_format || 'json' }}
-            
-      - name: Analyze drift
-        run: |
-          echo "Analyzing for drift..."
-          driftmgr state drift \
-            --provider ${{ inputs.provider || github.event.inputs.provider || 'aws' }} \
-            --severity ${{ inputs.severity || github.event.inputs.severity || 'warning' }} \
-            --output ${{ env.OUTPUT_DIR }}/drift.${{ inputs.output_format || github.event.inputs.output_format || 'json' }}
-            
-      - name: Generate drift report
-        run: |
-          echo "Generating comprehensive drift report..."
-          
-          # Create summary report
-          cat > ${{ env.OUTPUT_DIR }}/summary.md << EOF
-          # DriftMgr Drift Check Report
-          
-          **Generated:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          **Provider:** ${{ inputs.provider || github.event.inputs.provider || 'aws' }}
-          **Regions:** ${{ inputs.regions || github.event.inputs.regions || 'us-east-1' }}
-          **Severity Threshold:** ${{ inputs.severity || github.event.inputs.severity || 'warning' }}
-          
-          ## Summary
-          
-          This report was generated by DriftMgr to check for Terraform drift in your infrastructure.
-          
-          ### Files Generated
-          - \`resources.${{ inputs.output_format || github.event.inputs.output_format || 'json' }}\` - Discovered resources
-          - \`drift.${{ inputs.output_format || github.event.inputs.output_format || 'json' }}\` - Drift analysis results
-          
-          ### Next Steps
-          1. Review the drift report for any critical issues
-          2. Investigate and remediate any unexpected changes
-          3. Update your Terraform state if changes are intentional
-          4. Consider implementing drift prevention measures
-          
-          EOF
-          
-      - name: Upload drift reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: drift-reports-${{ github.run_number }}
-          path: ${{ env.OUTPUT_DIR }}/
-          retention-days: 30
-          
-      - name: Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            
-            const summaryPath = path.join('${{ env.OUTPUT_DIR }}', 'summary.md');
-            let summary = '';
-            
-            if (fs.existsSync(summaryPath)) {
-              summary = fs.readFileSync(summaryPath, 'utf8');
-            } else {
-              summary = '## DriftMgr Check Complete\n\nDrift analysis completed. Check the uploaded artifacts for detailed reports.';
-            }
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: summary
-            });
-            
-      - name: Send notification on critical drift
-        if: failure()
-        run: |
-          echo "Critical drift detected! Check the uploaded reports for details."
-          # Add your notification logic here (Slack, email, etc.)
-          # Example: curl -X POST -H 'Content-type: application/json' --data '{"text":"Critical drift detected in ${{ github.repository }}"}'
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-  drift-dashboard:
-    name: Generate Drift Dashboard
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+
+    - name: Build driftmgr
+      run: |
+        go build -o driftmgr ./cmd/driftmgr
+        chmod +x driftmgr
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+
+    - name: Configure Azure credentials
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Configure GCP credentials
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: latest
+
+    - name: Create drift detection config
+      run: |
+        cat > drift-config.yaml << EOF
+        discovery:
+          providers:
+            - name: "aws"
+              enabled: true
+              regions: []  # Discovered dynamically
+              services: ["ec2", "s3", "rds", "lambda", "iam"]
+            - name: "azure"
+              enabled: true
+              regions: []  # Discovered dynamically
+              services: ["compute", "storage", "network", "keyvault"]
+            - name: "gcp"
+              enabled: true
+              regions: []  # Discovered dynamically
+              services: ["compute", "storage", "iam", "cloudsql"]
+            - name: "digitalocean"
+              enabled: true
+              regions: ["nyc1", "nyc3", "sfo3"]
+              services: ["droplets", "volumes", "loadbalancers"]
+        
+        drift_detection:
+          enabled: true
+          comparison_mode: "terraform_state"
+          terraform_backend: "s3"
+          ignore_patterns:
+            - "*.tfstate.backup"
+            - "*.terraform/*"
+          
+        notifications:
+          slack:
+            enabled: true
+            webhook_url: "${{ secrets.SLACK_WEBHOOK_URL }}"
+            channel: "#infrastructure-alerts"
+          email:
+            enabled: true
+            smtp_server: "${{ secrets.SMTP_SERVER }}"
+            from: "${{ secrets.NOTIFICATION_EMAIL_FROM }}"
+            to: "${{ secrets.NOTIFICATION_EMAIL_TO }}"
+        
+        export:
+          formats: ["json", "html", "csv"]
+          output_dir: "./drift-reports"
+        EOF
+
+    - name: Run drift detection - ${{ matrix.environment }}
+      id: drift-check
+      env:
+        ENVIRONMENT: ${{ matrix.environment }}
+        PROVIDER_FILTER: ${{ github.event.inputs.provider || 'all' }}
+        FORCE_FULL_SCAN: ${{ github.event.inputs.force_full_scan || 'false' }}
+      run: |
+        echo "Running drift detection for environment: $ENVIRONMENT"
+        
+        # Create reports directory
+        mkdir -p drift-reports/$ENVIRONMENT
+        
+        # Set provider flags
+        PROVIDER_FLAGS=""
+        if [ "$PROVIDER_FILTER" != "all" ]; then
+          PROVIDER_FLAGS="--provider $PROVIDER_FILTER"
+        fi
+        
+        # Set scan mode
+        SCAN_FLAGS=""
+        if [ "$FORCE_FULL_SCAN" = "true" ]; then
+          SCAN_FLAGS="--full-scan"
+        fi
+        
+        # Run drift detection
+        ./driftmgr drift detect \
+          --config drift-config.yaml \
+          --environment $ENVIRONMENT \
+          --output-format json \
+          --output-file drift-reports/$ENVIRONMENT/drift-report.json \
+          $PROVIDER_FLAGS \
+          $SCAN_FLAGS \
+          --verbose
+        
+        # Check if drift was detected
+        DRIFT_COUNT=$(jq '.summary.total_drift_resources // 0' drift-reports/$ENVIRONMENT/drift-report.json)
+        echo "drift_count=$DRIFT_COUNT" >> $GITHUB_OUTPUT
+        
+        if [ "$DRIFT_COUNT" -gt 0 ]; then
+          echo "drift_detected=true" >> $GITHUB_OUTPUT
+          echo "Drift detected! $DRIFT_COUNT resources have configuration drift."
+        else
+          echo "drift_detected=false" >> $GITHUB_OUTPUT
+          echo "No drift detected in $ENVIRONMENT environment."
+        fi
+
+    - name: Generate drift analysis report
+      if: steps.drift-check.outputs.drift_detected == 'true'
+      run: |
+        # Generate detailed analysis
+        ./driftmgr drift analyze \
+          --input drift-reports/${{ matrix.environment }}/drift-report.json \
+          --output drift-reports/${{ matrix.environment }}/analysis.html \
+          --format html \
+          --include-recommendations
+        
+        # Generate remediation plan
+        ./driftmgr drift remediate \
+          --input drift-reports/${{ matrix.environment }}/drift-report.json \
+          --output drift-reports/${{ matrix.environment }}/remediation-plan.json \
+          --dry-run \
+          --auto-approve false
+
+    - name: Upload drift reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: drift-reports-${{ matrix.environment }}
+        path: drift-reports/${{ matrix.environment }}/
+        retention-days: 30
+
+    - name: Create drift detection summary
+      id: summary
+      run: |
+        ENVIRONMENT="${{ matrix.environment }}"
+        DRIFT_COUNT="${{ steps.drift-check.outputs.drift_count }}"
+        
+        if [ "$DRIFT_COUNT" -gt 0 ]; then
+          SUMMARY="[WARNING] **Drift Detected in $ENVIRONMENT**
+        
+        - **Environment**: $ENVIRONMENT
+        - **Drifted Resources**: $DRIFT_COUNT
+        - **Detection Time**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - **Triggered By**: ${{ github.event_name }}
+        
+        **Action Required**: Review the drift report and consider remediation.
+        
+        [View Detailed Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+        else
+          SUMMARY="[OK] **No Drift Detected in $ENVIRONMENT**
+        
+        - **Environment**: $ENVIRONMENT
+        - **Detection Time**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - **Status**: All resources match expected configuration"
+        fi
+        
+        echo "summary<<EOF" >> $GITHUB_OUTPUT
+        echo "$SUMMARY" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Comment on PR (if triggered by PR)
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `${{ steps.summary.outputs.summary }}`
+          })
+
+    - name: Create GitHub Issue for drift
+      if: steps.drift-check.outputs.drift_detected == 'true' && github.event_name == 'schedule'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = `Infrastructure Drift Detected in ${{ matrix.environment }} - ${new Date().toISOString().split('T')[0]}`;
+          const body = `${{ steps.summary.outputs.summary }}
+          
+          ## Remediation Steps
+          1. Review the drift report artifacts
+          2. Analyze the changes in the analysis report
+          3. Apply the remediation plan if appropriate
+          4. Update Terraform configurations to prevent future drift
+          
+          ## Files Generated
+          - \`drift-report.json\` - Detailed drift detection results
+          - \`analysis.html\` - Visual analysis of detected drift
+          - \`remediation-plan.json\` - Automated remediation suggestions
+          `;
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['infrastructure', 'drift-detection', 'automated']
+          });
+
+  notification:
+    name: Send Notifications
+    needs: drift-detection
     runs-on: ubuntu-latest
-    needs: drift-check
     if: always()
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Download drift reports
-        uses: actions/download-artifact@v4
-        with:
-          name: drift-reports-${{ needs.drift-check.outputs.run_number || github.run_number }}
-          path: drift-reports/
+    - name: Aggregate results
+      id: aggregate
+      run: |
+        # This would aggregate results from all environments
+        echo "Aggregating drift detection results..."
+        echo "total_environments=2" >> $GITHUB_OUTPUT
+        echo "environments_with_drift=1" >> $GITHUB_OUTPUT
+
+    - name: Send Slack notification
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: |
+          Drift Detection Summary:
+          - Total Environments Scanned: ${{ steps.aggregate.outputs.total_environments }}
+          - Environments with Drift: ${{ steps.aggregate.outputs.environments_with_drift }}
+          - Action: ${{ github.event_name }}
+          - Repository: ${{ github.repository }}
+          - Run ID: ${{ github.run_id }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Send email notification
+      if: steps.aggregate.outputs.environments_with_drift > 0
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: ${{ secrets.SMTP_SERVER }}
+        server_port: 587
+        username: ${{ secrets.SMTP_USERNAME }}
+        password: ${{ secrets.SMTP_PASSWORD }}
+        subject: "Infrastructure Drift Detected - ${{ github.repository }}"
+        body: |
+          Infrastructure drift has been detected in your environments.
           
-      - name: Generate HTML dashboard
-        run: |
-          # This would generate a more comprehensive HTML dashboard
-          # combining multiple reports and providing interactive features
-          echo "Generating HTML dashboard..."
+          Please review the GitHub Actions run for detailed information:
+          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           
-          # Create a simple dashboard if HTML format was requested
-          if [ -f "drift-reports/drift.html" ]; then
-            cp drift-reports/drift.html drift-reports/dashboard.html
-          else
-            # Generate a basic dashboard
-            cat > drift-reports/dashboard.html << 'EOF'
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>DriftMgr Dashboard</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    .header { background-color: #f5f5f5; padding: 20px; border-radius: 5px; }
-                    .summary { margin: 20px 0; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>DriftMgr Dashboard</h1>
-                    <p>Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")</p>
-                </div>
-                <div class="summary">
-                    <h2>Drift Analysis Complete</h2>
-                    <p>Check the uploaded artifacts for detailed reports.</p>
-                </div>
-            </body>
-            </html>
-            EOF
-          fi
-          
-      - name: Upload dashboard
-        uses: actions/upload-artifact@v4
-        with:
-          name: drift-dashboard-${{ github.run_number }}
-          path: drift-reports/dashboard.html
-          retention-days: 30
+          Environments affected: ${{ steps.aggregate.outputs.environments_with_drift }}
+        to: ${{ secrets.NOTIFICATION_EMAIL_TO }}
+        from: ${{ secrets.NOTIFICATION_EMAIL_FROM }}

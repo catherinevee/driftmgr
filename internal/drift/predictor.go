@@ -242,8 +242,9 @@ func (dp *DriftPredictor) evaluateCondition(resource models.Resource, condition 
 		return resource.State == condition.Value.(string)
 	case "tags":
 		if tags, ok := condition.Value.(map[string]string); ok {
+			resourceTags := resource.GetTagsAsMap()
 			for key, value := range tags {
-				if resource.Tags[key] != value {
+				if resourceValue, exists := resourceTags[key]; !exists || resourceValue != value {
 					return false
 				}
 			}
@@ -295,7 +296,8 @@ func (dp *DriftPredictor) getResourceConfidence(resource models.Resource) float6
 	confidence := 0.5 // Base confidence
 
 	// Higher confidence for resources with more tags (more context)
-	if len(resource.Tags) > 5 {
+	resourceTags := resource.GetTagsAsMap()
+	if len(resourceTags) > 5 {
 		confidence += 0.1
 	}
 
@@ -340,17 +342,16 @@ func (rs *RiskScorer) CalculateRisk(resource models.Resource) RiskScore {
 	}
 
 	// Compliance risk factors
-	if resource.Tags != nil {
-		if _, hasCompliance := resource.Tags["compliance"]; hasCompliance {
-			complianceScore := rs.factors["compliance"] * rs.weights["compliance"]
-			score += complianceScore
-			factors = append(factors, RiskFactor{
-				Name:        "compliance",
-				Value:       complianceScore,
-				Weight:      rs.weights["compliance"],
-				Description: "Compliance-related resource",
-			})
-		}
+	resourceTags := resource.GetTagsAsMap()
+	if _, hasCompliance := resourceTags["compliance"]; hasCompliance {
+		complianceScore := rs.factors["compliance"] * rs.weights["compliance"]
+		score += complianceScore
+		factors = append(factors, RiskFactor{
+			Name:        "compliance",
+			Value:       complianceScore,
+			Weight:      rs.weights["compliance"],
+			Description: "Compliance-related resource",
+		})
 	}
 
 	// Performance risk factors

@@ -1,0 +1,420 @@
+Auto-discovering all configured cloud providers...
+Discovering resources across all configured providers...
+🔍 Discovering resources with Amazon Web Services provider...
+  [AWS] Discovering resources using AWS SDK...
+  [AWS] Scanning region: us-west-2
+  [AWS] Found 3 resources
+🔍 Discovering resources with Microsoft Azure provider...
+  [Azure] Discovering resources using Azure SDK...
+  [Azure] Scanning region: eastus
+  [Azure] Found 1 resources
+🔍 Discovering resources with Google Cloud Platform provider...
+  [GCP] Discovering resources using Google Cloud SDK...
+  [GCP] Warning: No project ID configured, using mock data
+  [GCP] Using mock resources for demonstration
+🔍 Discovering resources with digitalocean provider...
+Note: Spaces discovery requires S3-compatible client configuration
+[
+  {
+    "id": "vpc-031c927086ea3903f",
+    "name": "",
+    "type": "aws_vpc",
+    "provider": "aws",
+    "region": "us-west-2",
+    "tags": {},
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "2025-08-21T16:47:32.6465304-07:00",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "cidr_block": "172.31.0.0/16",
+      "instance_tenancy": "default",
+      "is_default": true,
+      "state": "available"
+    },
+    "metadata": {
+      "import_id": "vpc-031c927086ea3903f",
+      "terraform_type": "aws_vpc"
+    }
+  },
+  {
+    "id": "sg-0d4f45df98bc79b7f",
+    "name": "default",
+    "type": "aws_security_group",
+    "provider": "aws",
+    "region": "us-west-2",
+    "tags": {},
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "2025-08-21T16:47:33.8450326-07:00",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "description": "default VPC security group",
+      "vpc_id": "vpc-031c927086ea3903f"
+    },
+    "metadata": {
+      "import_id": "sg-0d4f45df98bc79b7f",
+      "terraform_type": "aws_security_group"
+    }
+  },
+  {
+    "id": "driftmgr-test-bucket-1755579790",
+    "name": "driftmgr-test-bucket-1755579790",
+    "type": "aws_s3_bucket",
+    "provider": "aws",
+    "region": "global",
+    "tags": {},
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "2025-08-19T05:03:13Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "metadata": {
+      "import_id": "driftmgr-test-bucket-1755579790",
+      "terraform_type": "aws_s3_bucket"
+    }
+  },
+  {
+    "id": "/subscriptions/48421ac6-de0a-47d9-8a76-2166ceafcfe6/resourceGroups/NetworkWatcherRG/providers/Microsoft.Network/networkWatchers/NetworkWatcher_eastus",
+    "name": "NetworkWatcher_eastus",
+    "type": "azurerm_network_networkwatchers",
+    "provider": "azure",
+    "region": "eastus",
+    "tags": {},
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "2025-08-21T16:47:39.977939-07:00",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "metadata": {
+      "import_id": "/subscriptions/48421ac6-de0a-47d9-8a76-2166ceafcfe6/resourceGroups/NetworkWatcherRG/providers/Microsoft.Network/networkWatchers/NetworkWatcher_eastus",
+      "terraform_type": "azurerm_network_networkwatchers"
+    }
+  },
+  {
+    "id": "projects/my-project/zones/us-central1-a/instances/web-server-instance",
+    "name": "web-server-instance",
+    "type": "google_compute_instance",
+    "provider": "gcp",
+    "region": "us-central1",
+    "tags": {
+      "environment": "production",
+      "http-server": "",
+      "https-server": "",
+      "team": "platform"
+    },
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "2025-08-20T04:47:39.977939-07:00",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "metadata": {
+      "disk_size": "20",
+      "disk_type": "pd-standard",
+      "import_id": "projects/my-project/zones/us-central1-a/instances/web-server-instance",
+      "machine_type": "e2-medium",
+      "status": "RUNNING",
+      "terraform_type": "google_compute_instance",
+      "zone": "us-central1-a"
+    }
+  },
+  {
+    "id": "projects/my-project/global/networks/default",
+    "name": "default",
+    "type": "google_compute_network",
+    "provider": "gcp",
+    "region": "global",
+    "tags": {
+      "environment": "production"
+    },
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "2025-08-14T16:47:39.977939-07:00",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "metadata": {
+      "auto_create_subnetworks": "true",
+      "import_id": "projects/my-project/global/networks/default",
+      "mtu": "1460",
+      "routing_mode": "REGIONAL",
+      "terraform_type": "google_compute_network"
+    }
+  },
+  {
+    "id": "projects/my-project/global/buckets/my-project-storage",
+    "name": "my-project-storage",
+    "type": "google_storage_bucket",
+    "provider": "gcp",
+    "region": "us-central1",
+    "tags": {
+      "environment": "production",
+      "purpose": "data-storage"
+    },
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "2025-08-11T16:47:39.977939-07:00",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "metadata": {
+      "import_id": "my-project-storage",
+      "location": "US-CENTRAL1",
+      "storage_class": "STANDARD",
+      "terraform_type": "google_storage_bucket",
+      "versioning": "true"
+    }
+  },
+  {
+    "id": "501477383",
+    "name": "pool-i3xcogrq9-tk8xn",
+    "type": "digitalocean_droplet",
+    "provider": "digitalocean",
+    "region": "tor1",
+    "tags": [
+      "k8s",
+      "k8s:worker",
+      "k8s:ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea"
+    ],
+    "state": "active",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "created_at": "2025-06-10T16:40:47Z",
+      "image": "",
+      "ip_address": "138.197.170.14",
+      "size": "s-2vcpu-4gb",
+      "vpc_uuid": "31631903-559e-4892-afaa-45183a1b75fe"
+    }
+  },
+  {
+    "id": "501477384",
+    "name": "pool-i3xcogrq9-tk8y9",
+    "type": "digitalocean_droplet",
+    "provider": "digitalocean",
+    "region": "tor1",
+    "tags": [
+      "k8s",
+      "k8s:worker",
+      "k8s:ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea"
+    ],
+    "state": "active",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "created_at": "2025-06-10T16:40:47Z",
+      "image": "",
+      "ip_address": "159.203.11.181",
+      "size": "s-2vcpu-4gb",
+      "vpc_uuid": "31631903-559e-4892-afaa-45183a1b75fe"
+    }
+  },
+  {
+    "id": "ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea",
+    "name": "k8s-1-32-2-do-3-tor1-1749573488938",
+    "type": "digitalocean_kubernetes_cluster",
+    "provider": "digitalocean",
+    "region": "tor1",
+    "tags": [
+      "k8s",
+      "k8s:ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea"
+    ],
+    "state": "running",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "auto_upgrade": false,
+      "created_at": "2025-06-10T16:38:38Z",
+      "node_count": 1,
+      "surge_upgrade": true,
+      "version": "1.32.2-do.3",
+      "vpc_uuid": "31631903-559e-4892-afaa-45183a1b75fe"
+    }
+  },
+  {
+    "id": "4da245e0-5e75-4a36-85fa-c09fb041f787",
+    "name": "a1468988040d1447b9c85c21a129e443",
+    "type": "digitalocean_loadbalancer",
+    "provider": "digitalocean",
+    "region": "tor1",
+    "tags": null,
+    "state": "active",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "algorithm": "round_robin",
+      "created_at": "2025-07-01T19:44:04Z",
+      "droplet_ids": [
+        501477383,
+        501477384
+      ],
+      "forwarding_rules": 2,
+      "ip": "209.38.0.161",
+      "size": "lb-small",
+      "vpc_uuid": "31631903-559e-4892-afaa-45183a1b75fe"
+    }
+  },
+  {
+    "id": "a74f61cf-2e8e-4caf-af29-57bc0fd65732",
+    "name": "aa42085ac8f7f4ba69e675f6be05d9ef",
+    "type": "digitalocean_loadbalancer",
+    "provider": "digitalocean",
+    "region": "tor1",
+    "tags": null,
+    "state": "active",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "algorithm": "round_robin",
+      "created_at": "2025-07-25T22:06:31Z",
+      "droplet_ids": [
+        501477383,
+        501477384
+      ],
+      "forwarding_rules": 2,
+      "ip": "159.203.49.70",
+      "size": "lb-small",
+      "vpc_uuid": "31631903-559e-4892-afaa-45183a1b75fe"
+    }
+  },
+  {
+    "id": "87035e0a-69a5-11f0-aebc-0a58ac14ee5f",
+    "name": "pvc-1765b774-76e7-4b69-9e61-e40fab1fc811",
+    "type": "digitalocean_volume",
+    "provider": "digitalocean",
+    "region": "tor1",
+    "tags": [
+      "k8s:ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea"
+    ],
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "created_at": "2025-07-25T22:20:10Z",
+      "description": "Created by DigitalOcean CSI driver",
+      "droplet_ids": [
+        501477383
+      ],
+      "filesystem_type": "ext4",
+      "size_gigabytes": 2
+    }
+  },
+  {
+    "id": "86b2f4f8-69a5-11f0-b9d8-0a58ac14e5be",
+    "name": "pvc-93e5663a-15ce-464b-9281-bebabc6fd736",
+    "type": "digitalocean_volume",
+    "provider": "digitalocean",
+    "region": "tor1",
+    "tags": [
+      "k8s:ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea"
+    ],
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "created_at": "2025-07-25T22:20:09Z",
+      "description": "Created by DigitalOcean CSI driver",
+      "droplet_ids": [
+        501477383
+      ],
+      "filesystem_type": "ext4",
+      "size_gigabytes": 8
+    }
+  },
+  {
+    "id": "catherine.it.com",
+    "name": "catherine.it.com",
+    "type": "digitalocean_domain",
+    "provider": "digitalocean",
+    "region": "",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "ttl": 1800
+    }
+  },
+  {
+    "id": "8f64a949-ffd7-4b7e-bbd6-aaf22b88ddb7",
+    "name": "first-project",
+    "type": "digitalocean_project",
+    "provider": "digitalocean",
+    "region": "",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "created_at": "2025-05-25T15:07:49Z",
+      "description": "Update your project information under Settings",
+      "environment": "",
+      "is_default": true,
+      "purpose": ""
+    }
+  },
+  {
+    "id": "31631903-559e-4892-afaa-45183a1b75fe",
+    "name": "default-tor1",
+    "type": "digitalocean_vpc",
+    "provider": "digitalocean",
+    "region": "tor1",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "created_at": "2025-05-27T02:19:37Z",
+      "default": true,
+      "description": "",
+      "ip_range": "10.118.0.0/20"
+    }
+  },
+  {
+    "id": "4e53c273-781e-4285-9b61-c257c0a19762",
+    "name": "k8s-ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea-worker",
+    "type": "digitalocean_firewall",
+    "provider": "digitalocean",
+    "region": "",
+    "tags": [
+      "k8s:ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea"
+    ],
+    "state": "succeeded",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "created_at": "2025-06-10T16:40:46Z",
+      "droplet_ids": [],
+      "inbound_rules": 3,
+      "outbound_rules": 3
+    }
+  },
+  {
+    "id": "bfb40f0a-82c4-4305-819c-c997bcdfb7b4",
+    "name": "k8s-public-access-ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea",
+    "type": "digitalocean_firewall",
+    "provider": "digitalocean",
+    "region": "",
+    "tags": [
+      "k8s:ff41b5a9-add5-4ac0-9cf4-31e86aa6f2ea"
+    ],
+    "state": "succeeded",
+    "created": "0001-01-01T00:00:00Z",
+    "updated": "0001-01-01T00:00:00Z",
+    "created_at": "0001-01-01T00:00:00Z",
+    "last_modified": "0001-01-01T00:00:00Z",
+    "attributes": {
+      "created_at": "2025-06-10T16:39:41Z",
+      "droplet_ids": [],
+      "inbound_rules": 0,
+      "outbound_rules": 3
+    }
+  }
+]

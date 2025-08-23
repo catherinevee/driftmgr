@@ -3,6 +3,7 @@ package security
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -76,12 +77,12 @@ func (api *UserManagementAPI) HandleCreateUser(w http.ResponseWriter, r *http.Re
 
 	// Create user
 	user := &User{
-		ID:        generateUserID(),
-		Username:  req.Username,
-		Password:  hashedPassword,
-		Role:      role,
-		Created:   time.Now(),
-		Email:     req.Email,
+		ID:       generateUserID(),
+		Username: req.Username,
+		Password: hashedPassword,
+		Role:     role,
+		Created:  time.Now(),
+		Email:    req.Email,
 	}
 
 	if err := api.authManager.userDB.CreateUser(user); err != nil {
@@ -248,11 +249,17 @@ func (api *UserManagementAPI) HandleGetUsers(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// TODO: Implement user listing from database
-	// For now, return a simple response
+	// Return list of users (implementation depends on database backend)
+	users, err := api.authManager.ListUsers()
+	if err != nil {
+		log.Printf("Failed to list users: %v", err)
+		http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
+		return
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "User listing not yet implemented",
+		"users": users,
 	})
 }
 
@@ -270,11 +277,17 @@ func (api *UserManagementAPI) HandleGetAuditLogs(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// TODO: Implement audit log retrieval from database
-	// For now, return a simple response
+	// Return audit logs (implementation depends on database backend)
+	logs, err := api.authManager.GetAuditLogs(r.URL.Query().Get("limit"))
+	if err != nil {
+		log.Printf("Failed to retrieve audit logs: %v", err)
+		http.Error(w, "Failed to retrieve audit logs", http.StatusInternalServerError)
+		return
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message": "Audit logs not yet implemented",
+		"logs": logs,
 	})
 }
 

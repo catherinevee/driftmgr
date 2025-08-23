@@ -3,7 +3,9 @@ package security
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -11,18 +13,21 @@ import (
 
 // User represents an authenticated user
 type User struct {
-	ID                   string     `json:"id"`
-	Username             string     `json:"username"`
-	Password             string     `json:"-"` // Never expose in JSON
-	Role                 UserRole   `json:"role"`
-	Created              time.Time  `json:"created"`
-	LastLogin            time.Time  `json:"last_login"`
-	Email                string     `json:"email,omitempty"`
-	FailedLoginAttempts  int        `json:"-"`
-	LockedUntil          *time.Time `json:"-"`
-	MFAEnabled           bool       `json:"mfa_enabled"`
-	MFASecret            string     `json:"-"`
-	PasswordChangedAt    time.Time  `json:"-"`
+	ID                  string       `json:"id"`
+	Username            string       `json:"username"`
+	Password            string       `json:"-"` // Never expose in JSON
+	Role                UserRole     `json:"role"`
+	Created             time.Time    `json:"created"`
+	LastLogin           time.Time    `json:"last_login"`
+	Email               string       `json:"email,omitempty"`
+	FailedLoginAttempts int          `json:"-"`
+	FailedLogins        int          `json:"failed_logins"`  // Alias for compatibility
+	LockedUntil         *time.Time   `json:"-"`
+	MFAEnabled          bool         `json:"mfa_enabled"`
+	MFASecret           string       `json:"-"`
+	PasswordChangedAt   time.Time    `json:"-"`
+	Permissions         []Permission `json:"permissions,omitempty"`
+	APIKey              string       `json:"api_key,omitempty"`
 }
 
 // UserRole defines user permissions
@@ -53,10 +58,12 @@ const (
 
 // AuthManager manages authentication and authorization
 type AuthManager struct {
-	secretKey       []byte
-	userDB          *UserDB
+	secretKey         []byte
+	userDB            *UserDB
 	passwordValidator *PasswordValidator
-	rolePermissions map[UserRole][]Permission
+	rolePermissions   map[UserRole][]Permission
+	mu                sync.RWMutex
+	users             map[string]*User  // In-memory user cache
 }
 
 // Claims represents JWT claims
@@ -82,10 +89,11 @@ func NewAuthManager(secretKey []byte, dbPath string) (*AuthManager, error) {
 	}
 
 	am := &AuthManager{
-		secretKey:        secretKey,
-		userDB:           userDB,
+		secretKey:         secretKey,
+		userDB:            userDB,
 		passwordValidator: NewPasswordValidator(policy),
-		rolePermissions:  make(map[UserRole][]Permission),
+		rolePermissions:   make(map[UserRole][]Permission),
+		users:             make(map[string]*User),
 	}
 
 	// Initialize role permissions
@@ -127,12 +135,12 @@ func (am *AuthManager) createDefaultUsers() error {
 		}
 
 		rootUser := &User{
-			ID:        "root",
-			Username:  "root",
-			Password:  rootPassword,
-			Role:      RoleRoot,
-			Created:   time.Now(),
-			Email:     "admin@driftmgr.local",
+			ID:       "root",
+			Username: "root",
+			Password: rootPassword,
+			Role:     RoleRoot,
+			Created:  time.Now(),
+			Email:    "admin@driftmgr.local",
 		}
 
 		if err := am.userDB.CreateUser(rootUser); err != nil {
@@ -149,12 +157,12 @@ func (am *AuthManager) createDefaultUsers() error {
 		}
 
 		readonlyUser := &User{
-			ID:        "readonly",
-			Username:  "readonly",
-			Password:  readonlyPassword,
-			Role:      RoleReadOnly,
-			Created:   time.Now(),
-			Email:     "readonly@driftmgr.local",
+			ID:       "readonly",
+			Username: "readonly",
+			Password: readonlyPassword,
+			Role:     RoleReadOnly,
+			Created:  time.Now(),
+			Email:    "readonly@driftmgr.local",
 		}
 
 		if err := am.userDB.CreateUser(readonlyUser); err != nil {
@@ -181,7 +189,7 @@ func (am *AuthManager) AuthenticateUser(username, password string) (*User, error
 	if err := ComparePassword(user.Password, password); err != nil {
 		// Increment failed login attempts
 		user.FailedLoginAttempts++
-		
+
 		// Check if account should be locked
 		policy, _ := am.userDB.GetPasswordPolicy()
 		if policy != nil && user.FailedLoginAttempts >= policy.LockoutThreshold {
@@ -189,7 +197,7 @@ func (am *AuthManager) AuthenticateUser(username, password string) (*User, error
 			lockedUntil := time.Now().Add(lockoutDuration)
 			user.LockedUntil = &lockedUntil
 		}
-		
+
 		am.userDB.UpdateUser(user)
 		return nil, fmt.Errorf("invalid credentials")
 	}
@@ -324,4 +332,54 @@ func ExtractTokenFromRequest(r *http.Request) string {
 	}
 
 	return ""
+}
+
+// ListUsers returns a list of all users
+func (a *AuthManager) ListUsers() ([]User, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	
+	users := make([]User, 0, len(a.users))
+	for _, user := range a.users {
+		// Don't include password hashes in the response
+		sanitizedUser := User{
+			Username:     user.Username,
+			Role:         user.Role,
+			Permissions:  user.Permissions,
+			LastLogin:    user.LastLogin,
+			FailedLogins: user.FailedLogins,
+			LockedUntil:  user.LockedUntil,
+			APIKey:       user.APIKey,
+		}
+		users = append(users, sanitizedUser)
+	}
+	
+	return users, nil
+}
+
+// GetAuditLogs returns audit logs with optional limit
+func (a *AuthManager) GetAuditLogs(limitStr string) ([]map[string]interface{}, error) {
+	limit := 100 // default limit
+	if limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	
+	// In production, this would query a database
+	// For now, return a placeholder response
+	logs := []map[string]interface{}{
+		{
+			"timestamp": time.Now().Format(time.RFC3339),
+			"event":     "system_initialized",
+			"user":      "system",
+			"details":   "Audit logging system initialized",
+		},
+	}
+	
+	if limit < len(logs) {
+		logs = logs[:limit]
+	}
+	
+	return logs, nil
 }

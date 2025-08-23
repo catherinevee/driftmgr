@@ -1,0 +1,912 @@
+# Azure DevOps Pipeline for DriftMgr
+# Infrastructure Drift Detection and Management Tool
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - feature/*
+      - hotfix/*
+  tags:
+    include:
+      - v*
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+schedules:
+  - cron: "0 6 * * *"
+    displayName: Daily drift detection
+    branches:
+      include:
+        - main
+    always: true
+
+variables:
+  - name: GO_VERSION
+    value: '1.23.8'
+  - name: DOCKER_REGISTRY
+    value: 'driftmgr.azurecr.io'
+  - name: IMAGE_NAME
+    value: 'driftmgr'
+  - name: REPORTS_DIR
+    value: '$(Build.ArtifactStagingDirectory)/reports'
+  - name: ARTIFACTS_DIR
+    value: '$(Build.ArtifactStagingDirectory)/artifacts'
+  
+  # Variable groups for environment-specific configurations
+  - group: driftmgr-common
+  - group: driftmgr-$(Build.SourceBranchName)
+
+parameters:
+  - name: environment
+    displayName: 'Target Environment'
+    type: string
+    default: 'staging'
+    values:
+      - staging
+      - production
+      - development
+  
+  - name: provider
+    displayName: 'Cloud Provider'
+    type: string
+    default: 'all'
+    values:
+      - all
+      - aws
+      - azure
+      - gcp
+      - digitalocean
+  
+  - name: pipelineType
+    displayName: 'Pipeline Type'
+    type: string
+    default: 'full'
+    values:
+      - full
+      - drift-only
+      - test-only
+      - build-only
+  
+  - name: autoRemediate
+    displayName: 'Auto Remediate Drift'
+    type: boolean
+    default: false
+  
+  - name: dryRun
+    displayName: 'Dry Run Mode'
+    type: boolean
+    default: true
+  
+  - name: forceScan
+    displayName: 'Force Full Scan'
+    type: boolean
+    default: false
+
+stages:
+  - stage: Initialize
+    displayName: 'Initialize Pipeline'
+    jobs:
+      - job: Setup
+        displayName: 'Setup Environment'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+          
+          - task: PowerShell@2
+            displayName: 'Pipeline Information'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "===========================================" -ForegroundColor Cyan
+                Write-Host "Azure DevOps Pipeline for DriftMgr" -ForegroundColor Cyan
+                Write-Host "===========================================" -ForegroundColor Cyan
+                Write-Host "Build ID: $(Build.BuildId)" -ForegroundColor Yellow
+                Write-Host "Build Number: $(Build.BuildNumber)" -ForegroundColor Yellow
+                Write-Host "Source Branch: $(Build.SourceBranchName)" -ForegroundColor Yellow
+                Write-Host "Commit SHA: $(Build.SourceVersion)" -ForegroundColor Yellow
+                Write-Host "Pipeline Type: ${{ parameters.pipelineType }}" -ForegroundColor Yellow
+                Write-Host "Environment: ${{ parameters.environment }}" -ForegroundColor Yellow
+                Write-Host "Provider: ${{ parameters.provider }}" -ForegroundColor Yellow
+                Write-Host "Auto Remediate: ${{ parameters.autoRemediate }}" -ForegroundColor Yellow
+                Write-Host "Dry Run: ${{ parameters.dryRun }}" -ForegroundColor Yellow
+                Write-Host "===========================================" -ForegroundColor Cyan
+          
+          - script: |
+              mkdir -p $(REPORTS_DIR)
+              mkdir -p $(ARTIFACTS_DIR)/binaries
+              mkdir -p $(ARTIFACTS_DIR)/docker
+            displayName: 'Create Directories'
+
+  - stage: Setup
+    displayName: 'Environment Setup'
+    dependsOn: Initialize
+    condition: or(eq('${{ parameters.pipelineType }}', 'full'), eq('${{ parameters.pipelineType }}', 'test-only'), eq('${{ parameters.pipelineType }}', 'build-only'))
+    jobs:
+      - job: InstallDependencies
+        displayName: 'Install Dependencies'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: GoTool@0
+            displayName: 'Install Go $(GO_VERSION)'
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              # Install additional tools
+              sudo apt-get update -qq
+              sudo apt-get install -y jq curl unzip
+              
+              # Install AWS CLI
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip -q awscliv2.zip
+              sudo ./aws/install --update
+              
+              # Install Azure CLI (already available in Azure DevOps agents)
+              az --version
+              
+              # Install GCP CLI
+              echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+              sudo apt-get update && sudo apt-get install -y google-cloud-cli
+              
+              # Install doctl for DigitalOcean
+              wget -q https://github.com/digitalocean/doctl/releases/download/v1.94.0/doctl-1.94.0-linux-amd64.tar.gz
+              tar xf doctl-1.94.0-linux-amd64.tar.gz
+              sudo mv doctl /usr/local/bin
+              
+              # Install security tools
+              go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+              go install golang.org/x/vuln/cmd/govulncheck@latest
+              
+              # Install Trivy
+              wget -q https://github.com/aquasecurity/trivy/releases/download/v0.45.0/trivy_0.45.0_Linux-64bit.tar.gz
+              tar zxf trivy_0.45.0_Linux-64bit.tar.gz
+              sudo mv trivy /usr/local/bin/
+            displayName: 'Install Cloud CLIs and Security Tools'
+
+  - stage: CodeQuality
+    displayName: 'Code Quality & Security'
+    dependsOn: Setup
+    condition: or(eq('${{ parameters.pipelineType }}', 'full'), eq('${{ parameters.pipelineType }}', 'test-only'), eq(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - job: StaticAnalysis
+        displayName: 'Static Code Analysis'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              # Format check
+              go fmt -l . | tee $(REPORTS_DIR)/format-issues.txt
+              if [ -s $(REPORTS_DIR)/format-issues.txt ]; then
+                echo "##vso[task.logissue type=error]Code formatting issues found"
+                cat $(REPORTS_DIR)/format-issues.txt
+                exit 1
+              fi
+              
+              # Vet check
+              go vet ./... | tee $(REPORTS_DIR)/vet-issues.txt
+              
+              # Module verification
+              go mod verify
+            displayName: 'Go Static Analysis'
+          
+          - script: |
+              # Gosec security scan
+              $(go env GOPATH)/bin/gosec -fmt sarif -out $(REPORTS_DIR)/gosec-report.sarif ./...
+              $(go env GOPATH)/bin/gosec -fmt json -out $(REPORTS_DIR)/gosec-report.json ./...
+            displayName: 'Security Scan with Gosec'
+            continueOnError: true
+          
+          - task: PublishTestResults@2
+            displayName: 'Publish Security Scan Results'
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '$(REPORTS_DIR)/gosec-report.sarif'
+              failTaskOnFailedTests: false
+            condition: always()
+
+      - job: VulnerabilityCheck
+        displayName: 'Vulnerability Assessment'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              # Go vulnerability check
+              $(go env GOPATH)/bin/govulncheck ./... | tee $(REPORTS_DIR)/vulncheck-report.txt
+              
+              # Check if vulnerabilities were found
+              if grep -q "No vulnerabilities found" $(REPORTS_DIR)/vulncheck-report.txt; then
+                echo "##vso[task.logissue type=info]No vulnerabilities detected"
+              else
+                echo "##vso[task.logissue type=warning]Vulnerabilities detected"
+              fi
+            displayName: 'Vulnerability Check'
+            continueOnError: true
+          
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Vulnerability Report'
+            inputs:
+              pathToPublish: '$(REPORTS_DIR)/vulncheck-report.txt'
+              artifactName: 'vulnerability-report'
+
+      - job: LicenseCompliance
+        displayName: 'License Compliance Check'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              # Install go-licenses
+              go install github.com/google/go-licenses@latest
+              
+              # Generate license report
+              $(go env GOPATH)/bin/go-licenses report ./... > $(REPORTS_DIR)/licenses.txt || true
+              
+              # Check for forbidden licenses
+              if grep -E "(GPL-2|GPL-3|AGPL|LGPL)" $(REPORTS_DIR)/licenses.txt; then
+                echo "##vso[task.logissue type=error]Forbidden licenses detected!"
+                exit 1
+              else
+                echo "##vso[task.logissue type=info]License compliance check passed"
+              fi
+            displayName: 'License Compliance'
+          
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(REPORTS_DIR)/licenses.txt'
+              artifactName: 'license-report'
+
+  - stage: Test
+    displayName: 'Testing'
+    dependsOn: CodeQuality
+    condition: or(eq('${{ parameters.pipelineType }}', 'full'), eq('${{ parameters.pipelineType }}', 'test-only'), eq(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - job: UnitTests
+        displayName: 'Unit Tests'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              # Run unit tests with coverage
+              go test -v -race -coverprofile=$(REPORTS_DIR)/coverage.out ./... | tee $(REPORTS_DIR)/test-results.txt
+              
+              # Generate coverage report
+              go tool cover -html=$(REPORTS_DIR)/coverage.out -o $(REPORTS_DIR)/coverage.html
+              go tool cover -func=$(REPORTS_DIR)/coverage.out | grep total | awk '{print $3}' > $(REPORTS_DIR)/coverage.txt
+              
+              # Convert to JUnit format
+              go install github.com/jstemmer/go-junit-report/v2@latest
+              cat $(REPORTS_DIR)/test-results.txt | $(go env GOPATH)/bin/go-junit-report > $(REPORTS_DIR)/junit.xml
+            displayName: 'Run Unit Tests'
+          
+          - task: PublishTestResults@2
+            displayName: 'Publish Test Results'
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '$(REPORTS_DIR)/junit.xml'
+              failTaskOnFailedTests: true
+            condition: always()
+          
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish Coverage Results'
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: '$(REPORTS_DIR)/coverage.out'
+              reportDirectory: '$(REPORTS_DIR)'
+            condition: always()
+
+      - job: IntegrationTests
+        displayName: 'Integration Tests'
+        pool:
+          vmImage: 'ubuntu-latest'
+        services:
+          postgres: postgres:15
+          redis: redis:7
+        variables:
+          POSTGRES_DB: driftmgr_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          DATABASE_URL: postgres://postgres:postgres@postgres:5432/driftmgr_test?sslmode=disable
+          REDIS_URL: redis://redis:6379
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              # Wait for services to be ready
+              sleep 10
+              
+              # Run integration tests
+              go test -v -tags=integration ./tests/integration/... | tee $(REPORTS_DIR)/integration-test-results.txt
+            displayName: 'Run Integration Tests'
+            continueOnError: true
+
+      - job: BenchmarkTests
+        displayName: 'Benchmark Tests'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              # Run benchmark tests
+              go test -bench=. -benchmem ./... | tee $(REPORTS_DIR)/benchmark-results.txt
+            displayName: 'Run Benchmark Tests'
+          
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(REPORTS_DIR)/benchmark-results.txt'
+              artifactName: 'benchmark-results'
+
+  - stage: Build
+    displayName: 'Build Artifacts'
+    dependsOn: Test
+    condition: or(eq('${{ parameters.pipelineType }}', 'full'), eq('${{ parameters.pipelineType }}', 'build-only'), eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+    jobs:
+      - job: BuildBinaries
+        displayName: 'Build Cross-Platform Binaries'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          matrix:
+            linux_amd64:
+              GOOS: linux
+              GOARCH: amd64
+            linux_arm64:
+              GOOS: linux
+              GOARCH: arm64
+            windows_amd64:
+              GOOS: windows
+              GOARCH: amd64
+            darwin_amd64:
+              GOOS: darwin
+              GOARCH: amd64
+            darwin_arm64:
+              GOOS: darwin
+              GOARCH: arm64
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              # Set variables
+              if [ "$(GOOS)" = "windows" ]; then
+                SUFFIX=".exe"
+              else
+                SUFFIX=""
+              fi
+              
+              LDFLAGS="-s -w -X main.version=$(Build.BuildNumber) -X main.commit=$(Build.SourceVersion) -X main.date=$(date -u '+%Y-%m-%d_%H:%M:%S')"
+              
+              # Build binaries
+              export CGO_ENABLED=0
+              export GOOS=$(GOOS)
+              export GOARCH=$(GOARCH)
+              
+              go build -ldflags="$LDFLAGS" -o $(ARTIFACTS_DIR)/binaries/driftmgr-$(GOOS)-$(GOARCH)$SUFFIX ./cmd/driftmgr
+              go build -ldflags="$LDFLAGS" -o $(ARTIFACTS_DIR)/binaries/driftmgr-server-$(GOOS)-$(GOARCH)$SUFFIX ./cmd/server
+              go build -ldflags="$LDFLAGS" -o $(ARTIFACTS_DIR)/binaries/validate-discovery-$(GOOS)-$(GOARCH)$SUFFIX ./cmd/validate
+              
+              # Create archive
+              cd $(ARTIFACTS_DIR)/binaries
+              if [ "$(GOOS)" = "windows" ]; then
+                zip -r driftmgr-$(GOOS)-$(GOARCH).zip *$(GOOS)-$(GOARCH)*
+              else
+                tar -czf driftmgr-$(GOOS)-$(GOARCH).tar.gz *$(GOOS)-$(GOARCH)*
+              fi
+            displayName: 'Build $(GOOS)-$(GOARCH) Binaries'
+          
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Binaries'
+            inputs:
+              pathToPublish: '$(ARTIFACTS_DIR)/binaries'
+              artifactName: 'binaries-$(GOOS)-$(GOARCH)'
+
+      - job: BuildDocker
+        displayName: 'Build Docker Image'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: Docker@2
+            displayName: 'Login to Container Registry'
+            inputs:
+              containerRegistry: 'DriftMgrACR'
+              command: 'login'
+          
+          - script: |
+              # Determine image tag
+              if [ "$(Build.SourceBranch)" = "refs/heads/main" ]; then
+                IMAGE_TAG="latest"
+              elif [[ "$(Build.SourceBranch)" == refs/tags/* ]]; then
+                IMAGE_TAG="$(Build.SourceBranchName)"
+              else
+                IMAGE_TAG="$(Build.SourceBranchName)"
+              fi
+              
+              echo "##vso[task.setvariable variable=IMAGE_TAG]$IMAGE_TAG"
+              
+              FULL_IMAGE_NAME="$(DOCKER_REGISTRY)/$(IMAGE_NAME):$IMAGE_TAG"
+              echo "##vso[task.setvariable variable=FULL_IMAGE_NAME]$FULL_IMAGE_NAME"
+            displayName: 'Set Image Tag'
+          
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              containerRegistry: 'DriftMgrACR'
+              repository: '$(IMAGE_NAME)'
+              command: 'build'
+              Dockerfile: 'deployments/docker/Dockerfile'
+              tags: |
+                $(IMAGE_TAG)
+                $(Build.BuildNumber)
+              arguments: |
+                --build-arg VERSION=$(Build.BuildNumber)
+                --build-arg COMMIT=$(Build.SourceVersion)
+                --build-arg DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          
+          - script: |
+              # Security scan of Docker image
+              trivy image --format sarif --output $(REPORTS_DIR)/trivy-docker-report.sarif $(FULL_IMAGE_NAME)
+            displayName: 'Security Scan Docker Image'
+            continueOnError: true
+          
+          - task: Docker@2
+            displayName: 'Push Docker Image'
+            inputs:
+              containerRegistry: 'DriftMgrACR'
+              repository: '$(IMAGE_NAME)'
+              command: 'push'
+              tags: |
+                $(IMAGE_TAG)
+                $(Build.BuildNumber)
+            condition: or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+
+  - stage: DriftDetection
+    displayName: 'Infrastructure Drift Detection'
+    dependsOn: Build
+    condition: or(eq('${{ parameters.pipelineType }}', 'full'), eq('${{ parameters.pipelineType }}', 'drift-only'), eq(variables['Build.Reason'], 'Schedule'))
+    jobs:
+      - job: ConfigureCloudProviders
+        displayName: 'Configure Cloud Providers'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: GoTool@0
+            inputs:
+              version: '$(GO_VERSION)'
+          
+          - script: |
+              go build -o driftmgr ./cmd/driftmgr
+              chmod +x driftmgr
+            displayName: 'Build DriftMgr'
+          
+          - task: AzureCLI@2
+            displayName: 'Configure Azure'
+            inputs:
+              azureSubscription: 'AzureDriftMgr'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az account show
+                echo "Azure CLI configured successfully"
+          
+          - task: AWSCLI@1
+            displayName: 'Configure AWS'
+            inputs:
+              awsCredentials: 'AWSDriftMgr'
+              regionName: 'us-east-1'
+              awsCommand: 'sts'
+              awsSubCommand: 'get-caller-identity'
+          
+          - script: |
+              # Configure GCP
+              if [ -n "$(GCP_SERVICE_ACCOUNT_KEY)" ]; then
+                echo "$(GCP_SERVICE_ACCOUNT_KEY)" > gcp-key.json
+                gcloud auth activate-service-account --key-file=gcp-key.json
+                gcloud config set project $(GCP_PROJECT_ID)
+                echo "GCP configured successfully"
+              fi
+              
+              # Configure DigitalOcean
+              if [ -n "$(DO_TOKEN)" ]; then
+                doctl auth init --access-token $(DO_TOKEN)
+                echo "DigitalOcean configured successfully"
+              fi
+            displayName: 'Configure GCP and DigitalOcean'
+            env:
+              GCP_SERVICE_ACCOUNT_KEY: $(GCP_SERVICE_ACCOUNT_KEY)
+              DO_TOKEN: $(DO_TOKEN)
+              GCP_PROJECT_ID: $(GCP_PROJECT_ID)
+
+      - job: RunDriftDetection
+        displayName: 'Run Drift Detection'
+        dependsOn: ConfigureCloudProviders
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: |
+              # Download driftmgr binary from artifacts
+              go build -o driftmgr ./cmd/driftmgr
+              chmod +x driftmgr
+              
+              # Set scan flags
+              SCAN_FLAGS=""
+              if [ "${{ parameters.forceScan }}" = "true" ]; then
+                SCAN_FLAGS="--full-scan"
+              fi
+              
+              # Run drift detection
+              ./driftmgr drift detect \
+                --provider ${{ parameters.provider }} \
+                --environment ${{ parameters.environment }} \
+                --output-format json \
+                --output-file $(REPORTS_DIR)/drift-report.json \
+                $SCAN_FLAGS \
+                --verbose
+              
+              # Parse results
+              if [ -f "$(REPORTS_DIR)/drift-report.json" ]; then
+                DRIFT_COUNT=$(jq '.summary.total_drift_resources // 0' $(REPORTS_DIR)/drift-report.json)
+                COST_IMPACT=$(jq '.cost_analysis.total_impact // 0' $(REPORTS_DIR)/drift-report.json)
+                
+                echo "##vso[task.setvariable variable=DRIFT_COUNT]$DRIFT_COUNT"
+                echo "##vso[task.setvariable variable=COST_IMPACT]$COST_IMPACT"
+                
+                if [ "$DRIFT_COUNT" -gt 0 ]; then
+                  echo "##vso[task.setvariable variable=DRIFT_DETECTED]true"
+                  echo "##vso[task.logissue type=warning]Drift detected: $DRIFT_COUNT resources"
+                else
+                  echo "##vso[task.setvariable variable=DRIFT_DETECTED]false"
+                  echo "##vso[task.logissue type=info]No drift detected"
+                fi
+              fi
+            displayName: 'Execute Drift Detection'
+            env:
+              AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+              AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+              AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+              GCP_SERVICE_ACCOUNT_KEY: $(GCP_SERVICE_ACCOUNT_KEY)
+              DO_TOKEN: $(DO_TOKEN)
+          
+          - script: |
+              # Generate HTML report
+              ./driftmgr drift analyze \
+                --input $(REPORTS_DIR)/drift-report.json \
+                --output $(REPORTS_DIR)/drift-report.html \
+                --format html \
+                --include-recommendations
+              
+              # Generate CSV for analysis
+              ./driftmgr drift export \
+                --input $(REPORTS_DIR)/drift-report.json \
+                --output $(REPORTS_DIR)/drift-export.csv \
+                --format csv
+            displayName: 'Generate Drift Reports'
+            condition: succeededOrFailed()
+          
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Drift Reports'
+            inputs:
+              pathToPublish: '$(REPORTS_DIR)'
+              artifactName: 'drift-reports'
+            condition: always()
+          
+          - task: PublishTestResults@2
+            displayName: 'Publish Drift as Test Results'
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '$(REPORTS_DIR)/drift-junit.xml'
+              testRunTitle: 'Drift Detection Results'
+              failTaskOnFailedTests: false
+            condition: always()
+
+  - stage: Remediation
+    displayName: 'Automated Remediation'
+    dependsOn: DriftDetection
+    condition: and(succeeded(), eq('${{ parameters.autoRemediate }}', true), eq(dependencies.DriftDetection.outputs['RunDriftDetection.DRIFT_DETECTED'], 'true'))
+    jobs:
+      - job: RemediationApproval
+        displayName: 'Remediation Approval'
+        pool: server
+        condition: eq('${{ parameters.environment }}', 'production')
+        steps:
+          - task: ManualValidation@0
+            displayName: 'Approve Production Remediation'
+            inputs:
+              notifyUsers: '$(APPROVAL_USERS)'
+              instructions: |
+                Infrastructure drift has been detected in the production environment.
+                
+                Details:
+                - Environment: ${{ parameters.environment }}
+                - Drift Count: $(DRIFT_COUNT)
+                - Cost Impact: $$(COST_IMPACT)
+                - Provider: ${{ parameters.provider }}
+                
+                Please review the drift report before approving remediation.
+              onTimeout: 'reject'
+
+      - job: ExecuteRemediation
+        displayName: 'Execute Remediation'
+        dependsOn: RemediationApproval
+        condition: or(succeeded('RemediationApproval'), ne('${{ parameters.environment }}', 'production'))
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: |
+              go build -o driftmgr ./cmd/driftmgr
+              chmod +x driftmgr
+            displayName: 'Build DriftMgr'
+          
+          - task: DownloadBuildArtifacts@0
+            displayName: 'Download Drift Reports'
+            inputs:
+              artifactName: 'drift-reports'
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          - script: |
+              # Generate remediation plan
+              ./driftmgr remediation plan \
+                --drift-report $(System.ArtifactsDirectory)/drift-reports/drift-report.json \
+                --output $(REPORTS_DIR)/remediation-plan.json \
+                --environment ${{ parameters.environment }}
+              
+              # Create backup
+              ./driftmgr backup create \
+                --environment ${{ parameters.environment }} \
+                --output $(REPORTS_DIR)/backup-$(Build.BuildNumber).json
+              
+              # Execute remediation
+              DRY_RUN_FLAG=""
+              if [ "${{ parameters.dryRun }}" = "true" ]; then
+                DRY_RUN_FLAG="--dry-run"
+              fi
+              
+              ./driftmgr remediation execute \
+                $DRY_RUN_FLAG \
+                --plan $(REPORTS_DIR)/remediation-plan.json \
+                --output $(REPORTS_DIR)/remediation-result.json \
+                --environment ${{ parameters.environment }}
+              
+              # Verify remediation
+              sleep 30
+              ./driftmgr drift detect \
+                --provider ${{ parameters.provider }} \
+                --environment ${{ parameters.environment }} \
+                --output-format json \
+                --output-file $(REPORTS_DIR)/post-remediation-report.json
+              
+              # Check remaining drift
+              REMAINING_DRIFT=$(jq '.summary.total_drift_resources // 0' $(REPORTS_DIR)/post-remediation-report.json)
+              if [ "$REMAINING_DRIFT" -gt 0 ]; then
+                echo "##vso[task.logissue type=warning]$REMAINING_DRIFT resources still show drift after remediation"
+              else
+                echo "##vso[task.logissue type=info]All drift successfully remediated"
+              fi
+            displayName: 'Execute Remediation'
+            env:
+              AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+              AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+              AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+          
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Remediation Results'
+            inputs:
+              pathToPublish: '$(REPORTS_DIR)'
+              artifactName: 'remediation-results'
+
+  - stage: Release
+    displayName: 'Release'
+    dependsOn: Build
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+    jobs:
+      - job: CreateRelease
+        displayName: 'Create GitHub Release'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: DownloadBuildArtifacts@0
+            displayName: 'Download All Artifacts'
+            inputs:
+              downloadType: 'all'
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          - script: |
+              # Generate changelog
+              git log --pretty=format:"- %s (%h)" $(git describe --tags --abbrev=0 HEAD^)..HEAD > CHANGELOG.md
+              
+              # Create GitHub release
+              TAG_NAME=$(echo $(Build.SourceBranch) | sed 's|refs/tags/||')
+              
+              gh release create $TAG_NAME \
+                --title "Release $TAG_NAME" \
+                --notes-file CHANGELOG.md \
+                $(System.ArtifactsDirectory)/binaries-*/*.tar.gz \
+                $(System.ArtifactsDirectory)/binaries-*/*.zip
+            displayName: 'Create GitHub Release'
+            env:
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+  - stage: Deploy
+    displayName: 'Deployment'
+    dependsOn: Release
+    condition: or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
+    jobs:
+      - deployment: DeployStaging
+        displayName: 'Deploy to Staging'
+        condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+        environment: 'driftmgr-staging'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: Kubernetes@1
+                  displayName: 'Deploy to Staging'
+                  inputs:
+                    connectionType: 'kubernetesServiceConnection'
+                    kubernetesServiceEndpoint: 'k8s-staging'
+                    command: 'set'
+                    arguments: 'image deployment/driftmgr driftmgr=$(DOCKER_REGISTRY)/$(IMAGE_NAME):latest'
+                    namespace: 'staging'
+                
+                - task: Kubernetes@1
+                  displayName: 'Check Deployment Status'
+                  inputs:
+                    connectionType: 'kubernetesServiceConnection'
+                    kubernetesServiceEndpoint: 'k8s-staging'
+                    command: 'rollout'
+                    arguments: 'status deployment/driftmgr'
+                    namespace: 'staging'
+
+      - deployment: DeployProduction
+        displayName: 'Deploy to Production'
+        condition: startsWith(variables['Build.SourceBranch'], 'refs/tags/')
+        environment: 'driftmgr-production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: |
+                    TAG_NAME=$(echo $(Build.SourceBranch) | sed 's|refs/tags/||')
+                    echo "##vso[task.setvariable variable=TAG_NAME]$TAG_NAME"
+                  displayName: 'Extract Tag Name'
+                
+                - task: Kubernetes@1
+                  displayName: 'Deploy to Production'
+                  inputs:
+                    connectionType: 'kubernetesServiceConnection'
+                    kubernetesServiceEndpoint: 'k8s-production'
+                    command: 'set'
+                    arguments: 'image deployment/driftmgr driftmgr=$(DOCKER_REGISTRY)/$(IMAGE_NAME):$(TAG_NAME)'
+                    namespace: 'production'
+                
+                - task: Kubernetes@1
+                  displayName: 'Check Deployment Status'
+                  inputs:
+                    connectionType: 'kubernetesServiceConnection'
+                    kubernetesServiceEndpoint: 'k8s-production'
+                    command: 'rollout'
+                    arguments: 'status deployment/driftmgr'
+                    namespace: 'production'
+
+  - stage: Notify
+    displayName: 'Notifications'
+    dependsOn:
+      - DriftDetection
+      - Remediation
+      - Deploy
+    condition: always()
+    jobs:
+      - job: SendNotifications
+        displayName: 'Send Notifications'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: |
+              # Determine notification message
+              if [ "$(Agent.JobStatus)" = "Succeeded" ]; then
+                COLOR="good"
+                STATUS="[OK] Success"
+              elif [ "$(Agent.JobStatus)" = "Failed" ]; then
+                COLOR="danger"
+                STATUS="[ERROR] Failed"
+              else
+                COLOR="warning"
+                STATUS="[WARNING] Warning"
+              fi
+              
+              MESSAGE="DriftMgr Pipeline $STATUS
+              
+              Environment: ${{ parameters.environment }}
+              Provider: ${{ parameters.provider }}
+              Build: $(Build.BuildNumber)
+              Commit: $(Build.SourceVersion)
+              Branch: $(Build.SourceBranchName)"
+              
+              if [ -n "$(DRIFT_COUNT)" ] && [ "$(DRIFT_COUNT)" -gt 0 ]; then
+                MESSAGE="$MESSAGE
+                Drift Count: $(DRIFT_COUNT)
+                Cost Impact: \$$(COST_IMPACT)"
+              fi
+              
+              # Send to Teams
+              if [ -n "$(TEAMS_WEBHOOK_URL)" ]; then
+                curl -H "Content-Type: application/json" -d "{
+                  \"@type\": \"MessageCard\",
+                  \"@context\": \"http://schema.org/extensions\",
+                  \"themeColor\": \"$COLOR\",
+                  \"summary\": \"DriftMgr Pipeline\",
+                  \"sections\": [{
+                    \"activityTitle\": \"$STATUS\",
+                    \"activitySubtitle\": \"Pipeline completed\",
+                    \"text\": \"$MESSAGE\",
+                    \"facts\": [{
+                      \"name\": \"Build\",
+                      \"value\": \"$(Build.BuildNumber)\"
+                    }, {
+                      \"name\": \"Environment\",
+                      \"value\": \"${{ parameters.environment }}\"
+                    }]
+                  }]
+                }" $(TEAMS_WEBHOOK_URL)
+              fi
+            displayName: 'Send Teams Notification'
+            env:
+              TEAMS_WEBHOOK_URL: $(TEAMS_WEBHOOK_URL)
+          
+          - task: EmailReport@1
+            displayName: 'Send Email Report'
+            inputs:
+              sendMailConditionConfig: 'Always'
+              subject: 'DriftMgr Pipeline - $(Agent.JobStatus)'
+              to: '$(EMAIL_RECIPIENTS)'
+              body: |
+                DriftMgr Pipeline has completed with status: $(Agent.JobStatus)
+                
+                Details:
+                - Build Number: $(Build.BuildNumber)
+                - Environment: ${{ parameters.environment }}
+                - Provider: ${{ parameters.provider }}
+                - Branch: $(Build.SourceBranchName)
+                - Commit: $(Build.SourceVersion)
+                
+                For detailed results, please check the Azure DevOps pipeline:
+                $(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)
+            condition: always()

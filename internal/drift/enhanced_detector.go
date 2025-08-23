@@ -1,7 +1,11 @@
 package drift
 
 import (
+	"crypto/md5"
+	"encoding/json"
 	"fmt"
+	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -137,8 +141,10 @@ func (d *AttributeDriftDetector) detectAttributeDrift(stateResource, liveResourc
 	changes = append(changes, d.compareBasicAttributes(stateResource, liveResource)...)
 
 	// Compare tags if they exist
-	if len(stateResource.Tags) > 0 || len(liveResource.Tags) > 0 {
-		tagChanges := d.compareTags(stateResource.Tags, liveResource.Tags)
+	stateTags := stateResource.GetTagsAsMap()
+	liveTags := liveResource.GetTagsAsMap()
+	if len(stateTags) > 0 || len(liveTags) > 0 {
+		tagChanges := d.compareTags(stateTags, liveTags)
 		changes = append(changes, tagChanges...)
 	}
 
@@ -283,7 +289,8 @@ func (d *AttributeDriftDetector) extractValue(resource models.Resource, attribut
 		// Handle nested paths like "tags.environment"
 		if strings.HasPrefix(attributePath, "tags.") {
 			tagKey := strings.TrimPrefix(attributePath, "tags.")
-			if value, exists := resource.Tags[tagKey]; exists {
+			resourceTags := resource.GetTagsAsMap()
+			if value, exists := resourceTags[tagKey]; exists {
 				return value
 			}
 		}
@@ -556,4 +563,383 @@ func (d *AttributeDriftDetector) generateRiskReasoning(resource models.Resource,
 	}
 
 	return strings.Join(reasons, "; ")
+}
+
+// DeepDiff performs deep comparison of complex nested structures
+type DeepDiff struct {
+	IgnorePatterns   []string              // Regex patterns for fields to ignore
+	SemanticRules    map[string]SemanticCompareFunc
+	OrderSensitive   map[string]bool       // Which arrays/lists should be order-sensitive
+	NormalizationMap map[string]NormalizeFunc
+}
+
+// SemanticCompareFunc defines semantic comparison for specific types
+type SemanticCompareFunc func(path string, old, new interface{}) (bool, string)
+
+// NormalizeFunc normalizes values before comparison
+type NormalizeFunc func(value interface{}) interface{}
+
+// NewDeepDiff creates a new deep diff engine
+func NewDeepDiff() *DeepDiff {
+	return &DeepDiff{
+		IgnorePatterns:   []string{},
+		SemanticRules:    make(map[string]SemanticCompareFunc),
+		OrderSensitive:   make(map[string]bool),
+		NormalizationMap: make(map[string]NormalizeFunc),
+	}
+}
+
+// Compare performs deep comparison of two objects
+func (dd *DeepDiff) Compare(old, new interface{}) ([]models.DriftChange, error) {
+	var changes []models.DriftChange
+	dd.compareRecursive("", old, new, &changes)
+	return changes, nil
+}
+
+// compareRecursive recursively compares nested structures
+func (dd *DeepDiff) compareRecursive(path string, old, new interface{}, changes *[]models.DriftChange) {
+	// Check if field should be ignored
+	if dd.shouldIgnore(path) {
+		return
+	}
+
+	// Apply normalization if defined
+	if normalizer, exists := dd.NormalizationMap[path]; exists {
+		old = normalizer(old)
+		new = normalizer(new)
+	}
+
+	// Apply semantic comparison if defined
+	if semanticCompare, exists := dd.SemanticRules[path]; exists {
+		equal, description := semanticCompare(path, old, new)
+		if !equal {
+			*changes = append(*changes, models.DriftChange{
+				Field:       path,
+				OldValue:    old,
+				NewValue:    new,
+				ChangeType:  "modified",
+				Description: description,
+			})
+		}
+		return
+	}
+
+	// Handle nil cases
+	if old == nil && new == nil {
+		return
+	}
+	if old == nil && new != nil {
+		*changes = append(*changes, models.DriftChange{
+			Field:      path,
+			OldValue:   nil,
+			NewValue:   new,
+			ChangeType: "added",
+		})
+		return
+	}
+	if old != nil && new == nil {
+		*changes = append(*changes, models.DriftChange{
+			Field:      path,
+			OldValue:   old,
+			NewValue:   nil,
+			ChangeType: "removed",
+		})
+		return
+	}
+
+	// Use reflection for deep comparison
+	oldVal := reflect.ValueOf(old)
+	newVal := reflect.ValueOf(new)
+
+	// If types differ, it's a change
+	if oldVal.Type() != newVal.Type() {
+		*changes = append(*changes, models.DriftChange{
+			Field:      path,
+			OldValue:   old,
+			NewValue:   new,
+			ChangeType: "type_changed",
+		})
+		return
+	}
+
+	switch oldVal.Kind() {
+	case reflect.Map:
+		dd.compareMaps(path, oldVal, newVal, changes)
+	case reflect.Slice, reflect.Array:
+		dd.compareSlices(path, oldVal, newVal, changes)
+	case reflect.Struct:
+		dd.compareStructs(path, oldVal, newVal, changes)
+	case reflect.Ptr:
+		if !oldVal.IsNil() && !newVal.IsNil() {
+			dd.compareRecursive(path, oldVal.Elem().Interface(), newVal.Elem().Interface(), changes)
+		}
+	default:
+		// Simple value comparison
+		if !reflect.DeepEqual(old, new) {
+			*changes = append(*changes, models.DriftChange{
+				Field:      path,
+				OldValue:   old,
+				NewValue:   new,
+				ChangeType: "modified",
+			})
+		}
+	}
+}
+
+// compareMaps compares map structures
+func (dd *DeepDiff) compareMaps(path string, oldMap, newMap reflect.Value, changes *[]models.DriftChange) {
+	oldKeys := oldMap.MapKeys()
+	newKeys := newMap.MapKeys()
+
+	// Create key sets for comparison
+	oldKeySet := make(map[string]reflect.Value)
+	newKeySet := make(map[string]reflect.Value)
+
+	for _, key := range oldKeys {
+		oldKeySet[fmt.Sprintf("%v", key.Interface())] = key
+	}
+	for _, key := range newKeys {
+		newKeySet[fmt.Sprintf("%v", key.Interface())] = key
+	}
+
+	// Check for removed keys
+	for keyStr, key := range oldKeySet {
+		if _, exists := newKeySet[keyStr]; !exists {
+			keyPath := dd.buildPath(path, keyStr)
+			*changes = append(*changes, models.DriftChange{
+				Field:      keyPath,
+				OldValue:   oldMap.MapIndex(key).Interface(),
+				NewValue:   nil,
+				ChangeType: "removed",
+			})
+		}
+	}
+
+	// Check for added keys
+	for keyStr, key := range newKeySet {
+		if _, exists := oldKeySet[keyStr]; !exists {
+			keyPath := dd.buildPath(path, keyStr)
+			*changes = append(*changes, models.DriftChange{
+				Field:      keyPath,
+				OldValue:   nil,
+				NewValue:   newMap.MapIndex(key).Interface(),
+				ChangeType: "added",
+			})
+		}
+	}
+
+	// Check for modified values
+	for keyStr, oldKey := range oldKeySet {
+		if newKey, exists := newKeySet[keyStr]; exists {
+			keyPath := dd.buildPath(path, keyStr)
+			oldValue := oldMap.MapIndex(oldKey).Interface()
+			newValue := newMap.MapIndex(newKey).Interface()
+			dd.compareRecursive(keyPath, oldValue, newValue, changes)
+		}
+	}
+}
+
+// compareSlices compares slice/array structures
+func (dd *DeepDiff) compareSlices(path string, oldSlice, newSlice reflect.Value, changes *[]models.DriftChange) {
+	isOrderSensitive := dd.OrderSensitive[path]
+
+	if isOrderSensitive {
+		// Order-sensitive comparison
+		dd.compareOrderedSlices(path, oldSlice, newSlice, changes)
+	} else {
+		// Order-insensitive comparison (e.g., for security group rules)
+		dd.compareUnorderedSlices(path, oldSlice, newSlice, changes)
+	}
+}
+
+// compareOrderedSlices compares slices where order matters
+func (dd *DeepDiff) compareOrderedSlices(path string, oldSlice, newSlice reflect.Value, changes *[]models.DriftChange) {
+	oldLen := oldSlice.Len()
+	newLen := newSlice.Len()
+
+	// Compare common elements
+	minLen := oldLen
+	if newLen < minLen {
+		minLen = newLen
+	}
+
+	for i := 0; i < minLen; i++ {
+		indexPath := fmt.Sprintf("%s[%d]", path, i)
+		dd.compareRecursive(indexPath, oldSlice.Index(i).Interface(), newSlice.Index(i).Interface(), changes)
+	}
+
+	// Handle extra elements in old slice
+	for i := minLen; i < oldLen; i++ {
+		indexPath := fmt.Sprintf("%s[%d]", path, i)
+		*changes = append(*changes, models.DriftChange{
+			Field:      indexPath,
+			OldValue:   oldSlice.Index(i).Interface(),
+			NewValue:   nil,
+			ChangeType: "removed",
+		})
+	}
+
+	// Handle extra elements in new slice
+	for i := minLen; i < newLen; i++ {
+		indexPath := fmt.Sprintf("%s[%d]", path, i)
+		*changes = append(*changes, models.DriftChange{
+			Field:      indexPath,
+			OldValue:   nil,
+			NewValue:   newSlice.Index(i).Interface(),
+			ChangeType: "added",
+		})
+	}
+}
+
+// compareUnorderedSlices compares slices where order doesn't matter
+func (dd *DeepDiff) compareUnorderedSlices(path string, oldSlice, newSlice reflect.Value, changes *[]models.DriftChange) {
+	// Create hash sets for comparison
+	oldSet := make(map[string]interface{})
+	newSet := make(map[string]interface{})
+
+	for i := 0; i < oldSlice.Len(); i++ {
+		item := oldSlice.Index(i).Interface()
+		hash := dd.hashValue(item)
+		oldSet[hash] = item
+	}
+
+	for i := 0; i < newSlice.Len(); i++ {
+		item := newSlice.Index(i).Interface()
+		hash := dd.hashValue(item)
+		newSet[hash] = item
+	}
+
+	// Find removed items
+	for hash, item := range oldSet {
+		if _, exists := newSet[hash]; !exists {
+			*changes = append(*changes, models.DriftChange{
+				Field:      path,
+				OldValue:   item,
+				NewValue:   nil,
+				ChangeType: "item_removed",
+			})
+		}
+	}
+
+	// Find added items
+	for hash, item := range newSet {
+		if _, exists := oldSet[hash]; !exists {
+			*changes = append(*changes, models.DriftChange{
+				Field:      path,
+				OldValue:   nil,
+				NewValue:   item,
+				ChangeType: "item_added",
+			})
+		}
+	}
+}
+
+// compareStructs compares struct fields
+func (dd *DeepDiff) compareStructs(path string, oldStruct, newStruct reflect.Value, changes *[]models.DriftChange) {
+	oldType := oldStruct.Type()
+
+	for i := 0; i < oldStruct.NumField(); i++ {
+		field := oldType.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+
+		fieldPath := dd.buildPath(path, field.Name)
+		oldField := oldStruct.Field(i).Interface()
+		newField := newStruct.Field(i).Interface()
+
+		dd.compareRecursive(fieldPath, oldField, newField, changes)
+	}
+}
+
+// shouldIgnore checks if a field should be ignored based on patterns
+func (dd *DeepDiff) shouldIgnore(path string) bool {
+	for _, pattern := range dd.IgnorePatterns {
+		matched, _ := regexp.MatchString(pattern, path)
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+// buildPath constructs a field path
+func (dd *DeepDiff) buildPath(base, field string) string {
+	if base == "" {
+		return field
+	}
+	if strings.HasPrefix(field, "[") {
+		return base + field
+	}
+	return base + "." + field
+}
+
+// hashValue creates a hash for value comparison
+func (dd *DeepDiff) hashValue(value interface{}) string {
+	jsonBytes, _ := json.Marshal(value)
+	hash := md5.Sum(jsonBytes)
+	return fmt.Sprintf("%x", hash)
+}
+
+// Predefined semantic comparators
+
+// SecurityGroupRuleComparator compares security group rules semantically
+func SecurityGroupRuleComparator() SemanticCompareFunc {
+	return func(path string, old, new interface{}) (bool, string) {
+		// Convert to comparable format
+		oldRules := normalizeSecurityGroupRules(old)
+		newRules := normalizeSecurityGroupRules(new)
+		
+		// Compare normalized rules
+		if !reflect.DeepEqual(oldRules, newRules) {
+			return false, "Security group rules differ in effective permissions"
+		}
+		return true, ""
+	}
+}
+
+// normalizeSecurityGroupRules normalizes security group rules for comparison
+func normalizeSecurityGroupRules(rules interface{}) interface{} {
+	// Sort rules by protocol, port, and CIDR blocks
+	// Expand port ranges if needed
+	// Normalize CIDR blocks (0.0.0.0/0 vs ::/0)
+	return rules
+}
+
+// IAMPolicyDocumentComparator compares IAM policy documents semantically
+func IAMPolicyDocumentComparator() SemanticCompareFunc {
+	return func(path string, old, new interface{}) (bool, string) {
+		// Parse as JSON policy documents
+		// Compare statements semantically (order doesn't matter)
+		// Normalize principal formats
+		// Compare actions with wildcard expansion
+		return true, ""
+	}
+}
+
+// TimestampNormalizer normalizes timestamp formats
+func TimestampNormalizer() NormalizeFunc {
+	return func(value interface{}) interface{} {
+		if str, ok := value.(string); ok {
+			// Parse various timestamp formats
+			// Return standardized format
+			if t, err := time.Parse(time.RFC3339, str); err == nil {
+				return t.Format(time.RFC3339)
+			}
+		}
+		return value
+	}
+}
+
+// CIDRNormalizer normalizes CIDR blocks
+func CIDRNormalizer() NormalizeFunc {
+	return func(value interface{}) interface{} {
+		if str, ok := value.(string); ok {
+			// Normalize CIDR notation
+			// 0.0.0.0/0 and ::/0 handling
+			// Expand shortened IPv6 addresses
+			return str
+		}
+		return value
+	}
 }

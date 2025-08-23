@@ -10,7 +10,7 @@ import (
 
 // ResourceDiscoverer represents a resource discoverer
 type ResourceDiscoverer struct {
-	providers map[string]Provider
+	providers map[string]ResourceProvider
 	config    *DiscoveryConfig
 }
 
@@ -23,8 +23,8 @@ type DiscoveryConfig struct {
 	Filters       map[string]interface{} `json:"filters"`
 }
 
-// Provider represents a cloud provider interface
-type Provider interface {
+// ResourceProvider represents a cloud provider interface for resource discovery
+type ResourceProvider interface {
 	Name() string
 	DiscoverResources(ctx context.Context, region string) ([]models.Resource, error)
 }
@@ -41,7 +41,7 @@ func NewResourceDiscoverer(config *DiscoveryConfig) *ResourceDiscoverer {
 	}
 
 	return &ResourceDiscoverer{
-		providers: make(map[string]Provider),
+		providers: make(map[string]ResourceProvider),
 		config:    config,
 	}
 }

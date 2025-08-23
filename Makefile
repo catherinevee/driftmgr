@@ -1,55 +1,100 @@
 # DriftMgr Makefile
 # Build automation for DriftMgr project
 
-.PHONY: help build test clean setup lint docker-build docker-run
+.PHONY: help build test test-all test-unit test-integration test-e2e test-benchmarks test-performance test-coverage clean setup lint docker-build docker-run
 
 # Default target
 help:
 	@echo "Available targets:"
-	@echo "  build        - Build the application"
-	@echo "  test         - Run tests"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  setup        - Setup development environment"
-	@echo "  lint         - Run linters"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run   - Run Docker container"
+	@echo "  build            - Build the application"
+	@echo "  test             - Run basic tests"
+	@echo "  test-all         - Run comprehensive test suite"
+	@echo "  test-unit        - Run unit tests"
+	@echo "  test-integration - Run integration tests"
+	@echo "  test-e2e         - Run end-to-end tests"
+	@echo "  test-benchmarks  - Run benchmark tests"
+	@echo "  test-performance - Run performance tests"
+	@echo "  test-coverage    - Generate test coverage report"
+	@echo "  clean            - Clean build artifacts"
+	@echo "  setup            - Setup development environment"
+	@echo "  lint             - Run linters"
+	@echo "  docker-build     - Build Docker image"
+	@echo "  docker-run       - Run Docker container"
 
-# Build the application
+# Build all binaries
 build:
 	@echo "Building DriftMgr..."
-	@powershell -ExecutionPolicy Bypass -File scripts/build/build.ps1
-	@echo "Verifying build..."
-	@powershell -ExecutionPolicy Bypass -File scripts/build/verify-build.ps1
+	go build -o bin/driftmgr ./cmd/driftmgr
+	go build -o bin/driftmgr-server ./cmd/server
+	go build -o bin/validate-discovery ./cmd/validate
 
-# Run tests
+# Run basic tests
 test:
-	@echo "Running comprehensive tests..."
-	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1
+	@echo "Running basic tests..."
+	go test ./internal/...
 
-# Run specific test types
+# Run comprehensive test suite
+test-all:
+	@echo "Running comprehensive test suite..."
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -TestType all
+else
+	@bash scripts/run-tests.sh --type all
+endif
+
+# Run unit tests
 test-unit:
 	@echo "Running unit tests..."
-	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 unit
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -TestType unit
+else
+	@bash scripts/run-tests.sh --type unit
+endif
 
+# Run integration tests
 test-integration:
 	@echo "Running integration tests..."
-	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 integration
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -TestType integration
+else
+	@bash scripts/run-tests.sh --type integration
+endif
 
+# Run end-to-end tests
 test-e2e:
 	@echo "Running end-to-end tests..."
-	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 e2e
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -TestType e2e
+else
+	@bash scripts/run-tests.sh --type e2e
+endif
 
-test-benchmark:
-	@echo "Running benchmarks..."
-	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 benchmarks
+# Run benchmark tests
+test-benchmarks:
+	@echo "Running benchmark tests..."
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -TestType benchmarks
+else
+	@bash scripts/run-tests.sh --type benchmarks
+endif
 
-test-security:
-	@echo "Running security tests..."
-	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 security
+# Run performance tests
+test-performance:
+	@echo "Running performance tests..."
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -TestType performance
+else
+	@bash scripts/run-tests.sh --type performance
+endif
 
+# Generate test coverage report
 test-coverage:
-	@echo "Generating coverage report..."
-	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 coverage
+	@echo "Generating test coverage report..."
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -TestType coverage
+else
+	@bash scripts/run-tests.sh --type coverage
+endif
 
 # Clean build artifacts
 clean:
@@ -92,10 +137,8 @@ docs:
 	@if not exist docs\api mkdir docs\api
 	@swag init -g cmd/driftmgr-server/main.go -o docs/api
 
-# Run benchmarks
-bench:
-	@echo "Running benchmarks..."
-	@powershell -ExecutionPolicy Bypass -File scripts/test/run_comprehensive_tests.ps1 benchmarks
+# Alias for benchmark tests
+bench: test-benchmarks
 
 # Format code
 fmt:

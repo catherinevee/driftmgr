@@ -86,14 +86,14 @@ jobs:
         echo "Building DriftMgr..."
         go build -o driftmgr ./cmd/main.go
         chmod +x driftmgr
-        echo "✅ DriftMgr built successfully"
+        echo "[OK] DriftMgr built successfully"
         
     - name: Validate Build
       run: |
         echo "Validating DriftMgr build..."
         echo "DriftMgr binary exists and is executable"
         ls -la driftmgr
-        echo "✅ DriftMgr validation successful"
+        echo "[OK] DriftMgr validation successful"
 
     - name: Setup Cloud Credentials
       run: |
@@ -102,28 +102,28 @@ jobs:
           "aws")
             echo "Configuring AWS credentials..."
             if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-              echo "⚠️ AWS credentials not provided, running in dry-run mode"
+              echo "[WARNING] AWS credentials not provided, running in dry-run mode"
               export DRY_RUN="true"
             else
-              echo "✅ AWS credentials configured"
+              echo "[OK] AWS credentials configured"
             fi
             ;;
           "azure")
             echo "Configuring Azure credentials..."
             if [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_CLIENT_SECRET" ] || [ -z "$AZURE_TENANT_ID" ]; then
-              echo "⚠️ Azure credentials not provided, running in dry-run mode"
+              echo "[WARNING] Azure credentials not provided, running in dry-run mode"
               export DRY_RUN="true"
             else
-              echo "✅ Azure credentials configured"
+              echo "[OK] Azure credentials configured"
             fi
             ;;
           "gcp")
             echo "Configuring GCP credentials..."
             if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
-              echo "⚠️ GCP credentials not provided, running in dry-run mode"
+              echo "[WARNING] GCP credentials not provided, running in dry-run mode"
               export DRY_RUN="true"
             else
-              echo "✅ GCP credentials configured"
+              echo "[OK] GCP credentials configured"
             fi
             ;;
         esac
@@ -167,7 +167,7 @@ jobs:
         # Generate a report after execution
         echo "Generating execution report..."
         ./driftmgr github-actions generate-report --output workflow-execution-report.md
-        echo "✅ Workflow execution completed"
+        echo "[OK] Workflow execution completed"
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -190,7 +190,7 @@ jobs:
         echo "**Execution Time:** $(date)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Results" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Workflow completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "- [OK] Workflow completed successfully" >> $GITHUB_STEP_SUMMARY
         echo "- 📊 Check the logs above for detailed results" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload Artifacts

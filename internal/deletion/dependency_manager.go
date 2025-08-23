@@ -392,7 +392,8 @@ func (dm *DependencyManager) getKubernetesDependencies(resource models.Resource,
 // hasTagReference checks if one resource references another through tags
 func (dm *DependencyManager) hasTagReference(resource, other models.Resource) bool {
 	// Check if resource tags contain references to other resource
-	for key, value := range resource.Tags {
+	tags := resource.GetTagsAsMap()
+	for key, value := range tags {
 		if strings.Contains(strings.ToLower(key), other.Type) ||
 			strings.Contains(strings.ToLower(value), other.Name) ||
 			strings.Contains(strings.ToLower(value), other.ID) {
