@@ -1,117 +1,163 @@
 # DriftMgr Documentation
 
-Welcome to the DriftMgr documentation! This complete guide covers installation, configuration, and usage of DriftMgr for cloud infrastructure drift detection and management.
+Welcome to the DriftMgr documentation! This guide covers installation, configuration, and usage of DriftMgr for cloud infrastructure drift detection and management.
 
 ## Quick Links
 
-- [Installation Guide](./getting-started/installation.md) - Install DriftMgr on your system
-- [CLI Reference](./user-guide/cli-reference.md) - Complete command reference
-- [Configuration Guide](./reference/configuration.md) - Configuration options
-- [API Documentation](./api/versioning.md) - REST and WebSocket APIs
+- [Installation Guide](./INSTALLATION_GUIDE.md) - Install DriftMgr on your system
+- [Command Reference](./COMMAND_REFERENCE.md) - Complete command reference
+- [Enterprise Features](./ENTERPRISE_FEATURES.md) - Enterprise-grade capabilities
+- [Secrets Setup](./SECRETS_SETUP.md) - Configure GitHub Actions secrets
+
+## Available Documentation
+
+### Getting Started
+- [Installation Guide](./INSTALLATION_GUIDE.md) - Build and install DriftMgr
+- [Command Reference](./COMMAND_REFERENCE.md) - All available commands
+- [Testing Guide](./TESTING_GUIDE.md) - Run tests and validate installation
+
+### User Guides
+- [CLI Reference](./user-guide/cli-reference.md) - CLI usage examples
+- [Drift Detection Guide](./user-guide/drift-detection-guide.md) - Detect infrastructure drift
+- [CLI Help Feature](./user-guide/cli-help-feature.md) - Interactive help system
+- [Terraform Examples](./user-guide/terraform-examples.md) - Terraform integration
+
+### Enterprise Features
+- [Enterprise Features](./ENTERPRISE_FEATURES.md) - Audit, RBAC, Vault integration
+- [AWS Multi-Account](./AWS_MULTI_ACCOUNT_SUPPORT.md) - Multi-account AWS support
+- [Cost Calculation](./COST_CALCULATION.md) - Cost impact analysis
+
+### Development
+- [Contributing](./CONTRIBUTING.md) - How to contribute to DriftMgr
+- [DriftMgr Commands](./development/DRIFTMGR_COMMANDS.md) - Command implementation details
+- [TUI Loading Bar Guide](./development/TUI_LOADING_BAR_GUIDE.md) - Terminal UI components
+
+### Demos
+- [Drift Detection Demo](./demos/DRIFT_DETECTION_DEMO.md) - Live drift detection example
+- [Credential Display Demo](./demos/demo_credential_display.md) - Credential management
+- [TUI Demo](./demos/demo_tui.md) - Terminal UI demonstration
+
+### CI/CD & Deployment
+- [GitHub Actions Workflows](./../.github/workflows/) - Pre-configured workflows
+- [CI/CD Examples](./ci-cd-examples/README.md) - Examples for various platforms
+- [Docker Setup](./../.github/workflows/docker.yml) - Docker build and push
+
+### Architecture
+- [Component Interactions](./architecture/component-interactions.md) - System architecture
+- [Future Proofing Strategy](./architecture/FUTURE_PROOFING_STRATEGY.md) - Extensibility design
+
+### Features
+- [Progress Indicators](./PROGRESS_INDICATORS.md) - Progress bars and animations
+- [Color Support](./COLOR_SUPPORT.md) - Terminal color output
+- [Testing](./TESTING.md) - Test framework and strategies
+
+### Operations
+- [Operational Runbook](./runbooks/OPERATIONAL_RUNBOOK.md) - Production operations guide
 
 ## Core Features
 
 ### Discovery & Analysis
-- [Resource Discovery](discovery.md) - Discover cloud resources across providers
-- [Drift Analysis](analysis.md) - Analyze infrastructure drift
-- [Perspective Analysis](perspective.md) - Compare state with live infrastructure
+- **Multi-Cloud Discovery** - Discover resources across AWS, Azure, GCP, DigitalOcean
+- **Drift Detection** - Compare actual state with desired state
+- **Smart Defaults** - Intelligent filtering to reduce noise by 75-85%
+- **Cost Analysis** - Calculate financial impact of drift
 
 ### Remediation
-- [Automated Remediation](remediation.md) - Generate and execute remediation commands
-- [Batch Remediation](batch-remediation.md) - Handle multiple drifts at once
-- [Rollback Operations](rollback.md) - Rollback to previous states
+- **Automated Remediation** - Generate and execute remediation plans
+- **Dry-Run Mode** - Preview changes before applying
+- **Safety Checks** - Built-in safety mechanisms
+- **Rollback Support** - Undo changes if needed
 
-### Visualization
-- [Infrastructure Diagrams](diagrams.md) - Generate infrastructure visualizations
-- [Export Options](export.md) - Export diagrams in various formats
+### State Management
+- **Terraform Integration** - Analyze and visualize .tfstate files
+- **State Inspection** - Deep dive into state structure
+- **Backend Detection** - Auto-discover Terraform backends
+
+### Enterprise Features
+- **Audit Logging** - Complete audit trail with compliance modes
+- **RBAC** - Role-based access control
+- **HashiCorp Vault** - Secure secrets management
+- **Circuit Breakers** - Prevent cascading failures
+- **Rate Limiting** - Control API usage
 
 ## Configuration
 
-### Timeout Configuration
-- [Timeout Configuration Guide](../TIMEOUT_CONFIGURATION.md) - Configure timeouts for discovery operations
-- [Timeout Fix Summary](../TIMEOUT_FIX_SUMMARY.md) - Complete fix documentation
-- [Timeout Verification](../verify_timeout_fix.md) - Verification report
+### Environment Variables
+```bash
+DRIFTMGR_CONFIG=/etc/driftmgr/config.yaml
+DRIFTMGR_LOG_LEVEL=debug
+DRIFTMGR_PROVIDER=aws
+DRIFTMGR_REGION=us-east-1
+DRIFTMGR_OUTPUT=json
+```
 
-### Environment Setup
-- [Environment Variables](environment.md) - All available environment variables
-- [Provider Configuration](providers.md) - Configure cloud providers
-- [Security Configuration](security.md) - Security settings and best practices
+### Configuration File
+Default location: `~/.driftmgr/config.yaml`
 
-## Advanced Topics
+```yaml
+providers:
+  aws:
+    regions: ["us-east-1", "us-west-2"]
+    profile: default
+  azure:
+    subscription_id: "xxx"
+  gcp:
+    project_id: "xxx"
 
-### Multi-Cloud Support
-- [AWS Integration](aws-integration.md) - AWS-specific features and configuration
-- [Azure Integration](azure-integration.md) - Azure-specific features and configuration
-- [GCP Integration](gcp-integration.md) - GCP-specific features and configuration
-- [DigitalOcean Integration](digitalocean-integration.md) - DigitalOcean-specific features
+drift:
+  smart_defaults: true
+  environment: production
+  
+audit:
+  enabled: true
+  path: /var/log/driftmgr/audit
+  compliance_mode: SOC2
+```
 
-### Development & Customization
-- [API Reference](api-reference.md) - REST API documentation
-- [Plugin Development](plugins.md) - Creating custom plugins
-- [Contributing](contributing.md) - How to contribute to DriftMgr
+## Quick Start Examples
 
-## Troubleshooting
+### Basic Discovery
+```bash
+# Auto-discover all configured providers
+driftmgr discover --auto
 
-### Common Issues
-- [Timeout Issues](troubleshooting/timeouts.md) - Resolving timeout problems
-- [Connection Issues](troubleshooting/connections.md) - Network and connectivity problems
-- [Authentication Issues](troubleshooting/authentication.md) - Provider authentication problems
+# Discover specific provider
+driftmgr discover --provider aws --region us-east-1
+```
 
-### Performance
-- [Performance Tuning](performance.md) - Optimize DriftMgr performance
-- [Large Infrastructure](large-infrastructure.md) - Handling large-scale deployments
+### Drift Detection
+```bash
+# Detect drift with smart defaults
+driftmgr drift detect --provider aws
 
-## Reference
+# Detect all drift (no filtering)
+driftmgr drift detect --no-smart-defaults
+```
 
-- [Command Reference](commands.md) - Complete command reference
-- [Configuration Reference](config-reference.md) - All configuration options
-- [Error Codes](error-codes.md) - Error code reference
-- [Changelog](../CHANGELOG.md) - Version history and changes
+### State Management
+```bash
+# Inspect Terraform state
+driftmgr state inspect terraform.tfstate
 
-## Examples
+# Scan for Terraform backends
+driftmgr scan --path ./terraform
+```
 
-- [Basic Examples](examples/basic.md) - Simple usage examples
-- [Advanced Examples](examples/advanced.md) - Complex scenarios
-- [Real-World Workflows](examples/workflows.md) - Production workflows
+### Export Results
+```bash
+# Export to JSON
+driftmgr export --format json --output resources.json
+
+# Export to HTML report
+driftmgr export --format html --output report.html
+```
 
 ## Support
 
-- [FAQ](faq.md) - Frequently asked questions
-- [Community](community.md) - Get help from the community
-- [Reporting Issues](reporting-issues.md) - How to report bugs and request features
+- **GitHub Issues**: [Report issues](https://github.com/catherinevee/driftmgr/issues)
+- **Documentation**: This directory contains all documentation
+- **Examples**: See [examples/](../examples/) directory for usage examples
 
----
+## License
 
-## Quick Reference
-
-### Essential Commands
-```bash
-# Discover resources
-driftmgr discover aws all
-
-# Analyze drift
-driftmgr analyze terraform
-
-# Generate remediation
-driftmgr remediate drift_123 --generate
-
-# Configure timeouts for large infrastructure
-export DRIFT_DISCOVERY_TIMEOUT=10m
-export DRIFT_CLIENT_TIMEOUT=5m
-```
-
-### Configuration Scripts
-```bash
-# Windows PowerShell
-.\scripts\set-timeout.ps1 -Scenario large
-
-# Linux/macOS
-./scripts/set-timeout.sh -s large
-```
-
-### Environment Variables
-- `DRIFT_CLIENT_TIMEOUT` - General client timeout (default: 30s)
-- `DRIFT_DISCOVERY_TIMEOUT` - Discovery-specific timeout (default: 2m/5m)
-- `AWS_ACCESS_KEY_ID` - AWS access key
-- `AZURE_SUBSCRIPTION_ID` - Azure subscription ID
-- `GOOGLE_APPLICATION_CREDENTIALS` - GCP credentials path
+DriftMgr is open source software. See [LICENSE](../LICENSE) for details.

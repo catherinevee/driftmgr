@@ -2,42 +2,54 @@
 
 ## Quick Start
 
-### One-Line Installation
+### Build from Source (Currently Required)
+
+Since DriftMgr is in active development, you'll need to build from source:
 
 #### Windows
 ```powershell
-# PowerShell (Run as Administrator)
-irm https://raw.githubusercontent.com/catherinevee/driftmgr/main/install.ps1 | iex
+# Clone repository
+git clone https://github.com/catherinevee/driftmgr.git
+cd driftmgr
 
-# Or download and run
-.\install.bat
+# Build binary
+go build -o driftmgr.exe ./cmd/driftmgr
+
+# Run
+./driftmgr.exe --help
 ```
 
 #### Linux/macOS
 ```bash
-curl -sSL https://raw.githubusercontent.com/catherinevee/driftmgr/main/install.sh | bash
+# Clone repository
+git clone https://github.com/catherinevee/driftmgr.git
+cd driftmgr
 
-# Or download and run
-./install.sh
+# Build binary
+go build -o driftmgr ./cmd/driftmgr
+
+# Run
+./driftmgr --help
 ```
 
 ## Installation Methods
 
-### Method 1: Docker (Recommended for Production)
+### Method 1: Docker (Build Locally)
 ```bash
+# Build Docker image
+docker build -t catherinevee/driftmgr:latest .
+
+# Run with Docker
+docker run --rm -v ~/.aws:/root/.aws catherinevee/driftmgr:latest discover --provider aws
+
 # Using Docker Compose
 docker-compose up -d
-
-# Using Docker directly
-docker run -p 8080:8080 -p 9090:9090 driftmgr:latest
 ```
 
 ### Method 2: Binary Installation
 
-#### Download Binary
-1. Go to [Releases](https://github.com/catherinevee/driftmgr/releases)
-2. Download appropriate binary for your OS
-3. Extract and add to PATH
+#### Build and Install Binary
+After building from source, you can install the binary system-wide:
 
 #### Windows Binary
 ```powershell
@@ -64,20 +76,18 @@ chmod +x ~/.local/bin/driftmgr
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 ```
 
-### Method 3: Build from Source
+### Method 3: Using Go Install
 
 #### Prerequisites
-- Go 1.21+ installed
-- Git installed
+- Go 1.23+ installed
 
-#### Build Steps
+#### Install Steps
 ```bash
-# Clone repository
-git clone https://github.com/catherinevee/driftmgr.git
-cd driftmgr
+# Install directly with Go
+go install github.com/catherinevee/driftmgr/cmd/driftmgr@latest
 
-# Build binary
-go build -o driftmgr ./cmd/driftmgr
+# The binary will be in $GOPATH/bin or $HOME/go/bin
+driftmgr --help
 
 # Install
 sudo mv driftmgr /usr/local/bin/

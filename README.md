@@ -25,7 +25,7 @@
 - **Terraform State Management** - Analyze, visualize, and manage Terraform state files
 - **Cost Impact Analysis** - Calculate financial impact of drift and remediation
 - **Automated Remediation** - Fix drift automatically with safety checks and rollback capabilities
-- **Enterprise Features** - Circuit breakers, distributed tracing, health checks, rate limiting
+- **Enterprise Features** - Audit logging, RBAC, circuit breakers, health checks, rate limiting
 
 ## Table of Contents
 
@@ -470,10 +470,10 @@ DriftMgr includes production-grade features for enterprise deployments.
 - Automatic credential rotation support
 
 **2. Audit & Compliance**
-- Complete audit trail of all operations
-- SOC2 and HIPAA compliance support
-- Role-based access control (RBAC) ready
-- Detailed activity logging
+- Complete audit trail of all operations with file-based logging
+- SOC2, HIPAA, and PCI-DSS compliance modes with retention policies
+- Role-based access control (RBAC) with predefined roles
+- Detailed activity logging with CEF/SIEM export support
 
 #### Performance Optimizations
 
