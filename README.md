@@ -23,6 +23,7 @@
 - **Intelligent Drift Detection** - Reduces noise by 75-85% while maintaining critical security visibility
 - **Multi-Cloud Support** - Unified management for AWS, Azure, GCP, and DigitalOcean
 - **Terraform State Management** - Analyze, visualize, and manage Terraform state files
+- **Cost Impact Analysis** - Calculate financial impact of drift and remediation
 - **Automated Remediation** - Fix drift automatically with safety checks and rollback capabilities
 - **Enterprise Features** - Circuit breakers, distributed tracing, health checks, rate limiting
 
@@ -33,6 +34,7 @@
 - [Real-World Examples](#real-world-examples)
 - [Managing Terraform State](#managing-terraform-state)
 - [Fixing Drift](#fixing-drift)
+- [Cost Analysis](#cost-analysis)
 - [Command Reference](#command-reference)
 - [Production Features](#production-features)
 - [Configuration](#configuration)
@@ -443,6 +445,112 @@ Executing immediate remediation...
 
 Successfully fixed 4/4 selected items
 ```
+
+## Cost Analysis
+
+### How DriftMgr Calculates Remediation Costs
+
+DriftMgr provides intelligent cost analysis to help you understand the financial impact of both drift and remediation actions.
+
+#### Cost Calculation Components
+
+**1. Real-Time Pricing Data**
+- Fetches current pricing from AWS, Azure, GCP, and DigitalOcean APIs
+- Updates pricing data every 24 hours
+- Accounts for regional price variations
+- Includes reserved instance and spot pricing discounts
+
+**2. Cost Impact Categories**
+
+| Category | Description | Example |
+|----------|-------------|---------||
+| **Immediate Costs** | One-time charges upon remediation | Instance resizing, snapshot creation |
+| **Ongoing Costs** | Recurring monthly charges | Compute hours, storage capacity |
+| **Potential Savings** | Cost reductions from remediation | Downsizing, removing unused resources |
+| **Risk Costs** | Potential costs from non-compliance | Data breach, audit failures |
+
+#### Cost Calculation Examples
+
+**Instance Resizing**
+```
+Current: t2.micro ($0.0116/hour)
+Drift:   t2.small ($0.023/hour)
+Delta:   +$8.32/month (+$99.84/year)
+```
+
+**Storage Optimization**
+```
+Current: 500GB gp2 ($50/month)
+Optimal: 500GB gp3 ($40/month)
+Savings: -$10/month (-$120/year)
+```
+
+#### Cost-Aware Remediation
+
+```bash
+# View cost impact before remediation
+driftmgr drift detect --show-costs
+
+Drift Cost Analysis:
+=====================================
+Resource         | Type    | Monthly | Annual  | Priority
+-----------------|---------|---------|---------|----------
+i-0abc123        | Resize  | +$8.32  | +$99.84 | LOW
+db-prod          | Backup  | +$45.00 | +$540   | HIGH
+s3-logs          | Storage | +$12.50 | +$150   | MEDIUM
+
+Total Impact: +$65.82/month (+$789.84/year)
+
+# Remediate with cost threshold
+driftmgr drift fix --max-cost 50 --auto
+```
+
+#### Smart Cost Optimization
+
+DriftMgr automatically identifies cost optimization opportunities:
+
+```bash
+$ driftmgr cost analyze
+
+Cost Optimization Opportunities Found:
+======================================
+
+1. UNUSED RESOURCES ($156/month)
+   - 2 Elastic IPs not attached: $7.20/month
+   - 3 EBS volumes not attached: $45/month
+   - 1 ALB with no targets: $103.80/month
+
+2. RIGHTSIZING ($234/month)
+   - 5 EC2 instances using <10% CPU: $156/month
+   - 2 RDS instances oversized: $78/month
+
+3. STORAGE OPTIMIZATION ($89/month)
+   - 10TB in S3 Standard (move to Glacier): $67/month
+   - 500GB gp2 volumes (convert to gp3): $22/month
+
+Total Potential Savings: $479/month ($5,748/year)
+```
+
+#### Cost Configuration
+
+```yaml
+# configs/driftmgr.yaml
+cost_analysis:
+  enabled: true
+  currency: USD
+  
+  thresholds:
+    auto_fix_under: 50      # Auto-remediate if cost < $50/month
+    require_approval: 500   # Require approval if > $500/month
+    alert_increase: 100     # Alert on >$100/month increase
+  
+  optimization:
+    identify_unused: true
+    suggest_rightsizing: true
+    recommend_reservations: true
+```
+
+For detailed cost calculation methodology, see [Cost Calculation Documentation](docs/COST_CALCULATION.md).
 
 ## Command Reference
 
