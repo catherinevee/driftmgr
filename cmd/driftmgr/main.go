@@ -15,19 +15,32 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/cmd/driftmgr/commands"
-	"github.com/catherinevee/driftmgr/internal/core/drift"
-	"github.com/catherinevee/driftmgr/internal/credentials"
+	"github.com/catherinevee/driftmgr/internal/core/color"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
-	"github.com/catherinevee/driftmgr/internal/utils/graceful"
+	"github.com/catherinevee/driftmgr/internal/core/drift"
 	"github.com/catherinevee/driftmgr/internal/core/models"
+	"github.com/catherinevee/driftmgr/internal/core/progress"
+	"github.com/catherinevee/driftmgr/internal/credentials"
 	"github.com/catherinevee/driftmgr/internal/integration/terraform"
 	"github.com/catherinevee/driftmgr/internal/terraform/state"
+	"github.com/catherinevee/driftmgr/internal/utils/graceful"
 )
 
 const (
 	serverPort = "8080"
 	serverURL  = "http://localhost:" + serverPort + "/health"
 )
+
+// printASCIIArt prints the DriftMgr ASCII art logo with color
+func printASCIIArt() {
+	logo := `     .___      .__  _____  __                         
+   __| _/______|__|/ ____\/  |_  _____    ___________ 
+  / __ |\_  __ \  \   __\\   __\/     \  / ___\_  __ \
+ / /_/ | |  | \/  ||  |   |  | |  Y Y  \/ /_/  >  | \/
+ \____ | |__|  |__||__|   |__| |__|_|  /\___  /|__|   
+      \/                             \//_____/        `
+	color.Println(color.Cyan, logo)
+}
 
 // parseCommandArgs properly parses command arguments, handling quoted strings and flags
 func parseCommandArgs(input string) []string {
@@ -114,7 +127,7 @@ func parseCommandLineArgs(args []string) []string {
 func main() {
 	// Set up panic recovery
 	defer graceful.RecoverPanic()
-	
+
 	// If no arguments provided, show help
 	if len(os.Args) == 1 {
 		showCLIHelp()
@@ -131,7 +144,10 @@ func main() {
 			showCLIHelp()
 			return
 		case "--version", "-v", "version":
+			printASCIIArt()
+			fmt.Println()
 			fmt.Println("DriftMgr v1.0.0 - Cloud Infrastructure Drift Detection")
+			fmt.Println("Production Ready - Enterprise Grade")
 			return
 		case "status":
 			showSystemStatus()
@@ -180,6 +196,11 @@ func main() {
 			handleAccountsCommand(os.Args[2:])
 			return
 
+		// Use - select which account/subscription/project to work with
+		case "use":
+			handleUseCommand(os.Args[2:])
+			return
+
 		// Server commands - consolidated
 		case "serve":
 			handleServeCommand(os.Args[2:])
@@ -225,49 +246,68 @@ func main() {
 		case "cloud-state", "cloud": // Removed - use 'discover'
 			fmt.Println("Error: Command removed. Use 'discover' instead.")
 			os.Exit(1)
+		default:
+			// Handle unknown commands
+			if !strings.HasPrefix(os.Args[1], "-") {
+				fmt.Fprintf(os.Stderr, "Error: Unknown command '%s'\n", os.Args[1])
+				fmt.Fprintln(os.Stderr, "Run 'driftmgr --help' for usage.")
+				os.Exit(1)
+			}
+			// Handle invalid flags
+			fmt.Fprintf(os.Stderr, "Error: Unknown flag '%s'\n", os.Args[1])
+			fmt.Fprintln(os.Stderr, "Run 'driftmgr --help' for usage.")
+			os.Exit(1)
 		}
 	}
 
-	// For CLI mode, just show help since we don't have the full client implementation here
-	// In a real implementation, this would handle all the CLI commands
-	showCLIHelp()
+	// Show ASCII art and help when no arguments provided
+	if len(os.Args) == 1 {
+		printASCIIArt()
+		fmt.Println()
+		fmt.Println("Welcome to DriftMgr - Cloud Infrastructure Drift Detection")
+		fmt.Println()
+		fmt.Println("Get started with: driftmgr status")
+		fmt.Println("For help, run:    driftmgr --help")
+		return
+	}
 }
 
 // showCLIHelp displays CLI help information
 func showCLIHelp() {
-	fmt.Println("DriftMgr - Cloud Infrastructure Drift Detection and Management")
+	printASCIIArt()
 	fmt.Println()
-	fmt.Println("Usage: driftmgr [command] [flags]")
+	color.Println(color.BoldStyle+color.BrightWhite, "DriftMgr - Cloud Infrastructure Drift Detection and Management")
 	fmt.Println()
-	fmt.Println("Core Commands:")
-	fmt.Println("  status                      Show system status and auto-discover resources")
-	fmt.Println("  discover                    Discover cloud resources (use --credentials for auth status)")
-	fmt.Println("  drift                       Manage drift detection and remediation")
-	fmt.Println("  state                       Manage and visualize Terraform state files")
-	fmt.Println("  verify                      Verify discovery accuracy and resource counts")
+	fmt.Printf("%s driftmgr %s %s\n", color.Label("Usage:"), color.Command("[command]"), color.Flag("[flags]"))
 	fmt.Println()
-	fmt.Println("Resource Management:")
-	fmt.Println("  delete                      Delete a cloud resource")
-	fmt.Println("  export                      Export discovery results")
-	fmt.Println("  import                      Import existing resources into Terraform")
-	fmt.Println("  accounts                    List all accessible cloud accounts")
+
+	fmt.Println(color.Subheader("Core Commands:"))
+	fmt.Printf("  %s                      %s\n", color.Command("status"), color.Dim("Show system status and auto-discover resources"))
+	fmt.Printf("  %s                    %s\n", color.Command("discover"), color.Dim("Discover cloud resources (use --credentials for auth status)"))
+	fmt.Printf("  %s                       %s\n", color.Command("drift"), color.Dim("Manage drift detection and remediation"))
+	fmt.Printf("  %s                       %s\n", color.Command("state"), color.Dim("Manage and visualize Terraform state files"))
+	fmt.Printf("  %s                      %s\n", color.Command("verify"), color.Dim("Verify discovery accuracy and resource counts"))
 	fmt.Println()
-	fmt.Println("Server:")
-	fmt.Println("  serve                       Start web dashboard or API server")
+
+	fmt.Println(color.Subheader("Resource Management:"))
+	fmt.Printf("  %s                      %s\n", color.Command("delete"), color.Dim("Delete a cloud resource"))
+	fmt.Printf("  %s                      %s\n", color.Command("export"), color.Dim("Export discovery results"))
+	fmt.Printf("  %s                      %s\n", color.Command("import"), color.Dim("Import existing resources into Terraform"))
+	fmt.Printf("  %s                    %s\n", color.Command("accounts"), color.Dim("List all accessible cloud accounts"))
+	fmt.Printf("  %s                         %s\n", color.Command("use"), color.Dim("Select account/subscription/project to work with"))
 	fmt.Println()
-	fmt.Println("Key Features:")
-	fmt.Println("  • Smart Defaults: Automatically filters 75-85% of harmless drift")
-	fmt.Println("  • Auto-Discovery: Detects and uses all configured cloud credentials")
-	fmt.Println("  • Multi-Account: Discovers resources across all accessible accounts")
-	fmt.Println("  • Environment-Aware: Different thresholds for prod/staging/dev")
+
+	fmt.Println(color.Subheader("Server:"))
+	fmt.Printf("  %s                       %s\n", color.Command("serve"), color.Dim("Start web dashboard or API server"))
 	fmt.Println()
-	fmt.Println("Common Flags:")
-	fmt.Println("  --auto                     Auto-discover all configured providers")
-	fmt.Println("  --all-accounts             Include all accessible accounts/subscriptions")
-	fmt.Println("  --smart-defaults           Enable smart filtering (default: enabled)")
-	fmt.Println("  --environment string       Environment context (production, staging, development)")
-	fmt.Println("  --format string            Output format (json, summary, table)")
-	fmt.Println("  --help, -h                 Show help")
+
+	fmt.Println(color.Subheader("Common Flags:"))
+	fmt.Printf("  %s                     %s\n", color.Flag("--auto"), color.Dim("Auto-discover all configured providers"))
+	fmt.Printf("  %s             %s\n", color.Flag("--all-accounts"), color.Dim("Include all accessible accounts/subscriptions"))
+	fmt.Printf("  %s           %s\n", color.Flag("--smart-defaults"), color.Dim("Enable smart filtering (default: enabled)"))
+	fmt.Printf("  %s %s       %s\n", color.Flag("--environment"), color.Value("string"), color.Dim("Environment context (production, staging, development)"))
+	fmt.Printf("  %s %s            %s\n", color.Flag("--format"), color.Value("string"), color.Dim("Output format (json, summary, table)"))
+	fmt.Printf("  %s                 %s\n", color.Flag("--help, -h"), color.Dim("Show help"))
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  driftmgr status                                        # Show status & auto-discover")
@@ -715,7 +755,10 @@ func handleDriftDetect(args []string) {
 	}
 
 	fmt.Printf("Detecting drift for %s provider using state: %s\n", provider, statePath)
-	fmt.Println("Loading state file...")
+
+	// Show spinner while loading state file
+	stateSpinner := progress.NewSpinner("Loading state file")
+	stateSpinner.Start()
 
 	// Load state file
 	stateLoader := state.NewStateLoader(statePath)
@@ -723,12 +766,15 @@ func handleDriftDetect(args []string) {
 	ctx := context.Background()
 	stateFile, err := stateLoader.LoadStateFile(ctx, statePath, nil)
 	if err != nil {
+		stateSpinner.Error("Failed to load state file")
 		fmt.Fprintf(os.Stderr, "Error loading state file: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("State loaded: %d resources found\n", len(stateFile.Resources))
-	fmt.Println("Discovering cloud resources...")
+	stateSpinner.Success(fmt.Sprintf("State loaded: %d resources found", len(stateFile.Resources)))
+
+	// Show progress bar for drift detection
+	driftBar := progress.NewBar(len(stateFile.Resources), "Detecting drift")
 
 	// Detect drift
 	detector := drift.NewTerraformDriftDetector(statePath, provider)
@@ -738,6 +784,8 @@ func handleDriftDetect(args []string) {
 		fmt.Fprintf(os.Stderr, "Error detecting drift: %v\n", err)
 		os.Exit(1)
 	}
+
+	driftBar.Complete()
 
 	// Apply smart defaults if enabled
 	if useSmartDefaults {
@@ -759,9 +807,10 @@ func handleDriftDetect(args []string) {
 
 		// Show statistics
 		if originalCount > len(filteredResources) {
-			fmt.Printf("Smart defaults: Filtered %d harmless drift items (%.1f%% noise reduction)\n",
-				originalCount-len(filteredResources),
-				float64(originalCount-len(filteredResources))/float64(originalCount)*100)
+			fmt.Printf("%s Filtered %s harmless drift items (%s noise reduction)\n",
+				color.Info("Smart defaults:"),
+				color.Count(originalCount-len(filteredResources)),
+				color.Success(fmt.Sprintf("%.1f%%", float64(originalCount-len(filteredResources))/float64(originalCount)*100)))
 
 		}
 
@@ -774,7 +823,10 @@ func handleDriftDetect(args []string) {
 		}
 
 		if len(criticalResources) > 0 {
-			fmt.Printf("\n[WARNING]  %d CRITICAL drift items detected requiring immediate attention!\n", len(criticalResources))
+			fmt.Printf("\n%s %s %s drift items detected requiring immediate attention!\n",
+				color.Warning("[WARNING]"),
+				color.Count(len(criticalResources)),
+				color.Critical("CRITICAL"))
 		}
 	}
 
@@ -1536,94 +1588,520 @@ func getCommonDependencies(resourceType string) []string {
 	return []string{resourceType}
 }
 
-// showCredentialStatusCLI displays detected cloud credentials
-func showCredentialStatusCLI() {
-	detector := credentials.NewCredentialDetector()
-	creds := detector.DetectAll()
+// handleUseCommand handles the use command for selecting accounts
+func handleUseCommand(args []string) {
+	selector := NewAccountSelector()
 
-	if len(creds) == 0 {
-		fmt.Println("No cloud credentials detected.")
-		fmt.Println("\nTo configure credentials:")
-		fmt.Println("  AWS:          aws configure")
-		fmt.Println("  Azure:        az login")
-		fmt.Println("  GCP:          gcloud auth login")
-		fmt.Println("  DigitalOcean: export DIGITALOCEAN_ACCESS_TOKEN=<token>")
+	// If no args, show interactive menu
+	if len(args) == 0 {
+		showAccountSelectionMenu(selector)
 		return
 	}
 
-	fmt.Println("─────────────────────────────────────────────")
-	for _, cred := range creds {
-		status := "✓ Configured"
-		if cred.Status != "configured" {
-			status = "✗ Not configured"
-		}
-		fmt.Printf("%-15s %s\n", cred.Provider+":", status)
-		if cred.Status == "configured" && cred.Details != nil {
-			// Show account details if available
-			if account, ok := cred.Details["account"]; ok {
-				fmt.Printf("                Account: %s\n", account)
+	// Parse arguments
+	provider := ""
+	showAll := false
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--help", "-h":
+			showUseHelp()
+			return
+		case "--all":
+			showAll = true
+		case "aws", "azure", "gcp", "digitalocean", "do":
+			provider = args[i]
+			if provider == "do" {
+				provider = "digitalocean"
 			}
-			if profile, ok := cred.Details["profile"]; ok {
-				fmt.Printf("                Profile: %s\n", profile)
-			}
-			if region, ok := cred.Details["region"]; ok {
-				fmt.Printf("                Region: %s\n", region)
+		default:
+			if provider == "" {
+				provider = args[i]
 			}
 		}
 	}
-	fmt.Println("─────────────────────────────────────────────")
+
+	if showAll {
+		selector.ShowAllAccounts()
+		return
+	}
+
+	if provider != "" {
+		if err := selector.SelectAccount(provider); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		showAccountSelectionMenu(selector)
+	}
+}
+
+func showAccountSelectionMenu(selector *AccountSelector) {
+	fmt.Println("\n=== Account Selection ===")
+	fmt.Println("\nSelect cloud provider:")
+	fmt.Println("1. AWS")
+	fmt.Println("2. Azure")
+	fmt.Println("3. GCP")
+	fmt.Println("4. DigitalOcean")
+	fmt.Println("5. Show all accounts")
+	fmt.Println("0. Exit")
+
+	fmt.Print("\nEnter choice: ")
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	switch input {
+	case "1":
+		selector.SelectAccount("aws")
+	case "2":
+		selector.SelectAccount("azure")
+	case "3":
+		selector.SelectAccount("gcp")
+	case "4":
+		selector.SelectAccount("digitalocean")
+	case "5":
+		selector.ShowAllAccounts()
+	case "0":
+		return
+	default:
+		fmt.Println("Invalid choice")
+	}
+}
+
+func showUseHelp() {
+	fmt.Println("Usage: driftmgr use [provider] [flags]")
+	fmt.Println()
+	fmt.Println("Select which cloud account/subscription/project to work with")
+	fmt.Println()
+	fmt.Println("Providers:")
+	fmt.Println("  aws           Select AWS profile")
+	fmt.Println("  azure         Select Azure subscription")
+	fmt.Println("  gcp           Select GCP project")
+	fmt.Println("  digitalocean  Select DigitalOcean context")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  --all         Show all available accounts")
+	fmt.Println("  --help, -h    Show help")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  driftmgr use                    # Interactive account selection")
+	fmt.Println("  driftmgr use aws                # Select AWS profile")
+	fmt.Println("  driftmgr use azure              # Select Azure subscription")
+	fmt.Println("  driftmgr use gcp                # Select GCP project")
+	fmt.Println("  driftmgr use --all              # Show all available accounts")
+}
+
+// showCredentialStatusCLI displays detected cloud credentials
+func showCredentialStatusCLI() {
+	// Get timeout from environment variable or use default
+	timeoutSeconds := 30
+	if envTimeout := os.Getenv("DRIFTMGR_CREDENTIAL_TIMEOUT"); envTimeout != "" {
+		if parsed, err := strconv.Atoi(envTimeout); err == nil && parsed > 0 {
+			timeoutSeconds = parsed
+		}
+	}
+
+	// Show spinner while detecting credentials with timeout
+	spinner := progress.NewSpinner("Detecting cloud credentials")
+	spinner.Start()
+
+	// Run detection with timeout
+	type detectionResult struct {
+		creds            []credentials.Credential
+		multipleProfiles map[string][]string
+		awsAccounts      map[string][]string
+	}
+
+	resultChan := make(chan detectionResult, 1)
+	go func() {
+		detector := credentials.NewCredentialDetector()
+		result := detectionResult{
+			creds:            detector.DetectAll(),
+			multipleProfiles: detector.DetectMultipleProfiles(),
+			awsAccounts:      detector.DetectAWSAccounts(),
+		}
+		resultChan <- result
+	}()
+
+	var creds []credentials.Credential
+	var multipleProfiles map[string][]string
+	var awsAccounts map[string][]string
+
+	// Wait for detection with configurable timeout
+	select {
+	case result := <-resultChan:
+		creds = result.creds
+		multipleProfiles = result.multipleProfiles
+		awsAccounts = result.awsAccounts
+	case <-time.After(time.Duration(timeoutSeconds) * time.Second):
+		// Timeout after 30 seconds (increased from 10 to allow for slower cloud CLI tools)
+		spinner.Error("Credential detection timed out")
+		fmt.Println(color.Warning("Credential detection took too long. Some providers may not be shown."))
+		fmt.Println(color.Info("Tip: You can run 'driftmgr discover --credentials' to retry with a longer timeout."))
+		return
+	}
+
+	spinner.Stop()
+
+	if len(creds) == 0 {
+		fmt.Println(color.Warning("No cloud credentials detected."))
+		fmt.Println("\nTo configure credentials:")
+		fmt.Printf("  %s          %s\n", color.AWS("AWS:"), color.Command("aws configure"))
+		fmt.Printf("  %s        %s\n", color.Azure("Azure:"), color.Command("az login"))
+		fmt.Printf("  %s          %s\n", color.GCP("GCP:"), color.Command("gcloud auth login"))
+		fmt.Printf("  %s %s\n", color.DigitalOcean("DigitalOcean:"), color.Command("export DIGITALOCEAN_ACCESS_TOKEN=<token>"))
+		return
+	}
+
+	// Check if multiple credentials are detected
+	totalConfigured := 0
+	for _, cred := range creds {
+		if cred.Status == "configured" {
+			totalConfigured++
+		}
+	}
+
+	fmt.Println(color.Divider())
+	if totalConfigured > 1 {
+		fmt.Printf("%s (%s configured)\n",
+			color.Header("Multiple cloud providers detected"),
+			color.Count(totalConfigured))
+		fmt.Println(color.Divider())
+	}
+
+	for _, cred := range creds {
+		var providerName string
+		switch cred.Provider {
+		case "AWS":
+			providerName = color.AWS(cred.Provider + ":")
+		case "Azure":
+			providerName = color.Azure(cred.Provider + ":")
+		case "GCP":
+			providerName = color.GCP(cred.Provider + ":")
+		case "DigitalOcean":
+			providerName = color.DigitalOcean(cred.Provider + ":")
+		default:
+			providerName = cred.Provider + ":"
+		}
+
+		status := color.Success(color.CheckMark() + " Configured")
+		if cred.Status != "configured" {
+			status = color.Error(color.CrossMark() + " Not configured")
+		}
+		fmt.Printf("%-25s %s\n", providerName, status)
+		if cred.Status == "configured" && cred.Details != nil {
+			// Show account/subscription/project name prominently
+			if account, ok := cred.Details["account"]; ok {
+				fmt.Printf("                %s\n", color.Value(fmt.Sprintf("%v", account)))
+			} else if subName, ok := cred.Details["subscription_name"]; ok {
+				fmt.Printf("                %s %s\n", color.Label("Subscription:"), color.Value(fmt.Sprintf("%v", subName)))
+			} else if projectID, ok := cred.Details["project_id"]; ok {
+				fmt.Printf("                %s %s\n", color.Label("Project:"), color.Value(fmt.Sprintf("%v", projectID)))
+			}
+
+			// Show additional details
+			// For AWS and DO, account_id is already shown in the main account line
+			if accountID, ok := cred.Details["account_id"]; ok {
+				// Only show if there's no account line or if it's not AWS/DO
+				if _, hasAccount := cred.Details["account"]; !hasAccount {
+					if cred.Provider != "AWS" && cred.Provider != "DigitalOcean" {
+						fmt.Printf("                Account ID: %s\n", accountID)
+					}
+				}
+			}
+			if profile, ok := cred.Details["profile"]; ok && profile != "" {
+				fmt.Printf("                Profile: %s\n", profile)
+			}
+			if region, ok := cred.Details["region"]; ok && region != "" {
+				fmt.Printf("                Region: %s\n", region)
+			}
+			// Only show email if it's not already part of the account display
+			if email, ok := cred.Details["email"]; ok {
+				// For DigitalOcean, email is already shown in account, skip it
+				if cred.Provider != "DigitalOcean" {
+					fmt.Printf("                Email: %s\n", email)
+				}
+			}
+
+			// Show all detected profiles/subscriptions/projects for this provider
+			if profiles, exists := multipleProfiles[cred.Provider]; exists && len(profiles) > 0 {
+				switch cred.Provider {
+				case "AWS":
+					// Check if there are multiple AWS accounts
+					if len(awsAccounts) > 1 {
+						fmt.Printf("                %s\n", color.Subheader("Available AWS accounts:"))
+						currentAccountID, _ := cred.Details["account_id"].(string)
+						for accountID, accountProfiles := range awsAccounts {
+							current := ""
+							if accountID == currentAccountID {
+								current = color.Success(" (current)")
+							}
+							fmt.Printf("                  %s Account %s%s\n", color.Bullet(), color.Value(accountID), current)
+							if len(accountProfiles) > 0 {
+								fmt.Printf("                    %s %s\n", color.Label("Profiles:"), color.Info(strings.Join(accountProfiles, ", ")))
+							}
+						}
+					} else if len(profiles) > 1 {
+						// Single account but multiple profiles
+						fmt.Printf("                Available profiles: %s\n", strings.Join(profiles, ", "))
+					}
+				case "Azure":
+					if len(profiles) > 0 {
+						fmt.Printf("                %s\n", color.Subheader("Available subscriptions:"))
+						for _, sub := range profiles {
+							current := ""
+							if sub == cred.Details["subscription_name"] {
+								current = color.Success(" (current)")
+							}
+							fmt.Printf("                  %s %s%s\n", color.Bullet(), color.Value(sub), current)
+						}
+					}
+				case "GCP":
+					if len(profiles) > 0 {
+						// Show all projects if there are multiple, or if the single project is different from current
+						showProjects := len(profiles) > 1
+						if !showProjects && len(profiles) == 1 {
+							// Check if the single project is different from the current one
+							currentProj, _ := cred.Details["project_id"].(string)
+							if profiles[0] != currentProj && currentProj != "" {
+								showProjects = true
+							}
+						}
+
+						if showProjects {
+							fmt.Printf("                %s\n", color.Subheader("Available projects:"))
+							for _, proj := range profiles {
+								current := ""
+								if currentProjID, ok := cred.Details["project_id"].(string); ok && proj == currentProjID {
+									current = color.Success(" (current)")
+								}
+								fmt.Printf("                  %s %s%s\n", color.Bullet(), color.Value(proj), current)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	fmt.Println(color.Divider())
 }
 
 // showSystemStatus displays overall system status with auto-discovery
 func showSystemStatus() {
-	fmt.Println("DriftMgr System Status")
-	fmt.Println("══════════════════════════════════════════════")
+	printASCIIArt()
+	fmt.Println()
+	fmt.Println(color.Header("DriftMgr System Status"))
+	fmt.Println(color.DoubleDivider())
 
 	// Show credential status
-	fmt.Println("\nCloud Credentials:")
+	fmt.Printf("\n%s\n", color.Subheader("Cloud Credentials:"))
 	showCredentialStatusCLI()
 
 	// Auto-discover resources if credentials are available
-	fmt.Println("\nAuto-discovering cloud resources...")
-	autoDiscoverResources()
+	fmt.Printf("\n%s\n", color.Info("Auto-discovering cloud resources..."))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	autoDiscoverResourcesWithContext(ctx)
 
 	// Show smart defaults status
-	fmt.Println("\nSmart Defaults:")
-	fmt.Println("  Status:           Enabled")
-	fmt.Println("  Noise Reduction:  75-85%")
-	fmt.Println("  Config File:      configs/smart-defaults.yaml")
+	fmt.Printf("\n%s\n", color.Subheader("Smart Defaults:"))
+	fmt.Printf("  %s           %s\n", color.Label("Status:"), color.Success("Enabled"))
+	fmt.Printf("  %s  %s\n", color.Label("Noise Reduction:"), color.Value("75-85%"))
+	fmt.Printf("  %s      %s\n", color.Label("Config File:"), color.Path("configs/smart-defaults.yaml"))
 }
 
-// autoDiscoverResources automatically discovers resources from all configured providers
-func autoDiscoverResources() {
+// autoDiscoverResourcesWithContext automatically discovers resources with context cancellation
+func autoDiscoverResourcesWithContext(ctx context.Context) {
 	detector := credentials.NewCredentialDetector()
 	creds := detector.DetectAll()
 
-	totalResources := 0
+	// Count configured providers
+	configuredProviders := 0
 	for _, cred := range creds {
 		if cred.Status == "configured" {
-			fmt.Printf("\n%s:\n", cred.Provider)
-			count := discoverProviderResources(strings.ToLower(cred.Provider))
-			totalResources += count
+			configuredProviders++
 		}
 	}
+
+	if configuredProviders == 0 {
+		fmt.Println("\nNo configured providers found.")
+		return
+	}
+
+	// Create a progress bar for provider discovery
+	bar := progress.NewBar(configuredProviders, "Discovering resources")
+
+	totalResources := 0
+	for _, cred := range creds {
+		// Check if context is cancelled
+		select {
+		case <-ctx.Done():
+			bar.Clear()
+			fmt.Println(color.Warning("Discovery cancelled or timed out"))
+			return
+		default:
+		}
+
+		if cred.Status == "configured" {
+			fmt.Printf("\n%s:\n", cred.Provider)
+
+			// Show spinner for individual provider with context
+			providerSpinner := progress.NewDotSpinner(fmt.Sprintf("Scanning %s resources", cred.Provider))
+			providerSpinner.Start()
+
+			// Create a channel for discovery result
+			resultChan := make(chan int, 1)
+			go func(provider string) {
+				count := discoverProviderResourcesWithTimeout(provider, 5*time.Second)
+				resultChan <- count
+			}(strings.ToLower(cred.Provider))
+
+			// Wait for result or context cancellation
+			select {
+			case count := <-resultChan:
+				totalResources += count
+				providerSpinner.Success(fmt.Sprintf("Found resources in %s", cred.Provider))
+			case <-ctx.Done():
+				providerSpinner.Error(fmt.Sprintf("Discovery timeout for %s", cred.Provider))
+			case <-time.After(5 * time.Second):
+				providerSpinner.Error(fmt.Sprintf("Discovery timeout for %s", cred.Provider))
+			}
+
+			bar.Increment()
+		}
+	}
+
+	bar.Complete()
 
 	if totalResources > 0 {
 		fmt.Printf("\nTotal Resources: %d across all providers\n", totalResources)
 	} else {
-		fmt.Println("\nNo resources discovered. Please check your credentials.")
+		fmt.Println("\nQuick scan complete. Run 'driftmgr discover --auto' for detailed discovery.")
 	}
+}
+
+// autoDiscoverResources wrapper for backward compatibility
+func autoDiscoverResources() {
+	ctx := context.Background()
+	autoDiscoverResourcesWithContext(ctx)
+}
+
+// discoverProviderResourcesWithTimeout performs lightweight discovery with timeout
+func discoverProviderResourcesWithTimeout(provider string, timeout time.Duration) int {
+	// Perform actual lightweight resource discovery
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	switch provider {
+	case "aws":
+		// Get actual AWS resource count using a quick query
+		resourceCount := 0
+
+		// Count EC2 instances
+		cmd := exec.CommandContext(ctx, "aws", "ec2", "describe-instances",
+			"--query", "Reservations[].Instances[].[InstanceId]",
+			"--output", "text", "--max-items", "1000")
+		if output, err := cmd.Output(); err == nil {
+			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
+				resourceCount += len(lines)
+			}
+		}
+
+		// Count S3 buckets
+		cmd = exec.CommandContext(ctx, "aws", "s3api", "list-buckets",
+			"--query", "Buckets[].Name", "--output", "text")
+		if output, err := cmd.Output(); err == nil {
+			if items := strings.Fields(strings.TrimSpace(string(output))); len(items) > 0 && items[0] != "" {
+				resourceCount += len(items)
+			}
+		}
+
+		// Count VPCs
+		cmd = exec.CommandContext(ctx, "aws", "ec2", "describe-vpcs",
+			"--query", "Vpcs[].VpcId", "--output", "text")
+		if output, err := cmd.Output(); err == nil {
+			if items := strings.Fields(strings.TrimSpace(string(output))); len(items) > 0 && items[0] != "" {
+				resourceCount += len(items)
+			}
+		}
+
+		return resourceCount
+
+	case "azure":
+		// Get actual Azure resource count
+		cmd := exec.CommandContext(ctx, "az", "resource", "list",
+			"--query", "length(@)", "--output", "tsv")
+		if output, err := cmd.Output(); err == nil {
+			if count, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil {
+				return count
+			}
+		}
+		// Fallback: try to count resource groups
+		cmd = exec.CommandContext(ctx, "az", "group", "list",
+			"--query", "length(@)", "--output", "tsv")
+		if output, err := cmd.Output(); err == nil {
+			if count, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil {
+				return count * 3 // Estimate resources per group
+			}
+		}
+		return 0
+
+	case "gcp":
+		// Get actual GCP resource count
+		resourceCount := 0
+
+		// Count compute instances
+		cmd := exec.CommandContext(ctx, "gcloud", "compute", "instances", "list",
+			"--format=value(name)", "--limit=1000")
+		if output, err := cmd.Output(); err == nil {
+			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
+				resourceCount += len(lines)
+			}
+		}
+
+		// Count storage buckets
+		cmd = exec.CommandContext(ctx, "gcloud", "storage", "buckets", "list",
+			"--format=value(name)", "--limit=1000")
+		if output, err := cmd.Output(); err == nil {
+			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
+				resourceCount += len(lines)
+			}
+		}
+
+		return resourceCount
+
+	case "digitalocean":
+		// For DigitalOcean, use doctl if available
+		resourceCount := 0
+
+		// Count droplets
+		cmd := exec.CommandContext(ctx, "doctl", "compute", "droplet", "list",
+			"--format", "ID", "--no-header")
+		if output, err := cmd.Output(); err == nil {
+			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
+				resourceCount += len(lines)
+			}
+		}
+
+		// Count databases
+		cmd = exec.CommandContext(ctx, "doctl", "databases", "list",
+			"--format", "ID", "--no-header")
+		if output, err := cmd.Output(); err == nil {
+			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
+				resourceCount += len(lines)
+			}
+		}
+
+		return resourceCount
+	}
+
+	return 0
 }
 
 // discoverProviderResources discovers resources for a specific provider
 func discoverProviderResources(provider string) int {
-	// Use existing cloud discovery mechanism
-	args := []string{"--provider", provider, "--format", "summary"}
-	handleCloudDiscover(args)
-
-	// For now, return a placeholder count
-	// In production, this would parse the actual discovery results
-	return 0
+	return discoverProviderResourcesWithTimeout(provider, 5*time.Second)
 }
 
 // handleCloudStateDiscovery discovers tfstate files in cloud storage

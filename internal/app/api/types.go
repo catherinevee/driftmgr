@@ -1,4 +1,4 @@
-package rest
+package handlers
 
 // ProviderConfig represents provider configuration
 type ProviderConfig struct {

@@ -40,14 +40,14 @@ func NewLimiter(config Config) (*Limiter, error) {
 	if config.Requests <= 0 || config.Window <= 0 {
 		return nil, ErrInvalidConfig
 	}
-	
+
 	if config.Burst <= 0 {
 		config.Burst = config.Requests
 	}
-	
+
 	// Calculate rate per second
 	ratePerSecond := float64(config.Requests) / config.Window.Seconds()
-	
+
 	return &Limiter{
 		limiter:  rate.NewLimiter(rate.Limit(ratePerSecond), config.Burst),
 		name:     config.Name,
@@ -61,7 +61,7 @@ func NewLimiter(config Config) (*Limiter, error) {
 // Allow checks if a request is allowed
 func (l *Limiter) Allow() bool {
 	allowed := l.limiter.Allow()
-	
+
 	if !allowed {
 		l.log.Debug("Rate limit exceeded",
 			logger.String("name", l.name),
@@ -69,14 +69,14 @@ func (l *Limiter) Allow() bool {
 			logger.Duration("window", l.window),
 		)
 	}
-	
+
 	return allowed
 }
 
 // AllowN checks if n requests are allowed
 func (l *Limiter) AllowN(n int) bool {
 	allowed := l.limiter.AllowN(time.Now(), n)
-	
+
 	if !allowed {
 		l.log.Debug("Rate limit exceeded for N requests",
 			logger.String("name", l.name),
@@ -85,7 +85,7 @@ func (l *Limiter) AllowN(n int) bool {
 			logger.Duration("window", l.window),
 		)
 	}
-	
+
 	return allowed
 }
 
@@ -96,7 +96,7 @@ func (l *Limiter) Wait(ctx context.Context) error {
 		_, span := telemetry.Get().StartSpan(ctx, "rate_limiter.wait")
 		defer span.End()
 	}
-	
+
 	err := l.limiter.Wait(ctx)
 	if err != nil {
 		l.log.Debug("Rate limiter wait failed",
@@ -104,7 +104,7 @@ func (l *Limiter) Wait(ctx context.Context) error {
 			logger.Error(err),
 		)
 	}
-	
+
 	return err
 }
 
@@ -115,7 +115,7 @@ func (l *Limiter) WaitN(ctx context.Context, n int) error {
 		_, span := telemetry.Get().StartSpan(ctx, "rate_limiter.wait_n")
 		defer span.End()
 	}
-	
+
 	err := l.limiter.WaitN(ctx, n)
 	if err != nil {
 		l.log.Debug("Rate limiter wait N failed",
@@ -124,7 +124,7 @@ func (l *Limiter) WaitN(ctx context.Context, n int) error {
 			logger.Error(err),
 		)
 	}
-	
+
 	return err
 }
 
@@ -157,22 +157,22 @@ func NewManager() *Manager {
 func (m *Manager) AddLimiter(name string, config Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	config.Name = name
 	limiter, err := NewLimiter(config)
 	if err != nil {
 		return err
 	}
-	
+
 	m.limiters[name] = limiter
-	
+
 	m.log.Info("Added rate limiter",
 		logger.String("name", name),
 		logger.Int("requests", config.Requests),
 		logger.Duration("window", config.Window),
 		logger.Int("burst", config.Burst),
 	)
-	
+
 	return nil
 }
 
@@ -180,7 +180,7 @@ func (m *Manager) AddLimiter(name string, config Config) error {
 func (m *Manager) GetLimiter(name string) (*Limiter, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	limiter, exists := m.limiters[name]
 	return limiter, exists
 }
@@ -189,9 +189,9 @@ func (m *Manager) GetLimiter(name string) (*Limiter, bool) {
 func (m *Manager) RemoveLimiter(name string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	delete(m.limiters, name)
-	
+
 	m.log.Info("Removed rate limiter",
 		logger.String("name", name),
 	)
@@ -203,7 +203,7 @@ func (m *Manager) Allow(name string) bool {
 	if !exists {
 		return true // No limiter means no limit
 	}
-	
+
 	return limiter.Allow()
 }
 
@@ -213,7 +213,7 @@ func (m *Manager) Wait(ctx context.Context, name string) error {
 	if !exists {
 		return nil // No limiter means no limit
 	}
-	
+
 	return limiter.Wait(ctx)
 }
 
@@ -228,11 +228,11 @@ func (m *Manager) Middleware(limiterName string) func(http.Handler) http.Handler
 					logger.String("path", r.URL.Path),
 					logger.String("remote", r.RemoteAddr),
 				)
-				
+
 				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -255,10 +255,10 @@ func NewIPBasedLimiter(config Config) *IPBasedLimiter {
 		cleanup:  time.NewTicker(5 * time.Minute),
 		log:      logger.New("ip_rate_limiter"),
 	}
-	
+
 	// Start cleanup routine
 	go ipl.cleanupRoutine()
-	
+
 	return ipl
 }
 
@@ -267,7 +267,7 @@ func (ipl *IPBasedLimiter) Allow(ip string) bool {
 	ipl.mu.RLock()
 	limiter, exists := ipl.limiters[ip]
 	ipl.mu.RUnlock()
-	
+
 	if !exists {
 		// Create new limiter for this IP
 		ipl.mu.Lock()
@@ -280,7 +280,7 @@ func (ipl *IPBasedLimiter) Allow(ip string) bool {
 		}
 		ipl.mu.Unlock()
 	}
-	
+
 	return limiter.Allow()
 }
 
@@ -289,7 +289,7 @@ func (ipl *IPBasedLimiter) Wait(ctx context.Context, ip string) error {
 	ipl.mu.RLock()
 	limiter, exists := ipl.limiters[ip]
 	ipl.mu.RUnlock()
-	
+
 	if !exists {
 		// Create new limiter for this IP
 		ipl.mu.Lock()
@@ -302,7 +302,7 @@ func (ipl *IPBasedLimiter) Wait(ctx context.Context, ip string) error {
 		}
 		ipl.mu.Unlock()
 	}
-	
+
 	return limiter.Wait(ctx)
 }
 
@@ -310,7 +310,7 @@ func (ipl *IPBasedLimiter) Wait(ctx context.Context, ip string) error {
 func (ipl *IPBasedLimiter) cleanupRoutine() {
 	for range ipl.cleanup.C {
 		ipl.mu.Lock()
-		
+
 		// Remove limiters with no recent activity
 		for ip, limiter := range ipl.limiters {
 			if limiter.Tokens() >= float64(limiter.burst) {
@@ -320,7 +320,7 @@ func (ipl *IPBasedLimiter) cleanupRoutine() {
 				)
 			}
 		}
-		
+
 		ipl.mu.Unlock()
 	}
 }
@@ -335,18 +335,18 @@ func (ipl *IPBasedLimiter) Middleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := getClientIP(r)
-			
+
 			if !ipl.Allow(ip) {
 				ipl.log.Warn("IP rate limit exceeded",
 					logger.String("ip", ip),
 					logger.String("method", r.Method),
 					logger.String("path", r.URL.Path),
 				)
-				
+
 				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -366,12 +366,12 @@ func getClientIP(r *http.Request) string {
 		}
 		return xff
 	}
-	
+
 	// Check X-Real-IP header
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		return xri
 	}
-	
+
 	// Fall back to RemoteAddr
 	return r.RemoteAddr
 }

@@ -264,12 +264,12 @@ func (p *GCPProvider) convertComputeInstance(instance *computepb.Instance, zone,
 	}
 
 	return models.Resource{
-		ID:       id,
-		Name:     name,
-		Type:     "google_compute_instance",
-		Provider: "gcp",
-		Region:   region,
-		Tags:     tags,
+		ID:        id,
+		Name:      name,
+		Type:      "google_compute_instance",
+		Provider:  "gcp",
+		Region:    region,
+		Tags:      tags,
 		CreatedAt: time.Now(), // GCP doesn't provide creation time in list API
 		Metadata: map[string]string{
 			"terraform_type": "google_compute_instance",
@@ -309,12 +309,12 @@ func (p *GCPProvider) convertNetwork(network *computepb.Network) models.Resource
 	}
 
 	return models.Resource{
-		ID:       id,
-		Name:     name,
-		Type:     "google_compute_network",
-		Provider: "gcp",
-		Region:   "global",
-		Tags:     make(map[string]string),
+		ID:        id,
+		Name:      name,
+		Type:      "google_compute_network",
+		Provider:  "gcp",
+		Region:    "global",
+		Tags:      make(map[string]string),
 		CreatedAt: time.Now(),
 		Metadata: map[string]string{
 			"terraform_type":          "google_compute_network",

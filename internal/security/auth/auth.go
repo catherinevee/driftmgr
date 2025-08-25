@@ -23,7 +23,7 @@ type User struct {
 	LastLogin           time.Time    `json:"last_login"`
 	Email               string       `json:"email,omitempty"`
 	FailedLoginAttempts int          `json:"-"`
-	FailedLogins        int          `json:"failed_logins"`  // Alias for compatibility
+	FailedLogins        int          `json:"failed_logins"` // Alias for compatibility
 	LockedUntil         *time.Time   `json:"-"`
 	MFAEnabled          bool         `json:"mfa_enabled"`
 	MFASecret           string       `json:"-"`
@@ -65,7 +65,7 @@ type AuthManager struct {
 	passwordValidator *PasswordValidator
 	rolePermissions   map[UserRole][]Permission
 	mu                sync.RWMutex
-	users             map[string]*User  // In-memory user cache
+	users             map[string]*User // In-memory user cache
 }
 
 // Claims represents JWT claims
@@ -340,7 +340,7 @@ func ExtractTokenFromRequest(r *http.Request) string {
 func (a *AuthManager) ListUsers() ([]User, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-	
+
 	users := make([]User, 0, len(a.users))
 	for _, user := range a.users {
 		// Don't include password hashes in the response
@@ -355,7 +355,7 @@ func (a *AuthManager) ListUsers() ([]User, error) {
 		}
 		users = append(users, sanitizedUser)
 	}
-	
+
 	return users, nil
 }
 
@@ -367,7 +367,7 @@ func (a *AuthManager) GetAuditLogs(limitStr string) ([]map[string]interface{}, e
 			limit = parsed
 		}
 	}
-	
+
 	// In production, this would query a database
 	// For now, return a placeholder response
 	logs := []map[string]interface{}{
@@ -378,11 +378,11 @@ func (a *AuthManager) GetAuditLogs(limitStr string) ([]map[string]interface{}, e
 			"details":   "Audit logging system initialized",
 		},
 	}
-	
+
 	if limit < len(logs) {
 		logs = logs[:limit]
 	}
-	
+
 	return logs, nil
 }
 
@@ -405,20 +405,20 @@ func (am *AuthManager) ValidateToken(token string) (*User, error) {
 func (am *AuthManager) ValidateAPIKey(apiKey string) (*User, error) {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
-	
+
 	// Check cache first
 	for _, user := range am.users {
 		if user.APIKey == apiKey {
 			return user, nil
 		}
 	}
-	
+
 	// Check database
 	users, err := am.userDB.GetAllUsers()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users: %w", err)
 	}
-	
+
 	for _, user := range users {
 		if user.APIKey == apiKey {
 			// Cache the user
@@ -426,7 +426,7 @@ func (am *AuthManager) ValidateAPIKey(apiKey string) (*User, error) {
 			return user, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("invalid API key")
 }
 
@@ -438,24 +438,24 @@ func (am *AuthManager) GenerateAPIKey(userID string) (string, error) {
 		return "", fmt.Errorf("failed to generate API key: %w", err)
 	}
 	apiKey := fmt.Sprintf("dk_%s", hex.EncodeToString(b))
-	
+
 	// Get user from database
 	user, err := am.userDB.GetUserByID(userID)
 	if err != nil {
 		return "", fmt.Errorf("user not found: %w", err)
 	}
-	
+
 	// Update user with new API key
 	user.APIKey = apiKey
 	if err := am.userDB.UpdateUser(user); err != nil {
 		return "", fmt.Errorf("failed to update user: %w", err)
 	}
-	
+
 	// Update cache
 	am.mu.Lock()
 	am.users[userID] = user
 	am.mu.Unlock()
-	
+
 	return apiKey, nil
 }
 
@@ -466,19 +466,19 @@ func (am *AuthManager) RevokeAPIKey(userID string) error {
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
-	
+
 	// Clear API key
 	user.APIKey = ""
 	if err := am.userDB.UpdateUser(user); err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
-	
+
 	// Update cache
 	am.mu.Lock()
 	if cachedUser, exists := am.users[userID]; exists {
 		cachedUser.APIKey = ""
 	}
 	am.mu.Unlock()
-	
+
 	return nil
 }

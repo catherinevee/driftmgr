@@ -6,17 +6,17 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/utils/errors"
 	"github.com/catherinevee/driftmgr/internal/observability/logging"
+	"github.com/catherinevee/driftmgr/internal/utils/errors"
 )
 
 // RetryConfig configures retry behavior
 type RetryConfig struct {
-	MaxAttempts     int           `json:"max_attempts" yaml:"max_attempts"`
-	InitialDelay    time.Duration `json:"initial_delay" yaml:"initial_delay"`
-	MaxDelay        time.Duration `json:"max_delay" yaml:"max_delay"`
-	Multiplier      float64       `json:"multiplier" yaml:"multiplier"`
-	Jitter          bool          `json:"jitter" yaml:"jitter"`
+	MaxAttempts     int                `json:"max_attempts" yaml:"max_attempts"`
+	InitialDelay    time.Duration      `json:"initial_delay" yaml:"initial_delay"`
+	MaxDelay        time.Duration      `json:"max_delay" yaml:"max_delay"`
+	Multiplier      float64            `json:"multiplier" yaml:"multiplier"`
+	Jitter          bool               `json:"jitter" yaml:"jitter"`
 	RetryableErrors []errors.ErrorType `json:"retryable_errors" yaml:"retryable_errors"`
 }
 
@@ -110,7 +110,7 @@ func Retry(ctx context.Context, cfg *RetryConfig, fn func() error) error {
 		}
 	}
 
-	return errors.Wrapf(lastErr, errors.ErrorTypeInternal, 
+	return errors.Wrapf(lastErr, errors.ErrorTypeInternal,
 		"operation failed after %d attempts", cfg.MaxAttempts)
 }
 

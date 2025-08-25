@@ -567,9 +567,9 @@ func (d *AttributeDriftDetector) generateRiskReasoning(resource models.Resource,
 
 // DeepDiff performs deep comparison of complex nested structures
 type DeepDiff struct {
-	IgnorePatterns   []string              // Regex patterns for fields to ignore
+	IgnorePatterns   []string // Regex patterns for fields to ignore
 	SemanticRules    map[string]SemanticCompareFunc
-	OrderSensitive   map[string]bool       // Which arrays/lists should be order-sensitive
+	OrderSensitive   map[string]bool // Which arrays/lists should be order-sensitive
 	NormalizationMap map[string]NormalizeFunc
 }
 
@@ -889,7 +889,7 @@ func SecurityGroupRuleComparator() SemanticCompareFunc {
 		// Convert to comparable format
 		oldRules := normalizeSecurityGroupRules(old)
 		newRules := normalizeSecurityGroupRules(new)
-		
+
 		// Compare normalized rules
 		if !reflect.DeepEqual(oldRules, newRules) {
 			return false, "Security group rules differ in effective permissions"

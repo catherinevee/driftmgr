@@ -24,9 +24,9 @@ help:
 # Build all binaries
 build:
 	@echo "Building DriftMgr..."
-	go build -o bin/driftmgr ./cmd/driftmgr
-	go build -o bin/driftmgr-server ./cmd/server
-	go build -o bin/validate-discovery ./cmd/validate
+	go build -o build/driftmgr ./cmd/driftmgr
+	go build -o build/driftmgr-server ./cmd/server
+	go build -o build/validate-discovery ./cmd/validate
 
 # Run basic tests
 test:
@@ -99,8 +99,10 @@ endif
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
+	@if exist build rmdir /s /q build
 	@if exist bin rmdir /s /q bin
 	@if exist dist rmdir /s /q dist
+	@if exist temp rmdir /s /q temp
 	@go clean -cache
 
 # Setup development environment

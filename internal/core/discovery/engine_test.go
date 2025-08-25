@@ -150,13 +150,13 @@ func TestEngine_Discovery(t *testing.T) {
 
 func TestEngine_ParallelDiscovery(t *testing.T) {
 	mockProvider := new(MockCloudProvider)
-	
+
 	regions := []string{"us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"}
-	
+
 	mockProvider.On("Name").Return("aws")
 	mockProvider.On("GetRegions").Return(regions)
 	mockProvider.On("ValidateCredentials").Return(nil)
-	
+
 	// Setup mock for each region
 	for i, region := range regions {
 		resources := []models.Resource{
@@ -177,16 +177,16 @@ func TestEngine_ParallelDiscovery(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 8, len(resources)) // 2 resources per region * 4 regions
-	
+
 	// Verify parallel execution (should be faster than sequential)
 	assert.Less(t, duration, 2*time.Second)
-	
+
 	mockProvider.AssertExpectations(t)
 }
 
 func TestEngine_Timeout(t *testing.T) {
 	mockProvider := new(MockCloudProvider)
-	
+
 	mockProvider.On("Name").Return("aws")
 	mockProvider.On("GetRegions").Return([]string{"us-east-1"})
 	mockProvider.On("ValidateCredentials").Return(nil)
@@ -257,9 +257,9 @@ func TestEngine_Filtering(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filtered := filterResourcesEngine(resources, tt.filter)
-			
+
 			assert.Equal(t, tt.expectedCount, len(filtered))
-			
+
 			ids := make([]string, len(filtered))
 			for i, r := range filtered {
 				ids[i] = r.ID
@@ -279,9 +279,9 @@ func TestEngine_Deduplication(t *testing.T) {
 	}
 
 	deduplicated := deduplicateResources(resources)
-	
+
 	assert.Equal(t, 3, len(deduplicated))
-	
+
 	// Verify unique IDs
 	ids := make(map[string]bool)
 	for _, r := range deduplicated {
@@ -340,7 +340,7 @@ func TestEngine_ErrorHandling(t *testing.T) {
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectedError)
-			
+
 			mockProvider.AssertExpectations(t)
 		})
 	}
@@ -427,13 +427,13 @@ func filterResourcesEngine(resources []models.Resource, filter func(models.Resou
 func deduplicateResources(resources []models.Resource) []models.Resource {
 	seen := make(map[string]bool)
 	var deduplicated []models.Resource
-	
+
 	for _, r := range resources {
 		if !seen[r.ID] {
 			seen[r.ID] = true
 			deduplicated = append(deduplicated, r)
 		}
 	}
-	
+
 	return deduplicated
 }

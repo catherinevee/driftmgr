@@ -172,7 +172,7 @@ func (pd *ParallelDiscoverer) discoverProviderRegion(ctx context.Context, provid
 // performDiscovery performs the actual resource discovery
 func (pd *ParallelDiscoverer) performDiscovery(ctx context.Context, provider, region string) ([]models.Resource, error) {
 	// Create a discovery config for the region
-	config := Config{
+	options := DiscoveryOptions{
 		Regions: []string{region},
 	}
 
@@ -182,24 +182,35 @@ func (pd *ParallelDiscoverer) performDiscovery(ctx context.Context, provider, re
 		if err != nil {
 			return nil, fmt.Errorf("failed to create AWS provider: %w", err)
 		}
-		return awsProvider.Discover(config)
+		result, err := awsProvider.Discover(ctx, options)
+		if err != nil {
+			return nil, err
+		}
+		return result.Resources, nil
 	case "azure":
 		azureProvider, err := NewAzureProvider()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure provider: %w", err)
 		}
-		return azureProvider.Discover(config)
+		result, err := azureProvider.Discover(ctx, options)
+		if err != nil {
+			return nil, err
+		}
+		return result.Resources, nil
 	case "gcp":
 		gcpProvider, err := NewGCPProvider()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create GCP provider: %w", err)
 		}
-		return gcpProvider.Discover(config)
+		result, err := gcpProvider.Discover(ctx, options)
+		if err != nil {
+			return nil, err
+		}
+		return result.Resources, nil
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
 }
-
 
 // GetMetrics returns discovery metrics
 func (pd *ParallelDiscoverer) GetMetrics() DiscoveryMetrics {

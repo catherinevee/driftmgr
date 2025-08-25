@@ -26,16 +26,16 @@ func TestLoggerLevels(t *testing.T) {
 func TestLoggerWithContext(t *testing.T) {
 	logger := New("test")
 	ctx := context.WithValue(context.Background(), "trace_id", "12345")
-	
+
 	contextLogger := logger.WithContext(ctx)
 	assert.NotNil(t, contextLogger)
-	
+
 	contextLogger.Info("message with context", String("operation", "test"))
 }
 
 func TestLoggerFields(t *testing.T) {
 	logger := New("test")
-	
+
 	// Test various field types
 	logger.Info("test fields",
 		String("string", "value"),
@@ -50,7 +50,7 @@ func TestLoggerFields(t *testing.T) {
 
 func TestLoggerConcurrency(t *testing.T) {
 	logger := New("test")
-	
+
 	// Test concurrent logging
 	done := make(chan bool, 10)
 	for i := 0; i < 10; i++ {
@@ -59,7 +59,7 @@ func TestLoggerConcurrency(t *testing.T) {
 			done <- true
 		}(i)
 	}
-	
+
 	// Wait for all goroutines
 	for i := 0; i < 10; i++ {
 		<-done
@@ -70,7 +70,7 @@ func TestGlobalLogger(t *testing.T) {
 	// Test global logger functions
 	Printf("formatted %s %d", "message", 42)
 	Println("line message")
-	
+
 	// These should not panic
 	assert.NotPanics(t, func() {
 		Printf("safe message %d", 123)
@@ -80,7 +80,7 @@ func TestGlobalLogger(t *testing.T) {
 
 func BenchmarkLogger(b *testing.B) {
 	logger := New("bench")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info("benchmark message",
@@ -92,7 +92,7 @@ func BenchmarkLogger(b *testing.B) {
 
 func BenchmarkLoggerWithFields(b *testing.B) {
 	logger := New("bench")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		logger.Info("benchmark message",

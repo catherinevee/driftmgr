@@ -6,12 +6,24 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/catherinevee/driftmgr/internal/core/models"
 )
+
+// Config represents discovery configuration
+type Config struct {
+	Provider       string   // Single provider for targeted discovery
+	Providers      []string // Multiple providers for cross-cloud discovery
+	Regions        []string
+	ResourceType   string
+	MaxConcurrency int
+	Timeout        time.Duration
+	Tags           map[string]string
+	Filters        map[string]string
+}
 
 // AWSProvider implements the Provider interface for AWS
 type AWSProvider struct {
@@ -22,7 +34,7 @@ type AWSProvider struct {
 // NewAWSProvider creates a new AWS provider
 func NewAWSProvider() (*AWSProvider, error) {
 	ctx := context.Background()
-	cfg, err := config.LoadDefaultConfig(ctx)
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -36,6 +48,20 @@ func NewAWSProvider() (*AWSProvider, error) {
 // Name returns the provider name
 func (p *AWSProvider) Name() string {
 	return "Amazon Web Services"
+}
+
+// Regions returns the list of available AWS regions
+func (p *AWSProvider) Regions() []string {
+	return p.SupportedRegions()
+}
+
+// Services returns the list of available AWS services
+func (p *AWSProvider) Services() []string {
+	return []string{
+		"EC2", "S3", "RDS", "Lambda", "DynamoDB",
+		"ECS", "EKS", "CloudFormation", "IAM",
+		"Route53", "CloudWatch", "SNS", "SQS",
+	}
 }
 
 // SupportedRegions returns the list of supported AWS regions
@@ -67,10 +93,30 @@ func (p *AWSProvider) SupportedResourceTypes() []string {
 }
 
 // Discover discovers AWS resources
-func (p *AWSProvider) Discover(config Config) ([]models.Resource, error) {
+func (p *AWSProvider) Discover(ctx context.Context, options DiscoveryOptions) (*Result, error) {
 	fmt.Println("  [AWS] Discovering resources using AWS SDK...")
 
 	var allResources []models.Resource
+
+	// Convert options to config for backward compatibility
+	config := Config{
+		Regions: options.Regions,
+	}
+
+	// Handle resource type from ResourceTypes array
+	if len(options.ResourceTypes) > 0 {
+		config.ResourceType = options.ResourceTypes[0]
+	}
+
+	// Convert Filters interface{} map to string map
+	if options.Filters != nil {
+		config.Filters = make(map[string]string)
+		for k, v := range options.Filters {
+			if str, ok := v.(string); ok {
+				config.Filters[k] = str
+			}
+		}
+	}
 
 	// If specific regions are requested, use them; otherwise use current region
 	regions := config.Regions
@@ -127,7 +173,40 @@ func (p *AWSProvider) Discover(config Config) ([]models.Resource, error) {
 	}
 
 	fmt.Printf("  [AWS] Found %d resources\n", len(allResources))
-	return allResources, nil
+
+	// Return as Result
+	return &Result{
+		Resources: allResources,
+		Metadata: map[string]interface{}{
+			"provider":       "aws",
+			"resource_count": len(allResources),
+			"regions":        regions,
+		},
+	}, nil
+}
+
+// GetAccountInfo returns AWS account information
+func (p *AWSProvider) GetAccountInfo(ctx context.Context) (*AccountInfo, error) {
+	// For now, return basic info
+	return &AccountInfo{
+		ID:       "current",
+		Name:     "AWS Account",
+		Type:     "aws",
+		Provider: "aws",
+		Regions:  p.SupportedRegions(),
+	}, nil
+}
+
+// DiscoverRegion discovers resources in a specific region
+func (p *AWSProvider) DiscoverRegion(ctx context.Context, region string) ([]models.Resource, error) {
+	options := DiscoveryOptions{
+		Regions: []string{region},
+	}
+	result, err := p.Discover(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return result.Resources, nil
 }
 
 // discoverEC2Instances discovers EC2 instances in a region
@@ -314,4 +393,10 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// ValidateCredentials validates AWS credentials
+func (p *AWSProvider) ValidateCredentials(ctx context.Context) error {
+	// For now, just return nil
+	return nil
 }

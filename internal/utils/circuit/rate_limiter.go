@@ -20,13 +20,13 @@ type RateLimiter struct {
 
 // RateLimiterConfig configures rate limiting
 type RateLimiterConfig struct {
-	DefaultRate      int           `yaml:"default_rate"`       // Requests per second
-	DefaultBurst     int           `yaml:"default_burst"`      // Burst size
-	PerKeyLimits     map[string]KeyLimit `yaml:"per_key_limits"`
-	GlobalLimit      int           `yaml:"global_limit"`       // Global rate limit
-	WindowSize       time.Duration `yaml:"window_size"`        // Time window for limits
-	CleanupInterval  time.Duration `yaml:"cleanup_interval"`   // Cleanup old limiters
-	EnableMetrics    bool          `yaml:"enable_metrics"`
+	DefaultRate     int                 `yaml:"default_rate"`  // Requests per second
+	DefaultBurst    int                 `yaml:"default_burst"` // Burst size
+	PerKeyLimits    map[string]KeyLimit `yaml:"per_key_limits"`
+	GlobalLimit     int                 `yaml:"global_limit"`     // Global rate limit
+	WindowSize      time.Duration       `yaml:"window_size"`      // Time window for limits
+	CleanupInterval time.Duration       `yaml:"cleanup_interval"` // Cleanup old limiters
+	EnableMetrics   bool                `yaml:"enable_metrics"`
 }
 
 // KeyLimit represents per-key rate limits
@@ -123,7 +123,7 @@ func (rl *RateLimiter) Wait(ctx context.Context, key string) error {
 	rl.mu.Unlock()
 
 	err := limiter.Wait(ctx)
-	
+
 	if rl.config.EnableMetrics {
 		rl.updateMetrics(err == nil)
 	}
@@ -247,7 +247,7 @@ func (tbl *TokenBucketLimiter) AllowN(n int) bool {
 func (tbl *TokenBucketLimiter) refill() {
 	now := time.Now()
 	elapsed := now.Sub(tbl.lastRefill)
-	
+
 	// Calculate tokens to add
 	tokensToAdd := int(elapsed / tbl.refillRate)
 	if tokensToAdd > 0 {
@@ -258,10 +258,10 @@ func (tbl *TokenBucketLimiter) refill() {
 
 // SlidingWindowLimiter implements sliding window algorithm
 type SlidingWindowLimiter struct {
-	windowSize time.Duration
+	windowSize  time.Duration
 	maxRequests int
-	requests   []time.Time
-	mu         sync.Mutex
+	requests    []time.Time
+	mu          sync.Mutex
 }
 
 // NewSlidingWindowLimiter creates a new sliding window limiter
@@ -333,7 +333,7 @@ func (arl *AdaptiveRateLimiter) Allow(key string) bool {
 func (arl *AdaptiveRateLimiter) adjustLimits() {
 	load := arl.loadMonitor.GetLoad()
 	errorRate := arl.loadMonitor.GetErrorRate()
-	
+
 	arl.mu.Lock()
 	defer arl.mu.Unlock()
 
@@ -435,11 +435,11 @@ func max(a, b float64) float64 {
 
 // RateLimitError represents a rate limit error
 type RateLimitError struct {
-	Key         string
-	RetryAfter  time.Duration
-	Limit       int
-	Remaining   int
-	ResetAt     time.Time
+	Key        string
+	RetryAfter time.Duration
+	Limit      int
+	Remaining  int
+	ResetAt    time.Time
 }
 
 func (e *RateLimitError) Error() string {

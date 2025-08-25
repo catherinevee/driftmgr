@@ -27,17 +27,17 @@ type ImpactAnalyzer struct {
 
 // DependencyManager manages resource dependencies for safe remediation
 type DependencyManager struct {
-	dependencies   map[string][]string
-	reverseDeps    map[string][]string
-	orderingRules  []OrderingRule
+	dependencies  map[string][]string
+	reverseDeps   map[string][]string
+	orderingRules []OrderingRule
 }
 
 // ChangePreview provides detailed preview of changes
 type ChangePreview struct {
-	changes      []Change
-	affectedAPIs []string
+	changes       []Change
+	affectedAPIs  []string
 	estimatedTime time.Duration
-	riskLevel    string
+	riskLevel     string
 }
 
 // Change represents a single remediation change
@@ -71,13 +71,13 @@ type ValidationRule struct {
 
 // SafetyThresholds defines thresholds for safety checks
 type SafetyThresholds struct {
-	MaxChangesPerRun      int
-	MaxCriticalChanges    int
-	MaxCostIncrease       float64
-	MaxDowntimeMinutes    int
-	RequireApproval       []string // Resource types requiring approval
-	BlockedResourceTypes  []string
-	BlockedTimeWindows    []BlockedTimeWindow
+	MaxChangesPerRun     int
+	MaxCriticalChanges   int
+	MaxCostIncrease      float64
+	MaxDowntimeMinutes   int
+	RequireApproval      []string // Resource types requiring approval
+	BlockedResourceTypes []string
+	BlockedTimeWindows   []BlockedTimeWindow
 }
 
 // BlockedTimeWindow represents a time window for blocking changes
@@ -98,11 +98,11 @@ type OrderingRule struct {
 
 // RollbackPlan represents a plan to rollback changes
 type RollbackPlan struct {
-	ID           string
+	ID            string
 	OriginalState map[string]interface{}
-	Changes      []Change
-	Checkpoints  []Checkpoint
-	CreatedAt    time.Time
+	Changes       []Change
+	Checkpoints   []Checkpoint
+	CreatedAt     time.Time
 }
 
 // Checkpoint represents a rollback checkpoint
@@ -158,9 +158,9 @@ func (s *SafetyCheckEngine) DisableDryRun() {
 // PerformSafetyChecks performs all safety checks for a remediation plan
 func (s *SafetyCheckEngine) PerformSafetyChecks(ctx context.Context, plan *RemediationPlan) (*EnhancedSafetyCheckResult, error) {
 	result := &EnhancedSafetyCheckResult{
-		Passed:       true,
-		Warnings:     []string{},
-		Errors:       []string{},
+		Passed:            true,
+		Warnings:          []string{},
+		Errors:            []string{},
 		RequiredApprovals: []ApprovalRequirement{},
 	}
 
@@ -326,16 +326,16 @@ func (a *ImpactAnalyzer) AnalyzeChangeImpact(change Change) ImpactAssessment {
 func (a *ImpactAnalyzer) estimateCostImpact(change Change) float64 {
 	// Simplified cost estimation
 	costMap := map[string]float64{
-		"aws_instance":        100.0,
-		"aws_rds_instance":    200.0,
-		"aws_eks_cluster":     500.0,
-		"azure_vm":            100.0,
-		"azure_sql_database":  150.0,
+		"aws_instance":         100.0,
+		"aws_rds_instance":     200.0,
+		"aws_eks_cluster":      500.0,
+		"azure_vm":             100.0,
+		"azure_sql_database":   150.0,
 		"gcp_compute_instance": 100.0,
 	}
 
 	baseCost := costMap[change.ResourceType]
-	
+
 	switch change.ChangeType {
 	case "create":
 		return baseCost
@@ -395,7 +395,7 @@ func (d *DependencyManager) GetRemediationOrder(changes []Change) ([]Change, err
 	// Topological sort based on dependencies
 	visited := make(map[string]bool)
 	stack := []Change{}
-	
+
 	var visit func(change Change) error
 	visit = func(change Change) error {
 		if visited[change.ResourceID] {
@@ -599,7 +599,7 @@ func (s *SafetyCheckEngine) generateRollbackPlan(ctx context.Context, preview *C
 	// Save original state for each resource
 	for _, change := range preview.changes {
 		plan.OriginalState[change.ResourceID] = change.Before
-		
+
 		// Create checkpoint
 		checkpoint := Checkpoint{
 			ID:          fmt.Sprintf("checkpoint-%s-%d", change.ResourceID, time.Now().Unix()),
@@ -670,11 +670,11 @@ func (s *SafetyCheckEngine) estimateChangeTime(change Change) time.Duration {
 func (s *SafetyCheckEngine) getAffectedAPIs(change Change) []string {
 	// Map resource types to APIs
 	apiMap := map[string][]string{
-		"aws_instance":       {"EC2"},
-		"aws_rds_instance":   {"RDS"},
-		"aws_s3_bucket":      {"S3"},
-		"azure_vm":           {"Compute"},
-		"azure_sql_database": {"SQL"},
+		"aws_instance":         {"EC2"},
+		"aws_rds_instance":     {"RDS"},
+		"aws_s3_bucket":        {"S3"},
+		"azure_vm":             {"Compute"},
+		"azure_sql_database":   {"SQL"},
 		"gcp_compute_instance": {"Compute Engine"},
 	}
 

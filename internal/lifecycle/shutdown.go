@@ -34,7 +34,7 @@ func NewShutdownHandler(timeout time.Duration) *ShutdownHandler {
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
-	
+
 	return &ShutdownHandler{
 		timeout:    timeout,
 		callbacks:  make([]ShutdownCallback, 0),
@@ -48,7 +48,7 @@ func NewShutdownHandler(timeout time.Duration) *ShutdownHandler {
 func (h *ShutdownHandler) Register(callback ShutdownCallback) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	// Insert in priority order
 	inserted := false
 	for i, cb := range h.callbacks {
@@ -58,11 +58,11 @@ func (h *ShutdownHandler) Register(callback ShutdownCallback) {
 			break
 		}
 	}
-	
+
 	if !inserted {
 		h.callbacks = append(h.callbacks, callback)
 	}
-	
+
 	h.log.Debug("Registered shutdown callback",
 		logger.String("name", callback.Name),
 		logger.Int("priority", callback.Priority),
@@ -73,7 +73,7 @@ func (h *ShutdownHandler) Register(callback ShutdownCallback) {
 func (h *ShutdownHandler) Listen() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
-	
+
 	go func() {
 		sig := <-sigCh
 		h.log.Info("Received shutdown signal",
@@ -81,7 +81,7 @@ func (h *ShutdownHandler) Listen() {
 		)
 		h.Shutdown()
 	}()
-	
+
 	h.log.Info("Shutdown handler listening for signals")
 }
 
@@ -94,38 +94,38 @@ func (h *ShutdownHandler) Shutdown() {
 	default:
 		close(h.shutdownCh)
 	}
-	
+
 	h.log.Info("Starting graceful shutdown",
 		logger.Duration("timeout", h.timeout),
 	)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), h.timeout)
 	defer cancel()
-	
+
 	// Track shutdown with telemetry
 	if telemetry.Get() != nil {
 		_, span := telemetry.Get().StartSpan(ctx, "application.shutdown")
 		defer span.End()
 	}
-	
+
 	h.mu.RLock()
 	callbacks := make([]ShutdownCallback, len(h.callbacks))
 	copy(callbacks, h.callbacks)
 	h.mu.RUnlock()
-	
+
 	// Execute callbacks in priority order
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(callbacks))
-	
+
 	for _, callback := range callbacks {
 		wg.Add(1)
 		go func(cb ShutdownCallback) {
 			defer wg.Done()
-			
+
 			h.log.Info("Executing shutdown callback",
 				logger.String("name", cb.Name),
 			)
-			
+
 			start := time.Now()
 			if err := cb.Fn(ctx); err != nil {
 				h.log.Error("Shutdown callback failed",
@@ -142,21 +142,21 @@ func (h *ShutdownHandler) Shutdown() {
 			}
 		}(callback)
 	}
-	
+
 	// Wait for all callbacks or timeout
 	doneCh := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(doneCh)
 	}()
-	
+
 	select {
 	case <-doneCh:
 		h.log.Info("Graceful shutdown completed successfully")
 	case <-ctx.Done():
 		h.log.Warn("Graceful shutdown timed out, forcing exit")
 	}
-	
+
 	close(h.done)
 }
 
@@ -212,13 +212,13 @@ func (m *Manager) RegisterShutdown(name string, priority int, fn func(context.Co
 func (m *Manager) RegisterHealthCheck(check HealthCheck) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if check.Timeout <= 0 {
 		check.Timeout = 5 * time.Second
 	}
-	
+
 	m.healthChecks = append(m.healthChecks, check)
-	
+
 	m.log.Debug("Registered health check",
 		logger.String("name", check.Name),
 		logger.Duration("timeout", check.Timeout),
@@ -231,27 +231,27 @@ func (m *Manager) CheckHealth(ctx context.Context) (HealthStatus, error) {
 	checks := make([]HealthCheck, len(m.healthChecks))
 	copy(checks, m.healthChecks)
 	m.mu.RUnlock()
-	
+
 	status := HealthStatus{
 		Status:    "healthy",
 		Timestamp: time.Now(),
 		Checks:    make([]HealthCheckResult, 0),
 	}
-	
+
 	for _, check := range checks {
 		checkCtx, cancel := context.WithTimeout(ctx, check.Timeout)
-		
+
 		start := time.Now()
 		err := check.Check(checkCtx)
 		duration := time.Since(start)
-		
+
 		cancel()
-		
+
 		result := HealthCheckResult{
 			Name:     check.Name,
 			Duration: duration,
 		}
-		
+
 		if err != nil {
 			result.Status = "unhealthy"
 			result.Error = err.Error()
@@ -259,10 +259,10 @@ func (m *Manager) CheckHealth(ctx context.Context) (HealthStatus, error) {
 		} else {
 			result.Status = "healthy"
 		}
-		
+
 		status.Checks = append(status.Checks, result)
 	}
-	
+
 	return status, nil
 }
 

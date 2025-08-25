@@ -4,43 +4,43 @@ import "time"
 
 // Timeouts
 const (
-	DefaultTimeout         = 30 * time.Second
-	DefaultDiscoveryTimeout = 5 * time.Minute
+	DefaultTimeout            = 30 * time.Second
+	DefaultDiscoveryTimeout   = 5 * time.Minute
 	DefaultRemediationTimeout = 10 * time.Minute
-	DefaultDeletionTimeout = 30 * time.Minute
-	DefaultAPITimeout      = 10 * time.Second
-	DefaultContextTimeout  = 2 * time.Minute
+	DefaultDeletionTimeout    = 30 * time.Minute
+	DefaultAPITimeout         = 10 * time.Second
+	DefaultContextTimeout     = 2 * time.Minute
 )
 
 // Retry configuration
 const (
-	DefaultMaxRetries      = 3
-	DefaultRetryDelay      = 1 * time.Second
-	DefaultRetryBackoff    = 2.0
-	DefaultMaxRetryDelay   = 30 * time.Second
+	DefaultMaxRetries    = 3
+	DefaultRetryDelay    = 1 * time.Second
+	DefaultRetryBackoff  = 2.0
+	DefaultMaxRetryDelay = 30 * time.Second
 )
 
 // Concurrency limits
 const (
-	DefaultMaxConcurrency  = 10
-	DefaultBatchSize       = 50
-	DefaultMaxWorkers      = 20
-	DefaultQueueSize       = 1000
+	DefaultMaxConcurrency = 10
+	DefaultBatchSize      = 50
+	DefaultMaxWorkers     = 20
+	DefaultQueueSize      = 1000
 )
 
 // Resource limits
 const (
-	MaxResourcesPerPage    = 100
-	MaxResourcesPerBatch   = 500
-	MaxResourcesWarning    = 1000
-	MaxResourcesHardLimit  = 10000
-	DefaultResourceLimit   = 5000
+	MaxResourcesPerPage   = 100
+	MaxResourcesPerBatch  = 500
+	MaxResourcesWarning   = 1000
+	MaxResourcesHardLimit = 10000
+	DefaultResourceLimit  = 5000
 )
 
 // Cache configuration
 const (
-	DefaultCacheTTL        = 5 * time.Minute
-	DefaultCacheMaxSize    = 1000
+	DefaultCacheTTL             = 5 * time.Minute
+	DefaultCacheMaxSize         = 1000
 	DefaultCacheCleanupInterval = 10 * time.Minute
 )
 
@@ -54,18 +54,18 @@ const (
 
 // File and path limits
 const (
-	MaxFileSize            = 100 * 1024 * 1024 // 100MB
-	MaxPathLength          = 4096
-	MaxNameLength          = 256
+	MaxFileSize   = 100 * 1024 * 1024 // 100MB
+	MaxPathLength = 4096
+	MaxNameLength = 256
 )
 
 // API rate limits
 const (
 	DefaultRateLimit       = 100
 	DefaultRateLimitWindow = 1 * time.Minute
-	AWSRateLimit          = 100
-	AzureRateLimit        = 120
-	GCPRateLimit          = 100
+	AWSRateLimit           = 100
+	AzureRateLimit         = 120
+	GCPRateLimit           = 100
 )
 
 // Log levels
@@ -88,12 +88,12 @@ const (
 
 // Resource states
 const (
-	ResourceStateActive    = "active"
-	ResourceStatePending   = "pending"
-	ResourceStateDeleting  = "deleting"
-	ResourceStateDeleted   = "deleted"
-	ResourceStateFailed    = "failed"
-	ResourceStateUnknown   = "unknown"
+	ResourceStateActive   = "active"
+	ResourceStatePending  = "pending"
+	ResourceStateDeleting = "deleting"
+	ResourceStateDeleted  = "deleted"
+	ResourceStateFailed   = "failed"
+	ResourceStateUnknown  = "unknown"
 )
 
 // Remediation states

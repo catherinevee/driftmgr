@@ -219,7 +219,7 @@ func exportToCSV(resources []models.Resource, outputFile string) error {
 		} else if resource.State != nil {
 			stateStr = fmt.Sprintf("%v", resource.State)
 		}
-		
+
 		record := []string{
 			resource.ID,
 			resource.Name,

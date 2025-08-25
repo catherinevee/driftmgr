@@ -36,6 +36,14 @@ func HandleDashboard(args []string) {
 		}
 	}
 
+	// Print ASCII art when starting dashboard
+	fmt.Println(`     .___      .__  _____  __                         
+   __| _/______|__|/ ____\/  |_  _____    ___________ 
+  / __ |\_  __ \  \   __\\   __\/     \  / ___\_  __ \
+ / /_/ | |  | \/  ||  |   |  | |  Y Y  \/ /_/  >  | \/
+ \____ | |__|  |__||__|   |__| |__|_|  /\___  /|__|   
+      \/                             \//_____/        `)
+	fmt.Println()
 	fmt.Printf("Starting DriftMgr Dashboard Server on port %s\n", port)
 	fmt.Printf("Open your browser at http://localhost:%s\n", port)
 	fmt.Println("\nPress Ctrl+C to stop the server")

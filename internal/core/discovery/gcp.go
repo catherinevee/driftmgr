@@ -52,6 +52,20 @@ func (p *GCPProvider) Name() string {
 	return "Google Cloud Platform"
 }
 
+// Regions returns the list of available GCP regions
+func (p *GCPProvider) Regions() []string {
+	return p.SupportedRegions()
+}
+
+// Services returns the list of available GCP services
+func (p *GCPProvider) Services() []string {
+	return []string{
+		"Compute Engine", "Cloud Storage", "Cloud SQL", "BigQuery",
+		"Cloud Functions", "GKE", "App Engine", "Cloud Run",
+		"Pub/Sub", "Dataflow", "Cloud Spanner", "Firestore",
+	}
+}
+
 // SupportedRegions returns the list of supported GCP regions
 func (p *GCPProvider) SupportedRegions() []string {
 	return []string{
@@ -84,8 +98,16 @@ func (p *GCPProvider) SupportedResourceTypes() []string {
 }
 
 // Discover discovers GCP resources
-func (p *GCPProvider) Discover(config Config) ([]models.Resource, error) {
+func (p *GCPProvider) Discover(ctx context.Context, options DiscoveryOptions) (*Result, error) {
 	fmt.Println("  [GCP] Discovering resources using Google Cloud SDK...")
+
+	// Convert options to config for backward compatibility
+	config := Config{
+		Regions: options.Regions,
+	}
+	if len(options.ResourceTypes) > 0 {
+		config.ResourceType = options.ResourceTypes[0]
+	}
 
 	if p.projectID == "" {
 		// Try to get project ID from environment or default credentials
@@ -128,7 +150,34 @@ func (p *GCPProvider) Discover(config Config) ([]models.Resource, error) {
 	}
 
 	fmt.Printf("  [GCP] Found %d resources\n", len(allResources))
-	return allResources, nil
+	return &Result{
+		Resources: allResources,
+		Metadata: map[string]interface{}{
+			"provider":       "gcp",
+			"resource_count": len(allResources),
+			"regions":        regions,
+			"project_id":     p.projectID,
+		},
+	}, nil
+}
+
+// GetAccountInfo returns GCP account information
+func (p *GCPProvider) GetAccountInfo(ctx context.Context) (*AccountInfo, error) {
+	projectID := p.projectID
+	if projectID == "" {
+		projectID = getGCPProjectID()
+	}
+	if projectID == "" {
+		return nil, fmt.Errorf("no GCP project found")
+	}
+
+	return &AccountInfo{
+		ID:       projectID,
+		Name:     fmt.Sprintf("GCP Project %s", projectID),
+		Type:     "gcp",
+		Provider: "gcp",
+		Regions:  p.SupportedRegions(),
+	}, nil
 }
 
 // discoverComputeInstances discovers compute instances in a specific region
@@ -367,4 +416,22 @@ func getGCPProjectID() string {
 
 	// For demo, return empty to trigger mock data
 	return ""
+}
+
+// ValidateCredentials validates GCP credentials
+func (p *GCPProvider) ValidateCredentials(ctx context.Context) error {
+	// For now, just return nil
+	return nil
+}
+
+// DiscoverRegion discovers resources in a specific region
+func (p *GCPProvider) DiscoverRegion(ctx context.Context, region string) ([]models.Resource, error) {
+	options := DiscoveryOptions{
+		Regions: []string{region},
+	}
+	result, err := p.Discover(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return result.Resources, nil
 }

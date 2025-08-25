@@ -179,7 +179,7 @@ func (d *AzureDiscoverer) Discover(config Config) ([]models.Resource, error) {
 
 	var allResources []models.Resource
 	var mu sync.Mutex
-	
+
 	// Start progress monitoring
 	go d.monitorProgress()
 
@@ -323,17 +323,17 @@ func (d *AzureDiscoverer) discoverAllResourcesViaCLI(ctx context.Context, region
 		}
 
 		resource := models.Resource{
-			ID:       azResource.ID,
-			Name:     azResource.Name,
-			Type:     resourceType,
-			Provider: "azure",
-			Region:   azResource.Location,
-			Tags:     tags,
+			ID:        azResource.ID,
+			Name:      azResource.Name,
+			Type:      resourceType,
+			Provider:  "azure",
+			Region:    azResource.Location,
+			Tags:      tags,
 			CreatedAt: time.Now(),
 			Metadata: map[string]string{
-				"terraform_type":  resourceType,
-				"import_id":       azResource.ID,
-				"resource_group":  azResource.ResourceGroup,
+				"terraform_type": resourceType,
+				"import_id":      azResource.ID,
+				"resource_group": azResource.ResourceGroup,
 			},
 			Attributes: map[string]interface{}{
 				"resourceGroup": azResource.ResourceGroup,
@@ -369,16 +369,16 @@ func (d *AzureDiscoverer) discoverResourceGroupsSDK(ctx context.Context, config 
 				}
 
 				resources = append(resources, models.Resource{
-					ID:       safeString(group.ID),
-					Name:     safeString(group.Name),
-					Type:     "azurerm_resource_group",
-					Provider: "azure",
-					Region:   safeString(group.Location),
-					Tags:     convertSDKTags(group.Tags),
+					ID:        safeString(group.ID),
+					Name:      safeString(group.Name),
+					Type:      "azurerm_resource_group",
+					Provider:  "azure",
+					Region:    safeString(group.Location),
+					Tags:      convertSDKTags(group.Tags),
 					CreatedAt: time.Now(),
 					Metadata: map[string]string{
 						"terraform_type": "azurerm_resource_group",
-						"import_id":     safeString(group.ID),
+						"import_id":      safeString(group.ID),
 					},
 				})
 			}
@@ -432,7 +432,7 @@ func (d *AzureDiscoverer) discoverVirtualMachinesSDK(ctx context.Context, config
 					Properties: properties,
 					Metadata: map[string]string{
 						"terraform_type": "azurerm_virtual_machine",
-						"import_id":     safeString(vm.ID),
+						"import_id":      safeString(vm.ID),
 					},
 				})
 			}
@@ -488,7 +488,7 @@ func (d *AzureDiscoverer) discoverStorageAccountsSDK(ctx context.Context, config
 					Properties: properties,
 					Metadata: map[string]string{
 						"terraform_type": "azurerm_storage_account",
-						"import_id":     safeString(account.ID),
+						"import_id":      safeString(account.ID),
 					},
 				})
 			}
@@ -536,7 +536,7 @@ func (d *AzureDiscoverer) discoverVirtualNetworksSDK(ctx context.Context, config
 					Properties: properties,
 					Metadata: map[string]string{
 						"terraform_type": "azurerm_virtual_network",
-						"import_id":     safeString(vnet.ID),
+						"import_id":      safeString(vnet.ID),
 					},
 				})
 			}
@@ -582,19 +582,19 @@ func (d *AzureDiscoverer) discoverManagedDisksSDK(ctx context.Context, config Co
 // azureTypeToTerraformType converts Azure resource type to Terraform resource type
 func (d *AzureDiscoverer) azureTypeToTerraformType(azureType string) string {
 	typeMap := map[string]string{
-		"Microsoft.Compute/virtualMachines":       "azurerm_virtual_machine",
-		"Microsoft.Network/virtualNetworks":       "azurerm_virtual_network",
-		"Microsoft.Network/networkSecurityGroups": "azurerm_network_security_group",
-		"Microsoft.Storage/storageAccounts":       "azurerm_storage_account",
-		"Microsoft.Sql/servers":                   "azurerm_sql_server",
-		"Microsoft.Sql/servers/databases":         "azurerm_sql_database",
-		"Microsoft.Web/sites":                     "azurerm_app_service",
-		"Microsoft.Web/serverfarms":               "azurerm_app_service_plan",
-		"Microsoft.Resources/resourceGroups":      "azurerm_resource_group",
-		"Microsoft.Network/publicIPAddresses":     "azurerm_public_ip",
-		"Microsoft.Network/networkInterfaces":     "azurerm_network_interface",
-		"Microsoft.KeyVault/vaults":               "azurerm_key_vault",
-		"Microsoft.ContainerRegistry/registries":  "azurerm_container_registry",
+		"Microsoft.Compute/virtualMachines":          "azurerm_virtual_machine",
+		"Microsoft.Network/virtualNetworks":          "azurerm_virtual_network",
+		"Microsoft.Network/networkSecurityGroups":    "azurerm_network_security_group",
+		"Microsoft.Storage/storageAccounts":          "azurerm_storage_account",
+		"Microsoft.Sql/servers":                      "azurerm_sql_server",
+		"Microsoft.Sql/servers/databases":            "azurerm_sql_database",
+		"Microsoft.Web/sites":                        "azurerm_app_service",
+		"Microsoft.Web/serverfarms":                  "azurerm_app_service_plan",
+		"Microsoft.Resources/resourceGroups":         "azurerm_resource_group",
+		"Microsoft.Network/publicIPAddresses":        "azurerm_public_ip",
+		"Microsoft.Network/networkInterfaces":        "azurerm_network_interface",
+		"Microsoft.KeyVault/vaults":                  "azurerm_key_vault",
+		"Microsoft.ContainerRegistry/registries":     "azurerm_container_registry",
 		"Microsoft.ContainerService/managedClusters": "azurerm_kubernetes_cluster",
 	}
 

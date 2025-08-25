@@ -241,7 +241,7 @@ func (cm *CredentialManager) TestProviderConfig(ctx context.Context, config *Pro
 func (cm *CredentialManager) GetAccountInfoWithConfig(ctx context.Context, config *ProviderConfig) (map[string]interface{}, error) {
 	// Get actual account info based on provider
 	accountInfo := make(map[string]interface{})
-	
+
 	switch config.Provider {
 	case "aws":
 		// Get AWS account ID from STS or environment
@@ -285,7 +285,7 @@ func (cm *CredentialManager) GetAccountInfoWithConfig(ctx context.Context, confi
 			accountInfo["region"] = "default-region"
 		}
 	}
-	
+
 	return accountInfo, nil
 }
 

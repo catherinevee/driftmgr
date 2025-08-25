@@ -61,35 +61,35 @@ type TerraformCloudBackend struct {
 
 // TerraformState represents a complete Terraform state
 type TerraformState struct {
-	Version          int                      `json:"version"`
-	TerraformVersion string                   `json:"terraform_version"`
-	Serial           int                      `json:"serial"`
-	Lineage          string                   `json:"lineage"`
-	Outputs          map[string]OutputValue   `json:"outputs"`
-	Resources        []StateResource          `json:"resources"`
-	CheckResults     []CheckResult            `json:"check_results"`
+	Version          int                    `json:"version"`
+	TerraformVersion string                 `json:"terraform_version"`
+	Serial           int                    `json:"serial"`
+	Lineage          string                 `json:"lineage"`
+	Outputs          map[string]OutputValue `json:"outputs"`
+	Resources        []StateResource        `json:"resources"`
+	CheckResults     []CheckResult          `json:"check_results"`
 }
 
 // StateResource represents a resource in Terraform state
 type StateResource struct {
-	Module    string                    `json:"module,omitempty"`
-	Mode      string                    `json:"mode"`
-	Type      string                    `json:"type"`
-	Name      string                    `json:"name"`
-	Provider  string                    `json:"provider"`
-	Instances []StateResourceInstance   `json:"instances"`
-	Each      string                    `json:"each,omitempty"`
+	Module    string                  `json:"module,omitempty"`
+	Mode      string                  `json:"mode"`
+	Type      string                  `json:"type"`
+	Name      string                  `json:"name"`
+	Provider  string                  `json:"provider"`
+	Instances []StateResourceInstance `json:"instances"`
+	Each      string                  `json:"each,omitempty"`
 }
 
 // StateResourceInstance represents an instance of a resource
 type StateResourceInstance struct {
-	SchemaVersion       int                      `json:"schema_version"`
-	Attributes          map[string]interface{}   `json:"attributes"`
-	SensitiveAttributes []string                 `json:"sensitive_attributes,omitempty"`
-	Private             string                   `json:"private,omitempty"`
-	Dependencies        []string                 `json:"dependencies,omitempty"`
-	CreateBeforeDestroy bool                     `json:"create_before_destroy,omitempty"`
-	IndexKey            interface{}              `json:"index_key,omitempty"`
+	SchemaVersion       int                    `json:"schema_version"`
+	Attributes          map[string]interface{} `json:"attributes"`
+	SensitiveAttributes []string               `json:"sensitive_attributes,omitempty"`
+	Private             string                 `json:"private,omitempty"`
+	Dependencies        []string               `json:"dependencies,omitempty"`
+	CreateBeforeDestroy bool                   `json:"create_before_destroy,omitempty"`
+	IndexKey            interface{}            `json:"index_key,omitempty"`
 }
 
 // OutputValue represents a Terraform output value
@@ -440,7 +440,7 @@ func (p *EnhancedStateParser) processSensitiveAttributes(instance *StateResource
 func (p *EnhancedStateParser) resolveDependencies(resource *StateResource, state *TerraformState) {
 	for i := range resource.Instances {
 		instance := &resource.Instances[i]
-		
+
 		// Parse dependency references
 		var resolvedDeps []string
 		for _, dep := range instance.Dependencies {
@@ -528,17 +528,17 @@ func (p *EnhancedStateParser) convertInstanceToResource(stateResource StateResou
 	}
 
 	return models.Resource{
-		ID:           id,
-		Name:         name,
-		Type:         stateResource.Type,
-		Provider:     provider,
-		Region:       region,
-		State:        "managed",
-		Tags:         tags,
-		CreatedAt:    time.Now(),
-		Updated:      time.Now(),
-		Attributes:   instance.Attributes,
-		Metadata:     metadata,
+		ID:         id,
+		Name:       name,
+		Type:       stateResource.Type,
+		Provider:   provider,
+		Region:     region,
+		State:      "managed",
+		Tags:       tags,
+		CreatedAt:  time.Now(),
+		Updated:    time.Now(),
+		Attributes: instance.Attributes,
+		Metadata:   metadata,
 	}
 }
 

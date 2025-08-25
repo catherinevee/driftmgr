@@ -19,13 +19,13 @@ const (
 
 // Metric represents a single metric
 type Metric struct {
-	Name      string                 `json:"name"`
-	Type      MetricType             `json:"type"`
-	Value     float64                `json:"value"`
-	Labels    map[string]string      `json:"labels,omitempty"`
-	Timestamp time.Time              `json:"timestamp"`
-	Unit      string                 `json:"unit,omitempty"`
-	Help      string                 `json:"help,omitempty"`
+	Name      string            `json:"name"`
+	Type      MetricType        `json:"type"`
+	Value     float64           `json:"value"`
+	Labels    map[string]string `json:"labels,omitempty"`
+	Timestamp time.Time         `json:"timestamp"`
+	Unit      string            `json:"unit,omitempty"`
+	Help      string            `json:"help,omitempty"`
 }
 
 // MetricsCollector collects and stores metrics

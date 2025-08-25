@@ -256,7 +256,7 @@ func (api *UserManagementAPI) HandleGetUsers(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Failed to retrieve users", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"users": users,
@@ -284,7 +284,7 @@ func (api *UserManagementAPI) HandleGetAuditLogs(w http.ResponseWriter, r *http.
 		http.Error(w, "Failed to retrieve audit logs", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"logs": logs,

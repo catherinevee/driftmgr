@@ -162,7 +162,7 @@ func (s *EnhancedDashboardServer) createRemediationPlan(w http.ResponseWriter, r
 	if err := s.storage.SaveState(context.Background(), planKey, plan); err != nil {
 		s.logger.Printf("Failed to store remediation plan: %v", err)
 	}
-	
+
 	// Also store in remediation history
 	historyKey := fmt.Sprintf("remediation:history:%s", plan.ID)
 	s.storage.SaveState(context.Background(), historyKey, map[string]interface{}{
@@ -312,19 +312,19 @@ func (s *EnhancedDashboardServer) getRemediationHistory(w http.ResponseWriter, r
 		if limit > 0 && i >= limit {
 			break
 		}
-		
+
 		var histItem map[string]interface{}
 		if err := s.storage.LoadState(context.Background(), key, &histItem); err != nil {
 			continue
 		}
-		
+
 		// Apply status filter if needed
 		if status != "" {
 			if itemStatus, ok := histItem["status"].(string); ok && itemStatus != status {
 				continue
 			}
 		}
-		
+
 		history = append(history, histItem)
 	}
 
@@ -538,7 +538,7 @@ func (s *EnhancedDashboardServer) executeRemediationPlan(plan *RemediationPlan) 
 	if err := s.storage.SaveState(context.Background(), planKey, plan); err != nil {
 		s.logger.Printf("Failed to update remediation plan: %v", err)
 	}
-	
+
 	// Update history
 	historyKey := fmt.Sprintf("remediation:history:%s", plan.ID)
 	s.storage.SaveState(context.Background(), historyKey, map[string]interface{}{

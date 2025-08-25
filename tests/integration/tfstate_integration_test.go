@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	awsprovider "github.com/catherinevee/driftmgr/internal/cloud/aws"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	"github.com/catherinevee/driftmgr/internal/core/models"
-	awsprovider "github.com/catherinevee/driftmgr/internal/cloud/aws"
 	"github.com/catherinevee/driftmgr/internal/terraform/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -78,13 +78,13 @@ func Wrap(err error, errType ErrorType, message string) *Error {
 	if err == nil {
 		return nil
 	}
-	
+
 	// If it's already our error type, preserve the original
 	if e, ok := err.(*Error); ok {
 		e.Message = fmt.Sprintf("%s: %s", message, e.Message)
 		return e
 	}
-	
+
 	return &Error{
 		Type:       errType,
 		Message:    message,
@@ -141,10 +141,10 @@ func getStackTrace() string {
 	const depth = 32
 	var pcs [depth]uintptr
 	n := runtime.Callers(3, pcs[:])
-	
+
 	var sb strings.Builder
 	frames := runtime.CallersFrames(pcs[:n])
-	
+
 	for {
 		frame, more := frames.Next()
 		if !strings.Contains(frame.File, "runtime/") {
@@ -154,7 +154,7 @@ func getStackTrace() string {
 			break
 		}
 	}
-	
+
 	return sb.String()
 }
 

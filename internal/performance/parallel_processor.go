@@ -842,13 +842,13 @@ func (pp *ParallelProcessor) ProcessBatch(ctx context.Context, items []interface
 		wg.Add(1)
 
 		workItem := WorkItem{
-			ID:         generateWorkID(),
-			Task:       func(ctx context.Context) (interface{}, error) { return processor(ctx, item) },
-			Priority:   0,
-			Context:    ctx,
-			Metadata:   map[string]interface{}{"resultChan": resultChan, "index": i},
+			ID:          generateWorkID(),
+			Task:        func(ctx context.Context) (interface{}, error) { return processor(ctx, item) },
+			Priority:    0,
+			Context:     ctx,
+			Metadata:    map[string]interface{}{"resultChan": resultChan, "index": i},
 			SubmittedAt: time.Now(),
-			MaxRetries: pp.config.MaxRetries,
+			MaxRetries:  pp.config.MaxRetries,
 		}
 
 		select {

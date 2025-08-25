@@ -45,28 +45,28 @@ type SecretsProvider interface {
 
 // Secret represents a secret value with metadata
 type Secret struct {
-	Key         string                 `json:"key"`
-	Value       string                 `json:"value"`
-	Type        SecretType             `json:"type"`
-	Metadata    map[string]interface{} `json:"metadata"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
-	ExpiresAt   *time.Time             `json:"expires_at,omitempty"`
-	Version     int                    `json:"version"`
-	Encrypted   bool                   `json:"encrypted"`
-	Tags        map[string]string      `json:"tags"`
+	Key       string                 `json:"key"`
+	Value     string                 `json:"value"`
+	Type      SecretType             `json:"type"`
+	Metadata  map[string]interface{} `json:"metadata"`
+	CreatedAt time.Time              `json:"created_at"`
+	UpdatedAt time.Time              `json:"updated_at"`
+	ExpiresAt *time.Time             `json:"expires_at,omitempty"`
+	Version   int                    `json:"version"`
+	Encrypted bool                   `json:"encrypted"`
+	Tags      map[string]string      `json:"tags"`
 }
 
 // SecretType represents the type of secret
 type SecretType string
 
 const (
-	SecretTypePassword   SecretType = "password"
-	SecretTypeAPIKey     SecretType = "api_key"
+	SecretTypePassword    SecretType = "password"
+	SecretTypeAPIKey      SecretType = "api_key"
 	SecretTypeCertificate SecretType = "certificate"
-	SecretTypeSSHKey     SecretType = "ssh_key"
-	SecretTypeToken      SecretType = "token"
-	SecretTypeGeneric    SecretType = "generic"
+	SecretTypeSSHKey      SecretType = "ssh_key"
+	SecretTypeToken       SecretType = "token"
+	SecretTypeGeneric     SecretType = "generic"
 )
 
 // SecretCache provides in-memory caching of secrets
@@ -308,7 +308,7 @@ type VaultProvider struct {
 // NewVaultProvider creates a new Vault provider
 func NewVaultProvider(config map[string]interface{}) (*VaultProvider, error) {
 	vaultConfig := api.DefaultConfig()
-	
+
 	if addr, ok := config["address"].(string); ok {
 		vaultConfig.Address = addr
 	}
@@ -366,7 +366,7 @@ func (vp *VaultProvider) GetSecret(ctx context.Context, key string) (*Secret, er
 // SetSecret stores a secret in Vault
 func (vp *VaultProvider) SetSecret(ctx context.Context, key string, secret *Secret) error {
 	logical := vp.client.Logical()
-	
+
 	data := map[string]interface{}{
 		"data": map[string]interface{}{
 			"value":     secret.Value,
@@ -422,7 +422,7 @@ func (vp *VaultProvider) RotateSecret(ctx context.Context, key string) (*Secret,
 
 	// Generate new value (example for API key)
 	newValue := generateSecureToken(32)
-	
+
 	current.Value = newValue
 	current.Version++
 	current.UpdatedAt = time.Now()

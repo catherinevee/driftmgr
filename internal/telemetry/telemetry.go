@@ -26,19 +26,19 @@ type Telemetry struct {
 	meter          metric.Meter
 	tracerProvider *sdktrace.TracerProvider
 	meterProvider  *sdkmetric.MeterProvider
-	
+
 	// Metrics
-	discoveryDuration    metric.Float64Histogram
-	discoveryErrors      metric.Int64Counter
-	resourcesDiscovered  metric.Int64Counter
-	driftDetected        metric.Int64Counter
-	remediationAttempts  metric.Int64Counter
-	remediationSuccess   metric.Int64Counter
-	apiRequests          metric.Int64Counter
-	apiLatency           metric.Float64Histogram
-	activeConnections    metric.Int64UpDownCounter
-	cacheHits            metric.Int64Counter
-	cacheMisses          metric.Int64Counter
+	discoveryDuration   metric.Float64Histogram
+	discoveryErrors     metric.Int64Counter
+	resourcesDiscovered metric.Int64Counter
+	driftDetected       metric.Int64Counter
+	remediationAttempts metric.Int64Counter
+	remediationSuccess  metric.Int64Counter
+	apiRequests         metric.Int64Counter
+	apiLatency          metric.Float64Histogram
+	activeConnections   metric.Int64UpDownCounter
+	cacheHits           metric.Int64Counter
+	cacheMisses         metric.Int64Counter
 }
 
 var (
@@ -48,14 +48,14 @@ var (
 
 // Config represents telemetry configuration
 type Config struct {
-	ServiceName      string
-	ServiceVersion   string
-	Environment      string
-	JaegerEndpoint   string
-	PrometheusPort   int
-	SampleRate       float64
-	EnableTracing    bool
-	EnableMetrics    bool
+	ServiceName    string
+	ServiceVersion string
+	Environment    string
+	JaegerEndpoint string
+	PrometheusPort int
+	SampleRate     float64
+	EnableTracing  bool
+	EnableMetrics  bool
 }
 
 // Initialize sets up OpenTelemetry
@@ -63,7 +63,7 @@ func Initialize(ctx context.Context, config Config) (*Telemetry, error) {
 	if config.ServiceName != "" {
 		serviceName = config.ServiceName
 	}
-	
+
 	// Create resource
 	res, err := resource.Merge(
 		resource.Default(),
@@ -77,28 +77,28 @@ func Initialize(ctx context.Context, config Config) (*Telemetry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
-	
+
 	t := &Telemetry{}
-	
+
 	// Initialize tracing
 	if config.EnableTracing {
 		if err := t.initTracing(ctx, config, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize tracing: %w", err)
 		}
 	}
-	
+
 	// Initialize metrics
 	if config.EnableMetrics {
 		if err := t.initMetrics(ctx, config, res); err != nil {
 			return nil, fmt.Errorf("failed to initialize metrics: %w", err)
 		}
 	}
-	
+
 	// Create instruments
 	if err := t.createInstruments(); err != nil {
 		return nil, fmt.Errorf("failed to create instruments: %w", err)
 	}
-	
+
 	globalTelemetry = t
 	return t, nil
 }
@@ -110,23 +110,23 @@ func (t *Telemetry) initTracing(ctx context.Context, config Config, res *resourc
 	if err != nil {
 		return err
 	}
-	
+
 	// Create tracer provider
 	t.tracerProvider = sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.SampleRate)),
 	)
-	
+
 	// Set global tracer provider
 	otel.SetTracerProvider(t.tracerProvider)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	
+
 	t.tracer = t.tracerProvider.Tracer(serviceName)
-	
+
 	return nil
 }
 
@@ -137,25 +137,25 @@ func (t *Telemetry) initMetrics(ctx context.Context, config Config, res *resourc
 	if err != nil {
 		return err
 	}
-	
+
 	// Create meter provider
 	t.meterProvider = sdkmetric.NewMeterProvider(
 		sdkmetric.WithReader(exporter),
 		sdkmetric.WithResource(res),
 	)
-	
+
 	// Set global meter provider
 	otel.SetMeterProvider(t.meterProvider)
-	
+
 	t.meter = t.meterProvider.Meter(serviceName)
-	
+
 	return nil
 }
 
 // createInstruments creates metric instruments
 func (t *Telemetry) createInstruments() error {
 	var err error
-	
+
 	// Discovery metrics
 	t.discoveryDuration, err = t.meter.Float64Histogram(
 		"driftmgr.discovery.duration",
@@ -165,7 +165,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	t.discoveryErrors, err = t.meter.Int64Counter(
 		"driftmgr.discovery.errors",
 		metric.WithDescription("Number of discovery errors"),
@@ -173,7 +173,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	t.resourcesDiscovered, err = t.meter.Int64Counter(
 		"driftmgr.resources.discovered",
 		metric.WithDescription("Number of resources discovered"),
@@ -181,7 +181,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Drift metrics
 	t.driftDetected, err = t.meter.Int64Counter(
 		"driftmgr.drift.detected",
@@ -190,7 +190,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Remediation metrics
 	t.remediationAttempts, err = t.meter.Int64Counter(
 		"driftmgr.remediation.attempts",
@@ -199,7 +199,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	t.remediationSuccess, err = t.meter.Int64Counter(
 		"driftmgr.remediation.success",
 		metric.WithDescription("Number of successful remediations"),
@@ -207,7 +207,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// API metrics
 	t.apiRequests, err = t.meter.Int64Counter(
 		"driftmgr.api.requests",
@@ -216,7 +216,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	t.apiLatency, err = t.meter.Float64Histogram(
 		"driftmgr.api.latency",
 		metric.WithDescription("API request latency in seconds"),
@@ -225,7 +225,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	t.activeConnections, err = t.meter.Int64UpDownCounter(
 		"driftmgr.connections.active",
 		metric.WithDescription("Number of active connections"),
@@ -233,7 +233,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Cache metrics
 	t.cacheHits, err = t.meter.Int64Counter(
 		"driftmgr.cache.hits",
@@ -242,7 +242,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	t.cacheMisses, err = t.meter.Int64Counter(
 		"driftmgr.cache.misses",
 		metric.WithDescription("Number of cache misses"),
@@ -250,7 +250,7 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -261,13 +261,13 @@ func (t *Telemetry) Shutdown(ctx context.Context) error {
 			return err
 		}
 	}
-	
+
 	if t.meterProvider != nil {
 		if err := t.meterProvider.Shutdown(ctx); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -286,10 +286,10 @@ func (t *Telemetry) RecordDiscovery(ctx context.Context, provider string, resour
 	attrs := []attribute.KeyValue{
 		attribute.String("provider", provider),
 	}
-	
+
 	t.discoveryDuration.Record(ctx, duration.Seconds(), metric.WithAttributes(attrs...))
 	t.resourcesDiscovered.Add(ctx, int64(resourceCount), metric.WithAttributes(attrs...))
-	
+
 	if err != nil {
 		t.discoveryErrors.Add(ctx, 1, metric.WithAttributes(attrs...))
 	}
@@ -300,7 +300,7 @@ func (t *Telemetry) RecordDrift(ctx context.Context, provider string, driftCount
 	attrs := []attribute.KeyValue{
 		attribute.String("provider", provider),
 	}
-	
+
 	t.driftDetected.Add(ctx, int64(driftCount), metric.WithAttributes(attrs...))
 }
 
@@ -310,9 +310,9 @@ func (t *Telemetry) RecordRemediation(ctx context.Context, resourceType string, 
 		attribute.String("resource_type", resourceType),
 		attribute.Bool("success", success),
 	}
-	
+
 	t.remediationAttempts.Add(ctx, 1, metric.WithAttributes(attrs...))
-	
+
 	if success {
 		t.remediationSuccess.Add(ctx, 1, metric.WithAttributes(attrs...))
 	}
@@ -325,7 +325,7 @@ func (t *Telemetry) RecordAPIRequest(ctx context.Context, method, path string, s
 		attribute.String("path", path),
 		attribute.Int("status_code", statusCode),
 	}
-	
+
 	t.apiRequests.Add(ctx, 1, metric.WithAttributes(attrs...))
 	t.apiLatency.Record(ctx, duration.Seconds(), metric.WithAttributes(attrs...))
 }
@@ -335,7 +335,7 @@ func (t *Telemetry) RecordCacheHit(ctx context.Context, cacheType string) {
 	attrs := []attribute.KeyValue{
 		attribute.String("cache_type", cacheType),
 	}
-	
+
 	t.cacheHits.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
@@ -344,7 +344,7 @@ func (t *Telemetry) RecordCacheMiss(ctx context.Context, cacheType string) {
 	attrs := []attribute.KeyValue{
 		attribute.String("cache_type", cacheType),
 	}
-	
+
 	t.cacheMisses.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
@@ -353,7 +353,7 @@ func (t *Telemetry) IncrementActiveConnections(ctx context.Context, connectionTy
 	attrs := []attribute.KeyValue{
 		attribute.String("connection_type", connectionType),
 	}
-	
+
 	t.activeConnections.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
@@ -362,7 +362,7 @@ func (t *Telemetry) DecrementActiveConnections(ctx context.Context, connectionTy
 	attrs := []attribute.KeyValue{
 		attribute.String("connection_type", connectionType),
 	}
-	
+
 	t.activeConnections.Add(ctx, -1, metric.WithAttributes(attrs...))
 }
 
@@ -379,26 +379,26 @@ func TracedHTTPHandler(pattern string, handler func(http.ResponseWriter, *http.R
 			),
 		)
 		defer span.End()
-		
+
 		// Wrap response writer to capture status code
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: 200}
-		
+
 		// Time the request
 		start := time.Now()
-		
+
 		// Call the handler
 		handler(wrapped, r.WithContext(ctx))
-		
+
 		// Record metrics
 		duration := time.Since(start)
 		globalTelemetry.RecordAPIRequest(ctx, r.Method, pattern, wrapped.statusCode, duration)
-		
+
 		// Set span attributes
 		span.SetAttributes(
 			attribute.Int("http.status_code", wrapped.statusCode),
 			attribute.Int64("http.response_size", wrapped.written),
 		)
-		
+
 		if wrapped.statusCode >= 400 {
 			span.SetStatus(codes.Error, fmt.Sprintf("HTTP %d", wrapped.statusCode))
 		}

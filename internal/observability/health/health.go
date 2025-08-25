@@ -42,25 +42,25 @@ type Result struct {
 
 // Report represents a complete health report
 type Report struct {
-	Status      Status    `json:"status"`
-	Timestamp   time.Time `json:"timestamp"`
-	Version     string    `json:"version"`
+	Status      Status        `json:"status"`
+	Timestamp   time.Time     `json:"timestamp"`
+	Version     string        `json:"version"`
 	Uptime      time.Duration `json:"uptime"`
-	Results     []Result  `json:"results"`
-	TotalChecks int       `json:"total_checks"`
-	Healthy     int       `json:"healthy"`
-	Unhealthy   int       `json:"unhealthy"`
-	Degraded    int       `json:"degraded"`
+	Results     []Result      `json:"results"`
+	TotalChecks int           `json:"total_checks"`
+	Healthy     int           `json:"healthy"`
+	Unhealthy   int           `json:"unhealthy"`
+	Degraded    int           `json:"degraded"`
 }
 
 // Service manages health checks
 type Service struct {
-	checks      map[string]Check
-	results     map[string]Result
-	mu          sync.RWMutex
-	startTime   time.Time
-	version     string
-	log         logger.Logger
+	checks    map[string]Check
+	results   map[string]Result
+	mu        sync.RWMutex
+	startTime time.Time
+	version   string
+	log       logger.Logger
 }
 
 // NewService creates a new health service
@@ -78,13 +78,13 @@ func NewService(version string) *Service {
 func (s *Service) RegisterCheck(check Check) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if check.Timeout <= 0 {
 		check.Timeout = 5 * time.Second
 	}
-	
+
 	s.checks[check.Name] = check
-	
+
 	s.log.Info("Registered health check",
 		logger.String("name", check.Name),
 		logger.Bool("critical", check.Critical),
@@ -96,10 +96,10 @@ func (s *Service) RegisterCheck(check Check) {
 func (s *Service) UnregisterCheck(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	delete(s.checks, name)
 	delete(s.results, name)
-	
+
 	s.log.Info("Unregistered health check",
 		logger.String("name", name),
 	)
@@ -110,32 +110,32 @@ func (s *Service) RunCheck(ctx context.Context, name string) (Result, error) {
 	s.mu.RLock()
 	check, exists := s.checks[name]
 	s.mu.RUnlock()
-	
+
 	if !exists {
 		return Result{}, nil
 	}
-	
+
 	// Create context with timeout
 	checkCtx, cancel := context.WithTimeout(ctx, check.Timeout)
 	defer cancel()
-	
+
 	// Record telemetry
 	if telemetry.Get() != nil {
 		var span trace.Span
 		checkCtx, span = telemetry.Get().StartSpan(checkCtx, "health.check")
 		defer span.End()
 	}
-	
+
 	start := time.Now()
 	err := check.CheckFunc(checkCtx)
 	duration := time.Since(start)
-	
+
 	result := Result{
 		Name:        check.Name,
 		Duration:    duration,
 		LastChecked: time.Now(),
 	}
-	
+
 	if err != nil {
 		result.Status = StatusUnhealthy
 		result.Error = err.Error()
@@ -152,12 +152,12 @@ func (s *Service) RunCheck(ctx context.Context, name string) (Result, error) {
 			logger.Duration("duration", duration),
 		)
 	}
-	
+
 	// Store result
 	s.mu.Lock()
 	s.results[name] = result
 	s.mu.Unlock()
-	
+
 	return result, nil
 }
 
@@ -169,7 +169,7 @@ func (s *Service) RunAllChecks(ctx context.Context) Report {
 		checksCopy[k] = v
 	}
 	s.mu.RUnlock()
-	
+
 	report := Report{
 		Timestamp:   time.Now(),
 		Version:     s.version,
@@ -177,11 +177,11 @@ func (s *Service) RunAllChecks(ctx context.Context) Report {
 		Results:     make([]Result, 0, len(checksCopy)),
 		TotalChecks: len(checksCopy),
 	}
-	
+
 	// Run checks concurrently
 	var wg sync.WaitGroup
 	resultsCh := make(chan Result, len(checksCopy))
-	
+
 	for name := range checksCopy {
 		wg.Add(1)
 		go func(checkName string) {
@@ -190,15 +190,15 @@ func (s *Service) RunAllChecks(ctx context.Context) Report {
 			resultsCh <- result
 		}(name)
 	}
-	
+
 	wg.Wait()
 	close(resultsCh)
-	
+
 	// Collect results
 	overallStatus := StatusHealthy
 	for result := range resultsCh {
 		report.Results = append(report.Results, result)
-		
+
 		switch result.Status {
 		case StatusHealthy:
 			report.Healthy++
@@ -216,16 +216,16 @@ func (s *Service) RunAllChecks(ctx context.Context) Report {
 			}
 		}
 	}
-	
+
 	report.Status = overallStatus
-	
+
 	s.log.Info("Health check report generated",
 		logger.String("status", string(report.Status)),
 		logger.Int("total", report.TotalChecks),
 		logger.Int("healthy", report.Healthy),
 		logger.Int("unhealthy", report.Unhealthy),
 	)
-	
+
 	return report
 }
 
@@ -239,12 +239,12 @@ func (s *Service) GetReport() Report {
 func (s *Service) GetCachedResults() map[string]Result {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	results := make(map[string]Result)
 	for k, v := range s.results {
 		results[k] = v
 	}
-	
+
 	return results
 }
 
@@ -252,10 +252,10 @@ func (s *Service) GetCachedResults() map[string]Result {
 func (s *Service) HTTPHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		
+
 		// Check for specific check name
 		checkName := r.URL.Query().Get("check")
-		
+
 		if checkName != "" {
 			// Run specific check
 			result, err := s.RunCheck(ctx, checkName)
@@ -263,21 +263,21 @@ func (s *Service) HTTPHandler() http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			
+
 			w.Header().Set("Content-Type", "application/json")
 			if result.Status != StatusHealthy {
 				w.WriteHeader(http.StatusServiceUnavailable)
 			}
-			
+
 			json.NewEncoder(w).Encode(result)
 			return
 		}
-		
+
 		// Run all checks
 		report := s.RunAllChecks(ctx)
-		
+
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		// Set appropriate HTTP status
 		switch report.Status {
 		case StatusHealthy:
@@ -287,7 +287,7 @@ func (s *Service) HTTPHandler() http.HandlerFunc {
 		case StatusUnhealthy:
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
-		
+
 		json.NewEncoder(w).Encode(report)
 	}
 }
@@ -310,15 +310,15 @@ func (s *Service) ReadinessHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		report := s.RunAllChecks(ctx)
-		
+
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		if report.Status == StatusUnhealthy {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		} else {
 			w.WriteHeader(http.StatusOK)
 		}
-		
+
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"ready":     report.Status != StatusUnhealthy,
 			"status":    report.Status,
@@ -332,7 +332,7 @@ func (s *Service) ReadinessHandler() http.HandlerFunc {
 // StartPeriodicChecks starts periodic health checks
 func (s *Service) StartPeriodicChecks(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
-	
+
 	go func() {
 		for {
 			select {
@@ -344,7 +344,7 @@ func (s *Service) StartPeriodicChecks(ctx context.Context, interval time.Duratio
 			}
 		}
 	}()
-	
+
 	s.log.Info("Started periodic health checks",
 		logger.Duration("interval", interval),
 	)
@@ -385,19 +385,19 @@ func (h *HealthChecker) Start(ctx context.Context) {
 // Check performs a health check (backward compatibility)
 func (h *HealthChecker) Check(ctx context.Context, checkType CheckType) (map[string]interface{}, error) {
 	report := h.service.RunAllChecks(ctx)
-	
+
 	result := map[string]interface{}{
 		"status":    string(report.Status),
 		"timestamp": report.Timestamp,
 		"checks":    len(report.Results),
 	}
-	
+
 	if checkType == CheckTypeReadiness {
 		result["ready"] = report.Status != StatusUnhealthy
 	} else if checkType == CheckTypeLiveness {
 		result["alive"] = true
 	}
-	
+
 	return result, nil
 }
 

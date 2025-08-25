@@ -43,18 +43,18 @@ import (
 	// GCP SDK
 
 	// Internal packages
-	"github.com/catherinevee/driftmgr/internal/infrastructure/cache"
-	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
-	"github.com/catherinevee/driftmgr/internal/deletion"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	"github.com/catherinevee/driftmgr/internal/core/drift"
-	"github.com/catherinevee/driftmgr/internal/utils/graceful"
 	"github.com/catherinevee/driftmgr/internal/core/models"
-	"github.com/catherinevee/driftmgr/internal/monitoring"
-	"github.com/catherinevee/driftmgr/internal/integration/notification"
 	"github.com/catherinevee/driftmgr/internal/core/remediation"
-	"github.com/catherinevee/driftmgr/internal/security/auth"
+	"github.com/catherinevee/driftmgr/internal/deletion"
+	"github.com/catherinevee/driftmgr/internal/infrastructure/cache"
+	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
+	"github.com/catherinevee/driftmgr/internal/integration/notification"
 	"github.com/catherinevee/driftmgr/internal/integration/terragrunt"
+	"github.com/catherinevee/driftmgr/internal/monitoring"
+	"github.com/catherinevee/driftmgr/internal/security/auth"
+	"github.com/catherinevee/driftmgr/internal/utils/graceful"
 	"github.com/catherinevee/driftmgr/internal/visualization"
 	"github.com/catherinevee/driftmgr/internal/workflow"
 	"github.com/catherinevee/driftmgr/internal/workspace"
@@ -188,9 +188,20 @@ func getGCPProjectID() (string, error) {
 }
 
 func main() {
+	// Print ASCII art on startup
+	fmt.Println(`     .___      .__  _____  __                         
+   __| _/______|__|/ ____\/  |_  _____    ___________ 
+  / __ |\_  __ \  \   __\\   __\/     \  / ___\_  __ \
+ / /_/ | |  | \/  ||  |   |  | |  Y Y  \/ /_/  >  | \/
+ \____ | |__|  |__||__|   |__| |__|_|  /\___  /|__|   
+      \/                             \//_____/        `)
+	fmt.Println()
+	fmt.Println("DriftMgr Server - Enterprise Edition")
+	fmt.Println()
+
 	// Set up panic recovery
 	defer graceful.RecoverPanic()
-	
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -4037,11 +4048,11 @@ func handleRemediate(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare response
 	response := struct {
-		Success    bool     `json:"success"`
-		ActionID   string   `json:"action_id"`
-		ResourceID string   `json:"resource_id"`
-		Changes    []string `json:"changes"`
-		Error      string   `json:"error,omitempty"`
+		Success    bool          `json:"success"`
+		ActionID   string        `json:"action_id"`
+		ResourceID string        `json:"resource_id"`
+		Changes    []string      `json:"changes"`
+		Error      string        `json:"error,omitempty"`
 		Duration   time.Duration `json:"duration"`
 	}{
 		Success:    result != nil && result.Success,

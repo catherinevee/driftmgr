@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
 	"github.com/catherinevee/driftmgr/internal/core/models"
+	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -38,7 +38,7 @@ func TestNewEnhancedDiscoverer(t *testing.T) {
 	}
 
 	discoverer := NewEnhancedDiscoverer(cfg)
-	
+
 	assert.NotNil(t, discoverer)
 	assert.NotNil(t, discoverer.config)
 	assert.NotNil(t, discoverer.cache)
@@ -48,12 +48,12 @@ func TestNewEnhancedDiscoverer(t *testing.T) {
 
 func TestDiscoverResources(t *testing.T) {
 	testCases := []struct {
-		name           string
-		regions        []string
-		mockResources  []models.Resource
-		expectedCount  int
-		expectError    bool
-		errorMessage   string
+		name          string
+		regions       []string
+		mockResources []models.Resource
+		expectedCount int
+		expectError   bool
+		errorMessage  string
 	}{
 		{
 			name:    "successful discovery",
@@ -197,8 +197,8 @@ func TestRegisterPlugin(t *testing.T) {
 	discoverer := NewEnhancedDiscoverer(cfg)
 
 	plugin := &DiscoveryPlugin{
-		Name:    "custom-plugin",
-		Enabled: true,
+		Name:     "custom-plugin",
+		Enabled:  true,
 		Priority: 10,
 		DiscoveryFn: func(ctx context.Context, provider, region string) ([]models.Resource, error) {
 			return []models.Resource{}, nil
@@ -259,7 +259,7 @@ func TestConcurrentDiscovery(t *testing.T) {
 	}
 
 	discoverer := NewEnhancedDiscoverer(cfg)
-	
+
 	// Track concurrent executions
 	concurrentCalls := 0
 	maxConcurrent := 0

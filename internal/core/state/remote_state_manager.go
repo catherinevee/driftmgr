@@ -10,12 +10,12 @@ import (
 	"path"
 	"strings"
 
+	"cloud.google.com/go/storage"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"cloud.google.com/go/storage"
 	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
@@ -150,10 +150,10 @@ func (rsm *RemoteStateManager) parseGCSState(config *RemoteStateConfig) (*models
 
 	// Get the bucket handle
 	bucket := client.Bucket(config.Bucket)
-	
+
 	// Get the object handle
 	obj := bucket.Object(objectName)
-	
+
 	// Read the object
 	reader, err := obj.NewReader(ctx)
 	if err != nil {
@@ -310,12 +310,12 @@ func (rsm *RemoteStateManager) listAzureStates(config *RemoteStateConfig) ([]str
 	if accountName == "" {
 		accountName = os.Getenv("AZURE_STORAGE_ACCOUNT")
 	}
-	
+
 	accountKey := os.Getenv("ARM_ACCESS_KEY")
 	if accountKey == "" {
 		accountKey = os.Getenv("AZURE_STORAGE_ACCESS_KEY")
 	}
-	
+
 	if accountName == "" || accountKey == "" {
 		// Try using Azure CLI
 		cmd := exec.Command("az", "storage", "blob", "list",
@@ -323,20 +323,20 @@ func (rsm *RemoteStateManager) listAzureStates(config *RemoteStateConfig) ([]str
 			"--account-name", config.StorageAccount,
 			"--query", "[?ends_with(name, '.tfstate')].name",
 			"--output", "json")
-		
+
 		output, err := cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list Azure blobs via CLI: %w", err)
 		}
-		
+
 		var stateFiles []string
 		if err := json.Unmarshal(output, &stateFiles); err != nil {
 			return nil, fmt.Errorf("failed to parse Azure CLI output: %w", err)
 		}
-		
+
 		return stateFiles, nil
 	}
-	
+
 	// Use Azure SDK if credentials are available
 	// Note: This requires adding Azure Storage SDK dependency
 	// For now, we'll use the CLI approach as primary method
@@ -349,17 +349,17 @@ func (rsm *RemoteStateManager) listGCSStates(config *RemoteStateConfig) ([]strin
 	cmd := exec.Command("gcloud", "storage", "ls",
 		fmt.Sprintf("gs://%s/", config.Bucket),
 		"--format=json")
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		// Fallback to gsutil
-		cmd = exec.Command("gsutil", "ls", 
+		cmd = exec.Command("gsutil", "ls",
 			fmt.Sprintf("gs://%s/*.tfstate", config.Bucket))
 		output, err = cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("failed to list GCS objects via CLI: %w", err)
 		}
-		
+
 		// Parse gsutil output (one file per line)
 		lines := strings.Split(string(output), "\n")
 		var stateFiles []string
@@ -375,7 +375,7 @@ func (rsm *RemoteStateManager) listGCSStates(config *RemoteStateConfig) ([]strin
 		}
 		return stateFiles, nil
 	}
-	
+
 	// Parse gcloud JSON output
 	var objects []struct {
 		Name string `json:"name"`
@@ -383,13 +383,13 @@ func (rsm *RemoteStateManager) listGCSStates(config *RemoteStateConfig) ([]strin
 	if err := json.Unmarshal(output, &objects); err != nil {
 		return nil, fmt.Errorf("failed to parse gcloud output: %w", err)
 	}
-	
+
 	var stateFiles []string
 	for _, obj := range objects {
 		if strings.HasSuffix(obj.Name, ".tfstate") {
 			stateFiles = append(stateFiles, obj.Name)
 		}
 	}
-	
+
 	return stateFiles, nil
 }

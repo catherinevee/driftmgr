@@ -162,7 +162,7 @@ func TestDiscoveryEngine_ParallelDiscovery(t *testing.T) {
 
 func TestDiscoveryEngine_RetryLogic(t *testing.T) {
 	mockProvider := new(MockProvider)
-	
+
 	// Setup mock to fail twice then succeed
 	callCount := 0
 	mockProvider.On("Name").Return("aws")
@@ -183,12 +183,12 @@ func TestDiscoveryEngine_RetryLogic(t *testing.T) {
 	)
 
 	ctx := context.Background()
-	
+
 	// Implement retry logic
 	var resources []models.Resource
 	var err error
 	maxRetries := 3
-	
+
 	for i := 0; i < maxRetries; i++ {
 		resources, err = mockProvider.DiscoverResources(ctx)
 		if err == nil {
@@ -212,10 +212,10 @@ func TestDiscoveryEngine_Filtering(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		filterFunc     func(models.Resource) bool
-		expectedCount  int
-		expectedIDs    []string
+		name          string
+		filterFunc    func(models.Resource) bool
+		expectedCount int
+		expectedIDs   []string
 	}{
 		{
 			name: "filter by production environment",
@@ -250,9 +250,9 @@ func TestDiscoveryEngine_Filtering(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filtered := filterResources(resources, tt.filterFunc)
-			
+
 			assert.Len(t, filtered, tt.expectedCount)
-			
+
 			ids := make([]string, len(filtered))
 			for i, r := range filtered {
 				ids[i] = r.ID
@@ -265,7 +265,7 @@ func TestDiscoveryEngine_Filtering(t *testing.T) {
 func TestDiscoveryEngine_Caching(t *testing.T) {
 	mockProvider := new(MockProvider)
 	callCount := 0
-	
+
 	mockProvider.On("Name").Return("aws")
 	mockProvider.On("DiscoverResources", mock.Anything).Return(
 		func(ctx context.Context) []models.Resource {
@@ -278,13 +278,13 @@ func TestDiscoveryEngine_Caching(t *testing.T) {
 	)
 
 	ctx := context.Background()
-	
+
 	// First call - should hit provider
 	resources1, err := mockProvider.DiscoverResources(ctx)
 	require.NoError(t, err)
 	assert.Len(t, resources1, 1)
 	assert.Equal(t, 1, callCount)
-	
+
 	// Second call - should use cache (simulated)
 	// In real implementation, this would check cache first
 	resources2, err := mockProvider.DiscoverResources(ctx)
@@ -348,12 +348,12 @@ func BenchmarkDiscoveryEngine_DiscoverResources(b *testing.B) {
 			Type: "EC2",
 		}
 	}
-	
+
 	mockProvider.On("Name").Return("aws")
 	mockProvider.On("DiscoverResources", mock.Anything).Return(resources, nil)
-	
+
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = mockProvider.DiscoverResources(ctx)
@@ -372,7 +372,7 @@ func BenchmarkDiscoveryEngine_Filtering(b *testing.B) {
 			},
 		}
 	}
-	
+
 	filterFunc := func(r models.Resource) bool {
 		tags, ok := r.Tags.(map[string]string)
 		if !ok {
@@ -380,7 +380,7 @@ func BenchmarkDiscoveryEngine_Filtering(b *testing.B) {
 		}
 		return tags["env"] == "production"
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = filterResources(resources, filterFunc)

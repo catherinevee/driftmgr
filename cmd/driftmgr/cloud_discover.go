@@ -8,10 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/credentials"
+	"github.com/catherinevee/driftmgr/internal/core/color"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
-	"github.com/catherinevee/driftmgr/internal/utils/graceful"
 	"github.com/catherinevee/driftmgr/internal/core/models"
+	"github.com/catherinevee/driftmgr/internal/core/progress"
+	"github.com/catherinevee/driftmgr/internal/credentials"
+	"github.com/catherinevee/driftmgr/internal/utils/graceful"
 )
 
 // handleCloudDiscover handles cloud resource discovery using local credentials
@@ -61,7 +63,7 @@ func handleCloudDiscover(args []string) {
 	}
 
 	// Initialize discovery engine
-	engine, err := discovery.NewEngine()
+	engine, err := discovery.NewEnhancedEngine()
 	if err != nil {
 		graceful.HandleError(err, "Failed to create discovery engine")
 		return
@@ -77,7 +79,10 @@ func handleCloudDiscover(args []string) {
 	var resources []models.Resource
 
 	if provider == "" || provider == "all" {
-		fmt.Println("Discovering resources across all configured providers...")
+		// Show loading animation
+		loadingAnim := progress.NewLoadingAnimation("Discovering resources across all providers")
+		loadingAnim.Start()
+
 		if allAccounts {
 			fmt.Println("Including all accessible accounts/subscriptions...")
 		}
@@ -85,36 +90,64 @@ func handleCloudDiscover(args []string) {
 		detector := credentials.NewCredentialDetector()
 		creds := detector.DetectAll()
 
+		// Count configured providers for progress bar
+		configuredCount := 0
 		for _, cred := range creds {
 			if cred.Status == "configured" {
-				providerName := strings.ToLower(cred.Provider)
-				config := discovery.Config{
-					Provider:     providerName,
-					OutputFormat: format,
-				}
-				providerResources, err := engine.Discover(config)
-				if err != nil {
-					fmt.Printf("Warning: Failed to discover %s resources: %v\n", providerName, err)
-					continue
-				}
-				resources = append(resources, providerResources...)
+				configuredCount++
 			}
 		}
-	} else {
-		fmt.Printf("Discovering %s resources...\n", provider)
-		if allAccounts {
-			fmt.Println("Including all accessible accounts/subscriptions...")
+
+		loadingAnim.Stop()
+
+		if configuredCount > 0 {
+			bar := progress.NewBar(configuredCount, "Discovering providers")
+
+			for _, cred := range creds {
+				if cred.Status == "configured" {
+					providerName := strings.ToLower(cred.Provider)
+
+					// Show spinner for individual provider
+					spinner := progress.NewSpinner(fmt.Sprintf("Scanning %s", cred.Provider))
+					spinner.Start()
+
+					config := discovery.Config{
+						Provider: providerName,
+					}
+					providerResources, err := engine.Discover(config)
+					if err != nil {
+						spinner.Error(fmt.Sprintf("Failed to discover %s resources", providerName))
+						continue
+					}
+
+					spinner.Success(fmt.Sprintf("Found %d resources in %s", len(providerResources), cred.Provider))
+					resources = append(resources, providerResources...)
+					bar.Increment()
+				}
+			}
+			bar.Complete()
 		}
+	} else {
+		// Single provider discovery with spinner
+		spinner := progress.NewBarSpinner(fmt.Sprintf("Discovering %s resources", provider))
+		spinner.Start()
+
+		if allAccounts {
+			spinner.UpdateMessage(fmt.Sprintf("Discovering %s resources (all accounts)", provider))
+		}
+
 		config := discovery.Config{
-			Provider:     provider,
-			OutputFormat: format,
+			Provider: provider,
 		}
 		var err error
 		resources, err = engine.Discover(config)
 		if err != nil {
+			spinner.Error(fmt.Sprintf("Failed to discover %s resources", provider))
 			graceful.HandleError(err, "Discovery failed")
 			return
 		}
+
+		spinner.Success(fmt.Sprintf("Discovered %d %s resources", len(resources), provider))
 	}
 
 	if len(resources) == 0 {
@@ -235,15 +268,28 @@ func displayResourcesSummary(resources []models.Resource) {
 		typeCount[resource.Type]++
 	}
 
-	fmt.Println("\n=== Discovery Summary ===")
-	fmt.Printf("Total Resources: %d\n\n", len(resources))
+	fmt.Printf("\n%s\n", color.Header("=== Discovery Summary ==="))
+	fmt.Printf("%s %s\n\n", color.Label("Total Resources:"), color.Count(len(resources)))
 
-	fmt.Println("By Provider:")
+	fmt.Println(color.Subheader("By Provider:"))
 	for provider, count := range providerCount {
-		fmt.Printf("  %s: %d\n", provider, count)
+		var providerColor string
+		switch strings.ToLower(provider) {
+		case "aws":
+			providerColor = color.AWS(provider)
+		case "azure":
+			providerColor = color.Azure(provider)
+		case "gcp":
+			providerColor = color.GCP(provider)
+		case "digitalocean":
+			providerColor = color.DigitalOcean(provider)
+		default:
+			providerColor = provider
+		}
+		fmt.Printf("  %s: %s\n", providerColor, color.Count(count))
 	}
 
-	fmt.Println("\nTop Resource Types:")
+	fmt.Printf("\n%s\n", color.Subheader("Top Resource Types:"))
 	displayed := 0
 	for resType, count := range typeCount {
 		if displayed >= 10 {

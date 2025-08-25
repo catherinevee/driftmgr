@@ -581,12 +581,12 @@ func (d *DigitalOceanDiscoverer) discoverSpaces(ctx context.Context) ([]models.R
 					"import_id":      spaceName,
 				},
 				Attributes: map[string]interface{}{
-					"origin":             cdn.Origin,
-					"endpoint":           cdn.Endpoint,
-					"created_at":         cdn.CreatedAt,
-					"ttl":                cdn.TTL,
-					"custom_domain":      cdn.CustomDomain,
-					"certificate_id":     cdn.CertificateID,
+					"origin":         cdn.Origin,
+					"endpoint":       cdn.Endpoint,
+					"created_at":     cdn.CreatedAt,
+					"ttl":            cdn.TTL,
+					"custom_domain":  cdn.CustomDomain,
+					"certificate_id": cdn.CertificateID,
 				},
 			}
 

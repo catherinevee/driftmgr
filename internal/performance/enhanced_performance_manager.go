@@ -24,13 +24,13 @@ type EnhancedPerformanceManager struct {
 
 // IncrementalConfig configures incremental discovery
 type IncrementalConfig struct {
-	Enabled            bool          `yaml:"enabled"`
-	StateFile          string        `yaml:"state_file"`
-	ChangeThreshold    float64       `yaml:"change_threshold"`
-	MaxDeltaSize       int           `yaml:"max_delta_size"`
-	CompressionEnabled bool          `yaml:"compression_enabled"`
-	BackupEnabled      bool          `yaml:"backup_enabled"`
-	RetentionDays      int           `yaml:"retention_days"`
+	Enabled            bool    `yaml:"enabled"`
+	StateFile          string  `yaml:"state_file"`
+	ChangeThreshold    float64 `yaml:"change_threshold"`
+	MaxDeltaSize       int     `yaml:"max_delta_size"`
+	CompressionEnabled bool    `yaml:"compression_enabled"`
+	BackupEnabled      bool    `yaml:"backup_enabled"`
+	RetentionDays      int     `yaml:"retention_days"`
 }
 
 // PredictiveConfig configures predictive caching
@@ -71,12 +71,12 @@ type DistributedConfig struct {
 
 // ProcessingConfig configures parallel processing
 type ProcessingConfig struct {
-	Enabled          bool   `yaml:"enabled"`
-	WorkerCount      int    `yaml:"worker_count"`
-	QueueSize        int    `yaml:"queue_size"`
-	BatchSize        int    `yaml:"batch_size"`
-	LoadBalancing    string `yaml:"load_balancing"`
-	FailureThreshold int    `yaml:"failure_threshold"`
+	Enabled           bool    `yaml:"enabled"`
+	WorkerCount       int     `yaml:"worker_count"`
+	QueueSize         int     `yaml:"queue_size"`
+	BatchSize         int     `yaml:"batch_size"`
+	LoadBalancing     string  `yaml:"load_balancing"`
+	FailureThreshold  int     `yaml:"failure_threshold"`
 	BackoffMultiplier float64 `yaml:"backoff_multiplier"`
 }
 
@@ -174,7 +174,7 @@ func NewEnhancedPerformanceManager(config *EnhancedConfig) *EnhancedPerformanceM
 	// Create storage for incremental discovery - not implemented yet
 	// stateStorage := NewFileStateStorage(config.IncrementalDiscovery.StateFile)
 	var stateStorage StateStorage = nil // placeholder
-	
+
 	// Create distributed cache first - not implemented yet
 	// distributedCache := NewDistributedCache(&DistributedCacheConfig{
 	//	RedisAddress: "localhost:6379",
@@ -185,27 +185,27 @@ func NewEnhancedPerformanceManager(config *EnhancedConfig) *EnhancedPerformanceM
 
 	epm := &EnhancedPerformanceManager{
 		incrementalDiscovery: NewIncrementalDiscovery(stateStorage, nil), // Config struct mismatch - use nil
-		predictiveCache:      NewPredictiveCache(distributedCache, nil), // Config struct mismatch - use nil
-		adaptiveConcurrency:  NewAdaptiveConcurrencyManager(ConcurrencyConfig{
+		predictiveCache:      NewPredictiveCache(distributedCache, nil),  // Config struct mismatch - use nil
+		adaptiveConcurrency: NewAdaptiveConcurrencyManager(ConcurrencyConfig{
 			MinWorkers:          config.AdaptiveConcurrency.MinConcurrency,
 			MaxWorkers:          config.AdaptiveConcurrency.MaxConcurrency,
 			TargetCPUPercent:    config.AdaptiveConcurrency.TargetCPUPercent,
 			TargetMemoryPercent: config.AdaptiveConcurrency.TargetMemoryPercent,
 			AdjustmentInterval:  config.AdaptiveConcurrency.AdjustmentInterval,
 		}),
-		compressionManager:   NewCompressionManager(&CompressionConfig{
+		compressionManager: NewCompressionManager(&CompressionConfig{
 			Algorithm:        config.Compression.Algorithm,
 			CompressionLevel: config.Compression.CompressionLevel,
 			MinSizeThreshold: config.Compression.MinSizeThreshold,
 			MaxSizeThreshold: config.Compression.MaxSizeThreshold,
 		}),
-		distributedCache:     distributedCache,
-		parallelProcessor:    NewParallelProcessor(&ProcessorConfig{
-			WorkerCount:   config.ParallelProcessing.WorkerCount,
-			QueueSize:     config.ParallelProcessing.QueueSize,
-			BatchSize:     config.ParallelProcessing.BatchSize,
+		distributedCache: distributedCache,
+		parallelProcessor: NewParallelProcessor(&ProcessorConfig{
+			WorkerCount: config.ParallelProcessing.WorkerCount,
+			QueueSize:   config.ParallelProcessing.QueueSize,
+			BatchSize:   config.ParallelProcessing.BatchSize,
 		}),
-		config:               config,
+		config: config,
 	}
 
 	// Start monitoring and optimization loop

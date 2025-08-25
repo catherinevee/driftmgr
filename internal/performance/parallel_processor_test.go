@@ -15,17 +15,17 @@ import (
 
 func TestNewParallelProcessor(t *testing.T) {
 	config := &ProcessorConfig{
-		WorkerCount:      4,
-		QueueSize:        100,
-		BatchSize:        10,
-		MaxRetries:       3,
-		BatchTimeout:     5 * time.Second,
-		StealThreshold:   5,
+		WorkerCount:       4,
+		QueueSize:         100,
+		BatchSize:         10,
+		MaxRetries:        3,
+		BatchTimeout:      5 * time.Second,
+		StealThreshold:    5,
 		WorkerIdleTimeout: 10 * time.Second,
 	}
 
 	processor := NewParallelProcessor(config)
-	
+
 	assert.NotNil(t, processor)
 	assert.Equal(t, config, processor.config)
 	assert.NotNil(t, processor.workers)
@@ -66,7 +66,7 @@ func TestProcessBatch(t *testing.T) {
 
 	// Test data
 	items := []interface{}{1, 2, 3, 4, 5}
-	
+
 	// Processor function that doubles the input
 	processorFunc := func(ctx context.Context, item interface{}) (interface{}, error) {
 		num, ok := item.(int)
@@ -97,7 +97,7 @@ func TestProcessBatchWithErrors(t *testing.T) {
 	})
 
 	items := []interface{}{"valid", "error", "valid2"}
-	
+
 	processorFunc := func(ctx context.Context, item interface{}) (interface{}, error) {
 		str, ok := item.(string)
 		if !ok {
@@ -114,15 +114,15 @@ func TestProcessBatchWithErrors(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Len(t, results, 3)
-	
+
 	// Check first result
 	assert.Equal(t, "valid_processed", results[0])
-	
+
 	// Check error result
 	errResult, isError := results[1].(error)
 	assert.True(t, isError)
 	assert.Contains(t, errResult.Error(), "processing error")
-	
+
 	// Check third result
 	assert.Equal(t, "valid2_processed", results[2])
 }
@@ -184,7 +184,7 @@ func TestConcurrentProcessing(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, results, 20)
 	assert.Equal(t, int32(20), atomic.LoadInt32(&counter))
-	
+
 	// With 4 workers processing 20 items that each take 10ms,
 	// it should take roughly 50ms (20/4 * 10ms), not 200ms (serial)
 	assert.Less(t, duration, 100*time.Millisecond)
@@ -196,7 +196,7 @@ func TestWorkStealing(t *testing.T) {
 		QueueSize:      100,
 		StealThreshold: 2,
 	}
-	
+
 	processor := NewParallelProcessor(config)
 	processor.stealer = &WorkStealer{
 		processor: processor,
@@ -210,7 +210,7 @@ func TestWorkStealing(t *testing.T) {
 	// Submit work items with different processing times
 	var wg sync.WaitGroup
 	results := make([]int, 10)
-	
+
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		idx := i
@@ -230,9 +230,9 @@ func TestWorkStealing(t *testing.T) {
 				"resultChan": make(chan WorkResult, 1),
 			},
 		}
-		
+
 		processor.workQueue <- workItem
-		
+
 		go func(idx int) {
 			defer wg.Done()
 			resultChan := workItem.Metadata["resultChan"].(chan WorkResult)
@@ -273,7 +273,7 @@ func TestRetryMechanism(t *testing.T) {
 			attemptCount++
 			count := attemptCount
 			mu.Unlock()
-			
+
 			if count < 3 {
 				return nil, errors.New("temporary error")
 			}

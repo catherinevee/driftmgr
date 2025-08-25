@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"github.com/catherinevee/driftmgr/internal/core/models"
 )
@@ -22,12 +23,13 @@ func NewDigitalOceanProvider() (*DigitalOceanProvider, error) {
 	}, nil
 }
 
-// Discover discovers DigitalOcean resources based on the config
-func (p *DigitalOceanProvider) Discover(config Config) ([]models.Resource, error) {
+// Discover discovers DigitalOcean resources based on the options
+func (p *DigitalOceanProvider) Discover(ctx context.Context, options DiscoveryOptions) (*Result, error) {
+	var allResources []models.Resource
+
 	// If specific regions are requested, we need to handle that
-	if len(config.Regions) > 0 {
-		var allResources []models.Resource
-		for _, region := range config.Regions {
+	if len(options.Regions) > 0 {
+		for _, region := range options.Regions {
 			discoverer, err := NewDigitalOceanDiscoverer(region)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create discoverer for region %s: %w", region, err)
@@ -38,16 +40,53 @@ func (p *DigitalOceanProvider) Discover(config Config) ([]models.Resource, error
 			}
 			allResources = append(allResources, resources...)
 		}
-		return allResources, nil
+	} else {
+		// Otherwise discover all regions
+		resources, err := p.discoverer.Discover()
+		if err != nil {
+			return nil, err
+		}
+		allResources = resources
 	}
 
-	// Otherwise discover all regions
-	return p.discoverer.Discover()
+	return &Result{
+		Resources: allResources,
+		Metadata: map[string]interface{}{
+			"provider":       "digitalocean",
+			"resource_count": len(allResources),
+			"regions":        options.Regions,
+		},
+	}, nil
 }
 
 // Name returns the provider name
 func (p *DigitalOceanProvider) Name() string {
-	return "digitalocean"
+	return "DigitalOcean"
+}
+
+// Regions returns the list of available DigitalOcean regions
+func (p *DigitalOceanProvider) Regions() []string {
+	return p.SupportedRegions()
+}
+
+// Services returns the list of available DigitalOcean services
+func (p *DigitalOceanProvider) Services() []string {
+	return []string{
+		"Droplets", "Kubernetes", "Databases", "Spaces",
+		"Load Balancers", "Volumes", "VPC", "App Platform",
+		"Monitoring", "CDN", "Container Registry", "Functions",
+	}
+}
+
+// GetAccountInfo returns DigitalOcean account information
+func (p *DigitalOceanProvider) GetAccountInfo(ctx context.Context) (*AccountInfo, error) {
+	return &AccountInfo{
+		ID:       "current",
+		Name:     "DigitalOcean Account",
+		Type:     "digitalocean",
+		Provider: "digitalocean",
+		Regions:  p.SupportedRegions(),
+	}, nil
 }
 
 // SupportedRegions returns the list of supported regions
@@ -88,4 +127,22 @@ func (p *DigitalOceanProvider) SupportedResourceTypes() []string {
 		"digitalocean_monitor_alert",
 		"digitalocean_record",
 	}
+}
+
+// ValidateCredentials validates DigitalOcean credentials
+func (p *DigitalOceanProvider) ValidateCredentials(ctx context.Context) error {
+	// For now, just return nil
+	return nil
+}
+
+// DiscoverRegion discovers resources in a specific region
+func (p *DigitalOceanProvider) DiscoverRegion(ctx context.Context, region string) ([]models.Resource, error) {
+	options := DiscoveryOptions{
+		Regions: []string{region},
+	}
+	result, err := p.Discover(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return result.Resources, nil
 }

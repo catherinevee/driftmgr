@@ -32,7 +32,7 @@ func TestNewTelemetry(t *testing.T) {
 	telemetry, err := New(context.Background(), config)
 	require.NoError(t, err)
 	assert.NotNil(t, telemetry)
-	
+
 	// Clean up
 	err = telemetry.Shutdown(context.Background())
 	assert.NoError(t, err)
@@ -69,7 +69,7 @@ func TestStartSpan(t *testing.T) {
 	newCtx, span := telemetry.StartSpan(ctx, "test-operation")
 	assert.NotNil(t, newCtx)
 	assert.NotNil(t, span)
-	
+
 	span.End()
 }
 
@@ -89,10 +89,10 @@ func TestRecordDiscovery(t *testing.T) {
 	defer telemetry.Shutdown(context.Background())
 
 	ctx := context.Background()
-	
+
 	// Test successful discovery
 	telemetry.RecordDiscovery(ctx, "aws", 100, 5*time.Second, nil)
-	
+
 	// Test failed discovery
 	telemetry.RecordDiscovery(ctx, "azure", 0, 10*time.Second, assert.AnError)
 }
@@ -164,10 +164,10 @@ func TestGlobalTelemetry(t *testing.T) {
 
 	telemetry, err := New(context.Background(), config)
 	require.NoError(t, err)
-	
+
 	Set(telemetry)
 	assert.Equal(t, telemetry, Get())
-	
+
 	defer telemetry.Shutdown(context.Background())
 }
 
@@ -187,7 +187,7 @@ func TestTelemetryWithLabels(t *testing.T) {
 	defer telemetry.Shutdown(context.Background())
 
 	ctx := context.Background()
-	
+
 	// Create span with attributes
 	ctx, span := telemetry.StartSpan(ctx, "test-operation",
 		WithAttributes(map[string]interface{}{
@@ -214,7 +214,7 @@ func TestConcurrentTelemetry(t *testing.T) {
 	defer telemetry.Shutdown(context.Background())
 
 	ctx := context.Background()
-	
+
 	// Test concurrent metric recording
 	done := make(chan bool, 10)
 	for i := 0; i < 10; i++ {
@@ -223,7 +223,7 @@ func TestConcurrentTelemetry(t *testing.T) {
 			done <- true
 		}(i)
 	}
-	
+
 	// Wait for all goroutines
 	for i := 0; i < 10; i++ {
 		<-done
@@ -243,9 +243,9 @@ func BenchmarkStartSpan(b *testing.B) {
 
 	telemetry, _ := New(context.Background(), config)
 	defer telemetry.Shutdown(context.Background())
-	
+
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, span := telemetry.StartSpan(ctx, "benchmark-operation")
@@ -266,9 +266,9 @@ func BenchmarkRecordMetric(b *testing.B) {
 
 	telemetry, _ := New(context.Background(), config)
 	defer telemetry.Shutdown(context.Background())
-	
+
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		telemetry.RecordDiscovery(ctx, "aws", 100, time.Second, nil)

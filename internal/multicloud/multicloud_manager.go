@@ -9,8 +9,8 @@ import (
 	"github.com/catherinevee/driftmgr/internal/core/analysis"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	"github.com/catherinevee/driftmgr/internal/core/models"
-	"github.com/catherinevee/driftmgr/internal/performance"
 	"github.com/catherinevee/driftmgr/internal/core/remediation"
+	"github.com/catherinevee/driftmgr/internal/performance"
 )
 
 // MultiCloudManager provides unified multi-cloud resource management

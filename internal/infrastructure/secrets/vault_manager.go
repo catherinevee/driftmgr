@@ -10,10 +10,10 @@ import (
 
 	vault "github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/api/auth/kubernetes"
-	
-	"github.com/catherinevee/driftmgr/internal/utils/errors"
+
 	"github.com/catherinevee/driftmgr/internal/observability/logging"
 	"github.com/catherinevee/driftmgr/internal/utils/circuit"
+	"github.com/catherinevee/driftmgr/internal/utils/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -108,9 +108,9 @@ func NewVaultManager(cfg *Config) (*VaultManager, error) {
 		renewalStopChan: make(chan struct{}),
 		logger:          func() *zerolog.Logger { l := logging.WithComponent("vault"); return &l }(),
 		circuitBreaker: resilience.NewCircuitBreaker(resilience.Config{
-			Name:            "vault",
-			MaxFailures:     5,
-			ResetTimeout:    30 * time.Second,
+			Name:             "vault",
+			MaxFailures:      5,
+			ResetTimeout:     30 * time.Second,
 			HalfOpenMaxCalls: 3,
 		}),
 	}
@@ -230,7 +230,7 @@ func (vm *VaultManager) GetSecret(ctx context.Context, path string) (map[string]
 // fetchSecret fetches a secret from Vault
 func (vm *VaultManager) fetchSecret(path string) (map[string]interface{}, error) {
 	fullPath := fmt.Sprintf("%s/data/%s", vm.mountPath, path)
-	
+
 	secret, err := vm.client.Logical().Read(fullPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, errors.ErrorTypeProvider, "failed to read secret from path %s", path)
@@ -252,23 +252,23 @@ func (vm *VaultManager) fetchSecret(path string) (map[string]interface{}, error)
 func (vm *VaultManager) PutSecret(ctx context.Context, path string, data map[string]interface{}) error {
 	_, err := vm.circuitBreaker.Call(ctx, func() (interface{}, error) {
 		fullPath := fmt.Sprintf("%s/data/%s", vm.mountPath, path)
-		
+
 		// For KV v2, wrap the data
 		wrappedData := map[string]interface{}{
 			"data": data,
 		}
-		
+
 		_, err := vm.client.Logical().Write(fullPath, wrappedData)
 		if err != nil {
 			return nil, errors.Wrapf(err, errors.ErrorTypeProvider, "failed to write secret to path %s", path)
 		}
-		
+
 		// Invalidate cache for this path
 		vm.invalidateCache(path)
-		
+
 		return nil, nil
 	})
-	
+
 	return err
 }
 
@@ -276,18 +276,18 @@ func (vm *VaultManager) PutSecret(ctx context.Context, path string, data map[str
 func (vm *VaultManager) DeleteSecret(ctx context.Context, path string) error {
 	_, err := vm.circuitBreaker.Call(ctx, func() (interface{}, error) {
 		fullPath := fmt.Sprintf("%s/metadata/%s", vm.mountPath, path)
-		
+
 		_, err := vm.client.Logical().Delete(fullPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, errors.ErrorTypeProvider, "failed to delete secret at path %s", path)
 		}
-		
+
 		// Invalidate cache for this path
 		vm.invalidateCache(path)
-		
+
 		return nil, nil
 	})
-	
+
 	return err
 }
 
@@ -343,11 +343,11 @@ func (vm *VaultManager) RotateCredentials(ctx context.Context, provider string) 
 	vm.logger.Info().
 		Str("provider", provider).
 		Msg("credential rotation requested")
-	
+
 	// Invalidate cached credentials
 	path := fmt.Sprintf("cloud/%s/credentials", provider)
 	vm.invalidateCache(path)
-	
+
 	return nil
 }
 
@@ -357,25 +357,25 @@ func (vm *VaultManager) EncryptData(ctx context.Context, keyName string, plainte
 		data := map[string]interface{}{
 			"plaintext": base64.StdEncoding.EncodeToString(plaintext),
 		}
-		
+
 		path := fmt.Sprintf("transit/encrypt/%s", keyName)
 		secret, err := vm.client.Logical().Write(path, data)
 		if err != nil {
 			return nil, errors.Wrapf(err, errors.ErrorTypeProvider, "failed to encrypt data")
 		}
-		
+
 		ciphertext, ok := secret.Data["ciphertext"].(string)
 		if !ok {
 			return nil, errors.New(errors.ErrorTypeInternal, "invalid response from Vault transit engine")
 		}
-		
+
 		return ciphertext, nil
 	})
-	
+
 	if err != nil {
 		return "", err
 	}
-	
+
 	return result.(string), nil
 }
 
@@ -385,30 +385,30 @@ func (vm *VaultManager) DecryptData(ctx context.Context, keyName string, ciphert
 		data := map[string]interface{}{
 			"ciphertext": ciphertext,
 		}
-		
+
 		path := fmt.Sprintf("transit/decrypt/%s", keyName)
 		secret, err := vm.client.Logical().Write(path, data)
 		if err != nil {
 			return nil, errors.Wrapf(err, errors.ErrorTypeProvider, "failed to decrypt data")
 		}
-		
+
 		plaintextB64, ok := secret.Data["plaintext"].(string)
 		if !ok {
 			return nil, errors.New(errors.ErrorTypeInternal, "invalid response from Vault transit engine")
 		}
-		
+
 		plaintext, err := base64.StdEncoding.DecodeString(plaintextB64)
 		if err != nil {
 			return nil, errors.Wrapf(err, errors.ErrorTypeInternal, "failed to decode plaintext")
 		}
-		
+
 		return plaintext, nil
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return result.([]byte), nil
 }
 
@@ -502,7 +502,7 @@ func getEnvOrDefault(key, defaultValue string) string {
 
 // CloudCredentials represents cloud provider credentials
 type CloudCredentials struct {
-	Provider     string                    `json:"provider"`
+	Provider     string                   `json:"provider"`
 	AWS          *AWSCredentials          `json:"aws,omitempty"`
 	Azure        *AzureCredentials        `json:"azure,omitempty"`
 	GCP          *GCPCredentials          `json:"gcp,omitempty"`

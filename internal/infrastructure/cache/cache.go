@@ -96,11 +96,11 @@ func (c *CacheManager) Clear() error {
 func (c *CacheManager) GetStats() *CacheStats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	validEntries := 0
 	expiredEntries := 0
 	now := time.Now()
-	
+
 	for _, entry := range c.cache {
 		if now.After(entry.ExpiresAt) {
 			expiredEntries++
@@ -108,7 +108,7 @@ func (c *CacheManager) GetStats() *CacheStats {
 			validEntries++
 		}
 	}
-	
+
 	return &CacheStats{
 		TotalEntries:   len(c.cache),
 		ValidEntries:   validEntries,

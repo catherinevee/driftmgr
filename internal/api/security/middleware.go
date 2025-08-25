@@ -12,8 +12,8 @@ import (
 	"github.com/catherinevee/driftmgr/internal/api/auth"
 	"github.com/catherinevee/driftmgr/internal/api/validation"
 	"github.com/catherinevee/driftmgr/internal/observability/logging"
-	"github.com/catherinevee/driftmgr/internal/security/ratelimit"
 	"github.com/catherinevee/driftmgr/internal/security/auth"
+	"github.com/catherinevee/driftmgr/internal/security/ratelimit"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
@@ -32,37 +32,37 @@ type SecurityMiddleware struct {
 type Config struct {
 	// EnableAuth enables authentication
 	EnableAuth bool `json:"enable_auth"`
-	
+
 	// EnableRateLimit enables rate limiting
 	EnableRateLimit bool `json:"enable_rate_limit"`
-	
+
 	// EnableValidation enables input validation
 	EnableValidation bool `json:"enable_validation"`
-	
+
 	// EnableCSRF enables CSRF protection
 	EnableCSRF bool `json:"enable_csrf"`
-	
+
 	// EnableCORS enables CORS
 	EnableCORS bool `json:"enable_cors"`
-	
+
 	// CORSOrigins is the list of allowed origins
 	CORSOrigins []string `json:"cors_origins"`
-	
+
 	// EnableSecurityHeaders enables security headers
 	EnableSecurityHeaders bool `json:"enable_security_headers"`
-	
+
 	// EnableAuditLog enables audit logging
 	EnableAuditLog bool `json:"enable_audit_log"`
-	
+
 	// CSRFTokenHeader is the header name for CSRF tokens
 	CSRFTokenHeader string `json:"csrf_token_header"`
-	
+
 	// SessionTimeout is the session timeout duration
 	SessionTimeout time.Duration `json:"session_timeout"`
-	
+
 	// EnableIPWhitelist enables IP whitelisting
 	EnableIPWhitelist bool `json:"enable_ip_whitelist"`
-	
+
 	// IPWhitelist is the list of allowed IPs
 	IPWhitelist []string `json:"ip_whitelist"`
 }
@@ -90,15 +90,15 @@ func NewSecurityMiddleware(authManager *security.AuthManager, config *Config) *S
 	if config == nil {
 		config = DefaultConfig()
 	}
-	
+
 	logger := logging.WithComponent("security-middleware")
-	
+
 	// Create CORS allowed origins map
 	corsOrigins := make(map[string]bool)
 	for _, origin := range config.CORSOrigins {
 		corsOrigins[origin] = true
 	}
-	
+
 	return &SecurityMiddleware{
 		authMiddleware:     auth.NewAuthMiddleware(authManager, nil),
 		rateLimiter:        ratelimit.NewRateLimiter(nil),
@@ -113,50 +113,50 @@ func NewSecurityMiddleware(authManager *security.AuthManager, config *Config) *S
 func (sm *SecurityMiddleware) Secure(handler http.HandlerFunc) http.HandlerFunc {
 	// Build middleware chain (order matters!)
 	secured := handler
-	
+
 	// Audit logging (innermost - logs the actual request)
 	if sm.config.EnableAuditLog {
 		secured = sm.auditLog(secured)
 	}
-	
+
 	// Input validation
 	if sm.config.EnableValidation {
 		secured = sm.requestValidator.ValidateRequest(secured)
 	}
-	
+
 	// CSRF protection
 	if sm.config.EnableCSRF {
 		secured = sm.csrfProtection(secured)
 	}
-	
+
 	// Authentication
 	if sm.config.EnableAuth {
 		secured = sm.authMiddleware.Authenticate(secured)
 	}
-	
+
 	// Rate limiting
 	if sm.config.EnableRateLimit {
 		secured = sm.rateLimiter.Middleware(secured)
 	}
-	
+
 	// IP whitelist (if enabled)
 	if sm.config.EnableIPWhitelist {
 		secured = sm.ipWhitelist(secured)
 	}
-	
+
 	// CORS
 	if sm.config.EnableCORS {
 		secured = sm.cors(secured)
 	}
-	
+
 	// Security headers (outermost)
 	if sm.config.EnableSecurityHeaders {
 		secured = sm.securityHeaders(secured)
 	}
-	
+
 	// Request ID and tracing
 	secured = sm.requestID(secured)
-	
+
 	return secured
 }
 
@@ -171,11 +171,11 @@ func (sm *SecurityMiddleware) securityHeaders(next http.HandlerFunc) http.Handle
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-		
+
 		// Remove sensitive headers
 		w.Header().Del("Server")
 		w.Header().Del("X-Powered-By")
-		
+
 		next(w, r)
 	}
 }
@@ -184,7 +184,7 @@ func (sm *SecurityMiddleware) securityHeaders(next http.HandlerFunc) http.Handle
 func (sm *SecurityMiddleware) cors(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		
+
 		// Check if origin is allowed
 		if sm.corsAllowedOrigins[origin] || sm.corsAllowedOrigins["*"] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -193,13 +193,13 @@ func (sm *SecurityMiddleware) cors(next http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Request-ID")
 			w.Header().Set("Access-Control-Max-Age", "3600")
 		}
-		
+
 		// Handle preflight requests
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		
+
 		next(w, r)
 	}
 }
@@ -212,14 +212,14 @@ func (sm *SecurityMiddleware) csrfProtection(next http.HandlerFunc) http.Handler
 			next(w, r)
 			return
 		}
-		
+
 		// Get CSRF token from header
 		token := r.Header.Get(sm.config.CSRFTokenHeader)
 		if token == "" {
 			sm.sendError(w, http.StatusForbidden, "CSRF token required")
 			return
 		}
-		
+
 		// Validate CSRF token (simplified - in production use a proper CSRF library)
 		expectedToken := sm.getExpectedCSRFToken(r)
 		if subtle.ConstantTimeCompare([]byte(token), []byte(expectedToken)) != 1 {
@@ -230,7 +230,7 @@ func (sm *SecurityMiddleware) csrfProtection(next http.HandlerFunc) http.Handler
 			sm.sendError(w, http.StatusForbidden, "invalid CSRF token")
 			return
 		}
-		
+
 		next(w, r)
 	}
 }
@@ -243,7 +243,7 @@ func (sm *SecurityMiddleware) ipWhitelist(next http.HandlerFunc) http.HandlerFun
 		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 			clientIP = strings.Split(forwarded, ",")[0]
 		}
-		
+
 		// Check if IP is whitelisted
 		allowed := false
 		for _, ip := range sm.config.IPWhitelist {
@@ -252,7 +252,7 @@ func (sm *SecurityMiddleware) ipWhitelist(next http.HandlerFunc) http.HandlerFun
 				break
 			}
 		}
-		
+
 		if !allowed {
 			sm.logger.Warn().
 				Str("ip", clientIP).
@@ -260,7 +260,7 @@ func (sm *SecurityMiddleware) ipWhitelist(next http.HandlerFunc) http.HandlerFun
 			sm.sendError(w, http.StatusForbidden, "access denied")
 			return
 		}
-		
+
 		next(w, r)
 	}
 }
@@ -269,29 +269,29 @@ func (sm *SecurityMiddleware) ipWhitelist(next http.HandlerFunc) http.HandlerFun
 func (sm *SecurityMiddleware) auditLog(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
-		
+
 		// Create response writer wrapper to capture status
 		wrapped := &responseWriter{
 			ResponseWriter: w,
 			statusCode:     http.StatusOK,
 		}
-		
+
 		// Get request ID
 		requestID := r.Context().Value("request_id").(string)
-		
+
 		// Get user info if authenticated
 		var userID, username string
 		if user := auth.GetUser(r.Context()); user != nil {
 			userID = user.ID
 			username = user.Username
 		}
-		
+
 		// Process request
 		next(wrapped, r)
-		
+
 		// Log audit entry
 		duration := time.Since(startTime)
-		
+
 		sm.logger.Info().
 			Str("request_id", requestID).
 			Str("method", r.Method).
@@ -315,13 +315,13 @@ func (sm *SecurityMiddleware) requestID(next http.HandlerFunc) http.HandlerFunc 
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
-		
+
 		// Add to context
 		ctx := context.WithValue(r.Context(), "request_id", requestID)
-		
+
 		// Add to response header
 		w.Header().Set("X-Request-ID", requestID)
-		
+
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -340,13 +340,13 @@ func (sm *SecurityMiddleware) getExpectedCSRFToken(r *http.Request) string {
 func (sm *SecurityMiddleware) sendError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	
+
 	response := map[string]interface{}{
 		"error":     message,
 		"status":    status,
 		"timestamp": time.Now().Unix(),
 	}
-	
+
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -371,10 +371,10 @@ func (sm *SecurityMiddleware) GetStats() map[string]interface{} {
 		"cors_enabled":       sm.config.EnableCORS,
 		"audit_log_enabled":  sm.config.EnableAuditLog,
 	}
-	
+
 	if sm.config.EnableRateLimit {
 		stats["rate_limit_stats"] = sm.rateLimiter.GetStats()
 	}
-	
+
 	return stats
 }

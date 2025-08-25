@@ -36,23 +36,23 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := New(tt.errType, tt.message)
-			
+
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
-			
+
 			if err.Type != tt.errType {
 				t.Errorf("expected type %v, got %v", tt.errType, err.Type)
 			}
-			
+
 			if err.Message != tt.message {
 				t.Errorf("expected message %q, got %q", tt.message, err.Message)
 			}
-			
+
 			if !strings.Contains(err.Error(), tt.expected) {
 				t.Errorf("expected error string to contain %q, got %q", tt.expected, err.Error())
 			}
-			
+
 			if err.StackTrace == "" {
 				t.Error("expected stack trace to be captured")
 			}
@@ -62,11 +62,11 @@ func TestNew(t *testing.T) {
 
 func TestNewf(t *testing.T) {
 	err := Newf(ErrorTypeValidation, "field %s is required", "username")
-	
+
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	
+
 	expectedMessage := "field username is required"
 	if err.Message != expectedMessage {
 		t.Errorf("expected message %q, got %q", expectedMessage, err.Message)
@@ -75,7 +75,7 @@ func TestNewf(t *testing.T) {
 
 func TestWrap(t *testing.T) {
 	originalErr := errors.New("original error")
-	
+
 	tests := []struct {
 		name          string
 		err           error
@@ -112,22 +112,22 @@ func TestWrap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wrapped := Wrap(tt.err, tt.errType, tt.message)
-			
+
 			if tt.expectNil {
 				if wrapped != nil {
 					t.Errorf("expected nil, got %v", wrapped)
 				}
 				return
 			}
-			
+
 			if wrapped == nil {
 				t.Fatal("expected error, got nil")
 			}
-			
+
 			if tt.expectedCause != nil && wrapped.Cause != tt.expectedCause {
 				t.Errorf("expected cause %v, got %v", tt.expectedCause, wrapped.Cause)
 			}
-			
+
 			if !strings.Contains(wrapped.Error(), tt.message) {
 				t.Errorf("expected error to contain %q, got %q", tt.message, wrapped.Error())
 			}
@@ -138,16 +138,16 @@ func TestWrap(t *testing.T) {
 func TestWrapf(t *testing.T) {
 	originalErr := errors.New("database connection failed")
 	wrapped := Wrapf(originalErr, ErrorTypeInternal, "failed to connect to %s", "PostgreSQL")
-	
+
 	if wrapped == nil {
 		t.Fatal("expected error, got nil")
 	}
-	
+
 	expectedMessage := "failed to connect to PostgreSQL"
 	if wrapped.Message != expectedMessage {
 		t.Errorf("expected message %q, got %q", expectedMessage, wrapped.Message)
 	}
-	
+
 	if wrapped.Cause != originalErr {
 		t.Errorf("expected cause to be original error")
 	}
@@ -279,23 +279,23 @@ func TestGetType(t *testing.T) {
 
 func TestWithDetails(t *testing.T) {
 	err := New(ErrorTypeValidation, "validation failed")
-	
+
 	err.WithDetails("field", "username").
 		WithDetails("value", "invalid@user").
 		WithDetails("reason", "contains invalid characters")
-	
+
 	if err.Details == nil {
 		t.Fatal("expected details to be set")
 	}
-	
+
 	if err.Details["field"] != "username" {
 		t.Errorf("expected field to be 'username', got %v", err.Details["field"])
 	}
-	
+
 	if err.Details["value"] != "invalid@user" {
 		t.Errorf("expected value to be 'invalid@user', got %v", err.Details["value"])
 	}
-	
+
 	if err.Details["reason"] != "contains invalid characters" {
 		t.Errorf("expected reason to be 'contains invalid characters', got %v", err.Details["reason"])
 	}
@@ -367,12 +367,12 @@ func TestHelperFunctions(t *testing.T) {
 func TestUnwrap(t *testing.T) {
 	originalErr := errors.New("original error")
 	wrapped := Wrap(originalErr, ErrorTypeInternal, "wrapped")
-	
+
 	unwrapped := wrapped.Unwrap()
 	if unwrapped != originalErr {
 		t.Errorf("expected unwrapped error to be original error")
 	}
-	
+
 	// Test unwrap on error without cause
 	err := New(ErrorTypeValidation, "test")
 	if err.Unwrap() != nil {
@@ -382,11 +382,11 @@ func TestUnwrap(t *testing.T) {
 
 func TestStackTrace(t *testing.T) {
 	err := New(ErrorTypeInternal, "test error")
-	
+
 	if err.StackTrace == "" {
 		t.Error("expected stack trace to be captured")
 	}
-	
+
 	// Stack trace should contain this test function
 	if !strings.Contains(err.StackTrace, "TestStackTrace") {
 		t.Error("expected stack trace to contain test function name")
@@ -404,7 +404,7 @@ func BenchmarkNew(b *testing.B) {
 func BenchmarkWrap(b *testing.B) {
 	originalErr := errors.New("original error")
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = Wrap(originalErr, ErrorTypeInternal, "wrapped error")
 	}
@@ -413,7 +413,7 @@ func BenchmarkWrap(b *testing.B) {
 func BenchmarkIs(b *testing.B) {
 	err := New(ErrorTypeValidation, "test")
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = Is(err, ErrorTypeValidation)
 	}

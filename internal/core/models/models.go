@@ -13,7 +13,7 @@ type Resource struct {
 	Region       string                 `json:"region"`
 	AccountID    string                 `json:"account_id,omitempty"`
 	AccountName  string                 `json:"account_name,omitempty"`
-	Tags         interface{}            `json:"tags,omitempty"` // Can be map[string]string or []string
+	Tags         interface{}            `json:"tags,omitempty"`  // Can be map[string]string or []string
 	State        interface{}            `json:"state,omitempty"` // Can be string or map[string]interface{}
 	Status       string                 `json:"status,omitempty"`
 	Created      time.Time              `json:"created,omitempty"`

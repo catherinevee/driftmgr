@@ -19,21 +19,21 @@ type HealthServer struct {
 // NewHealthServer creates a new health server
 func NewHealthServer(db *sql.DB) *HealthServer {
 	checker := health.NewHealthChecker(5 * time.Second)
-	
+
 	// Add database check
 	if db != nil {
 		checker.RegisterCheck(&DatabaseCheck{db: db})
 	}
-	
+
 	// Add API check
 	checker.RegisterCheck(&APICheck{})
-	
+
 	// Add discovery service check
 	checker.RegisterCheck(&DiscoveryCheck{})
-	
+
 	// Start background health checks
 	checker.Start(context.Background())
-	
+
 	return &HealthServer{
 		checker: checker,
 		db:      db,
@@ -53,13 +53,13 @@ func (h *HealthServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	if statusStr, ok := status["status"].(string); ok && statusStr != "healthy" {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	
+
 	json.NewEncoder(w).Encode(status)
 }
 
@@ -70,17 +70,17 @@ func (h *HealthServer) handleLiveness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	if statusStr, ok := status["status"].(string); ok && statusStr != "healthy" {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
-	
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": status["status"],
+		"status":    status["status"],
 		"timestamp": time.Now().UTC(),
 	})
 }
@@ -92,19 +92,19 @@ func (h *HealthServer) handleReadiness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	ready, _ := status["ready"].(bool)
 	if !ready {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
-	
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": status["status"],
-		"ready": ready,
+		"status":    status["status"],
+		"ready":     ready,
 		"timestamp": time.Now().UTC(),
 	})
 }
@@ -122,10 +122,10 @@ func (d *DatabaseCheck) Check(ctx context.Context) error {
 	if d.db == nil {
 		return nil // No database configured
 	}
-	
+
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	
+
 	return d.db.PingContext(ctx)
 }
 

@@ -14,7 +14,7 @@ func TestNewValidator(t *testing.T) {
 		assert.NotNil(t, v.config)
 		assert.Equal(t, 10000, v.config.MaxStringLength)
 	})
-	
+
 	t.Run("with custom config", func(t *testing.T) {
 		config := &Config{
 			MaxStringLength: 5000,
@@ -33,7 +33,7 @@ func TestValidateString(t *testing.T) {
 		StrictMode:      true,
 		AllowHTML:       false,
 	})
-	
+
 	tests := []struct {
 		name      string
 		input     string
@@ -77,7 +77,7 @@ func TestValidateString(t *testing.T) {
 			expected:  "",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := v.ValidateString(tt.input, tt.fieldName)
@@ -93,7 +93,7 @@ func TestValidateString(t *testing.T) {
 
 func TestValidateEmail(t *testing.T) {
 	v := NewValidator(nil)
-	
+
 	tests := []struct {
 		name    string
 		email   string
@@ -108,7 +108,7 @@ func TestValidateEmail(t *testing.T) {
 		{"invalid - multiple @", "test@@example.com", true},
 		{"invalid - spaces", "test @example.com", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := v.ValidateEmail(tt.email)
@@ -123,7 +123,7 @@ func TestValidateEmail(t *testing.T) {
 
 func TestValidateURL(t *testing.T) {
 	v := NewValidator(&Config{StrictMode: true})
-	
+
 	tests := []struct {
 		name    string
 		url     string
@@ -139,7 +139,7 @@ func TestValidateURL(t *testing.T) {
 		{"invalid - 127.0.0.1 in strict mode", "http://127.0.0.1", true},
 		{"invalid - no host", "http://", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := v.ValidateURL(tt.url)
@@ -154,7 +154,7 @@ func TestValidateURL(t *testing.T) {
 
 func TestValidateIP(t *testing.T) {
 	v := NewValidator(&Config{StrictMode: true})
-	
+
 	tests := []struct {
 		name    string
 		ip      string
@@ -167,7 +167,7 @@ func TestValidateIP(t *testing.T) {
 		{"invalid - not an IP", "not.an.ip", true},
 		{"invalid - empty", "", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := v.ValidateIP(tt.ip)
@@ -185,7 +185,7 @@ func TestValidateJSON(t *testing.T) {
 		MaxJSONDepth:    3,
 		MaxStringLength: 1000,
 	})
-	
+
 	tests := []struct {
 		name    string
 		json    string
@@ -217,7 +217,7 @@ func TestValidateJSON(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := v.ValidateJSON(tt.json)
@@ -233,7 +233,7 @@ func TestValidateJSON(t *testing.T) {
 
 func TestValidateCloudResourceID(t *testing.T) {
 	v := NewValidator(nil)
-	
+
 	tests := []struct {
 		name       string
 		resourceID string
@@ -286,7 +286,7 @@ func TestValidateCloudResourceID(t *testing.T) {
 			wantErr:    true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := v.ValidateCloudResourceID(tt.resourceID, tt.provider)
@@ -301,7 +301,7 @@ func TestValidateCloudResourceID(t *testing.T) {
 
 func TestValidateFilePath(t *testing.T) {
 	v := NewValidator(&Config{StrictMode: true})
-	
+
 	tests := []struct {
 		name    string
 		path    string
@@ -314,7 +314,7 @@ func TestValidateFilePath(t *testing.T) {
 		{"invalid - command injection chars", "/home/user; rm -rf /", true},
 		{"invalid - too long", strings.Repeat("a", 4097), true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := v.ValidateFilePath(tt.path)
@@ -329,7 +329,7 @@ func TestValidateFilePath(t *testing.T) {
 
 func TestValidateCommand(t *testing.T) {
 	v := NewValidator(nil)
-	
+
 	tests := []struct {
 		name    string
 		cmd     string
@@ -341,7 +341,7 @@ func TestValidateCommand(t *testing.T) {
 		{"invalid - drop table", "DROP TABLE users", true},
 		{"invalid - command injection", "ls; cat /etc/passwd", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := v.ValidateCommand(tt.cmd)
@@ -359,7 +359,7 @@ func TestSanitizeString(t *testing.T) {
 		AllowHTML:    false,
 		AllowScripts: false,
 	})
-	
+
 	tests := []struct {
 		name     string
 		input    string
@@ -391,7 +391,7 @@ func TestSanitizeString(t *testing.T) {
 			expected: "hello world",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := v.sanitizeString(tt.input)
@@ -402,7 +402,7 @@ func TestSanitizeString(t *testing.T) {
 
 func TestGetJSONDepth(t *testing.T) {
 	v := NewValidator(nil)
-	
+
 	tests := []struct {
 		name     string
 		data     interface{}
@@ -435,7 +435,7 @@ func TestGetJSONDepth(t *testing.T) {
 			expected: 0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			depth := v.getJSONDepth(tt.data)
@@ -447,7 +447,7 @@ func TestGetJSONDepth(t *testing.T) {
 func BenchmarkValidateString(b *testing.B) {
 	v := NewValidator(nil)
 	input := "This is a test string with some content"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = v.ValidateString(input, "benchmark")
@@ -457,7 +457,7 @@ func BenchmarkValidateString(b *testing.B) {
 func BenchmarkValidateJSON(b *testing.B) {
 	v := NewValidator(nil)
 	json := `{"key": "value", "nested": {"field": "data"}}`
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = v.ValidateJSON(json)
@@ -467,7 +467,7 @@ func BenchmarkValidateJSON(b *testing.B) {
 func BenchmarkSanitizeString(b *testing.B) {
 	v := NewValidator(nil)
 	input := "<script>alert('test')</script>Hello World!"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = v.sanitizeString(input)

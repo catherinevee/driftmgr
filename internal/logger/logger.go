@@ -22,7 +22,7 @@ type Logger interface {
 	Warn(msg string, fields ...Field)
 	Error(msg string, fields ...Field)
 	Fatal(msg string, fields ...Field)
-	
+
 	WithContext(ctx context.Context) Logger
 	WithFields(fields ...Field) Logger
 	WithError(err error) Logger
@@ -61,7 +61,7 @@ type LogConfig struct {
 func Initialize(config LogConfig) {
 	once.Do(func() {
 		var output io.Writer
-		
+
 		// Set output
 		switch config.Output {
 		case "stdout":
@@ -76,7 +76,7 @@ func Initialize(config LogConfig) {
 				output = file
 			}
 		}
-		
+
 		// Set format
 		if config.Format == "console" {
 			output = zerolog.ConsoleWriter{
@@ -84,22 +84,22 @@ func Initialize(config LogConfig) {
 				TimeFormat: config.TimeFormat,
 			}
 		}
-		
+
 		// Set level
 		level := parseLevel(config.Level)
 		zerolog.SetGlobalLevel(level)
-		
+
 		// Create logger
 		logger := zerolog.New(output).With().Timestamp()
-		
+
 		if config.Caller {
 			logger = logger.Caller()
 		}
-		
+
 		globalLogger = &ZeroLogger{
 			logger: logger.Logger(),
 		}
-		
+
 		// Set global logger
 		log.Logger = globalLogger.logger
 	})
@@ -133,7 +133,7 @@ func (l *ZeroLogger) WithContext(ctx context.Context) Logger {
 		fields:  append([]Field{}, l.fields...),
 		context: ctx,
 	}
-	
+
 	// Extract trace ID if available
 	if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
 		newLogger.fields = append(newLogger.fields, Field{
@@ -141,7 +141,7 @@ func (l *ZeroLogger) WithContext(ctx context.Context) Logger {
 			Value: span.SpanContext().TraceID().String(),
 		})
 	}
-	
+
 	return newLogger
 }
 
@@ -160,17 +160,17 @@ func (l *ZeroLogger) WithError(err error) Logger {
 	if err == nil {
 		return l
 	}
-	
+
 	fields := []Field{
 		String("error", err.Error()),
 		String("error_type", fmt.Sprintf("%T", err)),
 	}
-	
+
 	// Add stack trace for errors
 	if _, file, line, ok := runtime.Caller(1); ok {
 		fields = append(fields, String("error_location", fmt.Sprintf("%s:%d", file, line)))
 	}
-	
+
 	return l.WithFields(fields...)
 }
 
@@ -215,12 +215,12 @@ func (l *ZeroLogger) logEvent(event *zerolog.Event, msg string, fields ...Field)
 	for _, field := range l.fields {
 		event = addField(event, field)
 	}
-	
+
 	// Add new fields
 	for _, field := range fields {
 		event = addField(event, field)
 	}
-	
+
 	event.Msg(msg)
 }
 
@@ -320,7 +320,7 @@ func Printf(format string, args ...interface{}) {
 	Get().Info(fmt.Sprintf(format, args...))
 }
 
-// Println is a compatibility function for fmt.Println replacement  
+// Println is a compatibility function for fmt.Println replacement
 func Println(args ...interface{}) {
 	Get().Info(fmt.Sprint(args...))
 }

@@ -20,8 +20,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 	"github.com/catherinevee/driftmgr/internal/core/models"
-	"google.golang.org/api/sqladmin/v1"
 	"google.golang.org/api/spanner/v1"
+	"google.golang.org/api/sqladmin/v1"
 )
 
 // DatabaseDiscovery handles database resource discovery across cloud providers
@@ -151,7 +151,7 @@ func newAzureDatabaseClient() (*AzureDatabaseClient, error) {
 // newGCPDatabaseClient creates GCP database clients
 func newGCPDatabaseClient() (*GCPDatabaseClient, error) {
 	ctx := context.Background()
-	
+
 	sqlAdminClient, err := sqladmin.NewService(ctx)
 	if err != nil {
 		return nil, err
@@ -269,7 +269,7 @@ func (d *DatabaseDiscovery) discoverRDSInstances(ctx context.Context) ([]models.
 
 	for _, db := range result.DBInstances {
 		tags := make(map[string]interface{})
-		
+
 		// Get tags for the instance
 		tagResult, err := d.awsClient.rdsClient.ListTagsForResource(ctx, &rds.ListTagsForResourceInput{
 			ResourceName: db.DBInstanceArn,
@@ -292,27 +292,27 @@ func (d *DatabaseDiscovery) discoverRDSInstances(ctx context.Context) ([]models.
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       *db.DBInstanceIdentifier,
-			Name:     *db.DBInstanceIdentifier,
-			Type:     "aws_rds_instance",
-			Provider: "aws",
-			Region:   extractRegionFromDBARN(*db.DBInstanceArn),
-			State:    state,
-			Tags:     tags,
+			ID:        *db.DBInstanceIdentifier,
+			Name:      *db.DBInstanceIdentifier,
+			Type:      "aws_rds_instance",
+			Provider:  "aws",
+			Region:    extractRegionFromDBARN(*db.DBInstanceArn),
+			State:     state,
+			Tags:      tags,
 			CreatedAt: *db.InstanceCreateTime,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"cost": cost,
-				"engine":             *db.Engine,
-				"engine_version":     *db.EngineVersion,
-				"instance_class":     *db.DBInstanceClass,
-				"allocated_storage":  *db.AllocatedStorage,
-				"multi_az":           *db.MultiAZ,
+				"cost":                cost,
+				"engine":              *db.Engine,
+				"engine_version":      *db.EngineVersion,
+				"instance_class":      *db.DBInstanceClass,
+				"allocated_storage":   *db.AllocatedStorage,
+				"multi_az":            *db.MultiAZ,
 				"publicly_accessible": *db.PubliclyAccessible,
-				"backup_retention":   *db.BackupRetentionPeriod,
-				"encrypted":          *db.StorageEncrypted,
-				"endpoint":           db.Endpoint.Address,
-				"port":               *db.Endpoint.Port,
+				"backup_retention":    *db.BackupRetentionPeriod,
+				"encrypted":           *db.StorageEncrypted,
+				"endpoint":            db.Endpoint.Address,
+				"port":                *db.Endpoint.Port,
 			},
 		})
 	}
@@ -331,7 +331,7 @@ func (d *DatabaseDiscovery) discoverRDSClusters(ctx context.Context) ([]models.R
 
 	for _, cluster := range result.DBClusters {
 		tags := make(map[string]interface{})
-		
+
 		// Get tags for the cluster
 		tagResult, err := d.awsClient.rdsClient.ListTagsForResource(ctx, &rds.ListTagsForResourceInput{
 			ResourceName: cluster.DBClusterArn,
@@ -343,24 +343,24 @@ func (d *DatabaseDiscovery) discoverRDSClusters(ctx context.Context) ([]models.R
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       *cluster.DBClusterIdentifier,
-			Name:     *cluster.DBClusterIdentifier,
-			Type:     "aws_rds_cluster",
-			Provider: "aws",
-			Region:   extractRegionFromDBARN(*cluster.DBClusterArn),
-			State:    *cluster.Status,
-			Tags:     tags,
+			ID:        *cluster.DBClusterIdentifier,
+			Name:      *cluster.DBClusterIdentifier,
+			Type:      "aws_rds_cluster",
+			Provider:  "aws",
+			Region:    extractRegionFromDBARN(*cluster.DBClusterArn),
+			State:     *cluster.Status,
+			Tags:      tags,
 			CreatedAt: *cluster.ClusterCreateTime,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"engine":            *cluster.Engine,
-				"engine_version":    *cluster.EngineVersion,
-				"multi_az":          *cluster.MultiAZ,
-				"backup_retention":  *cluster.BackupRetentionPeriod,
-				"encrypted":         *cluster.StorageEncrypted,
-				"endpoint":          *cluster.Endpoint,
-				"reader_endpoint":   *cluster.ReaderEndpoint,
-				"members":           len(cluster.DBClusterMembers),
+				"engine":           *cluster.Engine,
+				"engine_version":   *cluster.EngineVersion,
+				"multi_az":         *cluster.MultiAZ,
+				"backup_retention": *cluster.BackupRetentionPeriod,
+				"encrypted":        *cluster.StorageEncrypted,
+				"endpoint":         *cluster.Endpoint,
+				"reader_endpoint":  *cluster.ReaderEndpoint,
+				"members":          len(cluster.DBClusterMembers),
 			},
 		})
 	}
@@ -400,15 +400,15 @@ func (d *DatabaseDiscovery) discoverDynamoDBTables(ctx context.Context) ([]model
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       *table.TableName,
-			Name:     *table.TableName,
-			Type:     "aws_dynamodb_table",
-			Provider: "aws",
-			Region:   extractRegionFromDBARN(*table.TableArn),
-			State:    string(table.TableStatus),
-			Tags:     tags,
+			ID:        *table.TableName,
+			Name:      *table.TableName,
+			Type:      "aws_dynamodb_table",
+			Provider:  "aws",
+			Region:    extractRegionFromDBARN(*table.TableArn),
+			State:     string(table.TableStatus),
+			Tags:      tags,
 			CreatedAt: *table.CreationDateTime,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"billing_mode":     table.BillingModeSummary,
 				"item_count":       *table.ItemCount,
@@ -442,23 +442,23 @@ func (d *DatabaseDiscovery) discoverRedshiftClusters(ctx context.Context) ([]mod
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       *cluster.ClusterIdentifier,
-			Name:     *cluster.ClusterIdentifier,
-			Type:     "aws_redshift_cluster",
-			Provider: "aws",
-			Region:   extractRegionFromClusterEndpoint(cluster),
-			State:    *cluster.ClusterStatus,
-			Tags:     tags,
+			ID:        *cluster.ClusterIdentifier,
+			Name:      *cluster.ClusterIdentifier,
+			Type:      "aws_redshift_cluster",
+			Provider:  "aws",
+			Region:    extractRegionFromClusterEndpoint(cluster),
+			State:     *cluster.ClusterStatus,
+			Tags:      tags,
 			CreatedAt: *cluster.ClusterCreateTime,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"node_type":        *cluster.NodeType,
-				"number_of_nodes":  *cluster.NumberOfNodes,
-				"encrypted":        *cluster.Encrypted,
-				"database_name":    *cluster.DBName,
-				"endpoint":         cluster.Endpoint.Address,
-				"port":             *cluster.Endpoint.Port,
-				"version":          *cluster.ClusterVersion,
+				"node_type":         *cluster.NodeType,
+				"number_of_nodes":   *cluster.NumberOfNodes,
+				"encrypted":         *cluster.Encrypted,
+				"database_name":     *cluster.DBName,
+				"endpoint":          cluster.Endpoint.Address,
+				"port":              *cluster.Endpoint.Port,
+				"version":           *cluster.ClusterVersion,
 				"maintenance_track": *cluster.MaintenanceTrackName,
 			},
 		})
@@ -482,7 +482,7 @@ func (d *DatabaseDiscovery) discoverElastiCacheClusters(ctx context.Context) ([]
 
 	for _, cluster := range redisResult.CacheClusters {
 		tags := make(map[string]interface{})
-		
+
 		// Get tags
 		tagResult, err := d.awsClient.elasticacheClient.ListTagsForResource(ctx, &elasticache.ListTagsForResourceInput{
 			ResourceName: cluster.ARN,
@@ -494,15 +494,15 @@ func (d *DatabaseDiscovery) discoverElastiCacheClusters(ctx context.Context) ([]
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       *cluster.CacheClusterId,
-			Name:     *cluster.CacheClusterId,
-			Type:     "aws_elasticache_cluster",
-			Provider: "aws",
-			Region:   extractRegionFromDBARN(*cluster.ARN),
-			State:    *cluster.CacheClusterStatus,
-			Tags:     tags,
+			ID:        *cluster.CacheClusterId,
+			Name:      *cluster.CacheClusterId,
+			Type:      "aws_elasticache_cluster",
+			Provider:  "aws",
+			Region:    extractRegionFromDBARN(*cluster.ARN),
+			State:     *cluster.CacheClusterStatus,
+			Tags:      tags,
 			CreatedAt: *cluster.CacheClusterCreateTime,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"engine":         *cluster.Engine,
 				"engine_version": *cluster.EngineVersion,
@@ -527,7 +527,7 @@ func (d *DatabaseDiscovery) discoverDocumentDBClusters(ctx context.Context) ([]m
 
 	for _, cluster := range result.DBClusters {
 		tags := make(map[string]interface{})
-		
+
 		// Get tags
 		tagResult, err := d.awsClient.docdbClient.ListTagsForResource(ctx, &docdb.ListTagsForResourceInput{
 			ResourceName: cluster.DBClusterArn,
@@ -539,15 +539,15 @@ func (d *DatabaseDiscovery) discoverDocumentDBClusters(ctx context.Context) ([]m
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       *cluster.DBClusterIdentifier,
-			Name:     *cluster.DBClusterIdentifier,
-			Type:     "aws_documentdb_cluster",
-			Provider: "aws",
-			Region:   extractRegionFromDBARN(*cluster.DBClusterArn),
-			State:    *cluster.Status,
-			Tags:     tags,
+			ID:        *cluster.DBClusterIdentifier,
+			Name:      *cluster.DBClusterIdentifier,
+			Type:      "aws_documentdb_cluster",
+			Provider:  "aws",
+			Region:    extractRegionFromDBARN(*cluster.DBClusterArn),
+			State:     *cluster.Status,
+			Tags:      tags,
 			CreatedAt: *cluster.ClusterCreateTime,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"engine":           *cluster.Engine,
 				"engine_version":   *cluster.EngineVersion,
@@ -573,7 +573,7 @@ func (d *DatabaseDiscovery) discoverNeptuneClusters(ctx context.Context) ([]mode
 
 	for _, cluster := range result.DBClusters {
 		tags := make(map[string]interface{})
-		
+
 		// Get tags
 		tagResult, err := d.awsClient.neptuneClient.ListTagsForResource(ctx, &neptune.ListTagsForResourceInput{
 			ResourceName: cluster.DBClusterArn,
@@ -585,15 +585,15 @@ func (d *DatabaseDiscovery) discoverNeptuneClusters(ctx context.Context) ([]mode
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       *cluster.DBClusterIdentifier,
-			Name:     *cluster.DBClusterIdentifier,
-			Type:     "aws_neptune_cluster",
-			Provider: "aws",
-			Region:   extractRegionFromDBARN(*cluster.DBClusterArn),
-			State:    *cluster.Status,
-			Tags:     tags,
+			ID:        *cluster.DBClusterIdentifier,
+			Name:      *cluster.DBClusterIdentifier,
+			Type:      "aws_neptune_cluster",
+			Provider:  "aws",
+			Region:    extractRegionFromDBARN(*cluster.DBClusterArn),
+			State:     *cluster.Status,
+			Tags:      tags,
 			CreatedAt: *cluster.ClusterCreateTime,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"engine":           *cluster.Engine,
 				"engine_version":   *cluster.EngineVersion,
@@ -670,20 +670,20 @@ func (d *DatabaseDiscovery) discoverAzureSQLDatabases(ctx context.Context) ([]mo
 			}
 
 			resources = append(resources, models.Resource{
-				ID:       *server.ID,
-				Name:     *server.Name,
-				Type:     "azure_sql_server",
-				Provider: "azure",
-				Region:   *server.Location,
-				State:    string(*server.Properties.State),
-				Tags:     tags,
+				ID:        *server.ID,
+				Name:      *server.Name,
+				Type:      "azure_sql_server",
+				Provider:  "azure",
+				Region:    *server.Location,
+				State:     string(*server.Properties.State),
+				Tags:      tags,
 				CreatedAt: time.Now(), // Azure doesn't provide creation time in this API
-				Updated: time.Now(),
+				Updated:   time.Now(),
 				Attributes: map[string]interface{}{
-					"version":          *server.Properties.Version,
-					"administrator":    *server.Properties.AdministratorLogin,
-					"fqdn":             *server.Properties.FullyQualifiedDomainName,
-					"public_access":    *server.Properties.PublicNetworkAccess,
+					"version":       *server.Properties.Version,
+					"administrator": *server.Properties.AdministratorLogin,
+					"fqdn":          *server.Properties.FullyQualifiedDomainName,
+					"public_access": *server.Properties.PublicNetworkAccess,
 				},
 			})
 		}
@@ -712,18 +712,18 @@ func (d *DatabaseDiscovery) discoverCosmosDBAccounts(ctx context.Context) ([]mod
 			}
 
 			resources = append(resources, models.Resource{
-				ID:       *account.ID,
-				Name:     *account.Name,
-				Type:     "azure_cosmosdb_account",
-				Provider: "azure",
-				Region:   *account.Location,
-				State:    "active",
-				Tags:     tags,
+				ID:        *account.ID,
+				Name:      *account.Name,
+				Type:      "azure_cosmosdb_account",
+				Provider:  "azure",
+				Region:    *account.Location,
+				State:     "active",
+				Tags:      tags,
 				CreatedAt: time.Now(),
-				Updated: time.Now(),
+				Updated:   time.Now(),
 				Attributes: map[string]interface{}{
-					"kind":              string(*account.Kind),
-					"consistency_level": string(*account.Properties.ConsistencyPolicy.DefaultConsistencyLevel),
+					"kind":                  string(*account.Kind),
+					"consistency_level":     string(*account.Properties.ConsistencyPolicy.DefaultConsistencyLevel),
 					"enable_multiple_write": *account.Properties.EnableMultipleWriteLocations,
 				},
 			})
@@ -753,20 +753,20 @@ func (d *DatabaseDiscovery) discoverAzureMySQLServers(ctx context.Context) ([]mo
 			}
 
 			resources = append(resources, models.Resource{
-				ID:       *server.ID,
-				Name:     *server.Name,
-				Type:     "azure_mysql_server",
-				Provider: "azure",
-				Region:   *server.Location,
-				State:    string(*server.Properties.UserVisibleState),
-				Tags:     tags,
+				ID:        *server.ID,
+				Name:      *server.Name,
+				Type:      "azure_mysql_server",
+				Provider:  "azure",
+				Region:    *server.Location,
+				State:     string(*server.Properties.UserVisibleState),
+				Tags:      tags,
 				CreatedAt: time.Now(),
-				Updated: time.Now(),
+				Updated:   time.Now(),
 				Attributes: map[string]interface{}{
-					"version":       string(*server.Properties.Version),
-					"sku_name":      *server.SKU.Name,
-					"sku_tier":      string(*server.SKU.Tier),
-					"storage_mb":    *server.Properties.StorageProfile.StorageMB,
+					"version":          string(*server.Properties.Version),
+					"sku_name":         *server.SKU.Name,
+					"sku_tier":         string(*server.SKU.Tier),
+					"storage_mb":       *server.Properties.StorageProfile.StorageMB,
 					"backup_retention": *server.Properties.StorageProfile.BackupRetentionDays,
 				},
 			})
@@ -796,20 +796,20 @@ func (d *DatabaseDiscovery) discoverAzurePostgreSQLServers(ctx context.Context) 
 			}
 
 			resources = append(resources, models.Resource{
-				ID:       *server.ID,
-				Name:     *server.Name,
-				Type:     "azure_postgresql_server",
-				Provider: "azure",
-				Region:   *server.Location,
-				State:    string(*server.Properties.UserVisibleState),
-				Tags:     tags,
+				ID:        *server.ID,
+				Name:      *server.Name,
+				Type:      "azure_postgresql_server",
+				Provider:  "azure",
+				Region:    *server.Location,
+				State:     string(*server.Properties.UserVisibleState),
+				Tags:      tags,
 				CreatedAt: time.Now(),
-				Updated: time.Now(),
+				Updated:   time.Now(),
 				Attributes: map[string]interface{}{
-					"version":       string(*server.Properties.Version),
-					"sku_name":      *server.SKU.Name,
-					"sku_tier":      string(*server.SKU.Tier),
-					"storage_mb":    *server.Properties.StorageProfile.StorageMB,
+					"version":          string(*server.Properties.Version),
+					"sku_name":         *server.SKU.Name,
+					"sku_tier":         string(*server.SKU.Tier),
+					"storage_mb":       *server.Properties.StorageProfile.StorageMB,
 					"backup_retention": *server.Properties.StorageProfile.BackupRetentionDays,
 				},
 			})
@@ -839,15 +839,15 @@ func (d *DatabaseDiscovery) discoverAzureRedisCaches(ctx context.Context) ([]mod
 			}
 
 			resources = append(resources, models.Resource{
-				ID:       *cache.ID,
-				Name:     *cache.Name,
-				Type:     "azure_redis_cache",
-				Provider: "azure",
-				Region:   *cache.Location,
-				State:    string(*cache.Properties.ProvisioningState),
-				Tags:     tags,
+				ID:        *cache.ID,
+				Name:      *cache.Name,
+				Type:      "azure_redis_cache",
+				Provider:  "azure",
+				Region:    *cache.Location,
+				State:     string(*cache.Properties.ProvisioningState),
+				Tags:      tags,
 				CreatedAt: time.Now(),
-				Updated: time.Now(),
+				Updated:   time.Now(),
 				Attributes: map[string]interface{}{
 					"sku_name":     string(*cache.Properties.SKU.Name),
 					"sku_family":   string(*cache.Properties.SKU.Family),
@@ -900,15 +900,15 @@ func (d *DatabaseDiscovery) discoverCloudSQLInstances(ctx context.Context) ([]mo
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       instance.Name,
-			Name:     instance.Name,
-			Type:     "gcp_cloud_sql_instance",
-			Provider: "gcp",
-			Region:   instance.Region,
-			State:    instance.State,
-			Tags:     tags,
+			ID:        instance.Name,
+			Name:      instance.Name,
+			Type:      "gcp_cloud_sql_instance",
+			Provider:  "gcp",
+			Region:    instance.Region,
+			State:     instance.State,
+			Tags:      tags,
 			CreatedAt: parseGCPTimestamp(instance.CreateTime),
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"database_version": instance.DatabaseVersion,
 				"tier":             instance.Settings.Tier,
@@ -940,20 +940,20 @@ func (d *DatabaseDiscovery) discoverSpannerInstances(ctx context.Context) ([]mod
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       instance.Name,
-			Name:     extractResourceName(instance.Name),
-			Type:     "gcp_spanner_instance",
-			Provider: "gcp",
-			Region:   extractLocationFromConfig(instance.Config),
-			State:    instance.State,
-			Tags:     tags,
+			ID:        instance.Name,
+			Name:      extractResourceName(instance.Name),
+			Type:      "gcp_spanner_instance",
+			Provider:  "gcp",
+			Region:    extractLocationFromConfig(instance.Config),
+			State:     instance.State,
+			Tags:      tags,
 			CreatedAt: parseGCPTimestamp(instance.CreateTime),
-			Updated: parseGCPTimestamp(instance.UpdateTime),
+			Updated:   parseGCPTimestamp(instance.UpdateTime),
 			Attributes: map[string]interface{}{
-				"config":      instance.Config,
-				"node_count":  instance.NodeCount,
+				"config":           instance.Config,
+				"node_count":       instance.NodeCount,
 				"processing_units": instance.ProcessingUnits,
-				"display_name": instance.DisplayName,
+				"display_name":     instance.DisplayName,
 			},
 		})
 	}

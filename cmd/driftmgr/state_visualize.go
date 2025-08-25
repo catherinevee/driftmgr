@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/catherinevee/driftmgr/internal/core/visualization"
 	"github.com/catherinevee/driftmgr/internal/core/models"
+	"github.com/catherinevee/driftmgr/internal/core/visualization"
 	"github.com/catherinevee/driftmgr/internal/terraform/state"
 )
 

@@ -68,7 +68,7 @@ func TestDriftAnalyzer_AnalyzeDrift(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := NewDriftAnalyzer()
-			
+
 			// Create a mock drift result
 			driftResult := models.DriftResult{
 				ResourceID:   "test",
@@ -101,7 +101,7 @@ func TestImpactAnalyzer_AnalyzeImpact(t *testing.T) {
 			"CRITICAL": 20.0,
 		},
 	}
-	
+
 	analyzer := NewImpactAnalyzer(config)
 	ctx := context.Background()
 
@@ -121,9 +121,9 @@ func TestImpactAnalyzer_AnalyzeImpact(t *testing.T) {
 				Name: "prod-database",
 			},
 			{
-				ID:   "ec2-1",
-				Type: "EC2",
-				Name: "web-server",
+				ID:           "ec2-1",
+				Type:         "EC2",
+				Name:         "web-server",
 				Dependencies: []string{"db-1"},
 			},
 		},
@@ -144,18 +144,18 @@ func TestDriftAnalyzer_CompareStates(t *testing.T) {
 		Provider: "aws",
 		Resources: []models.Resource{
 			{
-				ID:    "i-12345",
-				Name:  "web-server",
-				Type:  "ec2_instance",
+				ID:   "i-12345",
+				Name: "web-server",
+				Type: "ec2_instance",
 				State: map[string]interface{}{
 					"instance_type": "t2.micro",
 					"ami":           "ami-12345",
 				},
 			},
 			{
-				ID:    "sg-67890",
-				Name:  "web-sg",
-				Type:  "security_group",
+				ID:   "sg-67890",
+				Name: "web-sg",
+				Type: "security_group",
 				State: map[string]interface{}{
 					"ingress": []interface{}{
 						map[string]interface{}{
@@ -173,9 +173,9 @@ func TestDriftAnalyzer_CompareStates(t *testing.T) {
 		Provider: "aws",
 		Resources: []models.Resource{
 			{
-				ID:    "i-12345",
-				Name:  "web-server",
-				Type:  "ec2_instance",
+				ID:   "i-12345",
+				Name: "web-server",
+				Type: "ec2_instance",
 				State: map[string]interface{}{
 					"instance_type": "t2.small", // Changed
 					"ami":           "ami-12345",
@@ -183,9 +183,9 @@ func TestDriftAnalyzer_CompareStates(t *testing.T) {
 			},
 			// Security group removed
 			{
-				ID:    "i-99999",
-				Name:  "new-server",
-				Type:  "ec2_instance",
+				ID:   "i-99999",
+				Name: "new-server",
+				Type: "ec2_instance",
 				State: map[string]interface{}{
 					"instance_type": "t2.micro",
 				},
@@ -237,7 +237,7 @@ func TestCostEstimation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cost := estimateCostMock(tt.resources)
-			
+
 			// Allow for some variance in cost estimates
 			assert.InDelta(t, tt.expectedCost, cost, tt.expectedCost*0.2)
 		})
@@ -246,9 +246,9 @@ func TestCostEstimation(t *testing.T) {
 
 func TestComplianceChecking(t *testing.T) {
 	tests := []struct {
-		name              string
-		resources         []models.Resource
-		policies          []models.Policy
+		name               string
+		resources          []models.Resource
+		policies           []models.Policy
 		expectedViolations int
 	}{
 		{
@@ -327,13 +327,13 @@ func TestConcurrentAnalysis(t *testing.T) {
 
 func BenchmarkDriftAnalysis(b *testing.B) {
 	analyzer := NewDriftAnalyzer()
-	
+
 	// Create large state files
 	desiredState := &models.StateFile{
 		Provider:  "aws",
 		Resources: make([]models.Resource, 1000),
 	}
-	
+
 	actualState := &models.StateFile{
 		Provider:  "aws",
 		Resources: make([]models.Resource, 1000),
@@ -359,7 +359,7 @@ func BenchmarkDriftAnalysis(b *testing.B) {
 	}
 
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = analyzer.CompareStates(ctx, desiredState, actualState)
@@ -373,9 +373,9 @@ func estimateCostMock(resources []models.Resource) float64 {
 
 	// Simplified cost calculation
 	costMap := map[string]float64{
-		"EC2": 0.0116,  // t2.micro hourly
-		"RDS": 0.0167,  // db.t3.micro hourly
-		"S3":  0.023,   // per GB per month
+		"EC2": 0.0116, // t2.micro hourly
+		"RDS": 0.0167, // db.t3.micro hourly
+		"S3":  0.023,  // per GB per month
 	}
 
 	for _, r := range resources {

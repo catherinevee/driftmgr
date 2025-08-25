@@ -526,18 +526,19 @@ func (sdk *SDKIntegration) discoverAWSSDK(ctx context.Context, region, service s
 		return nil, fmt.Errorf("failed to create AWS provider: %w", err)
 	}
 
-	config := Config{
-		Regions:      []string{region},
-		ResourceType: service,
+	// Convert to DiscoveryOptions
+	options := DiscoveryOptions{
+		Regions:       []string{region},
+		ResourceTypes: []string{service},
 	}
 
 	// Use the existing AWS discovery implementation
-	resources, err := provider.Discover(config)
+	result, err := provider.Discover(ctx, options)
 	if err != nil {
 		return nil, fmt.Errorf("AWS discovery failed: %w", err)
 	}
 
-	return resources, nil
+	return result.Resources, nil
 }
 
 // discoverAzureSDK performs Azure discovery using SDK
@@ -548,18 +549,19 @@ func (sdk *SDKIntegration) discoverAzureSDK(ctx context.Context, region, service
 		return nil, fmt.Errorf("failed to create Azure provider: %w", err)
 	}
 
-	config := Config{
-		Regions:      []string{region},
-		ResourceType: service,
+	// Convert to DiscoveryOptions
+	options := DiscoveryOptions{
+		Regions:       []string{region},
+		ResourceTypes: []string{service},
 	}
 
 	// Use the existing Azure discovery implementation
-	resources, err := provider.Discover(config)
+	result, err := provider.Discover(ctx, options)
 	if err != nil {
 		return nil, fmt.Errorf("Azure discovery failed: %w", err)
 	}
 
-	return resources, nil
+	return result.Resources, nil
 }
 
 // discoverGCPSDK performs GCP discovery using SDK
@@ -570,18 +572,20 @@ func (sdk *SDKIntegration) discoverGCPSDK(ctx context.Context, region, service s
 		return nil, fmt.Errorf("failed to create GCP provider: %w", err)
 	}
 
-	config := Config{
-		Regions:      []string{region},
-		ResourceType: service,
+	options := DiscoveryOptions{
+		Regions: []string{region},
+	}
+	if service != "" {
+		options.ResourceTypes = []string{service}
 	}
 
 	// Use the existing GCP discovery implementation
-	resources, err := provider.Discover(config)
+	result, err := provider.Discover(context.Background(), options)
 	if err != nil {
 		return nil, fmt.Errorf("GCP discovery failed: %w", err)
 	}
 
-	return resources, nil
+	return result.Resources, nil
 }
 
 // AdvancedQuery provides advanced querying capabilities

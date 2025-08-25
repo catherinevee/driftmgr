@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/core/models"
-	"github.com/catherinevee/driftmgr/internal/security/auth"
+	"github.com/catherinevee/driftmgr/internal/credentials"
 	"github.com/catherinevee/driftmgr/internal/utils/cache"
 	"github.com/catherinevee/driftmgr/internal/utils/retry"
 )
@@ -17,7 +17,7 @@ import (
 type EnhancedEngine struct {
 	providers  map[string]Provider
 	cache      *cache.DiscoveryCache
-	credDetect *security.CredentialDetector
+	credDetect *credentials.CredentialDetector
 	retryConf  *retry.Config
 }
 
@@ -26,7 +26,7 @@ func NewEnhancedEngine() (*EnhancedEngine, error) {
 	engine := &EnhancedEngine{
 		providers:  make(map[string]Provider),
 		cache:      cache.NewDiscoveryCache(),
-		credDetect: security.NewCredentialDetector(),
+		credDetect: credentials.NewCredentialDetector(),
 		retryConf:  retry.CloudAPIConfig(),
 	}
 
@@ -130,10 +130,22 @@ func (e *EnhancedEngine) Discover(config Config) ([]models.Resource, error) {
 
 	fmt.Printf("🔍 Discovering resources with %s provider...\n", provider.Name())
 
+	// Convert config to options
+	options := DiscoveryOptions{
+		Regions: config.Regions,
+	}
+	if config.ResourceType != "" {
+		options.ResourceTypes = []string{config.ResourceType}
+	}
+
 	// Perform discovery with retry
 	ctx := context.Background()
 	resources, err := retry.DoWithResult(ctx, e.retryConf, func() ([]models.Resource, error) {
-		return provider.Discover(config)
+		result, err := provider.Discover(ctx, options)
+		if err != nil {
+			return nil, err
+		}
+		return result.Resources, nil
 	})
 
 	if err != nil {
@@ -210,12 +222,24 @@ func (e *EnhancedEngine) DiscoverWithProgress(config Config, progress chan<- str
 	attempts := 0
 	ctx := context.Background()
 
+	// Convert config to options
+	options := DiscoveryOptions{
+		Regions: config.Regions,
+	}
+	if config.ResourceType != "" {
+		options.ResourceTypes = []string{config.ResourceType}
+	}
+
 	resources, err := retry.DoWithResult(ctx, e.retryConf, func() ([]models.Resource, error) {
 		attempts++
 		if attempts > 1 {
 			progress <- fmt.Sprintf("Retry attempt %d...", attempts)
 		}
-		return provider.Discover(config)
+		result, err := provider.Discover(ctx, options)
+		if err != nil {
+			return nil, err
+		}
+		return result.Resources, nil
 	})
 
 	if err != nil {
@@ -248,8 +272,15 @@ func (e *EnhancedEngine) applyFilters(resources []models.Resource, config Config
 		}
 
 		// Filter by tags if specified
-		if len(config.Tags) > 0 && !e.matchesTags(resource, config.Tags) {
-			continue
+		if len(config.Tags) > 0 {
+			// Convert map to slice of key:value strings
+			var tagFilters []string
+			for k, v := range config.Tags {
+				tagFilters = append(tagFilters, fmt.Sprintf("%s:%s", k, v))
+			}
+			if !e.matchesTags(resource, tagFilters) {
+				continue
+			}
 		}
 
 		filtered = append(filtered, resource)

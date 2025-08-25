@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/utils/errors"
 	"github.com/catherinevee/driftmgr/internal/observability/logging"
+	"github.com/catherinevee/driftmgr/internal/utils/errors"
 	"github.com/rs/zerolog"
 )
 

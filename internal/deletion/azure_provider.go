@@ -777,7 +777,7 @@ func (ap *AzureProvider) discoverSQLDatabases(ctx context.Context, accountID str
 
 			resourceGroup := ap.extractResourceGroupName(*server.ID)
 			dbPager := dbClient.NewListByServerPager(resourceGroup, *server.Name, nil)
-			
+
 			for dbPager.More() {
 				dbPage, err := dbPager.NextPage(ctx)
 				if err != nil {

@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	awsprovider "github.com/catherinevee/driftmgr/internal/cloud/aws"
 	azureprovider "github.com/catherinevee/driftmgr/internal/cloud/azure"
-	gcpprovider "github.com/catherinevee/driftmgr/internal/cloud/gcp"
 	doprovider "github.com/catherinevee/driftmgr/internal/cloud/digitalocean"
+	gcpprovider "github.com/catherinevee/driftmgr/internal/cloud/gcp"
+	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -417,7 +417,7 @@ func (d *DigitalOceanDiscoverer) discoverSpaces(ctx context.Context) ([]models.R
 	// Use DigitalOcean API to list Spaces buckets
 	// Note: DigitalOcean API doesn't directly support Spaces listing,
 	// but we can discover them through the CDN endpoint API
-	
+
 	// Get CDN endpoints which are associated with Spaces
 	opt := &godo.ListOptions{
 		Page:    1,
@@ -445,20 +445,20 @@ func (d *DigitalOceanDiscoverer) discoverSpaces(ctx context.Context) ([]models.R
 				Type:     "digitalocean_spaces_bucket",
 				Provider: "digitalocean",
 				Attributes: map[string]interface{}{
-					"origin":      cdn.Origin,
-					"endpoint":    cdn.Endpoint,
-					"created_at":  cdn.CreatedAt,
-					"ttl":         cdn.TTL,
-					"custom_domain": cdn.CustomDomain,
+					"origin":         cdn.Origin,
+					"endpoint":       cdn.Endpoint,
+					"created_at":     cdn.CreatedAt,
+					"ttl":            cdn.TTL,
+					"custom_domain":  cdn.CustomDomain,
 					"certificate_id": cdn.CertificateID,
 				},
 			}
-			
+
 			// Extract region from origin URL if possible
 			if region := extractRegionFromSpacesURL(cdn.Origin); region != "" {
 				resource.Region = region
 			}
-			
+
 			resources = append(resources, resource)
 		}
 

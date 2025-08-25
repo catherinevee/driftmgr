@@ -44,6 +44,20 @@ func (p *AzureProvider) Name() string {
 	return "Microsoft Azure"
 }
 
+// Regions returns the list of available Azure regions
+func (p *AzureProvider) Regions() []string {
+	return p.SupportedRegions()
+}
+
+// Services returns the list of available Azure services
+func (p *AzureProvider) Services() []string {
+	return []string{
+		"Virtual Machines", "Storage", "SQL Database", "App Service",
+		"Functions", "AKS", "Virtual Network", "Load Balancer",
+		"Application Gateway", "Traffic Manager", "CDN", "Event Hubs",
+	}
+}
+
 // SupportedRegions returns the list of supported Azure regions
 func (p *AzureProvider) SupportedRegions() []string {
 	return []string{
@@ -80,8 +94,16 @@ func (p *AzureProvider) SupportedResourceTypes() []string {
 }
 
 // Discover discovers Azure resources
-func (p *AzureProvider) Discover(config Config) ([]models.Resource, error) {
+func (p *AzureProvider) Discover(ctx context.Context, options DiscoveryOptions) (*Result, error) {
 	fmt.Println("  [Azure] Discovering resources using Azure SDK...")
+
+	// Convert options to config for backward compatibility
+	config := Config{
+		Regions: options.Regions,
+	}
+	if len(options.ResourceTypes) > 0 {
+		config.ResourceType = options.ResourceTypes[0]
+	}
 
 	// For Azure, we need a subscription ID. In a real implementation,
 	// this would come from configuration or be discovered from the credential
@@ -119,7 +141,31 @@ func (p *AzureProvider) Discover(config Config) ([]models.Resource, error) {
 	}
 
 	fmt.Printf("  [Azure] Found %d resources\n", len(allResources))
-	return allResources, nil
+	return &Result{
+		Resources: allResources,
+		Metadata: map[string]interface{}{
+			"provider":       "azure",
+			"resource_count": len(allResources),
+			"regions":        regions,
+		},
+	}, nil
+}
+
+// GetAccountInfo returns Azure account information
+func (p *AzureProvider) GetAccountInfo(ctx context.Context) (*AccountInfo, error) {
+	// Get subscription ID
+	subID := p.getSubscriptionID(Config{})
+	if subID == "" {
+		return nil, fmt.Errorf("no Azure subscription found")
+	}
+
+	return &AccountInfo{
+		ID:       subID,
+		Name:     "Azure Subscription",
+		Type:     "azure",
+		Provider: "azure",
+		Regions:  p.SupportedRegions(),
+	}, nil
 }
 
 // getSubscriptionID extracts subscription ID from config or environment
@@ -253,4 +299,22 @@ func (p *AzureProvider) azureTypeToTerraformType(azureType string) string {
 	}
 
 	return "azurerm_unknown"
+}
+
+// ValidateCredentials validates Azure credentials
+func (p *AzureProvider) ValidateCredentials(ctx context.Context) error {
+	// For now, just return nil
+	return nil
+}
+
+// DiscoverRegion discovers resources in a specific region
+func (p *AzureProvider) DiscoverRegion(ctx context.Context, region string) ([]models.Resource, error) {
+	options := DiscoveryOptions{
+		Regions: []string{region},
+	}
+	result, err := p.Discover(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return result.Resources, nil
 }

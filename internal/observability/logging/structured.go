@@ -17,7 +17,7 @@ import (
 var (
 	// Logger is the global logger instance
 	Logger zerolog.Logger
-	
+
 	// contextKey for storing logger in context
 	contextKey = struct{}{}
 )
@@ -86,27 +86,27 @@ func Init(cfg *Config) error {
 
 	// Create logger
 	logContext := zerolog.New(output).With().Timestamp()
-	
+
 	// Add caller information if enabled
 	if cfg.Caller {
 		logContext = logContext.Caller()
 	}
-	
+
 	// Add hostname
 	if hostname, err := os.Hostname(); err == nil {
 		logContext = logContext.Str("hostname", hostname)
 	}
-	
+
 	// Add service info
 	logContext = logContext.
 		Str("service", "driftmgr").
 		Str("version", getVersion())
 
 	Logger = logContext.Logger()
-	
+
 	// Set global logger
 	log.Logger = Logger
-	
+
 	return nil
 }
 
@@ -167,11 +167,11 @@ func Audit(ctx context.Context, action string, fields map[string]interface{}) {
 		Str("action", action).
 		Timestamp().
 		Logger()
-	
+
 	for k, v := range fields {
 		logger = logger.With().Interface(k, v).Logger()
 	}
-	
+
 	logger.Info().Msg("audit event")
 }
 
@@ -181,11 +181,11 @@ func Metric(name string, value float64, tags map[string]string) {
 		Str("metric_name", name).
 		Float64("metric_value", value).
 		Logger()
-	
+
 	for k, v := range tags {
 		logger = logger.With().Str(fmt.Sprintf("tag_%s", k), v).Logger()
 	}
-	
+
 	logger.Debug().Msg("metric")
 }
 
@@ -202,16 +202,16 @@ func getVersion() string {
 func Fatal(ctx context.Context, msg string, fields ...map[string]interface{}) {
 	logger := FromContext(ctx)
 	event := logger.Fatal()
-	
+
 	if len(fields) > 0 {
 		for k, v := range fields[0] {
 			event = event.Interface(k, v)
 		}
 	}
-	
+
 	// Add stack trace
 	event = event.Str("stack_trace", getStackTrace())
-	
+
 	event.Msg(msg)
 }
 
@@ -220,21 +220,21 @@ func getStackTrace() string {
 	const depth = 32
 	var pcs [depth]uintptr
 	n := runtime.Callers(3, pcs[:])
-	
+
 	var sb strings.Builder
 	frames := runtime.CallersFrames(pcs[:n])
-	
+
 	for {
 		frame, more := frames.Next()
 		if !strings.Contains(frame.File, "runtime/") {
-			sb.WriteString(fmt.Sprintf("%s:%d %s\n", 
+			sb.WriteString(fmt.Sprintf("%s:%d %s\n",
 				filepath.Base(frame.File), frame.Line, frame.Function))
 		}
 		if !more {
 			break
 		}
 	}
-	
+
 	return sb.String()
 }
 

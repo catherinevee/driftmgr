@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/catherinevee/driftmgr/internal/core/models"
 	"github.com/catherinevee/driftmgr/internal/infrastructure/cache"
 	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
-	"github.com/catherinevee/driftmgr/internal/core/models"
 )
 
 // EnhancedDiscoverer provides advanced cloud discovery capabilities
@@ -23,8 +23,8 @@ type EnhancedDiscoverer struct {
 	filters         *DiscoveryFilter
 	progressTracker *ProgressTracker
 	visualizer      *DiscoveryVisualizer
-	errorHandler    *ErrorHandler
-	errorReporting  *EnhancedErrorReporting
+	// errorHandler    *ErrorHandler          // TODO: Define ErrorHandler type
+	// errorReporting  *EnhancedErrorReporting // TODO: Define EnhancedErrorReporting type
 	advancedQuery   *AdvancedQuery
 	realTimeMonitor *RealTimeMonitor
 	sdkIntegration  *SDKIntegration
@@ -89,9 +89,9 @@ func NewEnhancedDiscoverer(cfg *config.Config) *EnhancedDiscoverer {
 		hierarchy:       &ResourceHierarchy{},
 		filters:         &DiscoveryFilter{},
 		progressTracker: NewProgressTracker([]string{"aws", "azure", "gcp"}, defaultRegions, services),
-		errorHandler:    NewErrorHandler(nil), // Use default retry config
-		errorReporting:  NewEnhancedErrorReporting(),
-		sdkIntegration:  NewSDKIntegration(),
+		// errorHandler:    NewErrorHandler(nil), // Use default retry config
+		// errorReporting:  NewEnhancedErrorReporting(),
+		sdkIntegration: NewSDKIntegration(),
 	}
 }
 
@@ -127,11 +127,11 @@ func (ed *EnhancedDiscoverer) DiscoverResources(ctx context.Context) ([]models.R
 			wg.Add(1)
 			go func(p, r string) {
 				defer wg.Done()
-				
+
 				// Use context with timeout
 				discoverCtx, cancel := context.WithTimeout(ctx, ed.config.Discovery.Timeout)
 				defer cancel()
-				
+
 				resources, err := ed.discoverProviderResources(discoverCtx, p, r)
 				if err != nil {
 					select {
@@ -140,7 +140,7 @@ func (ed *EnhancedDiscoverer) DiscoverResources(ctx context.Context) ([]models.R
 					}
 					return
 				}
-				
+
 				mu.Lock()
 				allResources = append(allResources, resources...)
 				mu.Unlock()

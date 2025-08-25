@@ -59,9 +59,9 @@ func TestDeepDiff_CompareNestedStructures(t *testing.T) {
 	dd := NewDeepDiff()
 
 	tests := []struct {
-		name     string
-		actual   interface{}
-		expected interface{}
+		name      string
+		actual    interface{}
+		expected  interface{}
 		diffCount int
 	}{
 		{
@@ -127,39 +127,39 @@ func TestDeepDiff_CompareArrays(t *testing.T) {
 	dd := NewDeepDiff()
 
 	tests := []struct {
-		name          string
-		actual        interface{}
-		expected      interface{}
+		name           string
+		actual         interface{}
+		expected       interface{}
 		orderSensitive bool
-		hasDiff       bool
+		hasDiff        bool
 	}{
 		{
-			name:          "identical arrays",
-			actual:        []string{"a", "b", "c"},
-			expected:      []string{"a", "b", "c"},
+			name:           "identical arrays",
+			actual:         []string{"a", "b", "c"},
+			expected:       []string{"a", "b", "c"},
 			orderSensitive: true,
-			hasDiff:       false,
+			hasDiff:        false,
 		},
 		{
-			name:          "different order - sensitive",
-			actual:        []string{"a", "c", "b"},
-			expected:      []string{"a", "b", "c"},
+			name:           "different order - sensitive",
+			actual:         []string{"a", "c", "b"},
+			expected:       []string{"a", "b", "c"},
 			orderSensitive: true,
-			hasDiff:       true,
+			hasDiff:        true,
 		},
 		{
-			name:          "different order - insensitive",
-			actual:        []string{"a", "c", "b"},
-			expected:      []string{"a", "b", "c"},
+			name:           "different order - insensitive",
+			actual:         []string{"a", "c", "b"},
+			expected:       []string{"a", "b", "c"},
 			orderSensitive: false,
-			hasDiff:       false,
+			hasDiff:        false,
 		},
 		{
-			name:          "missing element",
-			actual:        []string{"a", "b"},
-			expected:      []string{"a", "b", "c"},
+			name:           "missing element",
+			actual:         []string{"a", "b"},
+			expected:       []string{"a", "b", "c"},
 			orderSensitive: false,
-			hasDiff:       true,
+			hasDiff:        true,
 		},
 	}
 
@@ -198,11 +198,11 @@ func TestDeepDiff_IgnorePatterns(t *testing.T) {
 
 	expected := map[string]interface{}{
 		"id":         "resource-1",
-		"name":       "test-modified", // This should be detected
+		"name":       "test-modified",        // This should be detected
 		"timestamp":  "2024-01-02T00:00:00Z", // This should be ignored
-		"created_at": "2024-01-02", // This should be ignored
+		"created_at": "2024-01-02",           // This should be ignored
 		"metadata": map[string]interface{}{
-			"version": "2.0", // This should be ignored
+			"version": "2.0",   // This should be ignored
 			"author":  "user2", // This should be ignored
 		},
 		"config": map[string]interface{}{
@@ -212,7 +212,7 @@ func TestDeepDiff_IgnorePatterns(t *testing.T) {
 
 	diffs := dd.Compare(actual, expected, "")
 	assert.Equal(t, 2, len(diffs)) // Only name and config.enabled should differ
-	
+
 	// Verify the right fields were detected
 	fieldPaths := make(map[string]bool)
 	for _, diff := range diffs {
@@ -224,17 +224,17 @@ func TestDeepDiff_IgnorePatterns(t *testing.T) {
 
 func TestDeepDiff_SemanticComparison(t *testing.T) {
 	dd := NewDeepDiff()
-	
+
 	// Add semantic rule for security groups
 	dd.SemanticRules = map[string]SemanticCompareFunc{
 		"security_group": func(actual, expected interface{}) (bool, []Difference) {
 			actualSG := actual.(map[string]interface{})
 			expectedSG := expected.(map[string]interface{})
-			
+
 			// Compare ingress rules semantically
 			actualRules := actualSG["ingress_rules"].([]interface{})
 			expectedRules := expectedSG["ingress_rules"].([]interface{})
-			
+
 			// Check if rules are semantically equivalent
 			if len(actualRules) != len(expectedRules) {
 				return false, []Difference{{
@@ -244,7 +244,7 @@ func TestDeepDiff_SemanticComparison(t *testing.T) {
 					Expected: len(expectedRules),
 				}}
 			}
-			
+
 			return true, nil
 		},
 	}
@@ -287,7 +287,7 @@ func TestDeepDiff_SemanticComparison(t *testing.T) {
 
 func TestDeepDiff_Normalization(t *testing.T) {
 	dd := NewDeepDiff()
-	
+
 	// Add normalization for ARNs
 	dd.NormalizationMap = map[string]NormalizeFunc{
 		"*.arn": func(value interface{}) interface{} {
@@ -336,9 +336,9 @@ func TestDeepDiff_ComplexRealWorldScenario(t *testing.T) {
 
 	// Simulate EC2 instance comparison
 	actual := map[string]interface{}{
-		"instance_id": "i-1234567890abcdef0",
+		"instance_id":   "i-1234567890abcdef0",
 		"instance_type": "t2.micro",
-		"state": "running",
+		"state":         "running",
 		"tags": map[string]interface{}{
 			"Name":        "web-server",
 			"Environment": "production",
@@ -346,7 +346,7 @@ func TestDeepDiff_ComplexRealWorldScenario(t *testing.T) {
 		"security_groups": []interface{}{"sg-1", "sg-2"},
 		"network_interfaces": []interface{}{
 			map[string]interface{}{
-				"subnet_id": "subnet-123",
+				"subnet_id":  "subnet-123",
 				"private_ip": "10.0.1.10",
 			},
 		},
@@ -354,53 +354,53 @@ func TestDeepDiff_ComplexRealWorldScenario(t *testing.T) {
 	}
 
 	expected := map[string]interface{}{
-		"instance_id": "i-1234567890abcdef0",
+		"instance_id":   "i-1234567890abcdef0",
 		"instance_type": "t2.small", // Changed
-		"state": "running",
+		"state":         "running",
 		"tags": map[string]interface{}{
 			"Name":        "web-server",
 			"Environment": "staging", // Changed
-			"Owner":       "devops", // Added
+			"Owner":       "devops",  // Added
 		},
 		"security_groups": []interface{}{"sg-1", "sg-3"}, // sg-2 -> sg-3
 		"network_interfaces": []interface{}{
 			map[string]interface{}{
-				"subnet_id": "subnet-123",
+				"subnet_id":  "subnet-123",
 				"private_ip": "10.0.1.10",
-				"public_ip": "54.1.2.3", // Added
+				"public_ip":  "54.1.2.3", // Added
 			},
 		},
 		"last_modified": "2024-01-02T00:00:00Z", // Should be ignored
 	}
 
 	diffs := dd.Compare(actual, expected, "")
-	
-	// Should detect: instance_type, tags.Environment, tags.Owner (new), 
+
+	// Should detect: instance_type, tags.Environment, tags.Owner (new),
 	// security_groups change, network_interfaces.public_ip (new)
 	assert.GreaterOrEqual(t, len(diffs), 4)
-	
+
 	// Verify specific changes were detected
 	changeMap := make(map[string]bool)
 	for _, diff := range diffs {
 		changeMap[diff.Path] = true
 	}
-	
+
 	assert.True(t, changeMap["instance_type"])
 	assert.True(t, changeMap["tags.Environment"])
 }
 
 func TestDeepDiff_CircularReferences(t *testing.T) {
 	dd := NewDeepDiff()
-	
+
 	// Create circular reference
 	actual := make(map[string]interface{})
 	actual["self"] = actual
 	actual["value"] = "test"
-	
+
 	expected := make(map[string]interface{})
 	expected["self"] = expected
 	expected["value"] = "test"
-	
+
 	// Should handle circular references without infinite loop
 	diffs := dd.Compare(actual, expected, "")
 	assert.Equal(t, 0, len(diffs))

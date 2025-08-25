@@ -272,10 +272,10 @@ func ValidateMFAToken(secret, token string) bool {
 
 	// Implement TOTP validation using HMAC-SHA1
 	// This is a basic implementation - for production use github.com/pquerna/otp
-	
+
 	// Get current time window (30 second intervals)
 	counter := time.Now().Unix() / 30
-	
+
 	// Check current window and previous/next windows for clock skew tolerance
 	for i := -1; i <= 1; i++ {
 		testCounter := counter + int64(i)
@@ -284,7 +284,7 @@ func ValidateMFAToken(secret, token string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -292,7 +292,7 @@ func ValidateMFAToken(secret, token string) bool {
 func generateTOTP(secret string, counter int64) string {
 	// This is a simplified TOTP generation for validation
 	// In production, use proper HMAC-SHA1 implementation
-	
+
 	// For now, generate a predictable 6-digit code based on secret and counter
 	// This ensures consistency but is not cryptographically secure
 	hash := 0
@@ -300,6 +300,6 @@ func generateTOTP(secret string, counter int64) string {
 		hash = (hash*31 + int(c)) % 1000000
 	}
 	hash = (hash + int(counter)) % 1000000
-	
+
 	return fmt.Sprintf("%06d", hash)
 }

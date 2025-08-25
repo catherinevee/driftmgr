@@ -112,7 +112,7 @@ type Recommendation struct {
 func NewDetector() *Detector {
 	return &Detector{
 		analyzer:  NewAnalyzer(),
-		predictor: NewDriftPredictor(),
+		predictor: NewDriftPredictor(nil), // Pass nil to use default config
 		policy:    NewPolicyEngine(),
 	}
 }

@@ -36,14 +36,14 @@ func (cd *CloudDiscoverer) DiscoverAll(ctx context.Context) (map[string][]models
 		go func(providerName string, p Provider) {
 			defer wg.Done()
 
-			resources, err := p.Discover(Config{})
+			result, err := p.Discover(ctx, DiscoveryOptions{})
 			if err != nil {
 				fmt.Printf("Error discovering from %s: %v\n", providerName, err)
 				return
 			}
 
 			mu.Lock()
-			results[providerName] = resources
+			results[providerName] = result.Resources
 			mu.Unlock()
 		}(name, provider)
 	}
@@ -59,5 +59,16 @@ func (cd *CloudDiscoverer) DiscoverProvider(ctx context.Context, providerName st
 		return nil, fmt.Errorf("provider %s not found", providerName)
 	}
 
-	return provider.Discover(config)
+	options := DiscoveryOptions{
+		Regions: config.Regions,
+	}
+	if config.ResourceType != "" {
+		options.ResourceTypes = []string{config.ResourceType}
+	}
+
+	result, err := provider.Discover(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return result.Resources, nil
 }

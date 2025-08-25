@@ -13,12 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	"github.com/catherinevee/driftmgr/internal/core/drift"
 	"github.com/catherinevee/driftmgr/internal/core/models"
 	"github.com/catherinevee/driftmgr/internal/core/remediation"
 	"github.com/catherinevee/driftmgr/internal/core/state"
+	"github.com/catherinevee/driftmgr/internal/infrastructure/config"
 	"github.com/catherinevee/driftmgr/internal/integration/terragrunt"
 	"github.com/catherinevee/driftmgr/internal/visualization"
 )
@@ -64,21 +64,21 @@ func min(a, b int) int {
 }
 
 type InteractiveShell struct {
-	reader           *bufio.Reader
-	history          []string
-	historyIndex     int
-	historyMutex     sync.RWMutex
-	enhancedReader   *EnhancedInputReader
-	discovery        *discovery.ResourceDiscoverer
-	driftAnalyzer    interface{}
-	remediationEngine *remediation.RemediationEngine
-	stateManager     *state.RemoteStateManager
-	terragruntMgr    *terragrunt.TerragruntParser
-	visualizer       *visualization.EnhancedVisualization
-	config           *config.Config
+	reader              *bufio.Reader
+	history             []string
+	historyIndex        int
+	historyMutex        sync.RWMutex
+	enhancedReader      *EnhancedInputReader
+	discovery           *discovery.ResourceDiscoverer
+	driftAnalyzer       interface{}
+	remediationEngine   *remediation.RemediationEngine
+	stateManager        *state.RemoteStateManager
+	terragruntMgr       *terragrunt.TerragruntParser
+	visualizer          *visualization.EnhancedVisualization
+	config              *config.Config
 	discoveredResources []models.Resource
-	stateFiles       []models.StateFile
-	remediationHistory []remediation.RemediationPlan
+	stateFiles          []models.StateFile
+	remediationHistory  []remediation.RemediationPlan
 }
 
 func NewInteractiveShell() *InteractiveShell {
@@ -88,7 +88,7 @@ func NewInteractiveShell() *InteractiveShell {
 		cfg = &config.Config{
 			Discovery: config.DiscoveryConfig{
 				ConcurrencyLimit: 10,
-				Timeout:         300 * time.Second,
+				Timeout:          300 * time.Second,
 			},
 		}
 	}
@@ -109,20 +109,20 @@ func NewInteractiveShell() *InteractiveShell {
 	visualizer, _ := visualization.NewEnhancedVisualization("visualizations")
 
 	return &InteractiveShell{
-		reader:            bufio.NewReader(os.Stdin),
-		history:           make([]string, 0),
-		historyIndex:      -1,
-		enhancedReader:    NewEnhancedInputReader(),
-		discovery:         discoveryEngine,
-		driftAnalyzer:     driftAnalyzer,
-		remediationEngine: remediationEngine,
-		stateManager:      stateManager,
-		terragruntMgr:     terragruntMgr,
-		visualizer:        visualizer,
-		config:            cfg,
+		reader:              bufio.NewReader(os.Stdin),
+		history:             make([]string, 0),
+		historyIndex:        -1,
+		enhancedReader:      NewEnhancedInputReader(),
+		discovery:           discoveryEngine,
+		driftAnalyzer:       driftAnalyzer,
+		remediationEngine:   remediationEngine,
+		stateManager:        stateManager,
+		terragruntMgr:       terragruntMgr,
+		visualizer:          visualizer,
+		config:              cfg,
 		discoveredResources: make([]models.Resource, 0),
-		stateFiles:        make([]models.StateFile, 0),
-		remediationHistory: make([]remediation.RemediationPlan, 0),
+		stateFiles:          make([]models.StateFile, 0),
+		remediationHistory:  make([]remediation.RemediationPlan, 0),
 	}
 }
 
@@ -752,7 +752,7 @@ func (shell *InteractiveShell) handleVisualize(args []string) {
 		return
 	}
 
-	// Save to file  
+	// Save to file
 	if err == nil {
 		err = os.WriteFile(outputPath, []byte("[Visualization would be saved here]"), 0644)
 	}
@@ -868,7 +868,7 @@ func (shell *InteractiveShell) handleStateFiles(args []string) {
 		}
 		if strings.HasSuffix(path, ".tfstate") || strings.HasSuffix(path, "terraform.tfstate") {
 			stateFile := models.StateFile{
-				Path: path,
+				Path:      path,
 				Resources: []models.TerraformResource{},
 			}
 			stateFiles = append(stateFiles, stateFile)
@@ -1063,7 +1063,7 @@ func (shell *InteractiveShell) handleRemediateBatch(args []string) {
 
 func (shell *InteractiveShell) handleRemediateHistory(args []string) {
 	fmt.Println("[INFO] Remediation history:")
-	
+
 	if len(shell.remediationHistory) == 0 {
 		fmt.Println("  No remediation history available")
 		return
@@ -1119,16 +1119,16 @@ func (shell *InteractiveShell) handleRemediateRollback(args []string) {
 
 func (shell *InteractiveShell) handleHealth(args []string) {
 	fmt.Println("[INFO] Service health check:")
-	
+
 	// Check component health
 	components := map[string]bool{
-		"Discovery Engine":    shell.discovery != nil,
-		"Drift Analyzer":      shell.driftAnalyzer != nil,
-		"Remediation Engine":  shell.remediationEngine != nil,
-		"State Manager":       shell.stateManager != nil,
-		"Terragrunt Manager":  shell.terragruntMgr != nil,
-		"Visualizer":          shell.visualizer != nil,
-		"Configuration":       shell.config != nil,
+		"Discovery Engine":   shell.discovery != nil,
+		"Drift Analyzer":     shell.driftAnalyzer != nil,
+		"Remediation Engine": shell.remediationEngine != nil,
+		"State Manager":      shell.stateManager != nil,
+		"Terragrunt Manager": shell.terragruntMgr != nil,
+		"Visualizer":         shell.visualizer != nil,
+		"Configuration":      shell.config != nil,
 	}
 
 	allHealthy := true

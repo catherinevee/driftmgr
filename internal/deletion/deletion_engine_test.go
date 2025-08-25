@@ -89,7 +89,7 @@ func TestDeletionEngine_DiscoverResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine := NewDeletionEngine()
-			
+
 			if tt.name != "invalid provider" {
 				mockProvider := new(MockProvider)
 				mockProvider.On("Name").Return("aws")
@@ -103,7 +103,7 @@ func TestDeletionEngine_DiscoverResources(t *testing.T) {
 			}
 
 			resources, err := engine.DiscoverResources(context.Background(), options)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -154,7 +154,7 @@ func TestDeletionEngine_DeleteResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine := NewDeletionEngine()
-			
+
 			mockProvider := new(MockProvider)
 			mockProvider.On("Name").Return("aws")
 			mockProvider.On("DeleteResource", mock.Anything, mock.Anything).Return(nil)
@@ -171,7 +171,7 @@ func TestDeletionEngine_DeleteResources(t *testing.T) {
 			}
 
 			result, err := engine.DeleteResources(context.Background(), tt.resources, options)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -187,10 +187,10 @@ func TestDeletionEngine_DeleteResources(t *testing.T) {
 
 func TestDeletionEngine_SafetyChecks(t *testing.T) {
 	tests := []struct {
-		name         string
-		resources    []models.Resource
-		options      DeletionOptions
-		expectPass   bool
+		name       string
+		resources  []models.Resource
+		options    DeletionOptions
+		expectPass bool
 	}{
 		{
 			name: "pass safety check with force",
@@ -235,7 +235,7 @@ func TestDeletionEngine_SafetyChecks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine := NewDeletionEngine()
-			
+
 			passed := engine.performSafetyChecks(tt.resources, tt.options)
 			assert.Equal(t, tt.expectPass, passed)
 		})
@@ -244,15 +244,15 @@ func TestDeletionEngine_SafetyChecks(t *testing.T) {
 
 func TestDeletionEngine_DependencyOrdering(t *testing.T) {
 	engine := NewDeletionEngine()
-	
+
 	mockProvider := new(MockProvider)
 	mockProvider.On("Name").Return("aws")
-	
+
 	// Setup dependency chain: instance -> security group -> vpc
 	mockProvider.On("GetResourceDependencies", mock.Anything, "i-123").Return([]string{"sg-456"}, nil)
 	mockProvider.On("GetResourceDependencies", mock.Anything, "sg-456").Return([]string{"vpc-789"}, nil)
 	mockProvider.On("GetResourceDependencies", mock.Anything, "vpc-789").Return([]string{}, nil)
-	
+
 	engine.RegisterProvider("aws", mockProvider)
 
 	resources := []models.Resource{
@@ -264,7 +264,7 @@ func TestDeletionEngine_DependencyOrdering(t *testing.T) {
 	ordered, err := engine.orderResourcesByDependencies(context.Background(), resources)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(ordered))
-	
+
 	// Should delete in reverse dependency order
 	assert.Equal(t, "i-123", ordered[0].ID)
 	assert.Equal(t, "sg-456", ordered[1].ID)
@@ -273,10 +273,10 @@ func TestDeletionEngine_DependencyOrdering(t *testing.T) {
 
 func TestDeletionEngine_RetryLogic(t *testing.T) {
 	engine := NewDeletionEngine()
-	
+
 	mockProvider := new(MockProvider)
 	mockProvider.On("Name").Return("aws")
-	
+
 	// Simulate failure then success
 	callCount := 0
 	mockProvider.On("DeleteResource", mock.Anything, "i-123").Return(
@@ -288,7 +288,7 @@ func TestDeletionEngine_RetryLogic(t *testing.T) {
 			return nil
 		},
 	)
-	
+
 	engine.RegisterProvider("aws", mockProvider)
 
 	resource := models.Resource{ID: "i-123", Type: "aws_instance", Provider: "aws"}
@@ -304,7 +304,7 @@ func TestDeletionEngine_RetryLogic(t *testing.T) {
 
 func TestDeletionEngine_BatchProcessing(t *testing.T) {
 	engine := NewDeletionEngine()
-	
+
 	// Create 25 resources
 	resources := make([]models.Resource, 25)
 	for i := 0; i < 25; i++ {
@@ -331,9 +331,9 @@ func TestDeletionEngine_ProtectedResources(t *testing.T) {
 	engine := NewDeletionEngine()
 
 	tests := []struct {
-		name       string
-		resource   models.Resource
-		protected  bool
+		name      string
+		resource  models.Resource
+		protected bool
 	}{
 		{
 			name: "production database protected",
@@ -377,12 +377,12 @@ func TestDeletionEngine_ProtectedResources(t *testing.T) {
 
 func TestDeletionEngine_ConcurrentDeletion(t *testing.T) {
 	engine := NewDeletionEngine()
-	
+
 	mockProvider := new(MockProvider)
 	mockProvider.On("Name").Return("aws")
 	mockProvider.On("DeleteResource", mock.Anything, mock.Anything).Return(nil).After(10 * time.Millisecond)
 	mockProvider.On("GetResourceDependencies", mock.Anything, mock.Anything).Return([]string{}, nil)
-	
+
 	engine.RegisterProvider("aws", mockProvider)
 
 	// Create independent resources that can be deleted concurrently

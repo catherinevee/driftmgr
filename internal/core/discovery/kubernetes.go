@@ -236,21 +236,21 @@ func (p *KubernetesProvider) deploymentToResource(dep *v1.Deployment) models.Res
 	}
 
 	return models.Resource{
-		ID:           fmt.Sprintf("%s/%s/%s", p.clusterName, dep.Namespace, dep.Name),
-		Name:         dep.Name,
-		Type:         "kubernetes_deployment",
-		Provider:     "kubernetes",
-		Region:       p.clusterName,
-		State:        state,
-		Tags:         tags,
-		CreatedAt:    dep.CreationTimestamp.Time,
-		Updated:    time.Now(),
+		ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, dep.Namespace, dep.Name),
+		Name:      dep.Name,
+		Type:      "kubernetes_deployment",
+		Provider:  "kubernetes",
+		Region:    p.clusterName,
+		State:     state,
+		Tags:      tags,
+		CreatedAt: dep.CreationTimestamp.Time,
+		Updated:   time.Now(),
 		Attributes: map[string]interface{}{
-			"namespace":       dep.Namespace,
-			"replicas":        *dep.Spec.Replicas,
-			"ready_replicas":  dep.Status.ReadyReplicas,
-			"available":       dep.Status.AvailableReplicas,
-			"strategy":        dep.Spec.Strategy.Type,
+			"namespace":        dep.Namespace,
+			"replicas":         *dep.Spec.Replicas,
+			"ready_replicas":   dep.Status.ReadyReplicas,
+			"available":        dep.Status.AvailableReplicas,
+			"strategy":         dep.Spec.Strategy.Type,
 			"resource_version": dep.ResourceVersion,
 		},
 	}
@@ -291,15 +291,15 @@ func (p *KubernetesProvider) serviceToResource(svc *corev1.Service) models.Resou
 	}
 
 	return models.Resource{
-		ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, svc.Namespace, svc.Name),
-		Name:     svc.Name,
-		Type:     "kubernetes_service",
-		Provider: "kubernetes",
-		Region:   p.clusterName,
-		State:    "active",
-		Tags:     tags,
+		ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, svc.Namespace, svc.Name),
+		Name:      svc.Name,
+		Type:      "kubernetes_service",
+		Provider:  "kubernetes",
+		Region:    p.clusterName,
+		State:     "active",
+		Tags:      tags,
 		CreatedAt: svc.CreationTimestamp.Time,
-		Updated: time.Now(),
+		Updated:   time.Now(),
 		Attributes: map[string]interface{}{
 			"namespace":    svc.Namespace,
 			"type":         string(svc.Spec.Type),
@@ -327,15 +327,15 @@ func (p *KubernetesProvider) discoverConfigMaps(ctx context.Context) ([]models.R
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, cm.Namespace, cm.Name),
-			Name:     cm.Name,
-			Type:     "kubernetes_configmap",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, cm.Namespace, cm.Name),
+			Name:      cm.Name,
+			Type:      "kubernetes_configmap",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: cm.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace": cm.Namespace,
 				"data_keys": getMapKeys(cm.Data),
@@ -362,15 +362,15 @@ func (p *KubernetesProvider) discoverSecrets(ctx context.Context) ([]models.Reso
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, secret.Namespace, secret.Name),
-			Name:     secret.Name,
-			Type:     "kubernetes_secret",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, secret.Namespace, secret.Name),
+			Name:      secret.Name,
+			Type:      "kubernetes_secret",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: secret.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace": secret.Namespace,
 				"type":      string(secret.Type),
@@ -414,15 +414,15 @@ func (p *KubernetesProvider) ingressToResource(ing *networkingv1.Ingress) models
 	}
 
 	return models.Resource{
-		ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, ing.Namespace, ing.Name),
-		Name:     ing.Name,
-		Type:     "kubernetes_ingress",
-		Provider: "kubernetes",
-		Region:   p.clusterName,
-		State:    "active",
-		Tags:     tags,
+		ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, ing.Namespace, ing.Name),
+		Name:      ing.Name,
+		Type:      "kubernetes_ingress",
+		Provider:  "kubernetes",
+		Region:    p.clusterName,
+		State:     "active",
+		Tags:      tags,
 		CreatedAt: ing.CreationTimestamp.Time,
-		Updated: time.Now(),
+		Updated:   time.Now(),
 		Attributes: map[string]interface{}{
 			"namespace":      ing.Namespace,
 			"hosts":          hosts,
@@ -448,15 +448,15 @@ func (p *KubernetesProvider) discoverPods(ctx context.Context) ([]models.Resourc
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, pod.Namespace, pod.Name),
-			Name:     pod.Name,
-			Type:     "kubernetes_pod",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    string(pod.Status.Phase),
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, pod.Namespace, pod.Name),
+			Name:      pod.Name,
+			Type:      "kubernetes_pod",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     string(pod.Status.Phase),
+			Tags:      tags,
 			CreatedAt: pod.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace":       pod.Namespace,
 				"node_name":       pod.Spec.NodeName,
@@ -492,15 +492,15 @@ func (p *KubernetesProvider) discoverStatefulSets(ctx context.Context) ([]models
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, ss.Namespace, ss.Name),
-			Name:     ss.Name,
-			Type:     "kubernetes_statefulset",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    state,
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, ss.Namespace, ss.Name),
+			Name:      ss.Name,
+			Type:      "kubernetes_statefulset",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     state,
+			Tags:      tags,
 			CreatedAt: ss.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace":      ss.Namespace,
 				"replicas":       *ss.Spec.Replicas,
@@ -529,21 +529,21 @@ func (p *KubernetesProvider) discoverDaemonSets(ctx context.Context) ([]models.R
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, ds.Namespace, ds.Name),
-			Name:     ds.Name,
-			Type:     "kubernetes_daemonset",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "running",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, ds.Namespace, ds.Name),
+			Name:      ds.Name,
+			Type:      "kubernetes_daemonset",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "running",
+			Tags:      tags,
 			CreatedAt: ds.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"namespace":          ds.Namespace,
-				"desired_number":     ds.Status.DesiredNumberScheduled,
-				"current_number":     ds.Status.CurrentNumberScheduled,
-				"ready_number":       ds.Status.NumberReady,
-				"available_number":   ds.Status.NumberAvailable,
+				"namespace":        ds.Namespace,
+				"desired_number":   ds.Status.DesiredNumberScheduled,
+				"current_number":   ds.Status.CurrentNumberScheduled,
+				"ready_number":     ds.Status.NumberReady,
+				"available_number": ds.Status.NumberAvailable,
 			},
 		})
 	}
@@ -574,20 +574,20 @@ func (p *KubernetesProvider) discoverJobs(ctx context.Context) ([]models.Resourc
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, job.Namespace, job.Name),
-			Name:     job.Name,
-			Type:     "kubernetes_job",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    state,
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, job.Namespace, job.Name),
+			Name:      job.Name,
+			Type:      "kubernetes_job",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     state,
+			Tags:      tags,
 			CreatedAt: job.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"namespace":  job.Namespace,
-				"succeeded":  job.Status.Succeeded,
-				"failed":     job.Status.Failed,
-				"active":     job.Status.Active,
+				"namespace":   job.Namespace,
+				"succeeded":   job.Status.Succeeded,
+				"failed":      job.Status.Failed,
+				"active":      job.Status.Active,
 				"completions": job.Spec.Completions,
 			},
 		})
@@ -617,15 +617,15 @@ func (p *KubernetesProvider) discoverCronJobs(ctx context.Context) ([]models.Res
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, cj.Namespace, cj.Name),
-			Name:     cj.Name,
-			Type:     "kubernetes_cronjob",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    state,
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, cj.Namespace, cj.Name),
+			Name:      cj.Name,
+			Type:      "kubernetes_cronjob",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     state,
+			Tags:      tags,
 			CreatedAt: cj.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace": cj.Namespace,
 				"schedule":  cj.Spec.Schedule,
@@ -654,15 +654,15 @@ func (p *KubernetesProvider) discoverPersistentVolumes(ctx context.Context) ([]m
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/pv/%s", p.clusterName, pv.Name),
-			Name:     pv.Name,
-			Type:     "kubernetes_persistent_volume",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    string(pv.Status.Phase),
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/pv/%s", p.clusterName, pv.Name),
+			Name:      pv.Name,
+			Type:      "kubernetes_persistent_volume",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     string(pv.Status.Phase),
+			Tags:      tags,
 			CreatedAt: pv.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"capacity":       pv.Spec.Capacity.Storage().String(),
 				"access_modes":   pv.Spec.AccessModes,
@@ -691,21 +691,21 @@ func (p *KubernetesProvider) discoverPersistentVolumeClaims(ctx context.Context)
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, pvc.Namespace, pvc.Name),
-			Name:     pvc.Name,
-			Type:     "kubernetes_persistent_volume_claim",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    string(pvc.Status.Phase),
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, pvc.Namespace, pvc.Name),
+			Name:      pvc.Name,
+			Type:      "kubernetes_persistent_volume_claim",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     string(pvc.Status.Phase),
+			Tags:      tags,
 			CreatedAt: pvc.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"namespace":      pvc.Namespace,
-				"volume_name":    pvc.Spec.VolumeName,
-				"storage_class":  *pvc.Spec.StorageClassName,
-				"access_modes":   pvc.Spec.AccessModes,
-				"capacity":       pvc.Status.Capacity.Storage().String(),
+				"namespace":     pvc.Namespace,
+				"volume_name":   pvc.Spec.VolumeName,
+				"storage_class": *pvc.Spec.StorageClassName,
+				"access_modes":  pvc.Spec.AccessModes,
+				"capacity":      pvc.Status.Capacity.Storage().String(),
 			},
 		})
 	}
@@ -729,15 +729,15 @@ func (p *KubernetesProvider) discoverStorageClasses(ctx context.Context) ([]mode
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/sc/%s", p.clusterName, sc.Name),
-			Name:     sc.Name,
-			Type:     "kubernetes_storage_class",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/sc/%s", p.clusterName, sc.Name),
+			Name:      sc.Name,
+			Type:      "kubernetes_storage_class",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: sc.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"provisioner":     sc.Provisioner,
 				"reclaim_policy":  *sc.ReclaimPolicy,
@@ -766,21 +766,21 @@ func (p *KubernetesProvider) discoverNetworkPolicies(ctx context.Context) ([]mod
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, np.Namespace, np.Name),
-			Name:     np.Name,
-			Type:     "kubernetes_network_policy",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, np.Namespace, np.Name),
+			Name:      np.Name,
+			Type:      "kubernetes_network_policy",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: np.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"namespace":      np.Namespace,
-				"pod_selector":   np.Spec.PodSelector.MatchLabels,
-				"policy_types":   np.Spec.PolicyTypes,
-				"ingress_rules":  len(np.Spec.Ingress),
-				"egress_rules":   len(np.Spec.Egress),
+				"namespace":     np.Namespace,
+				"pod_selector":  np.Spec.PodSelector.MatchLabels,
+				"policy_types":  np.Spec.PolicyTypes,
+				"ingress_rules": len(np.Spec.Ingress),
+				"egress_rules":  len(np.Spec.Egress),
 			},
 		})
 	}
@@ -805,15 +805,15 @@ func (p *KubernetesProvider) discoverRBACResources(ctx context.Context) ([]model
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, role.Namespace, role.Name),
-			Name:     role.Name,
-			Type:     "kubernetes_role",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, role.Namespace, role.Name),
+			Name:      role.Name,
+			Type:      "kubernetes_role",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: role.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace":   role.Namespace,
 				"rules_count": len(role.Rules),
@@ -834,18 +834,18 @@ func (p *KubernetesProvider) discoverRBACResources(ctx context.Context) ([]model
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/cr/%s", p.clusterName, cr.Name),
-			Name:     cr.Name,
-			Type:     "kubernetes_cluster_role",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/cr/%s", p.clusterName, cr.Name),
+			Name:      cr.Name,
+			Type:      "kubernetes_cluster_role",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: cr.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"rules_count":       len(cr.Rules),
-				"aggregation_rule":  cr.AggregationRule != nil,
+				"rules_count":      len(cr.Rules),
+				"aggregation_rule": cr.AggregationRule != nil,
 			},
 		})
 	}
@@ -863,15 +863,15 @@ func (p *KubernetesProvider) discoverRBACResources(ctx context.Context) ([]model
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, rb.Namespace, rb.Name),
-			Name:     rb.Name,
-			Type:     "kubernetes_role_binding",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, rb.Namespace, rb.Name),
+			Name:      rb.Name,
+			Type:      "kubernetes_role_binding",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: rb.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace":      rb.Namespace,
 				"role_ref":       rb.RoleRef.Name,
@@ -893,15 +893,15 @@ func (p *KubernetesProvider) discoverRBACResources(ctx context.Context) ([]model
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/crb/%s", p.clusterName, crb.Name),
-			Name:     crb.Name,
-			Type:     "kubernetes_cluster_role_binding",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/crb/%s", p.clusterName, crb.Name),
+			Name:      crb.Name,
+			Type:      "kubernetes_cluster_role_binding",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: crb.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"role_ref":       crb.RoleRef.Name,
 				"subjects_count": len(crb.Subjects),
@@ -928,15 +928,15 @@ func (p *KubernetesProvider) discoverHPAs(ctx context.Context) ([]models.Resourc
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, hpa.Namespace, hpa.Name),
-			Name:     hpa.Name,
-			Type:     "kubernetes_hpa",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, hpa.Namespace, hpa.Name),
+			Name:      hpa.Name,
+			Type:      "kubernetes_hpa",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: hpa.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace":        hpa.Namespace,
 				"target_ref":       hpa.Spec.ScaleTargetRef.Name,
@@ -967,23 +967,23 @@ func (p *KubernetesProvider) discoverPDBs(ctx context.Context) ([]models.Resourc
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, pdb.Namespace, pdb.Name),
-			Name:     pdb.Name,
-			Type:     "kubernetes_pdb",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, pdb.Namespace, pdb.Name),
+			Name:      pdb.Name,
+			Type:      "kubernetes_pdb",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: pdb.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
-				"namespace":              pdb.Namespace,
-				"min_available":          pdb.Spec.MinAvailable,
-				"max_unavailable":        pdb.Spec.MaxUnavailable,
-				"current_healthy":        pdb.Status.CurrentHealthy,
-				"desired_healthy":        pdb.Status.DesiredHealthy,
-				"disruptions_allowed":    pdb.Status.DisruptionsAllowed,
-				"expected_pods":          pdb.Status.ExpectedPods,
+				"namespace":           pdb.Namespace,
+				"min_available":       pdb.Spec.MinAvailable,
+				"max_unavailable":     pdb.Spec.MaxUnavailable,
+				"current_healthy":     pdb.Status.CurrentHealthy,
+				"desired_healthy":     pdb.Status.DesiredHealthy,
+				"disruptions_allowed": pdb.Status.DisruptionsAllowed,
+				"expected_pods":       pdb.Status.ExpectedPods,
 			},
 		})
 	}
@@ -1024,7 +1024,7 @@ func (p *KubernetesProvider) DeleteResource(ctx context.Context, resourceID stri
 	namespace := ""
 	resourceType := ""
 	name := ""
-	
+
 	// Determine format based on parts
 	if len(parts) == 3 {
 		// Format: cluster/type/name (for cluster-scoped resources)
@@ -1125,15 +1125,15 @@ func (p *KubernetesProvider) discoverServiceAccounts(ctx context.Context) ([]mod
 		}
 
 		resources = append(resources, models.Resource{
-			ID:       fmt.Sprintf("%s/%s/%s", p.clusterName, sa.Namespace, sa.Name),
-			Name:     sa.Name,
-			Type:     "kubernetes_service_account",
-			Provider: "kubernetes",
-			Region:   p.clusterName,
-			State:    "active",
-			Tags:     tags,
+			ID:        fmt.Sprintf("%s/%s/%s", p.clusterName, sa.Namespace, sa.Name),
+			Name:      sa.Name,
+			Type:      "kubernetes_service_account",
+			Provider:  "kubernetes",
+			Region:    p.clusterName,
+			State:     "active",
+			Tags:      tags,
 			CreatedAt: sa.CreationTimestamp.Time,
-			Updated: time.Now(),
+			Updated:   time.Now(),
 			Attributes: map[string]interface{}{
 				"namespace":     sa.Namespace,
 				"secrets_count": len(sa.Secrets),

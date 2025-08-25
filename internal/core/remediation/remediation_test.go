@@ -101,9 +101,9 @@ func TestRemediationEngine_CreateRemediationPlan(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine := NewRemediationEngine()
-			
+
 			plan, err := engine.CreateRemediationPlan(context.Background(), tt.drift, tt.strategy)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -164,7 +164,7 @@ func TestRemediationEngine_ExecuteRemediation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine := NewRemediationEngine()
-			
+
 			mockProvider := new(MockCloudProvider)
 			if !tt.dryRun {
 				mockProvider.On("UpdateResource", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -173,7 +173,7 @@ func TestRemediationEngine_ExecuteRemediation(t *testing.T) {
 			engine.provider = mockProvider
 
 			result, err := engine.ExecuteRemediation(context.Background(), tt.plan, tt.dryRun)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -226,7 +226,7 @@ func TestRemediationEngine_SafetyChecks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine := NewRemediationEngine()
-			
+
 			passed := engine.performSafetyChecks(tt.plan)
 			assert.Equal(t, tt.expectPass, passed)
 		})
@@ -235,7 +235,7 @@ func TestRemediationEngine_SafetyChecks(t *testing.T) {
 
 func TestRemediationEngine_Rollback(t *testing.T) {
 	engine := NewRemediationEngine()
-	
+
 	// Create a snapshot before remediation
 	snapshot := ResourceSnapshot{
 		ResourceID: "i-123",
@@ -245,7 +245,7 @@ func TestRemediationEngine_Rollback(t *testing.T) {
 		},
 		Timestamp: time.Now(),
 	}
-	
+
 	engine.rollbackManager.SaveSnapshot(snapshot)
 
 	// Simulate failed remediation
@@ -320,7 +320,7 @@ func TestRemediationEngine_ImpactAnalysis(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine := NewRemediationEngine()
-			
+
 			impact := engine.AnalyzeImpact(tt.plan)
 			assert.Equal(t, tt.expectedImpact, impact.Level)
 		})
@@ -329,7 +329,7 @@ func TestRemediationEngine_ImpactAnalysis(t *testing.T) {
 
 func TestRemediationEngine_BatchRemediation(t *testing.T) {
 	engine := NewRemediationEngine()
-	
+
 	drifts := []models.DriftItem{
 		{
 			ResourceID:   "i-1",
@@ -349,10 +349,10 @@ func TestRemediationEngine_BatchRemediation(t *testing.T) {
 	}
 
 	options := BatchRemediationOptions{
-		Strategy:    "auto",
-		Parallel:    true,
-		MaxWorkers:  2,
-		DryRun:      true,
+		Strategy:   "auto",
+		Parallel:   true,
+		MaxWorkers: 2,
+		DryRun:     true,
 	}
 
 	results, err := engine.BatchRemediate(context.Background(), drifts, options)
@@ -362,7 +362,7 @@ func TestRemediationEngine_BatchRemediation(t *testing.T) {
 
 func TestRemediationEngine_ValidationSteps(t *testing.T) {
 	engine := NewRemediationEngine()
-	
+
 	plan := RemediationPlan{
 		ResourceID:   "i-123",
 		ResourceType: "aws_instance",
@@ -412,7 +412,7 @@ func TestRemediationEngine_ValidationSteps(t *testing.T) {
 
 func TestRemediationEngine_TerraformGeneration(t *testing.T) {
 	engine := NewRemediationEngine()
-	
+
 	drift := models.DriftItem{
 		ResourceID:   "i-123",
 		ResourceType: "aws_instance",
@@ -434,7 +434,7 @@ func TestRemediationEngine_TerraformGeneration(t *testing.T) {
 
 func TestRemediationEngine_ScheduledRemediation(t *testing.T) {
 	engine := NewRemediationEngine()
-	
+
 	plan := RemediationPlan{
 		ID:         "scheduled-plan",
 		ResourceID: "i-123",
@@ -447,7 +447,7 @@ func TestRemediationEngine_ScheduledRemediation(t *testing.T) {
 
 	err := engine.ScheduleRemediation(context.Background(), plan)
 	assert.NoError(t, err)
-	
+
 	// Verify plan is scheduled
 	scheduled := engine.GetScheduledRemediations()
 	assert.Equal(t, 1, len(scheduled))
@@ -456,10 +456,10 @@ func TestRemediationEngine_ScheduledRemediation(t *testing.T) {
 
 func TestRemediationEngine_ApprovalWorkflow(t *testing.T) {
 	engine := NewRemediationEngine()
-	
+
 	plan := RemediationPlan{
-		ID:         "approval-plan",
-		ResourceID: "prod-db",
+		ID:               "approval-plan",
+		ResourceID:       "prod-db",
 		RequiresApproval: true,
 		ApprovalConfig: &ApprovalConfig{
 			MinApprovers: 2,
@@ -476,7 +476,7 @@ func TestRemediationEngine_ApprovalWorkflow(t *testing.T) {
 	// Add approvals
 	err = engine.AddApproval(plan.ID, "admin1", true, "Looks good")
 	assert.NoError(t, err)
-	
+
 	err = engine.AddApproval(plan.ID, "admin2", true, "Approved")
 	assert.NoError(t, err)
 

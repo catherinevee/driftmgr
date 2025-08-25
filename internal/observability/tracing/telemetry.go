@@ -26,18 +26,18 @@ type Telemetry struct {
 	tracer   trace.Tracer
 	meter    metric.Meter
 	provider *sdktrace.TracerProvider
-	
+
 	// Common metrics
 	requestCounter  metric.Int64Counter
 	requestDuration metric.Float64Histogram
 	errorCounter    metric.Int64Counter
-	
+
 	// Resource metrics
 	resourcesDiscovered metric.Int64Counter
 	driftDetected       metric.Int64Counter
 	remediationSuccess  metric.Int64Counter
 	remediationFailure  metric.Int64Counter
-	
+
 	// Performance metrics
 	apiLatency       metric.Float64Histogram
 	discoveryLatency metric.Float64Histogram
@@ -49,16 +49,16 @@ type Config struct {
 	ServiceName    string `json:"service_name" yaml:"service_name"`
 	ServiceVersion string `json:"service_version" yaml:"service_version"`
 	Environment    string `json:"environment" yaml:"environment"`
-	
+
 	// Tracing
-	TracingEnabled  bool   `json:"tracing_enabled" yaml:"tracing_enabled"`
-	JaegerEndpoint  string `json:"jaeger_endpoint" yaml:"jaeger_endpoint"`
+	TracingEnabled  bool    `json:"tracing_enabled" yaml:"tracing_enabled"`
+	JaegerEndpoint  string  `json:"jaeger_endpoint" yaml:"jaeger_endpoint"`
 	TraceSampleRate float64 `json:"trace_sample_rate" yaml:"trace_sample_rate"`
-	
+
 	// Metrics
-	MetricsEnabled bool   `json:"metrics_enabled" yaml:"metrics_enabled"`
-	MetricsPort    int    `json:"metrics_port" yaml:"metrics_port"`
-	
+	MetricsEnabled bool `json:"metrics_enabled" yaml:"metrics_enabled"`
+	MetricsPort    int  `json:"metrics_port" yaml:"metrics_port"`
+
 	// Additional attributes
 	Attributes map[string]string `json:"attributes" yaml:"attributes"`
 }
@@ -92,7 +92,7 @@ func Init(ctx context.Context, cfg *Config) (*Telemetry, error) {
 		attribute.String("environment", cfg.Environment),
 	}
 	attrs = append(attrs, attributesFromMap(cfg.Attributes)...)
-	
+
 	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
@@ -140,7 +140,7 @@ func (t *Telemetry) initTracing(ctx context.Context, cfg *Config, res *resource.
 		otlptracehttp.WithEndpoint(cfg.JaegerEndpoint),
 		otlptracehttp.WithInsecure(),
 	)
-	
+
 	exp, err := otlptrace.New(ctx, client)
 	if err != nil {
 		return fmt.Errorf("failed to create OTLP exporter: %w", err)
@@ -416,4 +416,3 @@ func attributesFromMap(m map[string]string) []attribute.KeyValue {
 	}
 	return attrs
 }
-

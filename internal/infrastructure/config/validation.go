@@ -100,7 +100,6 @@ func (c *Config) validateSecurity() error {
 	return nil
 }
 
-
 // ValidateProviderConfig validates provider-specific configuration
 func ValidateProviderConfig(provider string, config ProviderConfig) error {
 	// Validate common fields
