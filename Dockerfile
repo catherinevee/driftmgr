@@ -1,5 +1,5 @@
 # Multi-stage build for DriftMgr
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git make gcc musl-dev
@@ -7,13 +7,13 @@ RUN apk add --no-cache git make gcc musl-dev
 # Set working directory
 WORKDIR /build
 
-# Copy go mod files
+# Copy go.mod and go.sum first for better caching
 COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
+# Copy all source code
 COPY . .
 
 # Build the application

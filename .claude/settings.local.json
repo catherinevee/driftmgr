@@ -52,7 +52,8 @@
       "Bash(./driftmgr.exe --version)",
       "Bash(./test_ci_compliance.bat)",
       "Bash(gofmt:*)",
-      "Bash(./build/driftmgr.exe --version)"
+      "Bash(./build/driftmgr.exe --version)",
+      "Bash(docker build:*)"
     ],
     "deny": [],
     "ask": [],

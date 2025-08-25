@@ -5,12 +5,9 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
-	"unsafe"
 
 	"github.com/catherinevee/driftmgr/internal/core/color"
 )
@@ -395,53 +392,5 @@ func (l *LoadingAnimation) Complete(message string) {
 
 // getTerminalWidth returns the terminal width, defaulting to 80 if unable to determine
 func getTerminalWidth() int {
-	if runtime.GOOS == "windows" {
-		// Windows-specific terminal width detection
-		type coord struct {
-			x int16
-			y int16
-		}
-		type small_rect struct {
-			left   int16
-			top    int16
-			right  int16
-			bottom int16
-		}
-		type consoleScreenBufferInfo struct {
-			size              coord
-			cursorPosition    coord
-			attributes        uint16
-			window            small_rect
-			maximumWindowSize coord
-		}
-
-		kernel32 := syscall.NewLazyDLL("kernel32.dll")
-		getConsoleScreenBufferInfo := kernel32.NewProc("GetConsoleScreenBufferInfo")
-
-		handle, err := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
-		if err != nil {
-			return 80
-		}
-
-		var info consoleScreenBufferInfo
-		ret, _, _ := getConsoleScreenBufferInfo.Call(uintptr(handle), uintptr(unsafe.Pointer(&info)))
-		if ret == 0 {
-			return 80
-		}
-
-		return int(info.size.x)
-	}
-
-	// Unix-like systems
-	width := 80
-	if term := os.Getenv("TERM"); term != "" {
-		// Try to get terminal width from environment
-		if cols := os.Getenv("COLUMNS"); cols != "" {
-			if w, err := strconv.Atoi(cols); err == nil && w > 0 {
-				width = w
-			}
-		}
-	}
-
-	return width
+	return getTerminalWidthPlatform()
 }

@@ -34,8 +34,9 @@
 - [Real-World Examples](#real-world-examples)
 - [Managing Terraform State](#managing-terraform-state)
 - [Fixing Drift](#fixing-drift)
-- [Cost Analysis](#cost-analysis)
+- [Advanced Features](#advanced-features)
 - [Command Reference](#command-reference)
+- [Practical Workflows](#practical-workflows)
 - [Production Features](#production-features)
 - [Configuration](#configuration)
 - [Web Dashboard](#web-dashboard)
@@ -908,6 +909,203 @@ spec:
         env:
         - name: DRIFTMGR_ENVIRONMENT
           value: production
+```
+
+## Practical Workflows
+
+### 1. Initial Cloud Infrastructure Audit
+
+Perform a complete audit of your cloud infrastructure:
+
+```bash
+# Check configured credentials
+driftmgr status
+
+# Discover all resources across all providers
+driftmgr discover --all
+
+# Export findings for review
+driftmgr export --format json --output audit.json
+driftmgr export --format csv --output audit.csv
+```
+
+### 2. Multi-Account Resource Discovery
+
+Work with multiple cloud accounts:
+
+```bash
+# List all available accounts
+driftmgr accounts
+
+# Select specific AWS account
+driftmgr use aws
+
+# Discover resources in selected account
+driftmgr discover --provider aws
+
+# Switch to Azure subscription
+driftmgr use azure
+driftmgr discover --provider azure
+
+# Or discover all accounts at once
+driftmgr discover --all-accounts
+```
+
+### 3. Terraform State Drift Detection
+
+Detect and manage drift in Terraform-managed infrastructure:
+
+```bash
+# Find all state files in current directory
+driftmgr state scan --dir .
+
+# Analyze a specific state file
+driftmgr state analyze --file terraform.tfstate
+
+# Detect drift between state and reality
+driftmgr drift detect --state terraform.tfstate
+
+# Generate drift report
+driftmgr drift report --format json
+
+# Plan remediation
+driftmgr drift fix --plan
+```
+
+### 4. Automated Drift Monitoring
+
+Set up continuous drift detection and auto-remediation:
+
+```bash
+# Check current auto-remediation config
+driftmgr drift auto-remediate status
+
+# Configure remediation rules
+driftmgr drift auto-remediate configure --rules security,encryption
+
+# Test rules without making changes
+driftmgr drift auto-remediate test --dry-run
+
+# Enable auto-remediation
+driftmgr drift auto-remediate enable
+
+# Disable when needed
+driftmgr drift auto-remediate disable
+```
+
+### 5. Resource Cleanup
+
+Clean up unused or unwanted resources:
+
+```bash
+# Discover all resources first
+driftmgr discover --all
+
+# Preview deletion (dry run)
+driftmgr delete ec2 i-0abc123 --dry-run
+driftmgr delete rds my-database --dry-run
+
+# Actually delete resources
+driftmgr delete ec2 i-0abc123
+
+# Verify cleanup
+driftmgr verify
+```
+
+### 6. Security Compliance Check
+
+Focus on security-critical drift:
+
+```bash
+# Detect drift with security focus
+driftmgr drift detect --smart-defaults
+
+# Generate security report
+driftmgr drift report --format json --output security.json
+
+# Review security fixes
+driftmgr drift fix --plan
+
+# Enable auto-fix for security issues
+driftmgr drift auto-remediate enable --rules security
+
+# Apply security fixes
+driftmgr drift fix --execute
+```
+
+### 7. Cross-Environment Comparison
+
+Compare resources between environments:
+
+```bash
+# Select production account
+driftmgr use aws  # Choose production profile
+driftmgr discover --provider aws
+driftmgr export --format json --output prod.json
+
+# Switch to staging account
+driftmgr use aws  # Choose staging profile
+driftmgr discover --provider aws
+driftmgr export --format json --output staging.json
+
+# Compare JSON files with external tools
+diff prod.json staging.json
+```
+
+### 8. Change Management Process
+
+Manage infrastructure changes safely:
+
+```bash
+# Baseline before changes
+driftmgr drift detect
+driftmgr export --format json --output before.json
+
+# Make your infrastructure changes
+# ...
+
+# Check what changed
+driftmgr drift detect
+driftmgr drift fix --plan    # Review remediation
+driftmgr drift fix --execute  # Apply fixes
+driftmgr verify              # Verify final state
+```
+
+### 9. API Integration
+
+Set up API access for external tools:
+
+```bash
+# Start web server
+driftmgr serve web --port 8080
+
+# In another terminal, check endpoints:
+curl http://localhost:8080/health
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+curl http://localhost:8080/metrics
+```
+
+### 10. Troubleshooting
+
+Debug issues with DriftMgr:
+
+```bash
+# Check system status
+driftmgr status
+
+# Test single provider
+driftmgr discover --provider aws
+
+# Debug credential detection
+driftmgr discover --show-credentials
+
+# Run verification checks
+driftmgr verify
+
+# Start server for health checks
+driftmgr serve web --port 8080
+curl http://localhost:8080/health
 ```
 
 ## Monitoring & Observability
