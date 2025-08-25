@@ -48,16 +48,19 @@
 ### 1. Install DriftMgr
 
 ```bash
-# Windows (PowerShell as Administrator)
-irm https://raw.githubusercontent.com/catherinevee/driftmgr/main/scripts/install.ps1 | iex
-
-# Linux/macOS
-curl -sSL https://raw.githubusercontent.com/catherinevee/driftmgr/main/scripts/install.sh | bash
-
-# Or build from source
+# Build from source (recommended)
 git clone https://github.com/catherinevee/driftmgr.git
 cd driftmgr
+go build -o build/driftmgr ./cmd/driftmgr
+
+# Or use Make
 make build
+
+# Windows: Add to PATH
+set PATH=%PATH%;%CD%\build
+
+# Linux/macOS: Add to PATH
+export PATH=$PATH:$(pwd)/build
 ```
 
 ### 2. Check Cloud Credentials
@@ -147,37 +150,42 @@ Drift Analysis Summary:
 - Cost Impact:        +$8.76/month
 ```
 
-### Example 2: Interactive Account Selection
+### Example 2: Multi-Account Discovery
 
 ```bash
-$ driftmgr discover --interactive
+$ driftmgr discover --all-accounts
 
-Select Cloud Provider:
-> AWS (3 accounts available)
-  Azure (2 subscriptions)
-  GCP (1 project)
-  All Providers
-
-AWS Account Selection:
+Discovering resources across all accounts...
 ============================================================
-Select accounts to scan:
-[x] Production (123456789012) - 234 resources
-[x] Staging (234567890123) - 156 resources
-[ ] Development (345678901234) - 89 resources
-[x] All Accounts
 
-Press SPACE to select, ENTER to confirm
+Detected Accounts:
+├─ AWS: 3 profiles found
+│  ├─ Production (123456789012)
+│  ├─ Staging (234567890123)
+│  └─ Development (345678901234)
+│
+├─ Azure: 2 subscriptions found
+│  ├─ Production-Sub
+│  └─ Staging-Sub
+│
+└─ GCP: 1 project found
+   └─ my-project-123
 
-Discovering resources from selected accounts...
+Discovering resources...
 [====================] 100% Complete
 
 Discovery Results:
-├─ Production:   234 resources (us-west-2, us-east-1)
-├─ Staging:      156 resources (us-west-2)
-└─ Total:        390 resources discovered
+├─ AWS Production:   234 resources (us-west-2, us-east-1)
+├─ AWS Staging:      156 resources (us-west-2)
+├─ AWS Development:  89 resources (us-west-2)
+├─ Azure Production: 145 resources
+├─ Azure Staging:    78 resources
+└─ GCP Project:      67 resources
 
-Export results? (Y/n): y
-Exported to: ./reports/discovery-2024-01-15.json
+Total: 769 resources discovered across all accounts
+
+$ driftmgr export --format json --output discovery-report.json
+Exported to: discovery-report.json
 ```
 
 ## Managing Terraform State
@@ -229,46 +237,51 @@ Potential Issues Found:
 └─ 2 resources with ignore_changes rules
 ```
 
-### Comparing State with Reality
+### Analyzing State Files
 
 ```bash
-$ driftmgr state compare --file terraform.tfstate --provider aws
+$ driftmgr state analyze --file terraform.tfstate --detailed
 
-Comparing Terraform State with AWS Reality...
+Analyzing Terraform State File...
 ============================================================
 
-Scanning AWS resources... [====================] 100%
+State Analysis Results:
 
-Comparison Results:
+State Metadata:
+├─ Version:     4
+├─ Serial:      156
+├─ Lineage:     a1b2c3d4-e5f6-7890-abcd-ef1234567890
+└─ Backend:     s3://my-bucket/terraform/prod.tfstate
 
-MATCHED (68/72)
-├─ All EC2 instances match state
-├─ All S3 buckets match state
-└─ Most security groups match state
+Resource Statistics:
+├─ Total Resources:     87
+├─ Resource Types:      12
+├─ Providers Used:      3 (aws, kubernetes, helm)
+└─ Modules:            4
 
-DRIFT DETECTED (4/72)
-├─ sg-0abc123: Extra ingress rule not in state
-│  └─ Port 443 from 10.0.0.0/8 (manually added)
-│
-├─ i-0def456: Instance type differs
-│  ├─ State:  t2.micro
-│  └─ Actual: t2.small
-│
-├─ rds-prod: Backup window changed
-│  ├─ State:  03:00-04:00
-│  └─ Actual: 04:00-05:00
-│
-└─ s3-logs: Versioning enabled (not in state)
+Resource Breakdown by Type:
+├─ aws_instance:              12
+├─ aws_security_group:        18
+├─ aws_security_group_rule:   24
+├─ aws_s3_bucket:            8
+├─ aws_db_instance:          2
+├─ aws_alb:                  3
+├─ kubernetes_deployment:     4
+├─ kubernetes_service:        4
+├─ kubernetes_config_map:     2
+├─ helm_release:             5
+└─ Other:                    5
 
-MISSING IN AWS (2)
-├─ sg-old-web (exists in state, not in AWS)
-└─ eip-unused (exists in state, not in AWS)
+State Health Check:
+├─ Resources with lifecycle rules: 5
+├─ Resources marked for recreation: 3
+├─ Resources with ignore_changes: 2
+└─ Orphaned resources: 0
 
 Recommendations:
-1. Run 'terraform refresh' to update state
-2. Import the missing security group rule
-3. Remove deleted resources from state
-4. Consider using 'terraform import' for untracked resources
+- Review resources marked for recreation
+- Consider removing lifecycle prevent_destroy for non-critical resources
+- Update ignore_changes rules to match current requirements
 ```
 
 ### Visualizing State Dependencies
@@ -362,195 +375,139 @@ Post-Remediation Verification:
 Running drift detection... No drift detected
 ```
 
-### Manual Drift Remediation with Terraform
+### Drift Remediation Planning
 
 ```bash
-$ driftmgr drift fix --generate-terraform
+$ driftmgr drift fix --plan
 
-Generating Terraform Code for Drift Remediation...
+Generating Drift Remediation Plan...
 ============================================================
 
-Generated: drift-fixes.tf
+Remediation Plan Summary:
 
-# Generated by DriftMgr on 2024-01-15
-# Fixes for 7 drift items detected
+Priority | Resource           | Issue                    | Action
+---------|-------------------|--------------------------|--------
+CRITICAL | sg-0abc123        | Open to 0.0.0.0/0       | Remove rule
+CRITICAL | s3-prod-data      | Encryption disabled      | Enable AES-256
+HIGH     | rds-prod-db       | Backup retention 7 days  | Restore to 30
+HIGH     | i-0def456abc      | Wrong instance type      | Resize
+MEDIUM   | alb-frontend      | Health check modified    | Reset
+LOW      | 8 resources       | Tag changes              | Update tags
 
-# Fix: Remove unsafe security group rule
-resource "aws_security_group_rule" "remove_unsafe" {
-  type              = "ingress"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = ["10.0.0.0/8"]  # Changed from 0.0.0.0/0
-  security_group_id = "sg-0abc123"
-}
+Remediation Strategy:
+├─ Total Changes: 14
+├─ Estimated Time: 15 minutes
+├─ Requires Downtime: Yes (2 minutes for instance resize)
+├─ Risk Level: Medium
+└─ Rollback Available: Yes
 
-# Fix: Enable S3 bucket encryption
-resource "aws_s3_bucket_server_side_encryption_configuration" "prod_data" {
-  bucket = "s3-prod-data"
-  
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
+Safety Checks:
+├─ Snapshot creation: Enabled
+├─ Backup verification: Passed
+├─ Dependencies checked: No conflicts
+└─ Approval required: Yes (critical changes)
 
-# Fix: Update RDS backup retention
-resource "aws_db_instance" "prod_db" {
-  identifier             = "rds-prod-db"
-  backup_retention_period = 30  # Restored from 7
-  # ... other configurations
-}
+To proceed with remediation:
+1. Review the plan above
+2. Run: driftmgr drift fix --execute
+3. Or run: driftmgr drift auto-remediate enable
 
-# Fix: Resize EC2 instance
-resource "aws_instance" "web_server" {
-  instance_id   = "i-0def456abc"
-  instance_type = "t2.micro"  # Reverted from t2.small
-  # ... other configurations
-}
-
-To apply these fixes:
-1. Review the generated code
-2. Run: terraform plan -out=drift-fixes.plan
-3. Run: terraform apply drift-fixes.plan
+For manual remediation:
+- Use your existing Terraform workflow
+- Or apply fixes individually through cloud console
 ```
 
-### Selective Drift Remediation
+### Auto-Remediation Configuration
 
 ```bash
-$ driftmgr drift fix --interactive
+$ driftmgr drift auto-remediate status
 
-Interactive Drift Remediation
+Auto-Remediation Status
 ============================================================
 
-Select items to fix:
-[x] CRITICAL: sg-0abc123: Remove unsafe security group rule
-[x] CRITICAL: s3-prod-data: Enable encryption
-[x] HIGH: rds-prod-db: Restore backup retention
-[ ] HIGH: i-0def456abc: Resize instance (requires downtime)
-[x] HIGH: alb-frontend: Reset health check
-[ ] LOW: 8 tag updates (cosmetic)
+Status: ENABLED
+Mode: Safe Mode (Critical issues only)
+Last Run: 2024-01-15 10:30:00
+Next Run: In 15 minutes
 
-Selected: 4 items
+Configuration:
+├─ Check Interval: 15 minutes
+├─ Max Concurrent Fixes: 5
+├─ Approval Required: Yes (for production)
+└─ Rollback Enabled: Yes
 
-Choose remediation strategy:
-> Immediate - Fix now with safety checks
-  Scheduled - Fix during maintenance window
-  Terraform - Generate Terraform code
-  Manual - Show manual fix instructions
+Active Rules:
+├─ auto-fix-security: Fix critical security issues
+├─ auto-fix-encryption: Enable encryption on unencrypted resources
+├─ auto-fix-backups: Restore backup configurations
+└─ auto-tag: Apply required tags
 
-Executing immediate remediation...
-[====================] 100% Complete
+Recent Actions:
+├─ [10:30] Fixed: sg-0abc123 - Removed unsafe rule
+├─ [10:15] Fixed: s3-logs - Enabled encryption
+├─ [10:00] Detected: rds-prod - Backup retention drift (pending approval)
+└─ [09:45] Fixed: 12 resources - Applied missing tags
 
-Successfully fixed 4/4 selected items
+To modify auto-remediation:
+$ driftmgr drift auto-remediate enable --rules security,encryption
+$ driftmgr drift auto-remediate disable
+$ driftmgr drift auto-remediate test --dry-run
 ```
 
-## Cost Analysis
+## Advanced Features
 
-### How DriftMgr Calculates Remediation Costs
+### Enterprise-Ready Capabilities
 
-DriftMgr provides intelligent cost analysis to help you understand the financial impact of both drift and remediation actions.
+DriftMgr includes production-grade features for enterprise deployments.
 
-#### Cost Calculation Components
+#### Security & Compliance
 
-**1. Real-Time Pricing Data**
-- Fetches current pricing from AWS, Azure, GCP, and DigitalOcean APIs
-- Updates pricing data every 24 hours
-- Accounts for regional price variations
-- Includes reserved instance and spot pricing discounts
+**1. Credential Management**
+- Encrypted credential storage using AES-256-GCM
+- Integration with HashiCorp Vault
+- Support for IAM roles and service principals
+- Automatic credential rotation support
 
-**2. Cost Impact Categories**
+**2. Audit & Compliance**
+- Complete audit trail of all operations
+- SOC2 and HIPAA compliance support
+- Role-based access control (RBAC) ready
+- Detailed activity logging
 
-| Category | Description | Example |
-|----------|-------------|---------||
-| **Immediate Costs** | One-time charges upon remediation | Instance resizing, snapshot creation |
-| **Ongoing Costs** | Recurring monthly charges | Compute hours, storage capacity |
-| **Potential Savings** | Cost reductions from remediation | Downsizing, removing unused resources |
-| **Risk Costs** | Potential costs from non-compliance | Data breach, audit failures |
+#### Performance Optimizations
 
-#### Cost Calculation Examples
+**1. Intelligent Caching**
+- TTL-based cache with automatic invalidation
+- Distributed caching support
+- Incremental discovery for large environments
 
-**Instance Resizing**
-```
-Current: t2.micro ($0.0116/hour)
-Drift:   t2.small ($0.023/hour)
-Delta:   +$8.32/month (+$99.84/year)
-```
+**2. Parallel Processing**
+- Concurrent resource discovery
+- Batched API calls
+- Rate limiting and backoff strategies
 
-**Storage Optimization**
-```
-Current: 500GB gp2 ($50/month)
-Optimal: 500GB gp3 ($40/month)
-Savings: -$10/month (-$120/year)
-```
+#### Resilience Features
 
-#### Cost-Aware Remediation
-
+**Circuit Breaker Pattern**
 ```bash
-# View cost impact before remediation
-driftmgr drift detect --show-costs
+$ driftmgr discover --provider aws
 
-Drift Cost Analysis:
-=====================================
-Resource         | Type    | Monthly | Annual  | Priority
------------------|---------|---------|---------|----------
-i-0abc123        | Resize  | +$8.32  | +$99.84 | LOW
-db-prod          | Backup  | +$45.00 | +$540   | HIGH
-s3-logs          | Storage | +$12.50 | +$150   | MEDIUM
+Circuit Breaker Status:
+=====================
+Provider | State  | Failures | Last Success
+---------|--------|----------|---------------
+AWS      | CLOSED | 0/5      | 2 min ago
+Azure    | CLOSED | 0/5      | 5 min ago
+GCP      | OPEN   | 5/5      | 1 hour ago
 
-Total Impact: +$65.82/month (+$789.84/year)
-
-# Remediate with cost threshold
-driftmgr drift fix --max-cost 50 --auto
+Note: GCP discovery temporarily disabled due to repeated failures
+Will retry in: 5 minutes
 ```
 
-#### Smart Cost Optimization
-
-DriftMgr automatically identifies cost optimization opportunities:
-
-```bash
-$ driftmgr cost analyze
-
-Cost Optimization Opportunities Found:
-======================================
-
-1. UNUSED RESOURCES ($156/month)
-   - 2 Elastic IPs not attached: $7.20/month
-   - 3 EBS volumes not attached: $45/month
-   - 1 ALB with no targets: $103.80/month
-
-2. RIGHTSIZING ($234/month)
-   - 5 EC2 instances using <10% CPU: $156/month
-   - 2 RDS instances oversized: $78/month
-
-3. STORAGE OPTIMIZATION ($89/month)
-   - 10TB in S3 Standard (move to Glacier): $67/month
-   - 500GB gp2 volumes (convert to gp3): $22/month
-
-Total Potential Savings: $479/month ($5,748/year)
-```
-
-#### Cost Configuration
-
-```yaml
-# configs/driftmgr.yaml
-cost_analysis:
-  enabled: true
-  currency: USD
-  
-  thresholds:
-    auto_fix_under: 50      # Auto-remediate if cost < $50/month
-    require_approval: 500   # Require approval if > $500/month
-    alert_increase: 100     # Alert on >$100/month increase
-  
-  optimization:
-    identify_unused: true
-    suggest_rightsizing: true
-    recommend_reservations: true
-```
-
-For detailed cost calculation methodology, see [Cost Calculation Documentation](docs/COST_CALCULATION.md).
+**Automatic Retry Logic**
+- Exponential backoff for transient failures
+- Provider-specific retry strategies
+- Configurable retry limits and timeouts
 
 ## Command Reference
 
@@ -561,8 +518,15 @@ For detailed cost calculation methodology, see [Cost Calculation Documentation](
 | `status` | Show system status and credentials | `driftmgr status` |
 | `discover` | Discover cloud resources | `driftmgr discover --all` |
 | `drift detect` | Detect infrastructure drift | `driftmgr drift detect --provider aws` |
-| `drift fix` | Fix detected drift | `driftmgr drift fix --auto` |
+| `drift fix` | Plan and execute drift remediation | `driftmgr drift fix --plan` |
 | `state` | Manage Terraform state files | `driftmgr state analyze --file terraform.tfstate` |
+| `accounts` | List all detected cloud accounts | `driftmgr accounts` |
+| `use` | Select account/subscription to work with | `driftmgr use aws` |
+| `delete` | Delete cloud resources | `driftmgr delete ec2 i-abc123` |
+| `verify` | Verify drift detection results | `driftmgr verify` |
+| `import` | Import resources into management | `driftmgr import` |
+| `export` | Export discovery results | `driftmgr export --format json` |
+| `serve` | Start web server or API | `driftmgr serve web` |
 
 ### Discovery Commands
 
@@ -570,17 +534,17 @@ For detailed cost calculation methodology, see [Cost Calculation Documentation](
 # Discover all resources across all providers
 driftmgr discover --all
 
-# Discover with specific providers
-driftmgr discover --provider aws,azure
+# Discover with specific provider
+driftmgr discover --provider aws
 
-# Interactive discovery with account selection
-driftmgr discover --interactive
+# Discover across all accounts/subscriptions
+driftmgr discover --all-accounts
 
-# Export discovery results
-driftmgr discover --export json --output discovery.json
+# Show credential status
+driftmgr discover --show-credentials
 
-# Discover with filters
-driftmgr discover --provider aws --region us-west-2 --tags env=prod
+# Export results after discovery
+driftmgr export --format json --output discovery.json
 ```
 
 ### Drift Detection Commands
@@ -645,18 +609,29 @@ driftmgr drift fix --schedule "2024-01-20 02:00 UTC"
 ### Enterprise-Grade Capabilities
 
 - **Circuit Breakers** - Prevent cascade failures with automatic recovery
-- **Distributed Tracing** - OpenTelemetry integration for request tracking
 - **Health Checks** - Kubernetes-ready liveness and readiness probes
-- **Security Vault** - AES-256-GCM encryption for credentials
+- **Security Vault** - AES-256-GCM encryption for credentials at rest
 - **Rate Limiting** - Provider-specific limits to prevent API throttling
-- **State Management** - Distributed state with etcd support
-- **Metrics Collection** - Prometheus-compatible metrics export
-- **Graceful Shutdown** - Zero-downtime deployments
+- **Metrics Collection** - Performance and operational metrics
+- **Graceful Shutdown** - Clean shutdown with resource cleanup
+- **Audit Logging** - Structured logging with request tracing
+- **Retry Logic** - Exponential backoff for transient failures
+
+#### Experimental Features
+
+- **Distributed State** - etcd integration (requires manual setup)
+- **OpenTelemetry** - Distributed tracing (partial implementation)
+- **WebSocket Support** - Real-time updates (basic implementation)
 
 ### Health Check Endpoints
 
+**Note:** Health and metrics endpoints require the web server to be running.
+
 ```bash
-# Check system health
+# First, start the web server
+driftmgr serve web --port 8080
+
+# Then in another terminal, check system health
 curl http://localhost:8080/health
 
 {
@@ -682,10 +657,18 @@ curl http://localhost:8080/health
 
 ## Configuration
 
-### Basic Configuration (`configs/driftmgr.yaml`)
+### Configuration Files
+
+DriftMgr looks for configuration files in the following order:
+1. `./configs/driftmgr.yaml` (project directory)
+2. `./driftmgr.yaml` (current directory)
+3. `~/.driftmgr/config.yaml` (user home directory)
+4. Environment variables (override file settings)
+
+### Basic Configuration Example
 
 ```yaml
-# DriftMgr Configuration
+# configs/driftmgr.yaml
 app:
   name: driftmgr
   environment: production
@@ -720,17 +703,6 @@ drift:
   ignore_tags:         # Tags to ignore in drift detection
     - LastModified
     - CreatedBy
-  
-  thresholds:
-    production:
-      critical: 0      # Zero tolerance for critical issues
-      important: 5     # Allow up to 5 important changes
-      informational: unlimited
-    
-    staging:
-      critical: 2
-      important: 10
-      informational: unlimited
 
 # Remediation Settings
 remediation:
@@ -738,14 +710,34 @@ remediation:
   safety_checks: true      # Always run safety checks
   create_snapshots: true   # Backup before changes
   rollback_on_failure: true
-  max_parallel: 5          # Parallel remediation tasks
+  max_parallel: 5          # Parallel remediation tasks (default)
 
 # Performance Settings
 performance:
   cache_ttl: 5m
   max_connections: 100
   discovery_timeout: 30s
-  workers: 10
+  workers: 5               # Default concurrent workers (max: 10)
+```
+
+### Environment Variables
+
+Override configuration with environment variables:
+
+```bash
+# Credential timeout
+export DRIFTMGR_CREDENTIAL_TIMEOUT=60
+
+# Log level
+export DRIFTMGR_LOG_LEVEL=debug
+
+# Provider settings
+export DRIFTMGR_AWS_REGIONS=us-west-2,us-east-1
+export DRIFTMGR_AZURE_SUBSCRIPTION=production-sub
+
+# Performance tuning
+export DRIFTMGR_WORKERS=10
+export DRIFTMGR_CACHE_TTL=10m
 ```
 
 ## Web Dashboard
@@ -763,7 +755,7 @@ Starting web server...
 - WebSocket:     ws://localhost:8080/ws
 - Dashboard:     http://localhost:8080
 - Health:        http://localhost:8080/health
-- Metrics:       http://localhost:8080/metrics
+- Metrics:       http://localhost:8080/metrics (JSON format, not Prometheus)
 
 Real-time monitoring enabled
 WebSocket connections: 0
@@ -772,34 +764,34 @@ Auto-refresh: Every 30 seconds
 Press Ctrl+C to stop the server
 ```
 
-### Dashboard Features
+### API Features
 
-- **Real-time Updates** - WebSocket-based live monitoring
-- **Multi-Account View** - See all accounts/subscriptions at once
-- **Drift Timeline** - Historical drift trends and patterns
-- **Cost Analysis** - Understand financial impact of drift
-- **Remediation Queue** - Manage and approve fixes
-- **Audit Trail** - Complete history of all actions
+- **REST API** - Full REST API for programmatic access
+- **Health Checks** - Kubernetes-ready health endpoints (`/health/live`, `/health/ready`)
+- **Metrics Export** - JSON metrics at `/metrics` endpoint (not Prometheus format)
+- **WebSocket Support** - Real-time updates (experimental)
+- **Audit Logging** - Complete history of all operations
+
+**Note:** All API endpoints require `driftmgr serve web` to be running.
 
 ## Performance
 
-### Benchmarks
+### Performance Characteristics
 
-| Operation | Resources | Time | Rate |
-|-----------|-----------|------|------|
-| Discovery (AWS) | 1,000 | 8.2s | 122/sec |
-| Discovery (Multi-cloud) | 2,500 | 18.5s | 135/sec |
-| Drift Detection | 500 | 3.1s | 161/sec |
-| State Analysis | 1,000 | 1.8s | 556/sec |
-| Remediation | 50 | 12.3s | 4/sec |
+| Operation | Typical Performance | Notes |
+|-----------|-------------------|--------|
+| Resource Discovery | 50-200 resources/sec | Depends on API rate limits |
+| Drift Detection | 100-500 resources/sec | Local state comparison |
+| State Analysis | 500+ resources/sec | File parsing only |
+| Parallel Discovery | Default: 5 concurrent | Max: 10 (configurable via workers flag) |
 
 ### Optimization Features
 
 - **Parallel Processing** - Concurrent resource discovery
-- **Intelligent Caching** - 80%+ cache hit rate
-- **Rate Limiting** - Respects API quotas
-- **Incremental Discovery** - Only scan changes
-- **Smart Filtering** - 75-85% noise reduction
+- **Intelligent Caching** - Reduces redundant API calls
+- **Rate Limiting** - Respects provider API quotas
+- **Incremental Discovery** - Scan only changed resources
+- **Smart Filtering** - Reduces noise in drift detection
 
 ## Security
 
@@ -874,15 +866,18 @@ driftmgr discover --retry-backoff
 ### Using Docker
 
 ```bash
-# Run with Docker
+# Build the Docker image locally first
+docker build -t driftmgr:latest .
+
+# Then run with Docker
 docker run -it --rm \
   -e AWS_PROFILE=default \
   -e AZURE_SUBSCRIPTION_ID=xxx \
   -v ~/.aws:/root/.aws:ro \
-  catherinevee/driftmgr:latest \
+  driftmgr:latest \
   discover --all
 
-# Docker Compose
+# Or use Docker Compose
 docker-compose up -d
 ```
 
@@ -899,7 +894,7 @@ spec:
     spec:
       containers:
       - name: driftmgr
-        image: catherinevee/driftmgr:latest
+        image: driftmgr:latest  # Build locally first: docker build -t driftmgr:latest .
         ports:
         - containerPort: 8080
         livenessProbe:
@@ -917,26 +912,25 @@ spec:
 
 ## Monitoring & Observability
 
-### Prometheus Metrics
+### Metrics Collection
 
-```yaml
-# Exposed metrics at /metrics endpoint
-driftmgr_discovery_duration_seconds
-driftmgr_resources_discovered_total
-driftmgr_drift_detected_total
-driftmgr_remediation_success_total
-driftmgr_api_requests_total
-driftmgr_cache_hit_ratio
+```bash
+# Start the web server to enable metrics
+driftmgr serve web --port 8080
+
+# Access metrics endpoint (JSON format)
+curl http://localhost:8080/metrics
 ```
 
-### Grafana Dashboard
+**Available Metrics:**
+- `discovery_duration` - Time taken for resource discovery
+- `resources_discovered_total` - Total resources found
+- `drift_detected_total` - Total drift items detected
+- `remediation_success_total` - Successful remediations
+- `api_requests_total` - API request count
+- `cache_hit_ratio` - Cache effectiveness
 
-Import the provided Grafana dashboard for visualizing:
-- Resource discovery trends
-- Drift detection patterns
-- Remediation success rates
-- API performance metrics
-- System health indicators
+**Note:** Metrics are currently in JSON format. Prometheus export format is planned for future releases.
 
 ## Contributing
 
@@ -975,11 +969,11 @@ DriftMgr is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-DriftMgr is built with enterprise-grade features including:
-- OpenTelemetry for distributed tracing
-- etcd for distributed state management
-- Prometheus for metrics
-- Multiple cloud provider SDKs
+DriftMgr is built with production-grade features including:
+- Multiple cloud provider SDKs (AWS, Azure, GCP, DigitalOcean)
+- Circuit breaker pattern for resilience
+- Structured logging and audit trails
+- Security-first design with encryption
 
 ---
 
