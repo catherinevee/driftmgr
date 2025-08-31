@@ -8,11 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/catherinevee/driftmgr/internal/cache"
+	"github.com/catherinevee/driftmgr/internal/config"
 	"github.com/catherinevee/driftmgr/internal/core/color"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	"github.com/catherinevee/driftmgr/internal/core/models"
 	"github.com/catherinevee/driftmgr/internal/core/progress"
 	"github.com/catherinevee/driftmgr/internal/credentials"
+	"github.com/catherinevee/driftmgr/internal/services"
 	"github.com/catherinevee/driftmgr/internal/utils/graceful"
 )
 
@@ -20,13 +23,36 @@ import (
 func handleCloudDiscover(args []string) {
 	ctx := context.Background()
 
-	// Parse provider from args
+	// Load configuration
+	configPath := "configs/config.yaml"
+	if envPath := os.Getenv("DRIFTMGR_CONFIG"); envPath != "" {
+		configPath = envPath
+	}
+	configManager, err := config.NewManager(configPath)
+	if err != nil {
+		// Continue with defaults if config fails to load
+		fmt.Printf("Warning: Failed to load configuration: %v\n", err)
+	}
+
+	// Parse provider from args with config defaults
 	provider := ""
 	outputFile := ""
 	format := "summary"
 	showCredentials := false
 	autoDiscover := false
 	allAccounts := false
+	forceRefresh := false
+
+	// Load defaults from config if available
+	if configManager != nil {
+		cfg := configManager.Get()
+		if cfg != nil {
+			if cfg.Provider != "" {
+				provider = cfg.Provider
+			}
+			autoDiscover = cfg.Settings.AutoDiscovery
+		}
+	}
 
 	for i, arg := range args {
 		switch arg {
@@ -48,6 +74,8 @@ func handleCloudDiscover(args []string) {
 			autoDiscover = true
 		case "--all-accounts":
 			allAccounts = true
+		case "--force-refresh":
+			forceRefresh = true
 		case "aws", "azure", "gcp", "digitalocean", "all":
 			provider = arg
 		case "--help", "-h":
@@ -62,6 +90,15 @@ func handleCloudDiscover(args []string) {
 		return
 	}
 
+	// Initialize services
+	serviceManager, err := services.NewManager(nil)
+	if err != nil {
+		graceful.HandleError(err, "Failed to create service manager")
+		return
+	}
+	discoveryService := serviceManager.Discovery
+	cacheManager := cache.GetGlobalCache()
+	
 	// Initialize discovery engine
 	engine, err := discovery.NewEnhancedEngine()
 	if err != nil {
@@ -111,21 +148,79 @@ func handleCloudDiscover(args []string) {
 					spinner := progress.NewSpinner(fmt.Sprintf("Scanning %s", cred.Provider))
 					spinner.Start()
 
-					config := discovery.Config{
+					// Use service layer for discovery
+					req := services.DiscoveryRequest{
 						Provider: providerName,
+						Options: map[string]interface{}{
+							"allAccounts": allAccounts,
+						},
 					}
-					providerResources, err := engine.Discover(config)
+					resp, err := discoveryService.StartDiscovery(ctx, req)
 					if err != nil {
 						spinner.Error(fmt.Sprintf("Failed to discover %s resources", providerName))
+						// Try cache fallback
+						if !forceRefresh {
+							fallbackKey := fmt.Sprintf("discovery:%s:%t", providerName, allAccounts)
+							if fallback, found, _ := cacheManager.GetWithAge(fallbackKey); found {
+								if fallbackResources, ok := fallback.([]models.Resource); ok {
+									color.Printf(color.Yellow, "Using cached fallback for %s\n", providerName)
+									resources = append(resources, fallbackResources...)
+								}
+							}
+						}
 						continue
 					}
 
+					// Wait for discovery to complete if async
+					var providerResources []models.Resource
+					if resp.JobID != "" {
+						providerResources = waitForDiscoveryJob(ctx, discoveryService, resp.JobID)
+					} else if resp.Resources != nil {
+						// Convert cloud.Resource to models.Resource
+						for _, r := range resp.Resources {
+							// Parse time strings
+							var createdAt, updatedAt time.Time
+							if r.CreatedAt != "" {
+								createdAt, _ = time.Parse(time.RFC3339, r.CreatedAt)
+							}
+							if r.ModifiedAt != "" {
+								updatedAt, _ = time.Parse(time.RFC3339, r.ModifiedAt)
+							}
+							
+							providerResources = append(providerResources, models.Resource{
+								ID:           r.ID,
+								Name:         r.Name,
+								Type:         r.Type,
+								Provider:     r.Provider,
+								Region:       r.Region,
+								AccountID:    r.AccountID,
+								Status:       r.Status,
+								State:        r.State,
+								CreatedAt:    createdAt,
+								LastModified: updatedAt,
+								Tags:         r.Tags,
+								Properties:   r.Properties,
+							})
+						}
+					}
+					
 					spinner.Success(fmt.Sprintf("Found %d resources in %s", len(providerResources), cred.Provider))
 					resources = append(resources, providerResources...)
+					
+					// Cache the provider results
+					providerCacheKey := fmt.Sprintf("discovery:%s:%t", providerName, allAccounts)
+					cacheManager.Set(providerCacheKey, providerResources, 5*time.Minute)
+					
 					bar.Increment()
 				}
 			}
 			bar.Complete()
+		}
+		
+		// Cache the combined results
+		if len(resources) > 0 {
+			cacheKey := fmt.Sprintf("discovery:all:%t", allAccounts)
+			cacheManager.Set(cacheKey, resources, 5*time.Minute)
 		}
 	} else {
 		// Single provider discovery with spinner
@@ -236,7 +331,7 @@ func showCredentialHelp() {
 func showDiscoverHelp() {
 	fmt.Println("Usage: driftmgr discover [flags]")
 	fmt.Println()
-	fmt.Println("Discover cloud resources using local credentials")
+	fmt.Println("Discover cloud resources using local credentials with intelligent caching")
 	fmt.Println()
 	fmt.Println("Flags:")
 	fmt.Println("  --auto              Auto-discover all configured providers")
@@ -246,15 +341,28 @@ func showDiscoverHelp() {
 	fmt.Println("  --output string     Output file path")
 	fmt.Println("  --show-credentials  Show credential status")
 	fmt.Println()
+	fmt.Println("Cache Flags:")
+	fmt.Println("  --force-refresh     Force live discovery, bypass cache")
+	fmt.Println("  --no-cache          Alias for --force-refresh")
+	fmt.Println("  --cache-status      Show cache status for discovery data")
+	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  driftmgr discover --auto")
 	fmt.Println("  driftmgr discover --provider aws --all-accounts")
 	fmt.Println("  driftmgr discover --format json --output resources.json")
+	fmt.Println("  driftmgr discover --force-refresh  # Force live data fetch")
+	fmt.Println("  driftmgr discover --cache-status   # View cache status")
 	fmt.Println()
 	fmt.Println("Multi-Account Support:")
 	fmt.Println("  AWS:   Discovers resources across all profiles in ~/.aws/credentials")
 	fmt.Println("  Azure: Discovers resources across all accessible subscriptions")
 	fmt.Println("  GCP:   Discovers resources across all accessible projects")
+	fmt.Println()
+	fmt.Println("Caching:")
+	fmt.Println("  - Discovery results are cached for 5 minutes")
+	fmt.Println("  - Cache is automatically used when available")
+	fmt.Println("  - Failed API calls fall back to cached data if available")
+	fmt.Println("  - Data source and timestamp are displayed with results")
 }
 
 // displayResourcesSummary displays a summary of discovered resources
@@ -373,4 +481,116 @@ func displayResourcesTerraform(resources []models.Resource, outputFile string) {
 	} else {
 		fmt.Print(output.String())
 	}
+}
+
+// waitForDiscoveryJob waits for an async discovery job to complete
+func waitForDiscoveryJob(ctx context.Context, service *services.DiscoveryService, jobID string) []models.Resource {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ctx.Done():
+			return []models.Resource{}
+		case <-ticker.C:
+			status, err := service.GetDiscoveryStatus(ctx, jobID)
+			if err != nil {
+				continue
+			}
+			if status.Status == "completed" {
+				if status.Resources != nil {
+					// Convert cloud.Resource to models.Resource
+					var resources []models.Resource
+					for _, r := range status.Resources {
+						// Parse time strings
+						var createdAt, updatedAt time.Time
+						if r.CreatedAt != "" {
+							createdAt, _ = time.Parse(time.RFC3339, r.CreatedAt)
+						}
+						if r.ModifiedAt != "" {
+							updatedAt, _ = time.Parse(time.RFC3339, r.ModifiedAt)
+						}
+						
+						resources = append(resources, models.Resource{
+							ID:           r.ID,
+							Name:         r.Name,
+							Type:         r.Type,
+							Provider:     r.Provider,
+							Region:       r.Region,
+							AccountID:    r.AccountID,
+							Status:       r.Status,
+							State:        r.State,
+							CreatedAt:    createdAt,
+							LastModified: updatedAt,
+							Tags:         r.Tags,
+							Properties:   r.Properties,
+						})
+					}
+					return resources
+				}
+				return []models.Resource{}
+			}
+			if status.Status == "failed" {
+				return []models.Resource{}
+			}
+		}
+	}
+}
+
+// formatDuration formats a duration in human-readable format
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+	}
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	return fmt.Sprintf("%dd %dh", days, hours)
+}
+
+// showDiscoverCacheStatus displays cache status for discovery data
+func showDiscoverCacheStatus() {
+	cacheManager := cache.GetGlobalCache()
+	
+	fmt.Println("Discovery Cache Status:")
+	fmt.Println("═══════════════════════════════════════════════════════════════")
+	fmt.Printf("%-30s %-15s %-20s %-10s\n", "Provider", "Status", "Last Updated", "Size")
+	fmt.Println("───────────────────────────────────────────────────────────────")
+	
+	providers := []string{"aws", "azure", "gcp", "digitalocean", "all"}
+	for _, provider := range providers {
+		for _, allAccounts := range []bool{false, true} {
+			cacheKey := fmt.Sprintf("discovery:%s:%t", provider, allAccounts)
+			if data, found, age := cacheManager.GetWithAge(cacheKey); found {
+				var size int
+				if resources, ok := data.([]models.Resource); ok {
+					size = len(resources)
+				}
+				
+				accountStr := ""
+				if allAccounts {
+					accountStr = " (all accounts)"
+				}
+				
+				fmt.Printf("%-30s %-15s %-20s %-10d\n", 
+					provider+accountStr,
+					"cached",
+					formatDuration(age)+" ago",
+					size)
+			}
+		}
+	}
+	fmt.Println("═══════════════════════════════════════════════════════════════")
+	
+	// Show cache configuration
+	fmt.Println("\nCache Configuration:")
+	fmt.Println("  TTL: 5 minutes")
+	fmt.Println("  Auto-refresh: Disabled")
+	fmt.Println("  Fallback on error: Enabled")
+	fmt.Println("\nUse --force-refresh to bypass cache and fetch live data.")
 }

@@ -18,88 +18,9 @@ type Engine struct {
 	mu       sync.RWMutex
 }
 
-// Plan represents a remediation plan
-type Plan struct {
-	ID         string                 `json:"id"`
-	Status     string                 `json:"status"`
-	CreatedAt  time.Time              `json:"created_at"`
-	UpdatedAt  time.Time              `json:"updated_at"`
-	DriftItems []models.DriftItem     `json:"drift_items"`
-	Actions    []Action               `json:"actions"`
-	Impact     Impact                 `json:"impact"`
-	Approval   *ApprovalStatus        `json:"approval,omitempty"`
-	Execution  *ExecutionStatus       `json:"execution,omitempty"`
-	Results    *Results               `json:"results,omitempty"`
-	Metadata   map[string]interface{} `json:"metadata"`
-}
+// Use types from types.go file
 
-// Action represents a remediation action
-type Action struct {
-	ID            string                 `json:"id"`
-	ResourceID    string                 `json:"resource_id"`
-	ResourceType  string                 `json:"resource_type"`
-	ActionType    string                 `json:"action_type"`
-	Description   string                 `json:"description"`
-	Parameters    map[string]interface{} `json:"parameters"`
-	Risk          string                 `json:"risk"`
-	EstimatedTime int                    `json:"estimated_time"`
-	Dependencies  []string               `json:"dependencies"`
-	Status        string                 `json:"status"`
-	Error         string                 `json:"error,omitempty"`
-}
-
-// Impact describes remediation impact
-type Impact struct {
-	ResourcesAffected int                    `json:"resources_affected"`
-	EstimatedDuration int                    `json:"estimated_duration"`
-	RiskLevel         string                 `json:"risk_level"`
-	CostImpact        float64                `json:"cost_impact"`
-	ServiceImpact     []string               `json:"service_impact"`
-	RequiresDowntime  bool                   `json:"requires_downtime"`
-	Reversible        bool                   `json:"reversible"`
-	Details           map[string]interface{} `json:"details"`
-}
-
-// ApprovalStatus represents approval status
-type ApprovalStatus struct {
-	Required     bool       `json:"required"`
-	Status       string     `json:"status"`
-	Approvers    []string   `json:"approvers"`
-	ApprovedBy   []string   `json:"approved_by"`
-	ApprovalTime *time.Time `json:"approval_time,omitempty"`
-	Comments     []string   `json:"comments,omitempty"`
-}
-
-// ExecutionStatus represents execution status
-type ExecutionStatus struct {
-	Status         string     `json:"status"`
-	StartTime      time.Time  `json:"start_time"`
-	EndTime        *time.Time `json:"end_time,omitempty"`
-	Progress       int        `json:"progress"`
-	CurrentStep    string     `json:"current_step"`
-	TotalSteps     int        `json:"total_steps"`
-	CompletedSteps int        `json:"completed_steps"`
-}
-
-// Results represents remediation results
-type Results struct {
-	Success      bool                   `json:"success"`
-	ItemsFixed   int                    `json:"items_fixed"`
-	ItemsFailed  int                    `json:"items_failed"`
-	Duration     time.Duration          `json:"duration"`
-	Details      map[string]interface{} `json:"details"`
-	RollbackInfo *RollbackInfo          `json:"rollback_info,omitempty"`
-}
-
-// RollbackInfo contains rollback information
-type RollbackInfo struct {
-	SnapshotID string                 `json:"snapshot_id"`
-	PlanID     string                 `json:"plan_id"`
-	CreatedAt  time.Time              `json:"created_at"`
-	Available  bool                   `json:"available"`
-	Snapshot   map[string]interface{} `json:"snapshot"`
-	Steps      []string               `json:"steps"`
-}
+// All types are now defined in types.go file
 
 // Options configures remediation
 type Options struct {
@@ -129,13 +50,18 @@ func (e *Engine) CreatePlan(ctx context.Context, drifts []models.DriftItem, opti
 	defer e.mu.Unlock()
 
 	// Use planner to create plan
-	plan, err := e.planner.CreatePlan(drifts, options)
+	// Convert drifts to interface slice
+	driftInterfaces := make([]interface{}, len(drifts))
+	for i, d := range drifts {
+		driftInterfaces[i] = d
+	}
+	plan, err := e.planner.CreatePlan(ctx, driftInterfaces, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plan: %w", err)
 	}
 
 	// Validate plan with safety manager
-	if err := e.safety.ValidatePlan(plan); err != nil {
+	if err := e.safety.ValidatePlan(ctx, plan); err != nil {
 		return nil, fmt.Errorf("plan validation failed: %w", err)
 	}
 
@@ -165,21 +91,19 @@ func (e *Engine) ExecutePlan(ctx context.Context, plan *Plan, options Options) (
 	// Create snapshot for rollback
 	var snapshot *RollbackInfo
 	if options.RollbackOnFail {
-		if e.rollback.CreateSnapshot("remediation", plan) == nil {
-			snapshot = &RollbackInfo{
-				SnapshotID: fmt.Sprintf("snapshot-%d", time.Now().Unix()),
-				PlanID:     plan.ID,
-				CreatedAt:  time.Now(),
-				Available:  true,
-			}
+		state := make(map[string]interface{})
+		state["plan"] = plan
+		s, err := e.rollback.CreateSnapshot(ctx, plan.ID, state)
+		if err == nil {
+			snapshot = s
 		}
 	}
 
 	// Execute plan
-	results, err := e.executor.Execute(ctx, plan)
+	results, err := e.executor.Execute(ctx, plan, &options)
 	if err != nil {
 		if options.RollbackOnFail && snapshot != nil {
-			e.rollback.Rollback(snapshot.SnapshotID)
+			e.rollback.Rollback(ctx, snapshot.SnapshotID)
 		}
 		return nil, fmt.Errorf("execution failed: %w", err)
 	}

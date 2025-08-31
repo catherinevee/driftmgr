@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="corporate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriftMgr - Terraform State Manager</title>
+    
+    <!-- Tailwind CSS and DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.19/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Alpine.js for reactivity -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'terraform': '#7e3ff2',
+                        'terraform-dark': '#5c2e9c',
+                        'terraform-light': '#a374f7',
+                        'state-healthy': '#10b981',
+                        'state-warning': '#f59e0b',
+                        'state-critical': '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Terraform-themed colors */
+        [data-theme="terraform"] {
+            --p: 263 86% 60%;  /* Terraform Purple */
+            --pf: 263 86% 50%;
+            --pc: 0 0% 100%;
+            --n: 240 5% 26%;
+            --nf: 240 5% 16%;
+            --nc: 0 0% 100%;
+            --b1: 0 0% 100%;
+            --b2: 240 5% 96%;
+            --b3: 240 5% 92%;
+        }
+        
+        .gradient-terraform {
+            background: linear-gradient(135deg, #7e3ff2 0%, #5c2e9c 100%);
+        }
+        
+        .health-score-ring {
+            stroke-dasharray: 251.2;
+            stroke-dashoffset: 0;
+            transform: rotate(-90deg);
+            transform-origin: center;
+            transition: stroke-dashoffset 1s ease-out;
+        }
+    </style>
+</head>
+<body x-data="terraformStateApp()" class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-terraform text-white shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="navbar min-h-16">
+                <div class="navbar-start">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0L1.5 6v12L12 24l10.5-6V6L12 0zm4.5 16.5L12 19l-4.5-2.5v-5L12 9l4.5 2.5v5z"/>
+                        </svg>
+                        <div>
+                            <h1 class="text-xl font-bold">Terraform State Manager</h1>
+                            <p class="text-xs opacity-80">Intelligent State Analysis & Drift Detection</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="navbar-end gap-2">
+                    <button @click="refreshState()" class="btn btn-sm btn-ghost">
+                        <i class="fas fa-sync-alt" :class="{'animate-spin': isRefreshing}"></i>
+                        Refresh
+                    </button>
+                    <button @click="showImportModal = true" class="btn btn-sm bg-white text-terraform-dark">
+                        <i class="fas fa-file-import"></i>
+                        Import State
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- State Overview Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <!-- State Health Score -->
+            <div class="card bg-white shadow-sm">
+                <div class="card-body p-4">
+                    <h3 class="text-sm font-semibold text-gray-600 mb-2">State Health</h3>
+                    <div class="flex items-center justify-between">
+                        <div class="relative w-20 h-20">
+                            <svg class="w-20 h-20">
+                                <circle cx="40" cy="40" r="36" stroke="#e5e7eb" stroke-width="8" fill="none"/>
+                                <circle cx="40" cy="40" r="36" 
+                                        :stroke="getHealthColor(stateHealth.score)" 
+                                        stroke-width="8" fill="none"
+                                        class="health-score-ring"
+                                        :style="`stroke-dashoffset: ${251.2 - (251.2 * stateHealth.score / 100)}`"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-2xl font-bold" x-text="stateHealth.score"></span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold" :class="getHealthColorClass(stateHealth.grade)" x-text="stateHealth.grade"></p>
+                            <p class="text-xs text-gray-500">Grade</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Resources -->
+            <div class="card bg-white shadow-sm">
+                <div class="card-body p-4">
+                    <h3 class="text-sm font-semibold text-gray-600 mb-2">Total Resources</h3>
+                    <p class="text-3xl font-bold text-terraform" x-text="stats.totalResources"></p>
+                    <div class="flex gap-4 mt-2">
+                        <span class="text-xs">
+                            <i class="fas fa-check-circle text-green-500"></i>
+                            <span x-text="stats.managedResources"></span> Managed
+                        </span>
+                        <span class="text-xs">
+                            <i class="fas fa-exclamation-triangle text-yellow-500"></i>
+                            <span x-text="stats.unmanagedResources"></span> Unmanaged
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Drift Status -->
+            <div class="card bg-white shadow-sm">
+                <div class="card-body p-4">
+                    <h3 class="text-sm font-semibold text-gray-600 mb-2">Drift Status</h3>
+                    <p class="text-3xl font-bold" :class="stats.driftCount > 0 ? 'text-red-500' : 'text-green-500'" x-text="stats.driftCount || 'No Drift'"></p>
+                    <div class="mt-2">
+                        <div class="progress progress-warning h-2">
+                            <div class="progress-bar" :style="`width: ${stats.driftPercentage}%`"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1"><span x-text="stats.driftPercentage"></span>% resources drifted</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- State Files -->
+            <div class="card bg-white shadow-sm">
+                <div class="card-body p-4">
+                    <h3 class="text-sm font-semibold text-gray-600 mb-2">State Files</h3>
+                    <p class="text-3xl font-bold text-terraform" x-text="stateFiles.length"></p>
+                    <div class="flex gap-4 mt-2">
+                        <span class="text-xs">
+                            <i class="fas fa-folder text-blue-500"></i>
+                            <span x-text="stats.workspaces"></span> Workspaces
+                        </span>
+                        <span class="text-xs">
+                            <i class="fas fa-cube text-purple-500"></i>
+                            <span x-text="stats.modules"></span> Modules
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs tabs-boxed bg-white mb-4">
+            <a class="tab" :class="{'tab-active': activeTab === 'analysis'}" @click="activeTab = 'analysis'">
+                <i class="fas fa-chart-line mr-2"></i>State Analysis
+            </a>
+            <a class="tab" :class="{'tab-active': activeTab === 'drift'}" @click="activeTab = 'drift'">
+                <i class="fas fa-exchange-alt mr-2"></i>Drift Detection
+            </a>
+            <a class="tab" :class="{'tab-active': activeTab === 'dependencies'}" @click="activeTab = 'dependencies'">
+                <i class="fas fa-project-diagram mr-2"></i>Dependencies
+            </a>
+            <a class="tab" :class="{'tab-active': activeTab === 'history'}" @click="activeTab = 'history'">
+                <i class="fas fa-history mr-2"></i>History
+            </a>
+            <a class="tab" :class="{'tab-active': activeTab === 'remediation'}" @click="activeTab = 'remediation'">
+                <i class="fas fa-wrench mr-2"></i>Remediation
+            </a>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <!-- State Analysis Tab -->
+            <div x-show="activeTab === 'analysis'">
+                <h2 class="text-xl font-bold mb-4">State Analysis</h2>
+                
+                <!-- State File Selector -->
+                <div class="form-control w-full max-w-xs mb-4">
+                    <label class="label">
+                        <span class="label-text">Select State File</span>
+                    </label>
+                    <select class="select select-bordered" x-model="selectedStateFile" @change="analyzeState()">
+                        <option value="">Choose a state file...</option>
+                        <template x-for="file in stateFiles" :key="file.id">
+                            <option :value="file.id" x-text="file.name"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <!-- Analysis Results -->
+                <div x-show="analysisResults" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Resource Breakdown -->
+                    <div>
+                        <h3 class="font-semibold mb-3">Resource Breakdown</h3>
+                        <canvas id="resourceChart"></canvas>
+                    </div>
+
+                    <!-- Provider Distribution -->
+                    <div>
+                        <h3 class="font-semibold mb-3">Provider Distribution</h3>
+                        <canvas id="providerChart"></canvas>
+                    </div>
+
+                    <!-- Health Issues -->
+                    <div class="lg:col-span-2">
+                        <h3 class="font-semibold mb-3">Health Issues & Recommendations</h3>
+                        <div class="space-y-2">
+                            <template x-for="issue in stateHealth.issues" :key="issue.description">
+                                <div class="alert" :class="{
+                                    'alert-error': issue.severity === 'critical',
+                                    'alert-warning': issue.severity === 'warning',
+                                    'alert-info': issue.severity === 'info'
+                                }">
+                                    <div>
+                                        <i class="fas" :class="{
+                                            'fa-exclamation-circle': issue.severity === 'critical',
+                                            'fa-exclamation-triangle': issue.severity === 'warning',
+                                            'fa-info-circle': issue.severity === 'info'
+                                        }"></i>
+                                        <div>
+                                            <h4 class="font-semibold" x-text="issue.description"></h4>
+                                            <p class="text-sm opacity-80" x-text="issue.impact"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Drift Detection Tab -->
+            <div x-show="activeTab === 'drift'">
+                <h2 class="text-xl font-bold mb-4">Drift Detection</h2>
+                
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex gap-2">
+                        <button @click="detectDrift()" class="btn btn-primary btn-sm">
+                            <i class="fas fa-search"></i>
+                            Detect Drift
+                        </button>
+                        <button @click="generateTerraformFix()" class="btn btn-outline btn-sm" :disabled="!driftItems.length">
+                            <i class="fas fa-code"></i>
+                            Generate Fix
+                        </button>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <label class="label cursor-pointer">
+                            <span class="label-text mr-2">Show only critical</span>
+                            <input type="checkbox" class="toggle toggle-sm" x-model="showOnlyCritical">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Drift Results -->
+                <div x-show="driftDetectionComplete">
+                    <div class="overflow-x-auto">
+                        <table class="table table-zebra w-full">
+                            <thead>
+                                <tr>
+                                    <th>Resource</th>
+                                    <th>Type</th>
+                                    <th>Drift Type</th>
+                                    <th>Severity</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="item in filteredDriftItems" :key="item.id">
+                                    <tr>
+                                        <td>
+                                            <div class="font-semibold" x-text="item.resourceName"></div>
+                                            <div class="text-xs text-gray-500" x-text="item.resourceId"></div>
+                                        </td>
+                                        <td x-text="item.resourceType"></td>
+                                        <td>
+                                            <span class="badge" :class="{
+                                                'badge-error': item.driftType === 'removed',
+                                                'badge-warning': item.driftType === 'modified',
+                                                'badge-success': item.driftType === 'added',
+                                                'badge-info': item.driftType === 'unmanaged'
+                                            }" x-text="item.driftType"></span>
+                                        </td>
+                                        <td>
+                                            <span class="badge" :class="{
+                                                'badge-error': item.severity === 'critical',
+                                                'badge-warning': item.severity === 'high',
+                                                'badge-info': item.severity === 'medium',
+                                                'badge-ghost': item.severity === 'low'
+                                            }" x-text="item.severity"></span>
+                                        </td>
+                                        <td>
+                                            <div class="dropdown dropdown-end">
+                                                <label tabindex="0" class="btn btn-ghost btn-xs">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </label>
+                                                <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52">
+                                                    <li><a @click="viewDriftDetails(item)"><i class="fas fa-eye"></i> View Details</a></li>
+                                                    <li><a @click="generateImport(item)"><i class="fas fa-file-import"></i> Generate Import</a></li>
+                                                    <li><a @click="generateTerraformCode(item)"><i class="fas fa-code"></i> Generate TF Code</a></li>
+                                                    <li><a @click="markAsIgnored(item)"><i class="fas fa-eye-slash"></i> Ignore</a></li>
+                                                </ul>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dependencies Tab -->
+            <div x-show="activeTab === 'dependencies'">
+                <h2 class="text-xl font-bold mb-4">Resource Dependencies</h2>
+                
+                <div class="form-control w-full max-w-xs mb-4">
+                    <label class="label">
+                        <span class="label-text">Select Resource</span>
+                    </label>
+                    <select class="select select-bordered" x-model="selectedResource" @change="loadDependencies()">
+                        <option value="">All resources...</option>
+                        <template x-for="resource in resources" :key="resource.id">
+                            <option :value="resource.id" x-text="`${resource.type}.${resource.name}`"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <!-- Dependency Graph -->
+                <div id="dependencyGraph" class="border rounded-lg p-4 h-96 bg-gray-50">
+                    <!-- D3.js or similar visualization would go here -->
+                    <div class="text-center text-gray-500 mt-32">
+                        <i class="fas fa-project-diagram text-4xl mb-2"></i>
+                        <p>Dependency visualization will appear here</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Tab -->
+            <div x-show="activeTab === 'history'">
+                <h2 class="text-xl font-bold mb-4">State History</h2>
+                
+                <div class="timeline">
+                    <template x-for="event in stateHistory" :key="event.id">
+                        <div class="timeline-item">
+                            <div class="timeline-marker" :class="{
+                                'bg-green-500': event.type === 'apply',
+                                'bg-red-500': event.type === 'destroy',
+                                'bg-blue-500': event.type === 'plan',
+                                'bg-yellow-500': event.type === 'import'
+                            }"></div>
+                            <div class="timeline-content">
+                                <time class="text-xs text-gray-500" x-text="event.timestamp"></time>
+                                <div class="font-semibold" x-text="event.description"></div>
+                                <div class="text-sm text-gray-600">
+                                    <span x-show="event.added" class="text-green-600">
+                                        <i class="fas fa-plus"></i> <span x-text="event.added"></span> added
+                                    </span>
+                                    <span x-show="event.changed" class="text-yellow-600 ml-2">
+                                        <i class="fas fa-edit"></i> <span x-text="event.changed"></span> changed
+                                    </span>
+                                    <span x-show="event.destroyed" class="text-red-600 ml-2">
+                                        <i class="fas fa-minus"></i> <span x-text="event.destroyed"></span> destroyed
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Remediation Tab -->
+            <div x-show="activeTab === 'remediation'">
+                <h2 class="text-xl font-bold mb-4">Terraform Remediation</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Remediation Options -->
+                    <div>
+                        <h3 class="font-semibold mb-3">Remediation Options</h3>
+                        <div class="space-y-2">
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="remediation" class="radio radio-primary" value="import">
+                                <div class="ml-3">
+                                    <p class="font-semibold">Import Unmanaged Resources</p>
+                                    <p class="text-sm text-gray-600">Generate terraform import commands</p>
+                                </div>
+                            </label>
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="remediation" class="radio radio-primary" value="update">
+                                <div class="ml-3">
+                                    <p class="font-semibold">Update Configuration</p>
+                                    <p class="text-sm text-gray-600">Generate TF code to match actual state</p>
+                                </div>
+                            </label>
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="remediation" class="radio radio-primary" value="apply">
+                                <div class="ml-3">
+                                    <p class="font-semibold">Apply Changes</p>
+                                    <p class="text-sm text-gray-600">Generate terraform apply commands</p>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <button @click="generateRemediation()" class="btn btn-primary mt-4">
+                            <i class="fas fa-magic"></i>
+                            Generate Remediation
+                        </button>
+                    </div>
+
+                    <!-- Generated Code -->
+                    <div>
+                        <h3 class="font-semibold mb-3">Generated Terraform Code</h3>
+                        <div class="mockup-code">
+                            <pre><code x-text="generatedTerraformCode || '# Generated code will appear here'"></code></pre>
+                        </div>
+                        
+                        <div class="flex gap-2 mt-3">
+                            <button @click="copyToClipboard()" class="btn btn-sm btn-outline" :disabled="!generatedTerraformCode">
+                                <i class="fas fa-copy"></i>
+                                Copy
+                            </button>
+                            <button @click="downloadTerraformFile()" class="btn btn-sm btn-outline" :disabled="!generatedTerraformCode">
+                                <i class="fas fa-download"></i>
+                                Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Import State Modal -->
+    <div x-show="showImportModal" class="modal modal-open">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg">Import Terraform State</h3>
+            <div class="py-4">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">State File Path</span>
+                    </label>
+                    <input type="text" placeholder="/path/to/terraform.tfstate" class="input input-bordered" x-model="importPath">
+                </div>
+                <div class="form-control mt-4">
+                    <label class="label">
+                        <span class="label-text">Workspace (optional)</span>
+                    </label>
+                    <input type="text" placeholder="default" class="input input-bordered" x-model="importWorkspace">
+                </div>
+            </div>
+            <div class="modal-action">
+                <button @click="showImportModal = false" class="btn btn-ghost">Cancel</button>
+                <button @click="importState()" class="btn btn-primary">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function terraformStateApp() {
+            return {
+                // State
+                activeTab: 'analysis',
+                selectedStateFile: '',
+                selectedResource: '',
+                showOnlyCritical: false,
+                isRefreshing: false,
+                showImportModal: false,
+                importPath: '',
+                importWorkspace: 'default',
+                driftDetectionComplete: false,
+                analysisResults: null,
+                generatedTerraformCode: '',
+                notifications: 0,
+
+                // Data
+                stateFiles: [],
+                resources: [],
+                driftItems: [],
+                stateHistory: [],
+                stateHealth: {
+                    score: 85,
+                    grade: 'B',
+                    issues: [],
+                    recommendations: []
+                },
+                stats: {
+                    totalResources: 0,
+                    managedResources: 0,
+                    unmanagedResources: 0,
+                    driftCount: 0,
+                    driftPercentage: 0,
+                    workspaces: 1,
+                    modules: 3
+                },
+
+                // Computed
+                get filteredDriftItems() {
+                    if (this.showOnlyCritical) {
+                        return this.driftItems.filter(item => item.severity === 'critical');
+                    }
+                    return this.driftItems;
+                },
+
+                // Methods
+                async init() {
+                    await this.loadStateFiles();
+                    await this.loadStats();
+                    this.setupWebSocket();
+                },
+
+                async loadStateFiles() {
+                    try {
+                        const response = await fetch('/api/state/files');
+                        this.stateFiles = await response.json();
+                    } catch (error) {
+                        console.error('Failed to load state files:', error);
+                    }
+                },
+
+                async loadStats() {
+                    try {
+                        const response = await fetch('/api/state/stats');
+                        const data = await response.json();
+                        this.stats = data;
+                    } catch (error) {
+                        console.error('Failed to load stats:', error);
+                    }
+                },
+
+                async analyzeState() {
+                    if (!this.selectedStateFile) return;
+                    
+                    try {
+                        const response = await fetch(`/api/state/analyze/${this.selectedStateFile}`);
+                        this.analysisResults = await response.json();
+                        this.stateHealth = this.analysisResults.health;
+                        this.updateCharts();
+                    } catch (error) {
+                        console.error('Failed to analyze state:', error);
+                    }
+                },
+
+                async detectDrift() {
+                    this.isRefreshing = true;
+                    try {
+                        const response = await fetch('/api/drift/detect', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ stateFileId: this.selectedStateFile })
+                        });
+                        const result = await response.json();
+                        this.driftItems = result.items;
+                        this.stats.driftCount = result.count;
+                        this.stats.driftPercentage = result.percentage;
+                        this.driftDetectionComplete = true;
+                    } catch (error) {
+                        console.error('Failed to detect drift:', error);
+                    } finally {
+                        this.isRefreshing = false;
+                    }
+                },
+
+                async generateTerraformFix() {
+                    try {
+                        const response = await fetch('/api/remediation/generate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                driftItems: this.driftItems,
+                                type: 'terraform'
+                            })
+                        });
+                        const result = await response.json();
+                        this.generatedTerraformCode = result.code;
+                        this.activeTab = 'remediation';
+                    } catch (error) {
+                        console.error('Failed to generate fix:', error);
+                    }
+                },
+
+                async importState() {
+                    try {
+                        const response = await fetch('/api/state/import', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                path: this.importPath,
+                                workspace: this.importWorkspace
+                            })
+                        });
+                        const result = await response.json();
+                        this.stateFiles.push(result);
+                        this.showImportModal = false;
+                        this.notifications++;
+                    } catch (error) {
+                        console.error('Failed to import state:', error);
+                    }
+                },
+
+                async refreshState() {
+                    this.isRefreshing = true;
+                    await this.loadStateFiles();
+                    await this.loadStats();
+                    if (this.selectedStateFile) {
+                        await this.analyzeState();
+                    }
+                    this.isRefreshing = false;
+                },
+
+                getHealthColor(score) {
+                    if (score >= 80) return '#10b981';
+                    if (score >= 60) return '#f59e0b';
+                    return '#ef4444';
+                },
+
+                getHealthColorClass(grade) {
+                    const gradeColors = {
+                        'A': 'text-green-500',
+                        'B': 'text-blue-500',
+                        'C': 'text-yellow-500',
+                        'D': 'text-orange-500',
+                        'F': 'text-red-500'
+                    };
+                    return gradeColors[grade] || 'text-gray-500';
+                },
+
+                updateCharts() {
+                    // Update resource breakdown chart
+                    if (this.analysisResults && this.analysisResults.resourceTypes) {
+                        const ctx = document.getElementById('resourceChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'doughnut',
+                            data: {
+                                labels: Object.keys(this.analysisResults.resourceTypes),
+                                datasets: [{
+                                    data: Object.values(this.analysisResults.resourceTypes),
+                                    backgroundColor: [
+                                        '#7e3ff2', '#a374f7', '#5c2e9c',
+                                        '#10b981', '#f59e0b', '#ef4444'
+                                    ]
+                                }]
+                            }
+                        });
+                    }
+                },
+
+                copyToClipboard() {
+                    navigator.clipboard.writeText(this.generatedTerraformCode);
+                },
+
+                downloadTerraformFile() {
+                    const blob = new Blob([this.generatedTerraformCode], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'remediation.tf';
+                    a.click();
+                },
+
+                setupWebSocket() {
+                    // WebSocket for real-time updates
+                    const ws = new WebSocket('ws://localhost:8095/ws');
+                    ws.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'state_changed') {
+                            this.refreshState();
+                        }
+                    };
+                }
+            }
+        }
+    </script>
+</body>
+</html>

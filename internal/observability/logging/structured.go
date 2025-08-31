@@ -127,7 +127,12 @@ func FromContext(ctx context.Context) zerolog.Logger {
 func WithFields(fields map[string]interface{}) zerolog.Logger {
 	logger := Logger.With()
 	for k, v := range fields {
-		logger = logger.Interface(k, v)
+		// Sanitize sensitive data
+		if isSensitiveField(k) {
+			logger = logger.Interface(k, "***REDACTED***")
+		} else {
+			logger = logger.Interface(k, SanitizeValue(v))
+		}
 	}
 	return logger.Logger()
 }
@@ -169,7 +174,12 @@ func Audit(ctx context.Context, action string, fields map[string]interface{}) {
 		Logger()
 
 	for k, v := range fields {
-		logger = logger.With().Interface(k, v).Logger()
+		// Sanitize sensitive data in audit logs
+		if isSensitiveField(k) {
+			logger = logger.With().Interface(k, "***REDACTED***").Logger()
+		} else {
+			logger = logger.With().Interface(k, SanitizeValue(v)).Logger()
+		}
 	}
 
 	logger.Info().Msg("audit event")
@@ -183,7 +193,12 @@ func Metric(name string, value float64, tags map[string]string) {
 		Logger()
 
 	for k, v := range tags {
-		logger = logger.With().Str(fmt.Sprintf("tag_%s", k), v).Logger()
+		// Sanitize sensitive data in metric tags
+		if isSensitiveField(k) {
+			logger = logger.With().Str(fmt.Sprintf("tag_%s", k), "***REDACTED***").Logger()
+		} else {
+			logger = logger.With().Str(fmt.Sprintf("tag_%s", k), sanitizeString(v)).Logger()
+		}
 	}
 
 	logger.Debug().Msg("metric")
@@ -243,7 +258,12 @@ func Debug(msg string, fields ...map[string]interface{}) {
 	event := Logger.Debug()
 	if len(fields) > 0 {
 		for k, v := range fields[0] {
-			event = event.Interface(k, v)
+			// Sanitize sensitive data
+			if isSensitiveField(k) {
+				event = event.Interface(k, "***REDACTED***")
+			} else {
+				event = event.Interface(k, SanitizeValue(v))
+			}
 		}
 	}
 	event.Msg(msg)
@@ -254,7 +274,12 @@ func Info(msg string, fields ...map[string]interface{}) {
 	event := Logger.Info()
 	if len(fields) > 0 {
 		for k, v := range fields[0] {
-			event = event.Interface(k, v)
+			// Sanitize sensitive data
+			if isSensitiveField(k) {
+				event = event.Interface(k, "***REDACTED***")
+			} else {
+				event = event.Interface(k, SanitizeValue(v))
+			}
 		}
 	}
 	event.Msg(msg)
@@ -265,7 +290,12 @@ func Warn(msg string, fields ...map[string]interface{}) {
 	event := Logger.Warn()
 	if len(fields) > 0 {
 		for k, v := range fields[0] {
-			event = event.Interface(k, v)
+			// Sanitize sensitive data
+			if isSensitiveField(k) {
+				event = event.Interface(k, "***REDACTED***")
+			} else {
+				event = event.Interface(k, SanitizeValue(v))
+			}
 		}
 	}
 	event.Msg(msg)
@@ -273,10 +303,22 @@ func Warn(msg string, fields ...map[string]interface{}) {
 
 // Error logs an error message
 func Error(msg string, err error, fields ...map[string]interface{}) {
-	event := Logger.Error().Err(err)
+	event := Logger.Error()
+	
+	// Sanitize error message if it contains sensitive data
+	if err != nil {
+		errMsg := sanitizeString(err.Error())
+		event = event.Str("error", errMsg)
+	}
+	
 	if len(fields) > 0 {
 		for k, v := range fields[0] {
-			event = event.Interface(k, v)
+			// Sanitize sensitive data
+			if isSensitiveField(k) {
+				event = event.Interface(k, "***REDACTED***")
+			} else {
+				event = event.Interface(k, SanitizeValue(v))
+			}
 		}
 	}
 	event.Msg(msg)

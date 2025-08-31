@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriftMgr - Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.9.4/dist/full.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    <div x-data="loginApp()" class="min-h-screen flex items-center justify-center">
+        <div class="card w-96 bg-base-100 shadow-xl">
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <i class="fas fa-cloud text-6xl text-primary mb-2"></i>
+                    <h2 class="card-title text-2xl justify-center">DriftMgr</h2>
+                    <p class="text-gray-500">Infrastructure Drift Detection & Remediation</p>
+                </div>
+                
+                <!-- Alert Messages -->
+                <div x-show="errorMessage" class="alert alert-error mb-4" x-transition>
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span x-text="errorMessage"></span>
+                </div>
+                
+                <div x-show="successMessage" class="alert alert-success mb-4" x-transition>
+                    <i class="fas fa-check-circle"></i>
+                    <span x-text="successMessage"></span>
+                </div>
+                
+                <!-- Login Form -->
+                <form @submit.prevent="login()">
+                    <div class="form-control mb-4">
+                        <label class="label">
+                            <span class="label-text">Username</span>
+                        </label>
+                        <input type="text" 
+                               x-model="username" 
+                               placeholder="Enter username" 
+                               class="input input-bordered" 
+                               required
+                               :disabled="loading">
+                    </div>
+                    
+                    <div class="form-control mb-4">
+                        <label class="label">
+                            <span class="label-text">Password</span>
+                        </label>
+                        <input type="password" 
+                               x-model="password" 
+                               placeholder="Enter password" 
+                               class="input input-bordered" 
+                               required
+                               :disabled="loading">
+                    </div>
+                    
+                    <div class="form-control mb-4">
+                        <label class="label cursor-pointer">
+                            <span class="label-text">Remember me</span>
+                            <input type="checkbox" x-model="rememberMe" class="checkbox checkbox-primary">
+                        </label>
+                    </div>
+                    
+                    <div class="form-control">
+                        <button type="submit" 
+                                class="btn btn-primary" 
+                                :disabled="loading">
+                            <span x-show="!loading">
+                                <i class="fas fa-sign-in-alt mr-2"></i>
+                                Login
+                            </span>
+                            <span x-show="loading">
+                                <span class="loading loading-spinner loading-sm mr-2"></span>
+                                Logging in...
+                            </span>
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="divider">OR</div>
+                
+                <!-- Demo Accounts -->
+                <div class="text-center">
+                    <p class="text-sm text-gray-500 mb-2">Demo Accounts:</p>
+                    <div class="flex flex-wrap gap-2 justify-center">
+                        <button @click="loginAs('root', 'admin')" 
+                                class="btn btn-xs btn-outline"
+                                :disabled="loading">
+                            Admin
+                        </button>
+                        <button @click="loginAs('operator', 'operator')" 
+                                class="btn btn-xs btn-outline"
+                                :disabled="loading">
+                            Operator
+                        </button>
+                        <button @click="loginAs('readonly', 'readonly')" 
+                                class="btn btn-xs btn-outline"
+                                :disabled="loading">
+                            Viewer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function loginApp() {
+            return {
+                username: '',
+                password: '',
+                rememberMe: false,
+                loading: false,
+                errorMessage: '',
+                successMessage: '',
+                
+                init() {
+                    // Check if already logged in
+                    const token = localStorage.getItem('auth_token');
+                    if (token) {
+                        this.validateToken(token);
+                    }
+                },
+                
+                async validateToken(token) {
+                    try {
+                        const response = await fetch('/api/v1/auth/validate', {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            // Token is valid, redirect to main app
+                            window.location.href = '/index-aws-daisyui.html';
+                        } else {
+                            // Token is invalid, remove it
+                            localStorage.removeItem('auth_token');
+                            localStorage.removeItem('user_info');
+                        }
+                    } catch (error) {
+                        console.error('Token validation error:', error);
+                    }
+                },
+                
+                async login() {
+                    this.loading = true;
+                    this.errorMessage = '';
+                    this.successMessage = '';
+                    
+                    try {
+                        const response = await fetch('/api/v1/auth/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                username: this.username,
+                                password: this.password
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            // Store token
+                            if (this.rememberMe) {
+                                localStorage.setItem('auth_token', data.token);
+                                localStorage.setItem('user_info', JSON.stringify(data.user));
+                            } else {
+                                sessionStorage.setItem('auth_token', data.token);
+                                sessionStorage.setItem('user_info', JSON.stringify(data.user));
+                            }
+                            
+                            this.successMessage = 'Login successful! Redirecting...';
+                            
+                            // Redirect to main app
+                            setTimeout(() => {
+                                window.location.href = '/index-aws-daisyui.html';
+                            }, 1000);
+                        } else {
+                            this.errorMessage = data.message || 'Invalid username or password';
+                        }
+                    } catch (error) {
+                        console.error('Login error:', error);
+                        this.errorMessage = 'Failed to connect to server';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                loginAs(username, password) {
+                    this.username = username;
+                    this.password = password;
+                    this.login();
+                }
+            };
+        }
+    </script>
+</body>
+</html>

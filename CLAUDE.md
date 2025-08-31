@@ -15,7 +15,7 @@ DriftMgr is a multi-cloud infrastructure drift detection and remediation tool th
 ### Language and Framework
 - **Language**: Go 1.23
 - **Primary Dependencies**: AWS SDK v2, Azure SDK, Google Cloud SDK
-- **Architecture**: Modular with provider interfaces
+- **Architecture**: Unified Service Layer v2.0 with event-driven design
 - **Testing**: Standard Go testing with benchmarks
 
 ### Project Structure
@@ -25,14 +25,18 @@ driftmgr/
 │   ├── driftmgr/          # Main CLI application
 │   └── driftmgr-server/   # Server mode
 ├── internal/              # Core business logic
+│   ├── services/          # Unified service layer (v2.0)
+│   ├── events/            # Event bus system
+│   ├── jobs/              # Async job queue
+│   ├── cqrs/              # Command/Query separation
 │   ├── providers/         # Cloud provider implementations
 │   ├── core/              # Core functionality
-│   ├── discovery/         # Resource discovery
-│   ├── drift/             # Drift detection
+│   ├── api/handlers/      # Refactored API handlers
 │   └── remediation/       # Auto-remediation
 ├── configs/               # Configuration files
 ├── scripts/               # Build and utility scripts
 └── docs/                  # Documentation
+    └── architecture/      # Architecture documentation
 ```
 
 ## Development Guidelines
@@ -82,7 +86,12 @@ docker run --rm -v ~/.aws:/root/.aws catherinevee/driftmgr discover --provider a
 - **GCP**: Service account JSON or application default credentials
 - **DigitalOcean**: API token
 
-### Recently Implemented Features
+### Recently Implemented Features (v2.0)
+- **Unified Service Layer**: Complete service layer architecture ensuring consistency between CLI and web interfaces
+- **Event Bus System**: Real-time event propagation for UI updates and audit trails
+- **Job Queue System**: Asynchronous job processing with priority, retry logic, and progress tracking
+- **CQRS Pattern**: Command Query Responsibility Segregation for clear separation of concerns
+- **Workflow Commands**: CLI workflow commands for common operations (terraform-drift, cleanup-unmanaged, etc.)
 - **Enterprise Audit Logging**: Complete audit trail with compliance modes (SOC2, HIPAA, PCI-DSS)
 - **RBAC System**: Role-based access control with predefined roles (Admin, Operator, Viewer, Approver)
 - **HashiCorp Vault Integration**: Secure secrets management via vault client
@@ -160,7 +169,10 @@ For GitHub Actions workflows:
 
 ## Useful Resources
 
-- **README.md**: Main project documentation
+- **README.md**: Main project documentation with v2.0 architecture overview
+- **docs/architecture/ARCHITECTURE_OVERVIEW.md**: Comprehensive architecture documentation
+- **docs/architecture/SERVICE_LAYER_ARCHITECTURE.md**: Service layer implementation details
+- **docs/PROJECT_STRUCTURE.md**: Updated project structure with v2.0 components
 - **docs/SECRETS_SETUP.md**: GitHub secrets configuration
 - **configs/config.yaml**: Default configuration
 - **.github/workflows/**: CI/CD pipeline definitions
@@ -172,8 +184,13 @@ For GitHub Actions workflows:
 - Issues: Report at GitHub Issues
 - Main branch: `main` (default for PRs)
 
-## Recent Changes
+## Recent Changes (v2.0 Release)
 
+- **Major Architecture Refactor**: Implemented unified service layer for CLI and web consistency
+- **Event-Driven Updates**: Added event bus for real-time WebSocket updates
+- **Async Processing**: Implemented job queue with worker pools for long-running operations
+- **Fixed Web UI Issues**: Resolved duplicate methods and scope issues in Alpine.js components
+- **Documentation Updates**: Created comprehensive architecture documentation
 - Fixed Docker build issues with platform-specific code
 - Added comprehensive GitHub Actions workflows
 - Improved documentation accuracy

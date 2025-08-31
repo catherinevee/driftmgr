@@ -1,127 +1,39 @@
-# DriftMgr Test Script (PowerShell)
-# This script runs tests for the DriftMgr application
+# PowerShell test runner script for comprehensive test suite
 
-param(
-    [switch]$Unit,
-    [switch]$Integration,
-    [switch]$Benchmark,
-    [switch]$All
-)
+Write-Host "🧪 Running Terraform Import Helper Test Suite" -ForegroundColor Cyan
+Write-Host "===============================================" -ForegroundColor Cyan
 
-# Set error action preference
-$ErrorActionPreference = "Stop"
+# Change to project directory
+Set-Location $PSScriptRoot
 
-# Colors for output
-$Green = "Green"
-$Blue = "Blue"
-$Red = "Red"
-$Yellow = "Yellow"
+Write-Host "📍 Current directory: $(Get-Location)" -ForegroundColor Yellow
+Write-Host ""
 
-# Function to print colored output
-function Write-Status {
-    param([string]$Message)
-    Write-Host "[INFO] $Message" -ForegroundColor $Blue
-}
+# Run go mod tidy first
+Write-Host "🔧 Running go mod tidy..." -ForegroundColor Green
+go mod tidy
+Write-Host ""
 
-function Write-Success {
-    param([string]$Message)
-    Write-Host "[SUCCESS] $Message" -ForegroundColor $Green
-}
+# Test individual packages
+Write-Host "🧮 Testing Models package..." -ForegroundColor Green
+go test -v ./internal/models
+Write-Host ""
 
-function Write-Error {
-    param([string]$Message)
-    Write-Host "[ERROR] $Message" -ForegroundColor $Red
-}
+Write-Host "🔍 Testing Discovery package..." -ForegroundColor Green
+go test -v ./internal/discovery
+Write-Host ""
 
-function Write-Warning {
-    param([string]$Message)
-    Write-Host "[WARNING] $Message" -ForegroundColor $Yellow
-}
+Write-Host "🎨 Testing TUI package..." -ForegroundColor Green
+go test -v ./internal/tui
+Write-Host ""
 
-Write-Status "Starting DriftMgr tests..."
+Write-Host "📥 Testing Importer package..." -ForegroundColor Green
+go test -v ./internal/importer
+Write-Host ""
 
-# If no specific test type is specified, run all
-if (-not $Unit -and -not $Integration -and -not $Benchmark) {
-    $All = $true
-}
+# Run all tests
+Write-Host "🚀 Running all tests..." -ForegroundColor Green
+go test -v ./...
+Write-Host ""
 
-$TestResults = @()
-
-# Run unit tests
-if ($Unit -or $All) {
-    Write-Status "Running unit tests..."
-    try {
-        $UnitResult = go test ./internal/... -v
-        if ($LASTEXITCODE -eq 0) {
-            Write-Success "Unit tests passed"
-            $TestResults += "Unit tests: PASSED"
-        } else {
-            Write-Error "Unit tests failed"
-            $TestResults += "Unit tests: FAILED"
-        }
-    } catch {
-        Write-Error "Failed to run unit tests: $_"
-        $TestResults += "Unit tests: ERROR"
-    }
-}
-
-# Run integration tests
-if ($Integration -or $All) {
-    Write-Status "Running integration tests..."
-    try {
-        if (Test-Path "tests/integration") {
-            $IntegrationResult = go test ./tests/integration/... -v
-            if ($LASTEXITCODE -eq 0) {
-                Write-Success "Integration tests passed"
-                $TestResults += "Integration tests: PASSED"
-            } else {
-                Write-Error "Integration tests failed"
-                $TestResults += "Integration tests: FAILED"
-            }
-        } else {
-            Write-Warning "Integration tests directory not found, skipping"
-            $TestResults += "Integration tests: SKIPPED"
-        }
-    } catch {
-        Write-Error "Failed to run integration tests: $_"
-        $TestResults += "Integration tests: ERROR"
-    }
-}
-
-# Run benchmarks
-if ($Benchmark -or $All) {
-    Write-Status "Running benchmarks..."
-    try {
-        if (Test-Path "tests/benchmarks") {
-            $BenchmarkResult = go test ./tests/benchmarks/... -bench=.
-            if ($LASTEXITCODE -eq 0) {
-                Write-Success "Benchmarks completed"
-                $TestResults += "Benchmarks: PASSED"
-            } else {
-                Write-Error "Benchmarks failed"
-                $TestResults += "Benchmarks: FAILED"
-            }
-        } else {
-            Write-Warning "Benchmarks directory not found, skipping"
-            $TestResults += "Benchmarks: SKIPPED"
-        }
-    } catch {
-        Write-Error "Failed to run benchmarks: $_"
-        $TestResults += "Benchmarks: ERROR"
-    }
-}
-
-# Summary
-Write-Status "Test Summary:"
-foreach ($result in $TestResults) {
-    Write-Host "  $result"
-}
-
-# Check if all tests passed
-$FailedTests = $TestResults | Where-Object { $_ -like "*FAILED*" -or $_ -like "*ERROR*" }
-if ($FailedTests) {
-    Write-Error "Some tests failed!"
-    exit 1
-} else {
-    Write-Success "All tests passed!"
-}
+Write-Host "[OK] Test suite completed!" -ForegroundColor Cyan

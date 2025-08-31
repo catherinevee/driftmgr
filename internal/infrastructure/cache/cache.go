@@ -200,3 +200,10 @@ func (dc *DiscoveryCache) Set(key string, value interface{}) {
 func (dc *DiscoveryCache) Clear() {
 	dc.manager.Clear()
 }
+
+// GetSize returns the number of entries in the cache
+func (dc *DiscoveryCache) GetSize() int {
+	dc.manager.mu.RLock()
+	defer dc.manager.mu.RUnlock()
+	return len(dc.manager.cache)
+}

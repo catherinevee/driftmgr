@@ -57,6 +57,9 @@ build/
 dist/
 bin/
 release/
+*.exe
+driftmgr2.exe
+driftmgr-server.exe
 
 # === Cloud/Infrastructure ===
 # Terraform
@@ -90,11 +93,18 @@ service-account*.json
 *.db
 *.sqlite*
 data/
+driftmgr.db
 
 # Logs
 *.log
 logs/
 *.log.*
+server.log
+server_error.log
+server_output.log
+test_err.log
+serve_web*.log
+full_serve_web_output.log
 
 # === OS ===
 .DS_Store
@@ -122,9 +132,15 @@ npm-debug.log*
 *.orig
 tmp/
 temp/
+nul
+test_*.html
+test_*.ps1
+verify_*.ps1
 
 # === Archives ===
 *.tar.gz
 *.zip
 *.rar
 *.7z
+web/archive/
+web/*.backup

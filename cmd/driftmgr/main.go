@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/cmd/driftmgr/commands"
+	"github.com/catherinevee/driftmgr/internal/api"
 	"github.com/catherinevee/driftmgr/internal/core/color"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
 	"github.com/catherinevee/driftmgr/internal/core/drift"
@@ -128,12 +129,16 @@ func main() {
 	// Set up panic recovery
 	defer graceful.RecoverPanic()
 
-	// If no arguments provided, show help
+	// If no arguments provided, default to state analysis
 	if len(os.Args) == 1 {
-		showCLIHelp()
-		// Also show detected credentials
-		fmt.Println("\nDetected Cloud Credentials:")
-		showCredentialStatusCLI()
+		printASCIIArt()
+		fmt.Println()
+		fmt.Println("Terraform State Manager - Intelligent State Analysis & Drift Detection")
+		fmt.Println()
+		// Default to state analysis
+		fmt.Println("No command specified. Running state analysis...")
+		fmt.Println()
+		handleStateCommand([]string{"analyze"})
 		return
 	}
 
@@ -158,19 +163,67 @@ func main() {
 	// Check for commands
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		// State management - consolidated
-		case "state":
-			handleStateCommand(os.Args[2:])
+		// PRIMARY: Terraform State Management (default focus)
+		case "state", "analyze", "drift", "fix":
+			if os.Args[1] == "analyze" || os.Args[1] == "drift" || os.Args[1] == "fix" {
+				// Direct state operations without 'state' prefix
+				handleStateCommand(append([]string{os.Args[1]}, os.Args[2:]...))
+			} else {
+				handleStateCommand(os.Args[2:])
+			}
+			return
+		
+		// Quick drift check
+		case "check":
+			handleQuickCheck(os.Args[2:])
+			return
+		
+		// State surgery operations
+		case "surgery":
+			handleStateSurgery(os.Args[2:])
 			return
 
-		// Drift management - consolidated with auto-remediation
-		case "drift":
-			handleDriftCommand(os.Args[2:])
+		// Terraform-specific perspective management
+		case "perspective":
+			handlePerspectiveCommand(os.Args[2:])
+			return
+		
+		// Workspace drift comparison
+		case "workspace":
+			handleWorkspaceDrift(os.Args[2:])
+			return
+		
+		// Module version tracking
+		case "module":
+			handleModuleTracking(os.Args[2:])
 			return
 
-		// Resource discovery - absorbs cloud and credentials
+		// Terraform import generation
+		case "generate-import", "gen-import":
+			handleTerraformImportGeneration(os.Args[2:])
+			return
+
+		// Initialize configuration
+		case "init":
+			commands.HandleInit(os.Args[2:])
+			return
+		// Resource discovery - enhanced with categorization
 		case "discover":
-			handleCloudDiscover(os.Args[2:])
+			// Check if enhanced discovery flags are present
+			hasEnhancedFlags := false
+			for _, arg := range os.Args[2:] {
+				if arg == "--unmanaged-only" || arg == "--import-candidates" || 
+				   arg == "--shadow-it" || arg == "--categorize" || arg == "--continuous" {
+					hasEnhancedFlags = true
+					break
+				}
+			}
+			
+			if hasEnhancedFlags {
+				handleEnhancedDiscovery(os.Args[2:])
+			} else {
+				handleCloudDiscover(os.Args[2:])
+			}
 			return
 
 		// Verification - consolidated validate and verify-enhanced
@@ -199,6 +252,11 @@ func main() {
 		// Use - select which account/subscription/project to work with
 		case "use":
 			handleUseCommand(os.Args[2:])
+			return
+		
+		// Terraform remediation commands
+		case "remediation", "remediate":
+			commands.HandleRemediationCommand(os.Args[2:])
 			return
 
 		// Server commands - consolidated
@@ -260,14 +318,9 @@ func main() {
 		}
 	}
 
-	// Show ASCII art and help when no arguments provided
+	// This code should not be reached due to earlier check
 	if len(os.Args) == 1 {
-		printASCIIArt()
-		fmt.Println()
-		fmt.Println("Welcome to DriftMgr - Cloud Infrastructure Drift Detection")
-		fmt.Println()
-		fmt.Println("Get started with: driftmgr status")
-		fmt.Println("For help, run:    driftmgr --help")
+		handleStateCommand([]string{"analyze"})
 		return
 	}
 }
@@ -281,20 +334,27 @@ func showCLIHelp() {
 	fmt.Printf("%s driftmgr %s %s\n", color.Label("Usage:"), color.Command("[command]"), color.Flag("[flags]"))
 	fmt.Println()
 
-	fmt.Println(color.Subheader("Core Commands:"))
-	fmt.Printf("  %s                      %s\n", color.Command("status"), color.Dim("Show system status and auto-discover resources"))
-	fmt.Printf("  %s                    %s\n", color.Command("discover"), color.Dim("Discover cloud resources (use --credentials for auth status)"))
-	fmt.Printf("  %s                       %s\n", color.Command("drift"), color.Dim("Manage drift detection and remediation"))
-	fmt.Printf("  %s                       %s\n", color.Command("state"), color.Dim("Manage and visualize Terraform state files"))
-	fmt.Printf("  %s                      %s\n", color.Command("verify"), color.Dim("Verify discovery accuracy and resource counts"))
+	fmt.Println(color.Subheader("Terraform/Terragrunt State Management:"))
+	fmt.Printf("  %s                       %s\n", color.Command("state"), color.Dim("Analyze and manage Terraform/Terragrunt state files"))
+	fmt.Printf("  %s                       %s\n", color.Command("check"), color.Dim("Quick drift check - is it safe to apply?"))
+	fmt.Printf("  %s                       %s\n", color.Command("drift"), color.Dim("Detailed drift detection and remediation"))
+	fmt.Printf("  %s                  %s\n", color.Command("workspace"), color.Dim("Compare drift across Terraform workspaces"))
+	fmt.Printf("  %s                     %s\n", color.Command("module"), color.Dim("Track module versions and drift"))
+	fmt.Printf("  %s                    %s\n", color.Command("surgery"), color.Dim("Safe state manipulation (mv, rm, replace)"))
+	fmt.Printf("  %s                    %s\n", color.Command("backend"), color.Dim("Migrate state backends safely"))
 	fmt.Println()
 
-	fmt.Println(color.Subheader("Resource Management:"))
-	fmt.Printf("  %s                      %s\n", color.Command("delete"), color.Dim("Delete a cloud resource"))
-	fmt.Printf("  %s                      %s\n", color.Command("export"), color.Dim("Export discovery results"))
-	fmt.Printf("  %s                      %s\n", color.Command("import"), color.Dim("Import existing resources into Terraform"))
-	fmt.Printf("  %s                    %s\n", color.Command("accounts"), color.Dim("List all accessible cloud accounts"))
-	fmt.Printf("  %s                         %s\n", color.Command("use"), color.Dim("Select account/subscription/project to work with"))
+	fmt.Println(color.Subheader("Remediation & Import:"))
+	fmt.Printf("  %s                  %s\n", color.Command("remediate"), color.Dim("Generate Terraform code to fix drift"))
+	fmt.Printf("  %s                      %s\n", color.Command("import"), color.Dim("Import unmanaged resources into Terraform"))
+	fmt.Printf("  %s              %s\n", color.Command("safe-to-apply"), color.Dim("Pre-apply validation and safety check"))
+	fmt.Printf("  %s                 %s\n", color.Command("cost-drift"), color.Dim("Analyze cost impact of drift"))
+	fmt.Println()
+
+	fmt.Println(color.Subheader("Discovery & Analysis:"))
+	fmt.Printf("  %s                    %s\n", color.Command("discover"), color.Dim("Discover resources from state or cloud"))
+	fmt.Printf("  %s                      %s\n", color.Command("verify"), color.Dim("Verify state accuracy"))
+	fmt.Printf("  %s                    %s\n", color.Command("accounts"), color.Dim("List accessible accounts"))
 	fmt.Println()
 
 	fmt.Println(color.Subheader("Server:"))
@@ -773,19 +833,116 @@ func handleDriftDetect(args []string) {
 
 	stateSpinner.Success(fmt.Sprintf("State loaded: %d resources found", len(stateFile.Resources)))
 
-	// Show progress bar for drift detection
-	driftBar := progress.NewBar(len(stateFile.Resources), "Detecting drift")
-
-	// Detect drift
-	detector := drift.NewTerraformDriftDetector(statePath, provider)
-
-	report, err := detector.DetectDrift(ctx)
+	// Initialize discovery service
+	discoveryService, err := discovery.InitializeServiceSilent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error initializing discovery service: %v\n", err)
+		os.Exit(1)
+	}
+	
+	// Discover current cloud resources
+	driftBar := progress.NewBar(1, "Discovering cloud resources")
+	discoveryResult, err := discoveryService.DiscoverProvider(ctx, provider, discovery.DiscoveryOptions{})
+	if err != nil {
+		fmt.Println("Failed to discover resources")
+		fmt.Fprintf(os.Stderr, "Error discovering resources: %v\n", err)
+		os.Exit(1)
+	}
+	driftBar.Complete()
+	fmt.Printf("Discovered %d resources from %s\n", len(discoveryResult.Resources), provider)
+	
+	// Create drift detector
+	detector := drift.NewDetector()
+	
+	// Perform drift detection
+	detectionOptions := drift.DetectionOptions{
+		CompareWith:    "terraform",
+		StateFile:      statePath,
+		SmartDefaults:  useSmartDefaults,
+		Environment:    "production", // Could be made configurable
+	}
+	
+	detectionResult, err := detector.Detect(ctx, discoveryResult.Resources, detectionOptions)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error detecting drift: %v\n", err)
 		os.Exit(1)
 	}
-
-	driftBar.Complete()
+	
+	// Create report from detection result
+	report := &drift.TerraformDriftReport{
+		StateFile:      statePath,
+		Provider:       provider,
+		ScanTime:       detectionResult.Timestamp,
+		Duration:       detectionResult.Duration,
+		TotalResources: detectionResult.Summary.TotalResources,
+		DriftedCount:   detectionResult.Summary.DriftedResources,
+		MissingCount:   detectionResult.Summary.ByDriftType["deleted"],
+		UnmanagedCount: detectionResult.Summary.ByDriftType["added"],
+		Summary: &drift.DriftSummary{
+			CriticalCount: detectionResult.Summary.BySeverity["critical"],
+			HighCount:     detectionResult.Summary.BySeverity["high"],
+			MediumCount:   detectionResult.Summary.BySeverity["medium"],
+			LowCount:      detectionResult.Summary.BySeverity["low"],
+			DriftPercent:  detectionResult.Summary.DriftPercentage,
+		},
+		Resources: []drift.TerraformResource{},
+	}
+	
+	// Convert drift items to report resources
+	for _, driftItem := range detectionResult.DriftItems {
+		resource := drift.TerraformResource{
+			ResourceName: driftItem.ResourceName,
+			ResourceType: driftItem.ResourceType,
+			DriftType:    driftItem.DriftType,
+			Severity:     driftItem.Severity,
+			Differences:  []drift.Difference{},
+		}
+		
+		// Convert details to differences
+		for path, change := range driftItem.Details {
+			if changeMap, ok := change.(map[string]interface{}); ok {
+				resource.Differences = append(resource.Differences, drift.Difference{
+					Path:        path,
+					StateValue:  changeMap["baseline"],
+					ActualValue: changeMap["current"],
+				})
+			}
+		}
+		
+		report.Resources = append(report.Resources, resource)
+	}
+	
+	// Store drift results in the global drift store
+	driftStore := api.GetGlobalDriftStore()
+	
+	// Convert and store each drift resource
+	for _, resource := range report.Resources {
+		if resource.DriftType != "" && resource.DriftType != "none" {
+			driftRecord := &api.DriftRecord{
+				ID:           fmt.Sprintf("drift-%s-%d", resource.ResourceName, time.Now().Unix()),
+				ResourceID:   resource.ResourceName,
+				ResourceType: resource.ResourceType,
+				Provider:     provider,
+				Region:       "", // Could be extracted from resource or args
+				DriftType:    resource.DriftType,
+				Severity:     resource.Severity,
+				Changes:      make(map[string]interface{}),
+				DetectedAt:   time.Now(),
+				Status:       "active",
+			}
+			
+			// Convert differences to changes map
+			for _, diff := range resource.Differences {
+				driftRecord.Changes[diff.Path] = map[string]interface{}{
+					"old":  diff.StateValue,
+					"new":  diff.ActualValue,
+					"type": "update",
+				}
+			}
+			
+			driftStore.AddDrift(driftRecord)
+		}
+	}
 
 	// Apply smart defaults if enabled
 	if useSmartDefaults {
@@ -832,6 +989,23 @@ func handleDriftDetect(args []string) {
 
 	// Display results
 	displayTerraformDriftReport(report, format)
+	
+	// Show information about remediation if drift was detected
+	storedDrifts := driftStore.GetAllDrifts()
+	if len(storedDrifts) > 0 {
+		fmt.Println()
+		fmt.Printf("✅ Detected %d drift items have been stored\n", len(storedDrifts))
+		fmt.Println()
+		fmt.Println("To generate remediation plans:")
+		for i, drift := range storedDrifts {
+			if i < 3 { // Show first 3 examples
+				fmt.Printf("  driftmgr remediation generate --drift-id %s\n", drift.ID)
+			}
+		}
+		if len(storedDrifts) > 3 {
+			fmt.Printf("  ... and %d more\n", len(storedDrifts)-3)
+		}
+	}
 }
 
 // handleDriftReport handles drift report generation
@@ -868,22 +1042,64 @@ func handleDriftFix(args []string) {
 	// Load state and detect drift
 	ctx := context.Background()
 
-	detector := drift.NewTerraformDriftDetector(statePath, provider)
-
-	report, err := detector.DetectDrift(ctx)
+	// Initialize discovery service
+	discoveryService, err := discovery.InitializeServiceSilent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error initializing discovery service: %v\n", err)
+		os.Exit(1)
+	}
+	
+	// Discover current cloud resources
+	discoveryResult, err := discoveryService.DiscoverProvider(ctx, provider, discovery.DiscoveryOptions{})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error discovering resources: %v\n", err)
+		os.Exit(1)
+	}
+	
+	// Create drift detector
+	detector := drift.NewDetector()
+	
+	// Perform drift detection
+	detectionOptions := drift.DetectionOptions{
+		CompareWith:    "terraform",
+		StateFile:      statePath,
+		SmartDefaults:  true,
+		Environment:    "production",
+	}
+	
+	detectionResult, err := detector.Detect(ctx, discoveryResult.Resources, detectionOptions)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error detecting drift: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Generate remediation plan
-	plan, err := detector.GenerateRemediationPlan(report)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error generating remediation: %v\n", err)
-		os.Exit(1)
+	// Generate remediation recommendations
+	fmt.Println("=== Drift Remediation Plan ===")
+	fmt.Printf("Total Drift Items: %d\n", len(detectionResult.DriftItems))
+	fmt.Println()
+	
+	for _, recommendation := range detectionResult.Recommendations {
+		fmt.Printf("Priority: %s\n", recommendation.Priority)
+		fmt.Printf("Type: %s\n", recommendation.Type)
+		fmt.Printf("Description: %s\n", recommendation.Description)
+		fmt.Println("Actions:")
+		for _, action := range recommendation.Actions {
+			fmt.Printf("  - %s\n", action)
+		}
+		fmt.Printf("Impact: %s\n", recommendation.Impact)
+		fmt.Println()
 	}
+}
 
-	fmt.Println(plan)
+// formatCacheDuration formats a duration for cache display
+func formatCacheDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
 // displayTerraformDriftReport displays the Terraform drift detection report
@@ -986,20 +1202,27 @@ func findClientExecutable(exeDir string) string {
 
 // handleResourceDeletion handles the delete-resource command with generic dependency management
 func handleResourceDeletion(args []string) {
+	// Check for bulk operation first
+	for _, arg := range args {
+		if arg == "--bulk" {
+			commands.HandleBulkDelete(args)
+			return
+		}
+	}
+	
 	if len(args) < 1 || args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
-		fmt.Println("Usage: driftmgr delete-resource [<resource-type> <resource-name>] [options]")
+		fmt.Println("Usage: driftmgr delete [<resource-type> <resource-name>] [options]")
+		fmt.Println("       driftmgr delete --bulk [options]")
 		fmt.Println()
 		fmt.Println("Description:")
-		fmt.Println("  Delete a cloud resource with automatic dependency management.")
-		fmt.Println("  This command ensures proper deletion order and validates resource state.")
-		fmt.Println("  If no resource type/name is provided, will discover and let you select resources.")
+		fmt.Println("  Delete cloud resources with automatic dependency management.")
+		fmt.Println("  Supports both single resource and bulk deletion operations.")
 		fmt.Println()
-		fmt.Println("Arguments:")
-		fmt.Println("  <resource-type>    Type of resource to delete (e.g., eks_cluster, ecs_cluster, rds_instance)")
+		fmt.Println("Single Resource Arguments:")
+		fmt.Println("  <resource-type>    Type of resource to delete (e.g., eks_cluster, ec2_instance)")
 		fmt.Println("  <resource-name>    Name of the resource to delete")
-		fmt.Println("                     (If omitted, will discover and show available resources)")
 		fmt.Println()
-		fmt.Println("Options:")
+		fmt.Println("Common Options:")
 		fmt.Println("  --region <region>     AWS region (default: us-east-1)")
 		fmt.Println("  --force               Skip validation and force deletion")
 		fmt.Println("  --dry-run             Show what would be deleted without actually deleting")
@@ -1007,11 +1230,23 @@ func handleResourceDeletion(args []string) {
 		fmt.Println("  --wait                Wait for deletion to complete")
 		fmt.Println("  --discover            Force resource discovery and selection")
 		fmt.Println()
+		fmt.Println("Bulk Delete Options:")
+		fmt.Println("  --bulk                Enable bulk deletion mode")
+		fmt.Println("  --filter-type <type>  Filter by resource type")
+		fmt.Println("  --filter-tag <k=v>    Filter by tag (can be repeated)")
+		fmt.Println("  --filter-id <id>      Filter by resource ID (can be repeated)")
+		fmt.Println("  --parallel            Delete resources in parallel")
+		fmt.Println("  --max-concurrent <n>  Max concurrent deletions (default: 5)")
+		fmt.Println()
 		fmt.Println("Examples:")
-		fmt.Println("  driftmgr delete-resource eks_cluster prod-use1-eks-main")
-		fmt.Println("  driftmgr delete-resource rds_instance my-database --region us-east-1 --dry-run")
-		fmt.Println("  driftmgr delete-resource ecs_cluster my-cluster --include-deps --force")
-		fmt.Println("  driftmgr delete-resource --discover  # Interactive resource selection")
+		fmt.Println("  # Single resource")
+		fmt.Println("  driftmgr delete eks_cluster prod-use1-eks-main")
+		fmt.Println("  driftmgr delete rds_instance my-database --region us-east-1 --dry-run")
+		fmt.Println()
+		fmt.Println("  # Bulk deletion")
+		fmt.Println("  driftmgr delete --bulk --filter-tag Environment=dev --dry-run")
+		fmt.Println("  driftmgr delete --bulk --filter-type ec2_instance --parallel")
+		fmt.Println("  driftmgr delete --bulk --discover  # Interactive selection")
 		fmt.Println()
 		fmt.Println("Supported Resource Types:")
 		fmt.Println()
@@ -2332,6 +2567,9 @@ func handleStateCommand(args []string) {
 		fmt.Println("  visualize  Generate visual diagrams of state")
 		fmt.Println("  scan       Scan for Terraform backend configurations")
 		fmt.Println("  list       List and analyze Terraform state files")
+		fmt.Println("  discover   Discover resources from state files")
+		fmt.Println("  analyze    Analyze state for drift and issues")
+		fmt.Println("  compare    Compare multiple state files")
 		fmt.Println()
 		fmt.Println("Run 'driftmgr state <command> --help' for more information")
 		return
@@ -2346,6 +2584,12 @@ func handleStateCommand(args []string) {
 		handleBackendScan(args[1:])
 	case "list":
 		handleTfStateCommand(args[1:])
+	case "discover":
+		handleStateDiscover(args[1:])
+	case "analyze":
+		handleStateAnalyze(args[1:])
+	case "compare":
+		handleStateCompare(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown state subcommand: %s\n", args[0])
 		fmt.Println("Run 'driftmgr state' for available commands")
@@ -2410,7 +2654,11 @@ func handleServeCommand(args []string) {
 	}
 
 	switch args[0] {
-	case "web", "dashboard":
+	case "web":
+		// Use the new serve web command that loads cache immediately
+		commands.HandleServeWeb(args[1:])
+	case "dashboard":
+		// Legacy dashboard command with pre-discovery
 		commands.HandleDashboard(args[1:])
 	case "api", "server":
 		commands.HandleServer(args[1:])

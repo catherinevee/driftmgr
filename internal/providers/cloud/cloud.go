@@ -20,11 +20,13 @@ type Resource struct {
 	Provider   string                 `json:"provider"`
 	Region     string                 `json:"region"`
 	State      string                 `json:"state"`
+	Status     string                 `json:"status"`     // Resource status (active, inactive, pending, etc.)
 	Tags       map[string]string      `json:"tags"`
 	Properties map[string]interface{} `json:"properties"`
 	AccountID  string                 `json:"account_id"`
 	CreatedAt  string                 `json:"created_at"`
 	UpdatedAt  string                 `json:"updated_at"`
+	ModifiedAt string                 `json:"modified_at"` // Last modification timestamp
 }
 
 // GetResourceID returns the resource ID
@@ -169,13 +171,48 @@ func GroupResourcesByRegion(resources []Resource) map[string][]Resource {
 func GetRegionsForProvider(provider string) []string {
 	switch NormalizeProviderName(provider) {
 	case "aws":
-		return []string{"us-east-1", "us-west-2", "eu-west-1"}
+		// All major AWS regions
+		return []string{
+			"us-east-1", "us-east-2", "us-west-1", "us-west-2",
+			"eu-west-1", "eu-west-2", "eu-west-3", "eu-central-1",
+			"ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "ap-northeast-2",
+			"ap-south-1", "sa-east-1", "ca-central-1",
+		}
 	case "azure":
-		return []string{"eastus", "westus", "northeurope"}
+		// All major Azure regions
+		return []string{
+			"eastus", "eastus2", "westus", "westus2", "westus3",
+			"centralus", "northcentralus", "southcentralus",
+			"westeurope", "northeurope", "uksouth", "ukwest",
+			"francecentral", "germanywestcentral", "norwayeast",
+			"switzerlandnorth", "eastasia", "southeastasia",
+			"japaneast", "japanwest", "koreacentral", "koreasouth",
+			"australiaeast", "australiasoutheast", "brazilsouth",
+			"canadacentral", "canadaeast", "southafricanorth",
+			"uaenorth", "centralindia", "southindia", "westindia",
+		}
 	case "gcp":
-		return []string{"us-central1", "us-east1", "europe-west1"}
+		// All major GCP regions
+		return []string{
+			"us-central1", "us-east1", "us-east4", "us-west1", "us-west2", "us-west3", "us-west4",
+			"europe-north1", "europe-west1", "europe-west2", "europe-west3", "europe-west4", "europe-west6",
+			"asia-east1", "asia-east2", "asia-northeast1", "asia-northeast2", "asia-northeast3",
+			"asia-south1", "asia-southeast1", "asia-southeast2",
+			"australia-southeast1", "northamerica-northeast1", "southamerica-east1",
+		}
 	case "digitalocean":
-		return []string{"nyc1", "sfo1", "lon1"}
+		// All DigitalOcean regions
+		return []string{
+			"nyc1", "nyc2", "nyc3", // New York
+			"sfo1", "sfo2", "sfo3", // San Francisco
+			"ams2", "ams3", // Amsterdam
+			"sgp1", // Singapore
+			"lon1", // London
+			"fra1", // Frankfurt
+			"tor1", // Toronto
+			"blr1", // Bangalore
+			"syd1", // Sydney
+		}
 	default:
 		return []string{}
 	}

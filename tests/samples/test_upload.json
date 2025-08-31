@@ -1,0 +1,28 @@
+{
+  "version": 4,
+  "terraform_version": "1.5.0",
+  "serial": 1,
+  "lineage": "test-lineage",
+  "resources": [
+    {
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "test_instance",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "id": "i-1234567890",
+            "instance_type": "t2.micro",
+            "region": "us-east-1",
+            "tags": {
+              "Name": "Test Instance",
+              "Environment": "test"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

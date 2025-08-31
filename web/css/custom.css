@@ -1,0 +1,83 @@
+/* DriftMgr Simple Styles */
+
+/* Basic transitions */
+* {
+    transition: background-color 0.2s ease;
+}
+
+/* Panel styling */
+.bg-base-100.rounded-lg {
+    padding: 1rem;
+}
+
+/* Section headers */
+h2.text-xl {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Stats cards */
+.stat {
+    border-left: 3px solid var(--p, #333);
+}
+
+/* Loading spinner */
+.loading-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Table hover */
+.table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Badge */
+.badge {
+    font-weight: 500;
+}
+
+/* Status indicators */
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+.status-indicator.online {
+    background-color: #22c55e;
+}
+
+.status-indicator.offline {
+    background-color: #ef4444;
+}
+
+/* Loading bar */
+.loading-bar-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+}
