@@ -62,6 +62,8 @@ func HandleDashboard(args []string) {
  \____ | |__|  |__||__|   |__| |__|_|  /\___  /|__|   
       \/                             \//_____/        `)
 	fmt.Println()
+
+	fmt.Println("Starting DriftMgr dashboard...")
 	
 	// Skip discovery if requested
 	if skipDiscovery {

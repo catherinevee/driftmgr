@@ -54,6 +54,7 @@ func HandleServeWeb(args []string) {
       \/                             \//_____/        `)
 	fmt.Println()
 
+	fmt.Println("Starting DriftMgr web server...")
 	fmt.Println("Loading cached resources...")
 	
 	// Create server options

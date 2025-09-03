@@ -238,7 +238,7 @@ func main() {
  \____ | |__|  |__||__|   |__| |__|_|  /\___  /|__|   
       \/                             \//_____/        `)
 	fmt.Println()
-	fmt.Println("DriftMgr Server - Enterprise Edition")
+	fmt.Println("DriftMgr Server")
 	fmt.Println()
 
 	// Set up panic recovery
