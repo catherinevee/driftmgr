@@ -13,7 +13,7 @@ Discover, analyze, and remediate drift in Terraform state files across multiple 
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
 [![Release](https://img.shields.io/github/v/release/catherinevee/driftmgr?include_prereleases&sort=semver&color=blue)](https://github.com/catherinevee/driftmgr/releases)
-[![Docker Pulls](https://img.shields.io/docker/pulls/catherinevee/driftmgr)](https://hub.docker.com/r/catherinevee/driftmgr)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcatherinevee%2Fdriftmgr.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcatherinevee%2Fdriftmgr?ref=badge_shield)
 [![Multi-Cloud](https://img.shields.io/badge/☁️-AWS%20|%20Azure%20|%20GCP%20|%20DO-orange)](https://github.com/catherinevee/driftmgr#supported-providers)
 [![Terraform](https://img.shields.io/badge/Terraform-0.11→1.x-7B42BC?logo=terraform)](https://github.com/catherinevee/driftmgr#terraform-compatibility)
 
