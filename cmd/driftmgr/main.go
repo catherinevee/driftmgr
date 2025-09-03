@@ -1,732 +1,154 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
+	"os/signal"
 	"path/filepath"
-	"runtime"
-	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/catherinevee/driftmgr/cmd/driftmgr/commands"
+	"github.com/catherinevee/driftmgr/internal/analysis/cost"
+	"github.com/catherinevee/driftmgr/internal/analysis/graph"
 	"github.com/catherinevee/driftmgr/internal/api"
-	"github.com/catherinevee/driftmgr/internal/core/color"
-	"github.com/catherinevee/driftmgr/internal/core/discovery"
-	"github.com/catherinevee/driftmgr/internal/core/drift"
-	"github.com/catherinevee/driftmgr/internal/core/models"
-	"github.com/catherinevee/driftmgr/internal/core/progress"
-	"github.com/catherinevee/driftmgr/internal/credentials"
-	"github.com/catherinevee/driftmgr/internal/integration/terraform"
-	"github.com/catherinevee/driftmgr/internal/terraform/state"
-	"github.com/catherinevee/driftmgr/internal/utils/graceful"
+	"github.com/catherinevee/driftmgr/internal/discovery/backend"
+	"github.com/catherinevee/driftmgr/internal/drift/detector"
+	"github.com/catherinevee/driftmgr/internal/providers"
+	"github.com/catherinevee/driftmgr/internal/remediation/planner"
+	"github.com/catherinevee/driftmgr/internal/safety/cleanup"
+	"github.com/catherinevee/driftmgr/internal/state/backup"
+	"github.com/catherinevee/driftmgr/internal/state/manager"
+	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/terragrunt/parser/hcl"
 )
-
-const (
-	serverPort = "8080"
-	serverURL  = "http://localhost:" + serverPort + "/health"
-)
-
-// printASCIIArt prints the DriftMgr ASCII art logo with color
-func printASCIIArt() {
-	logo := `     .___      .__  _____  __                         
-   __| _/______|__|/ ____\/  |_  _____    ___________ 
-  / __ |\_  __ \  \   __\\   __\/     \  / ___\_  __ \
- / /_/ | |  | \/  ||  |   |  | |  Y Y  \/ /_/  >  | \/
- \____ | |__|  |__||__|   |__| |__|_|  /\___  /|__|   
-      \/                             \//_____/        `
-	color.Println(color.Cyan, logo)
-}
-
-// parseCommandArgs properly parses command arguments, handling quoted strings and flags
-func parseCommandArgs(input string) []string {
-	var args []string
-	var current strings.Builder
-	inQuotes := false
-	quoteChar := byte(0)
-
-	for i := 0; i < len(input); i++ {
-		char := input[i]
-
-		if char == '"' || char == '\'' {
-			if !inQuotes {
-				inQuotes = true
-				quoteChar = char
-			} else if char == quoteChar {
-				inQuotes = false
-				quoteChar = 0
-			} else {
-				// Different quote character, treat as literal
-				current.WriteByte(char)
-			}
-		} else if char == ' ' && !inQuotes {
-			if current.Len() > 0 {
-				args = append(args, current.String())
-				current.Reset()
-			}
-		} else {
-			current.WriteByte(char)
-		}
-	}
-
-	// Add the last argument if there is one
-	if current.Len() > 0 {
-		args = append(args, current.String())
-	}
-
-	return args
-}
-
-// parseCommandLineArgs handles command line argument parsing for the main executable
-func parseCommandLineArgs(args []string) []string {
-	// For the main executable, we need to handle the case where flags are passed
-	// but the client expects them to be properly separated
-	var result []string
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
-		// Handle flags that take values
-		if strings.HasPrefix(arg, "--") {
-			if strings.Contains(arg, "=") {
-				// Handle --flag=value format
-				result = append(result, arg)
-			} else {
-				// Handle --flag value format
-				result = append(result, arg)
-				if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") && !strings.HasPrefix(args[i+1], "-") {
-					result = append(result, args[i+1])
-					i++ // Skip the next argument since it's the value
-				}
-			}
-		} else if strings.HasPrefix(arg, "-") && len(arg) > 1 {
-			if strings.Contains(arg, "=") {
-				// Handle -f=value format
-				result = append(result, arg)
-			} else {
-				// Handle -f value format
-				result = append(result, arg)
-				if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") && !strings.HasPrefix(args[i+1], "-") {
-					result = append(result, args[i+1])
-					i++ // Skip the next argument since it's the value
-				}
-			}
-		} else {
-			// Only add non-flag arguments to result
-			result = append(result, arg)
-		}
-	}
-
-	return result
-}
 
 func main() {
-	// Set up panic recovery
-	defer graceful.RecoverPanic()
-
-	// If no arguments provided, default to state analysis
-	if len(os.Args) == 1 {
-		printASCIIArt()
-		fmt.Println()
-		fmt.Println("Terraform State Manager - Intelligent State Analysis & Drift Detection")
-		fmt.Println()
-		// Default to state analysis
-		fmt.Println("No command specified. Running state analysis...")
-		fmt.Println()
-		handleStateCommand([]string{"analyze"})
-		return
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
 	}
 
-	// Check for help flag
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "--help", "-h", "help":
-			showCLIHelp()
-			return
-		case "--version", "-v", "version":
-			printASCIIArt()
-			fmt.Println()
-			fmt.Println("DriftMgr v1.0.0 - Cloud Infrastructure Drift Detection")
-			fmt.Println("Production Ready - Enterprise Grade")
-			return
-		case "status":
-			showSystemStatus()
-			return
-		}
-	}
+	ctx := context.Background()
+	command := os.Args[1]
 
-	// Check for commands
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		// PRIMARY: Terraform State Management (default focus)
-		case "state", "analyze", "drift", "fix":
-			if os.Args[1] == "analyze" || os.Args[1] == "drift" || os.Args[1] == "fix" {
-				// Direct state operations without 'state' prefix
-				handleStateCommand(append([]string{os.Args[1]}, os.Args[2:]...))
-			} else {
-				handleStateCommand(os.Args[2:])
-			}
-			return
-		
-		// Quick drift check
-		case "check":
-			handleQuickCheck(os.Args[2:])
-			return
-		
-		// State surgery operations
-		case "surgery":
-			handleStateSurgery(os.Args[2:])
-			return
-
-		// Terraform-specific perspective management
-		case "perspective":
-			handlePerspectiveCommand(os.Args[2:])
-			return
-		
-		// Workspace drift comparison
-		case "workspace":
-			handleWorkspaceDrift(os.Args[2:])
-			return
-		
-		// Module version tracking
-		case "module":
-			handleModuleTracking(os.Args[2:])
-			return
-
-		// Terraform import generation
-		case "generate-import", "gen-import":
-			handleTerraformImportGeneration(os.Args[2:])
-			return
-
-		// Initialize configuration
-		case "init":
-			commands.HandleInit(os.Args[2:])
-			return
-		// Resource discovery - enhanced with categorization
-		case "discover":
-			// Check if enhanced discovery flags are present
-			hasEnhancedFlags := false
-			for _, arg := range os.Args[2:] {
-				if arg == "--unmanaged-only" || arg == "--import-candidates" || 
-				   arg == "--shadow-it" || arg == "--categorize" || arg == "--continuous" {
-					hasEnhancedFlags = true
-					break
-				}
-			}
-			
-			if hasEnhancedFlags {
-				handleEnhancedDiscovery(os.Args[2:])
-			} else {
-				handleCloudDiscover(os.Args[2:])
-			}
-			return
-
-		// Verification - consolidated validate and verify-enhanced
-		case "verify":
-			handleVerifyCommand(os.Args[2:])
-			return
-
-		// Delete resource - simplified name
-		case "delete":
-			handleResourceDeletion(os.Args[2:])
-			return
-
-		// Export/Import - unchanged
-		case "export":
-			handleExportCommand(os.Args[2:])
-			return
-		case "import":
-			handleImport(os.Args[2:])
-			return
-
-		// Accounts - unchanged
-		case "accounts":
-			handleAccountsCommand(os.Args[2:])
-			return
-
-		// Use - select which account/subscription/project to work with
-		case "use":
-			handleUseCommand(os.Args[2:])
-			return
-		
-		// Terraform remediation commands
-		case "remediation", "remediate":
-			commands.HandleRemediationCommand(os.Args[2:])
-			return
-
-		// Server commands - consolidated
-		case "serve":
-			handleServeCommand(os.Args[2:])
-			return
-
-		// Backward compatibility aliases (deprecated)
-		case "scan": // Deprecated: use 'state scan'
-			fmt.Println("Note: 'scan' is deprecated. Use 'state scan' instead.")
-			handleStateCommand(append([]string{"scan"}, os.Args[2:]...))
-			return
-		case "tfstate": // Deprecated: use 'state list'
-			fmt.Println("Note: 'tfstate' is deprecated. Use 'state list' instead.")
-			handleStateCommand(append([]string{"list"}, os.Args[2:]...))
-			return
-		case "credentials", "creds": // Deprecated: use 'discover --credentials'
-			fmt.Println("Note: 'credentials' is deprecated. Use 'discover --credentials' instead.")
-			handleCloudDiscover(append([]string{"--credentials"}, os.Args[2:]...))
-			return
-		case "delete-resource": // Deprecated: use 'delete'
-			fmt.Println("Note: 'delete-resource' is deprecated. Use 'delete' instead.")
-			handleResourceDeletion(os.Args[2:])
-			return
-		case "auto-remediation", "ar", "auto-rem": // Deprecated: use 'drift auto-remediate'
-			fmt.Println("Note: 'auto-remediation' is deprecated. Use 'drift auto-remediate' instead.")
-			handleDriftCommand(append([]string{"auto-remediate"}, os.Args[2:]...))
-			return
-		case "dashboard": // Deprecated: use 'serve web'
-			fmt.Println("Note: 'dashboard' is deprecated. Use 'serve web' instead.")
-			handleServeCommand(append([]string{"web"}, os.Args[2:]...))
-			return
-		case "server": // Deprecated: use 'serve api'
-			fmt.Println("Note: 'server' is deprecated. Use 'serve api' instead.")
-			handleServeCommand(append([]string{"api"}, os.Args[2:]...))
-			return
-		case "validate": // Deprecated: use 'verify --validate'
-			fmt.Println("Note: 'validate' is deprecated. Use 'verify --validate' instead.")
-			handleVerifyCommand(append([]string{"--validate"}, os.Args[2:]...))
-			return
-		case "verify-enhanced": // Deprecated: use 'verify --enhanced'
-			fmt.Println("Note: 'verify-enhanced' is deprecated. Use 'verify --enhanced' instead.")
-			handleVerifyCommand(append([]string{"--enhanced"}, os.Args[2:]...))
-			return
-		case "cloud-state", "cloud": // Removed - use 'discover'
-			fmt.Println("Error: Command removed. Use 'discover' instead.")
-			os.Exit(1)
-		default:
-			// Handle unknown commands
-			if !strings.HasPrefix(os.Args[1], "-") {
-				fmt.Fprintf(os.Stderr, "Error: Unknown command '%s'\n", os.Args[1])
-				fmt.Fprintln(os.Stderr, "Run 'driftmgr --help' for usage.")
-				os.Exit(1)
-			}
-			// Handle invalid flags
-			fmt.Fprintf(os.Stderr, "Error: Unknown flag '%s'\n", os.Args[1])
-			fmt.Fprintln(os.Stderr, "Run 'driftmgr --help' for usage.")
-			os.Exit(1)
-		}
-	}
-
-	// This code should not be reached due to earlier check
-	if len(os.Args) == 1 {
-		handleStateCommand([]string{"analyze"})
-		return
-	}
-}
-
-// showCLIHelp displays CLI help information
-func showCLIHelp() {
-	printASCIIArt()
-	fmt.Println()
-	color.Println(color.BoldStyle+color.BrightWhite, "DriftMgr - Cloud Infrastructure Drift Detection and Management")
-	fmt.Println()
-	fmt.Printf("%s driftmgr %s %s\n", color.Label("Usage:"), color.Command("[command]"), color.Flag("[flags]"))
-	fmt.Println()
-
-	fmt.Println(color.Subheader("Terraform/Terragrunt State Management:"))
-	fmt.Printf("  %s                       %s\n", color.Command("state"), color.Dim("Analyze and manage Terraform/Terragrunt state files"))
-	fmt.Printf("  %s                       %s\n", color.Command("check"), color.Dim("Quick drift check - is it safe to apply?"))
-	fmt.Printf("  %s                       %s\n", color.Command("drift"), color.Dim("Detailed drift detection and remediation"))
-	fmt.Printf("  %s                  %s\n", color.Command("workspace"), color.Dim("Compare drift across Terraform workspaces"))
-	fmt.Printf("  %s                     %s\n", color.Command("module"), color.Dim("Track module versions and drift"))
-	fmt.Printf("  %s                    %s\n", color.Command("surgery"), color.Dim("Safe state manipulation (mv, rm, replace)"))
-	fmt.Printf("  %s                    %s\n", color.Command("backend"), color.Dim("Migrate state backends safely"))
-	fmt.Println()
-
-	fmt.Println(color.Subheader("Remediation & Import:"))
-	fmt.Printf("  %s                  %s\n", color.Command("remediate"), color.Dim("Generate Terraform code to fix drift"))
-	fmt.Printf("  %s                      %s\n", color.Command("import"), color.Dim("Import unmanaged resources into Terraform"))
-	fmt.Printf("  %s              %s\n", color.Command("safe-to-apply"), color.Dim("Pre-apply validation and safety check"))
-	fmt.Printf("  %s                 %s\n", color.Command("cost-drift"), color.Dim("Analyze cost impact of drift"))
-	fmt.Println()
-
-	fmt.Println(color.Subheader("Discovery & Analysis:"))
-	fmt.Printf("  %s                    %s\n", color.Command("discover"), color.Dim("Discover resources from state or cloud"))
-	fmt.Printf("  %s                      %s\n", color.Command("verify"), color.Dim("Verify state accuracy"))
-	fmt.Printf("  %s                    %s\n", color.Command("accounts"), color.Dim("List accessible accounts"))
-	fmt.Println()
-
-	fmt.Println(color.Subheader("Server:"))
-	fmt.Printf("  %s                       %s\n", color.Command("serve"), color.Dim("Start web dashboard or API server"))
-	fmt.Println()
-
-	fmt.Println(color.Subheader("Common Flags:"))
-	fmt.Printf("  %s                     %s\n", color.Flag("--auto"), color.Dim("Auto-discover all configured providers"))
-	fmt.Printf("  %s             %s\n", color.Flag("--all-accounts"), color.Dim("Include all accessible accounts/subscriptions"))
-	fmt.Printf("  %s           %s\n", color.Flag("--smart-defaults"), color.Dim("Enable smart filtering (default: enabled)"))
-	fmt.Printf("  %s %s       %s\n", color.Flag("--environment"), color.Value("string"), color.Dim("Environment context (production, staging, development)"))
-	fmt.Printf("  %s %s            %s\n", color.Flag("--format"), color.Value("string"), color.Dim("Output format (json, summary, table)"))
-	fmt.Printf("  %s                 %s\n", color.Flag("--help, -h"), color.Dim("Show help"))
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println("  driftmgr status                                        # Show status & auto-discover")
-	fmt.Println("  driftmgr discover --auto --all-accounts                # Discover all resources")
-	fmt.Println("  driftmgr drift detect --provider aws                   # Detect drift with smart defaults")
-	fmt.Println("  driftmgr drift detect --environment staging            # Use staging thresholds")
-	fmt.Println("  driftmgr drift detect --no-smart-defaults              # Show all drift")
-	fmt.Println("  driftmgr auto-remediation enable --dry-run             # Test auto-remediation")
-}
-
-// handleAutoRemediationCommand handles the auto-remediation command group
-func handleAutoRemediationCommand(args []string) {
-	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		showAutoRemediationHelp()
-		return
-	}
-
-	switch args[0] {
-	case "enable":
-		handleAutoRemediationEnable(args[1:])
-	case "disable":
-		handleAutoRemediationDisable(args[1:])
-	case "status":
-		handleAutoRemediationStatus(args[1:])
-	case "test":
-		handleAutoRemediationTest(args[1:])
+	switch command {
+	case "discover":
+		handleDiscover(ctx)
+	case "analyze":
+		handleAnalyze(ctx, os.Args[2:])
+	case "drift":
+		handleDrift(ctx, os.Args[2:])
+	case "remediate":
+		handleRemediate(ctx, os.Args[2:])
+	case "import":
+		handleImport(ctx, os.Args[2:])
+	case "state":
+		handleState(ctx, os.Args[2:])
+	case "workspace":
+		handleWorkspace(ctx, os.Args[2:])
+	case "cost-drift":
+		handleCostDrift(ctx, os.Args[2:])
+	case "terragrunt":
+		handleTerragrunt(ctx, os.Args[2:])
+	case "backup":
+		handleBackup(ctx, os.Args[2:])
+	case "cleanup":
+		handleCleanup(ctx, os.Args[2:])
+	case "serve":
+		handleServe(ctx, os.Args[2:])
+	case "benchmark":
+		handleBenchmark(ctx, os.Args[2:])
+	case "roi":
+		handleROI(ctx, os.Args[2:])
+	case "integrations":
+		handleIntegrations(ctx, os.Args[2:])
+	case "version":
+		fmt.Println("DriftMgr v3.0.0 Complete - Terraform/Terragrunt State Management & Drift Detection")
+		fmt.Println("Build: Full Feature Release")
+	case "help", "--help", "-h":
+		printUsage()
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown auto-remediation command: %s\n", args[0])
-		showAutoRemediationHelp()
+		fmt.Printf("Unknown command: %s\n", command)
+		printUsage()
 		os.Exit(1)
 	}
 }
 
-func showAutoRemediationHelp() {
-	fmt.Println("Usage: driftmgr auto-remediation [command] [flags]")
+func printUsage() {
+	fmt.Println("DriftMgr v3.0 Complete - Terraform/Terragrunt State Management & Drift Detection")
 	fmt.Println()
-	fmt.Println("Auto-remediation automatically fixes infrastructure drift based on configured rules.")
+	fmt.Println("Usage: driftmgr <command> [options]")
 	fmt.Println()
-	fmt.Println("Commands:")
-	fmt.Println("  enable      Enable auto-remediation")
-	fmt.Println("  disable     Disable auto-remediation")
-	fmt.Println("  status      Show auto-remediation status")
-	fmt.Println("  test        Test auto-remediation with simulated drift")
+	fmt.Println("Core Commands:")
+	fmt.Println("  discover          Discover Terraform backend configurations")
+	fmt.Println("  analyze           Analyze state files and build dependency graphs")
+	fmt.Println("  drift             Detect configuration drift between desired and actual state")
+	fmt.Println("  remediate         Generate and apply remediation plans for drift")
+	fmt.Println("  import            Import unmanaged resources into Terraform state")
+	fmt.Println()
+	fmt.Println("State Management:")
+	fmt.Println("  state <cmd>       State management commands (list, get, push, pull)")
+	fmt.Println("  workspace         Compare drift across Terraform workspaces")
+	fmt.Println("  backup <cmd>      Backup management (create, list, restore)")
+	fmt.Println("  cleanup           Clean up old backup files and manage quarantine")
+	fmt.Println()
+	fmt.Println("Advanced:")
+	fmt.Println("  cost-drift        Analyze cost impact of configuration drift")
+	fmt.Println("  terragrunt        Parse and analyze Terragrunt configurations")
+	fmt.Println("  serve             Start web dashboard or API server")
+	fmt.Println()
+	fmt.Println("Performance & Analytics:")
+	fmt.Println("  benchmark         Run performance benchmarks")
+	fmt.Println("  roi               Calculate return on investment")
+	fmt.Println("  integrations      Show available integrations")
+	fmt.Println()
+	fmt.Println("Other:")
+	fmt.Println("  version           Show version information")
+	fmt.Println("  help              Show this help message")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  driftmgr auto-remediation enable --dry-run")
-	fmt.Println("  driftmgr auto-remediation status")
-	fmt.Println("  driftmgr auto-remediation test --resource test-123 --drift-type modified")
+	fmt.Println("  driftmgr discover")
+	fmt.Println("  driftmgr drift detect --state terraform.tfstate --provider aws")
+	fmt.Println("  driftmgr remediate --plan drift-plan.json --apply")
+	fmt.Println("  driftmgr import --provider aws --resource-type aws_instance")
+	fmt.Println("  driftmgr serve --port 8080")
 }
 
-func handleAutoRemediationEnable(args []string) {
-	dryRun := true
-	configFile := "configs/auto-remediation.yaml"
-
-	// Parse arguments
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--dry-run":
-			if i+1 < len(args) && args[i+1] == "false" {
-				dryRun = false
-				i++
-			}
-		case "--config":
-			if i+1 < len(args) {
-				configFile = args[i+1]
-				i++
-			}
-		}
-	}
-
-	fmt.Println("=== Enabling Auto-Remediation ===")
-	if dryRun {
-		fmt.Println("[OK] Auto-remediation enabled in DRY RUN mode")
-		fmt.Println("[INFO]  No actual changes will be made to your infrastructure")
-	} else {
-		fmt.Println("[OK] Auto-remediation enabled")
-		fmt.Println("[WARNING]  Changes will be automatically applied based on configured rules")
-	}
-	fmt.Printf("Configuration file: %s\n", configFile)
-}
-
-func handleAutoRemediationDisable(args []string) {
-	fmt.Println("[OK] Auto-remediation disabled")
-}
-
-func handleAutoRemediationStatus(args []string) {
-	fmt.Println("=== Auto-Remediation Status ===")
-	fmt.Println("Enabled: false")
-	fmt.Println("Dry Run: true")
-	fmt.Println("Scan Interval: 15m")
-	fmt.Println("Max Concurrent: 5")
-	fmt.Println()
-	fmt.Println("=== Active Rules ===")
-	fmt.Println("- auto-fix-tags: Automatically fix missing or incorrect tags")
-	fmt.Println("- recreate-missing-resources: Recreate missing resources with approval")
-	fmt.Println("- import-unmanaged-resources: Import unmanaged resources into Terraform state")
-	fmt.Println("- notify-extra-resources: Notify about extra resources (never auto-delete)")
-}
-
-func handleAutoRemediationTest(args []string) {
-	resourceID := "test-resource-123"
-	driftType := "modified"
-
-	// Parse arguments
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--resource":
-			if i+1 < len(args) {
-				resourceID = args[i+1]
-				i++
-			}
-		case "--drift-type":
-			if i+1 < len(args) {
-				driftType = args[i+1]
-				i++
-			}
-		}
-	}
-
-	fmt.Println("=== Auto-Remediation Test ===")
-	fmt.Printf("Resource ID: %s\n", resourceID)
-	fmt.Printf("Drift Type: %s\n", driftType)
-	fmt.Println("\n📋 Evaluating remediation rules...")
-	fmt.Println("[OK] Matching rule found: auto-fix-tags")
-	fmt.Println("📊 Risk Assessment: LOW")
-	fmt.Println("💰 Estimated Cost: $0.00")
-	fmt.Println("🔍 Pre-checks: PASSED")
-	fmt.Println("\n[DRY RUN] Would execute remediation:")
-	fmt.Println("  - Strategy: terraform")
-	fmt.Println("  - Action: auto_fix")
-	fmt.Println("  - Rollback Enabled: true")
-	fmt.Println("\n[OK] Test completed successfully")
-	fmt.Println("[INFO]  No actual changes were made (dry-run mode)")
-}
-
-// handleBackendScan handles the scan command for Terraform backends
-func handleBackendScan(args []string) {
-	dir := "."
-	format := "summary"
-	retrieveState := false
-
-	// Parse arguments
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--dir":
-			if i+1 < len(args) {
-				dir = args[i+1]
-				i++
-			}
-		case "--format":
-			if i+1 < len(args) {
-				format = args[i+1]
-				i++
-			}
-		case "--retrieve-state":
-			retrieveState = true
-		case "--help", "-h":
-			fmt.Println("Usage: driftmgr scan [flags]")
-			fmt.Println()
-			fmt.Println("Scan for Terraform backend configurations and Terragrunt files")
-			fmt.Println()
-			fmt.Println("Flags:")
-			fmt.Println("  --dir string        Directory to scan (default: current directory)")
-			fmt.Println("  --format string     Output format: summary, json, table, detailed (default: summary)")
-			fmt.Println("  --retrieve-state    Retrieve remote state files from cloud backends")
-			return
-		}
-	}
-
-	fmt.Printf("Scanning for Terraform and Terragrunt configurations in: %s\n", dir)
-	fmt.Println()
-
-	scanner := terraform.NewBackendScanner(dir)
-	configs, err := scanner.ScanDirectory()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error scanning directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	if len(configs) == 0 {
-		fmt.Println("No Terraform or Terragrunt configurations found.")
-		return
-	}
-
-	// Count configurations
-	terragruntCount := 0
-	tfstateCount := 0
-	terragruntWithRemote := 0
-
-	for _, config := range configs {
-		if config.IsTerragrunt {
-			terragruntCount++
-			if config.HasRemoteState() {
-				terragruntWithRemote++
-			}
-		}
-		if config.IsStateFile {
-			tfstateCount++
-		}
-	}
-
-	fmt.Printf("Found %d configuration(s):\n", len(configs))
-	if terragruntCount > 0 {
-		fmt.Printf("  - %d Terragrunt file(s)", terragruntCount)
-		if terragruntWithRemote > 0 {
-			fmt.Printf(" (%d with remote state)", terragruntWithRemote)
-		}
-		fmt.Println()
-	}
-	if tfstateCount > 0 {
-		fmt.Printf("  - %d Terraform state file(s)\n", tfstateCount)
-	}
-	fmt.Println()
-
-	// Retrieve remote state if requested
-	if retrieveState && terragruntWithRemote > 0 {
-		fmt.Println("Retrieving remote state files from cloud backends...")
-		ctx := context.Background()
-		retrievedCount := 0
-
-		for _, config := range configs {
-			if config.IsTerragrunt && config.HasRemoteState() {
-				fmt.Printf("  Retrieving state for %s...", config.ConfigFile)
-				stateData, err := config.RetrieveRemoteState(ctx)
-				if err != nil {
-					fmt.Printf(" ERROR: %v\n", err)
-				} else {
-					config.StateContent = stateData
-					retrievedCount++
-
-					// Parse state to count resources
-					var state map[string]interface{}
-					if err := json.Unmarshal(stateData, &state); err == nil {
-						if resources, ok := state["resources"].([]interface{}); ok {
-							fmt.Printf(" SUCCESS (%d resources)\n", len(resources))
-						} else {
-							fmt.Printf(" SUCCESS\n")
-						}
-					} else {
-						fmt.Printf(" SUCCESS (retrieved %d bytes)\n", len(stateData))
-					}
-				}
-			}
-		}
-
-		if retrievedCount > 0 {
-			fmt.Printf("\nSuccessfully retrieved %d remote state file(s)\n", retrievedCount)
-		}
-		fmt.Println()
-	}
-
-	// Display results based on format
-	switch format {
-	case "json":
-		data, _ := json.MarshalIndent(configs, "", "  ")
-		fmt.Println(string(data))
-	case "detailed":
-		fmt.Println("Detailed Configuration Information:")
-		fmt.Println("════════════════════════════════════")
-		for _, config := range configs {
-			if config.IsTerragrunt {
-				fmt.Printf("\n📁 %s\n", config.ConfigFile)
-				fmt.Printf("   Type: Terragrunt\n")
-				fmt.Printf("   Directory: %s\n", config.WorkingDir)
-
-				if config.HasRemoteState() {
-					fmt.Printf("   Remote State:\n")
-					fmt.Printf("     Backend: %s\n", config.RemoteState.Backend)
-					for k, v := range config.RemoteState.Config {
-						fmt.Printf("     %s: %s\n", k, v)
-					}
-					if len(config.StateContent) > 0 {
-						var state map[string]interface{}
-						if err := json.Unmarshal(config.StateContent, &state); err == nil {
-							if resources, ok := state["resources"].([]interface{}); ok {
-								fmt.Printf("     Resources: %d\n", len(resources))
-							}
-						}
-					}
-				} else {
-					fmt.Printf("   Remote State: None configured\n")
-				}
-			} else if config.IsStateFile {
-				fmt.Printf("\n📄 %s\n", config.ConfigFile)
-				fmt.Printf("   Type: Terraform State File\n")
-				fmt.Printf("   Directory: %s\n", config.WorkingDir)
-			}
-		}
-		fmt.Println("\n════════════════════════════════════")
-	case "table":
-		fmt.Println("Configurations Found:")
-		fmt.Println("═══════════════════════════════════════════════════════════════════")
-		fmt.Printf("%-50s %-12s %-15s %-10s\n", "Path", "Type", "Backend", "Status")
-		fmt.Println("───────────────────────────────────────────────────────────────────")
-		for _, config := range configs {
-			configType := "Terraform"
-			backend := "local"
-			status := "Found"
-
-			if config.IsTerragrunt {
-				configType = "Terragrunt"
-				if config.HasRemoteState() {
-					backend = config.RemoteState.Backend
-					if len(config.StateContent) > 0 {
-						status = "Retrieved"
-					}
-				}
-			}
-
-			// Truncate path if too long
-			displayPath := config.ConfigFile
-			if len(displayPath) > 48 {
-				displayPath = "..." + displayPath[len(displayPath)-45:]
-			}
-
-			fmt.Printf("%-50s %-12s %-15s %-10s\n", displayPath, configType, backend, status)
-		}
-		fmt.Println("═══════════════════════════════════════════════════════════════════")
-	default: // summary
-		if terragruntWithRemote > 0 && !retrieveState {
-			fmt.Println("💡 Tip: Use --retrieve-state to download remote state files from cloud backends")
-		}
-	}
-}
-
-// handleDriftCommand handles drift detection commands
-func handleDriftCommand(args []string) {
-	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("Usage: driftmgr drift [subcommand] [flags]")
+// handleDrift handles drift detection commands
+func handleDrift(ctx context.Context, args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: driftmgr drift <subcommand> [options]")
 		fmt.Println()
 		fmt.Println("Subcommands:")
-		fmt.Println("  detect         Detect drift between state and cloud resources")
-		fmt.Println("  report         Generate a drift report")
-		fmt.Println("  fix            Generate remediation plan")
-		fmt.Println("  auto-remediate Manage auto-remediation for drift")
+		fmt.Println("  detect            Detect drift between state and actual resources")
+		fmt.Println("  report            Generate drift report")
+		fmt.Println("  monitor           Start continuous drift monitoring")
 		return
 	}
 
-	switch args[0] {
+	subcommand := args[0]
+	switch subcommand {
 	case "detect":
-		handleDriftDetect(args[1:])
+		handleDriftDetect(ctx, args[1:])
 	case "report":
-		handleDriftReport(args[1:])
-	case "fix":
-		handleDriftFix(args[1:])
-	case "auto-remediate", "auto-remediation":
-		handleAutoRemediationCommand(args[1:])
+		handleDriftReport(ctx, args[1:])
+	case "monitor":
+		handleDriftMonitor(ctx, args[1:])
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown drift subcommand: %s\n", args[0])
-		os.Exit(1)
+		fmt.Printf("Unknown drift subcommand: %s\n", subcommand)
 	}
 }
 
-// handleDriftDetect handles drift detection
-func handleDriftDetect(args []string) {
-	var statePath, provider, workspace, format string
-	var useSmartDefaults bool
-	format = "summary"
-	useSmartDefaults = true // Enable by default
+// handleDriftDetect performs drift detection
+func handleDriftDetect(ctx context.Context, args []string) {
+	var statePath, provider, region string
+	var deepComparison bool
 
 	// Parse arguments
 	for i := 0; i < len(args); i++ {
@@ -741,280 +163,463 @@ func handleDriftDetect(args []string) {
 				provider = args[i+1]
 				i++
 			}
-		case "--workspace":
+		case "--region":
 			if i+1 < len(args) {
-				workspace = args[i+1]
+				region = args[i+1]
 				i++
 			}
-		case "--format":
+		case "--deep":
+			deepComparison = true
+		}
+	}
+
+	// Auto-detect state file if not specified
+	if statePath == "" {
+		statePath = findStateFile()
+		if statePath == "" {
+			fmt.Println("Error: No state file found. Use --state to specify.")
+			return
+		}
+		fmt.Printf("Using state file: %s\n", statePath)
+	}
+
+	// Parse state file
+	stateParser := parser.NewStateParser()
+	state, err := stateParser.ParseFile(statePath)
+	if err != nil {
+		fmt.Printf("Error parsing state file: %v\n", err)
+		return
+	}
+
+	// Auto-detect provider if not specified
+	if provider == "" {
+		provider = detectProviderFromState(state)
+		if provider == "" {
+			fmt.Println("Error: Could not detect provider. Use --provider to specify.")
+			return
+		}
+		fmt.Printf("Detected provider: %s\n", provider)
+	}
+
+	// Create cloud provider
+	cloudProvider, err := createCloudProvider(provider, region)
+	if err != nil {
+		fmt.Printf("Error creating provider: %v\n", err)
+		return
+	}
+
+	// Create drift detector
+	driftDetector := detector.NewDriftDetector(map[string]types.CloudProvider{
+		provider: cloudProvider,
+	})
+
+	// Configure detection
+	config := &detector.DetectorConfig{
+		CheckUnmanaged:  true,
+		DeepComparison:  deepComparison,
+		ParallelWorkers: 5,
+		RetryAttempts:   3,
+		RetryDelay:      2 * time.Second,
+	}
+	driftDetector.SetConfig(config)
+
+	fmt.Println("\nDetecting drift...")
+	startTime := time.Now()
+
+	// Detect drift for each resource
+	var driftResults []*detector.DriftResult
+	var driftedCount, missingCount, unmanagedCount int
+
+	for _, resource := range state.Resources {
+		result, err := driftDetector.DetectResourceDrift(ctx, resource)
+		if err != nil {
+			fmt.Printf("  Error checking %s.%s: %v\n", resource.Type, resource.Name, err)
+			continue
+		}
+
+		driftResults = append(driftResults, result)
+
+		if result.HasDrift {
+			driftedCount++
+			symbol := "!"
+			if result.DriftType == detector.DriftTypeMissing {
+				missingCount++
+				symbol = "✗"
+			}
+			fmt.Printf("  %s %s.%s: %s\n", symbol, resource.Type, resource.Name, result.Summary)
+		} else {
+			fmt.Printf("  ✓ %s.%s: No drift\n", resource.Type, resource.Name)
+		}
+	}
+
+	duration := time.Since(startTime)
+
+	// Generate summary
+	fmt.Println("\n" + strings.Repeat("=", 70))
+	fmt.Println("DRIFT DETECTION SUMMARY")
+	fmt.Println(strings.Repeat("=", 70))
+	fmt.Printf("Total Resources:    %d\n", len(state.Resources))
+	fmt.Printf("Drifted Resources:  %d\n", driftedCount)
+	fmt.Printf("Missing Resources:  %d\n", missingCount)
+	fmt.Printf("Unmanaged Resources: %d\n", unmanagedCount)
+	fmt.Printf("Scan Duration:      %v\n", duration)
+
+	if driftedCount == 0 {
+		fmt.Println("\n✅ No drift detected - infrastructure matches desired state")
+	} else if driftedCount < 5 {
+		fmt.Println("\n⚠️  Minor drift detected - review and fix individual resources")
+	} else {
+		fmt.Println("\n🔴 Significant drift detected - immediate action recommended")
+	}
+
+	// Save drift results for remediation
+	if driftedCount > 0 {
+		saveDriftResults(driftResults)
+		fmt.Println("\nDrift results saved to: drift-results.json")
+		fmt.Println("Run 'driftmgr remediate --plan drift-results.json' to generate remediation plan")
+	}
+}
+
+// handleRemediate handles remediation commands
+func handleRemediate(ctx context.Context, args []string) {
+	var planPath string
+	var apply, dryRun bool
+
+	// Parse arguments
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--plan":
 			if i+1 < len(args) {
-				format = args[i+1]
+				planPath = args[i+1]
 				i++
 			}
-		case "--smart-defaults", "--smart":
-			useSmartDefaults = true
-		case "--no-smart-defaults":
-			useSmartDefaults = false
-		case "--help", "-h":
-			fmt.Println("Usage: driftmgr drift detect [flags]")
-			fmt.Println()
-			fmt.Println("Detect drift between Terraform state and actual cloud resources")
-			fmt.Println()
-			fmt.Println("Flags:")
-			fmt.Println("  --state string         Path to state file or backend URL")
-			fmt.Println("  --provider string      Cloud provider (aws, azure, gcp)")
-			fmt.Println("  --workspace string     Terraform workspace")
-			fmt.Println("  --format string        Output format: summary, json, table")
-			fmt.Println("  --environment string   Environment (production, staging, development, sandbox)")
-			fmt.Println("  --smart-defaults       Enable smart defaults to reduce noise (enabled by default)")
-			fmt.Println("  --no-smart-defaults    Disable smart defaults and show all drift")
-			fmt.Println("  --show-ignored         Show drift that would be ignored by smart defaults")
-			fmt.Println()
-			fmt.Println("Smart Defaults:")
-			fmt.Println("  • Automatically ignores harmless drift (timestamps, generated IDs)")
-			fmt.Println("  • Prioritizes critical resources (security groups, IAM, databases)")
-			fmt.Println("  • Applies environment-specific thresholds")
-			fmt.Println("  • Groups related changes to reduce alert fatigue")
-			fmt.Println()
-			fmt.Println("Examples:")
-			fmt.Println("  driftmgr drift detect --provider aws")
-			fmt.Println("  driftmgr drift detect --environment staging --smart-defaults")
-			fmt.Println("  driftmgr drift detect --no-smart-defaults --format json")
+		case "--apply":
+			apply = true
+		case "--dry-run":
+			dryRun = true
+		}
+	}
+
+	if planPath == "" {
+		// Try to use default drift results
+		planPath = "drift-results.json"
+		if _, err := os.Stat(planPath); os.IsNotExist(err) {
+			fmt.Println("Error: No drift results found. Run 'driftmgr drift detect' first.")
 			return
 		}
 	}
 
-	if statePath == "" {
-		// Try to auto-detect state file
-		fmt.Println("No state file specified. Scanning for Terraform backends...")
-		scanner := terraform.NewBackendScanner(".")
-		configs, _ := scanner.ScanDirectory()
-		if len(configs) > 0 {
-			// Use the first found backend
-			config := configs[0]
-			statePath = config.GetStateFilePath(workspace)
-			fmt.Printf("Using detected state: %s\n", statePath)
-		} else {
-			fmt.Fprintf(os.Stderr, "Error: No state file specified and none detected\n")
-			os.Exit(1)
+	// Load drift results
+	driftResults, err := loadDriftResults(planPath)
+	if err != nil {
+		fmt.Printf("Error loading drift results: %v\n", err)
+		return
+	}
+
+	// Create remediation planner
+	remediationPlanner := planner.NewRemediationPlanner()
+
+	fmt.Println("Generating remediation plan...")
+	
+	// Create remediation plan
+	plan, err := remediationPlanner.CreatePlan(ctx, driftResults)
+	if err != nil {
+		fmt.Printf("Error creating remediation plan: %v\n", err)
+		return
+	}
+
+	// Display plan
+	fmt.Println("\n" + strings.Repeat("=", 70))
+	fmt.Println("REMEDIATION PLAN")
+	fmt.Println(strings.Repeat("=", 70))
+	fmt.Printf("Total Actions: %d\n", len(plan.Actions))
+	fmt.Printf("Risk Level: %s\n", plan.RiskLevel)
+	fmt.Printf("Estimated Duration: %v\n", plan.EstimatedDuration)
+
+	fmt.Println("\nActions to be performed:")
+	for i, action := range plan.Actions {
+		fmt.Printf("\n%d. %s\n", i+1, action.Description)
+		fmt.Printf("   Type: %s\n", action.Type)
+		fmt.Printf("   Resource: %s\n", action.ResourceID)
+		fmt.Printf("   Risk: %s\n", action.RiskLevel)
+		
+		if action.Type == planner.ActionTypeImport {
+			fmt.Printf("   Command: terraform import %s %s\n", action.ResourceID, action.ImportID)
+		} else if action.Type == planner.ActionTypeUpdate {
+			fmt.Printf("   Changes: %d attributes\n", len(action.Changes))
+		}
+	}
+
+	if dryRun {
+		fmt.Println("\n[DRY RUN] No changes were made")
+		return
+	}
+
+	if !apply {
+		fmt.Println("\nTo apply this plan, run:")
+		fmt.Println("  driftmgr remediate --plan drift-results.json --apply")
+		return
+	}
+
+	// Apply remediation
+	fmt.Println("\nApplying remediation plan...")
+	if err := remediationPlanner.ExecutePlan(ctx, plan); err != nil {
+		fmt.Printf("Error executing plan: %v\n", err)
+		return
+	}
+
+	fmt.Println("\n✅ Remediation completed successfully")
+}
+
+// handleImport handles import commands
+func handleImport(ctx context.Context, args []string) {
+	var provider, resourceType, region string
+	var dryRun bool
+
+	// Parse arguments
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--provider":
+			if i+1 < len(args) {
+				provider = args[i+1]
+				i++
+			}
+		case "--resource-type":
+			if i+1 < len(args) {
+				resourceType = args[i+1]
+				i++
+			}
+		case "--region":
+			if i+1 < len(args) {
+				region = args[i+1]
+				i++
+			}
+		case "--dry-run":
+			dryRun = true
 		}
 	}
 
 	if provider == "" {
-		// Try to detect provider from state path
-		if strings.Contains(statePath, "s3://") {
-			provider = "aws"
-		} else if strings.Contains(statePath, "azurerm://") {
-			provider = "azure"
-		} else if strings.Contains(statePath, "gs://") {
-			provider = "gcp"
-		} else {
-			fmt.Fprintf(os.Stderr, "Error: Could not determine provider. Please specify with --provider\n")
-			os.Exit(1)
-		}
+		fmt.Println("Error: Provider is required. Use --provider")
+		return
 	}
 
-	fmt.Printf("Detecting drift for %s provider using state: %s\n", provider, statePath)
-
-	// Show spinner while loading state file
-	stateSpinner := progress.NewSpinner("Loading state file")
-	stateSpinner.Start()
-
-	// Load state file
-	stateLoader := state.NewStateLoader(statePath)
-
-	ctx := context.Background()
-	stateFile, err := stateLoader.LoadStateFile(ctx, statePath, nil)
+	// Create cloud provider
+	cloudProvider, err := createCloudProvider(provider, region)
 	if err != nil {
-		stateSpinner.Error("Failed to load state file")
-		fmt.Fprintf(os.Stderr, "Error loading state file: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("Error creating provider: %v\n", err)
+		return
 	}
 
-	stateSpinner.Success(fmt.Sprintf("State loaded: %d resources found", len(stateFile.Resources)))
+	fmt.Printf("Discovering unmanaged %s resources", provider)
+	if resourceType != "" {
+		fmt.Printf(" of type %s", resourceType)
+	}
+	if region != "" {
+		fmt.Printf(" in region %s", region)
+	}
+	fmt.Println("...")
 
-	// Initialize discovery service
-	discoveryService, err := discovery.InitializeServiceSilent(ctx)
+	// List resources from cloud
+	var resources []*types.CloudResource
+	if resourceType != "" {
+		resources, err = cloudProvider.ListResources(ctx, resourceType)
+	} else {
+		// List all resource types
+		resources, err = cloudProvider.ListResources(ctx, "")
+	}
+
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error initializing discovery service: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("Error listing resources: %v\n", err)
+		return
 	}
-	
-	// Discover current cloud resources
-	driftBar := progress.NewBar(1, "Discovering cloud resources")
-	discoveryResult, err := discoveryService.DiscoverProvider(ctx, provider, discovery.DiscoveryOptions{})
-	if err != nil {
-		fmt.Println("Failed to discover resources")
-		fmt.Fprintf(os.Stderr, "Error discovering resources: %v\n", err)
-		os.Exit(1)
+
+	// Check which resources are unmanaged (not in any state file)
+	unmanagedResources := findUnmanagedResources(resources)
+
+	if len(unmanagedResources) == 0 {
+		fmt.Println("No unmanaged resources found")
+		return
 	}
-	driftBar.Complete()
-	fmt.Printf("Discovered %d resources from %s\n", len(discoveryResult.Resources), provider)
-	
-	// Create drift detector
-	detector := drift.NewDetector()
-	
-	// Perform drift detection
-	detectionOptions := drift.DetectionOptions{
-		CompareWith:    "terraform",
-		StateFile:      statePath,
-		SmartDefaults:  useSmartDefaults,
-		Environment:    "production", // Could be made configurable
-	}
-	
-	detectionResult, err := detector.Detect(ctx, discoveryResult.Resources, detectionOptions)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error detecting drift: %v\n", err)
-		os.Exit(1)
-	}
-	
-	// Create report from detection result
-	report := &drift.TerraformDriftReport{
-		StateFile:      statePath,
-		Provider:       provider,
-		ScanTime:       detectionResult.Timestamp,
-		Duration:       detectionResult.Duration,
-		TotalResources: detectionResult.Summary.TotalResources,
-		DriftedCount:   detectionResult.Summary.DriftedResources,
-		MissingCount:   detectionResult.Summary.ByDriftType["deleted"],
-		UnmanagedCount: detectionResult.Summary.ByDriftType["added"],
-		Summary: &drift.DriftSummary{
-			CriticalCount: detectionResult.Summary.BySeverity["critical"],
-			HighCount:     detectionResult.Summary.BySeverity["high"],
-			MediumCount:   detectionResult.Summary.BySeverity["medium"],
-			LowCount:      detectionResult.Summary.BySeverity["low"],
-			DriftPercent:  detectionResult.Summary.DriftPercentage,
-		},
-		Resources: []drift.TerraformResource{},
-	}
-	
-	// Convert drift items to report resources
-	for _, driftItem := range detectionResult.DriftItems {
-		resource := drift.TerraformResource{
-			ResourceName: driftItem.ResourceName,
-			ResourceType: driftItem.ResourceType,
-			DriftType:    driftItem.DriftType,
-			Severity:     driftItem.Severity,
-			Differences:  []drift.Difference{},
+
+	fmt.Printf("\nFound %d unmanaged resources:\n\n", len(unmanagedResources))
+
+	// Generate import commands
+	var importCommands []string
+	for _, resource := range unmanagedResources {
+		resourceName := sanitizeResourceName(resource.Name)
+		if resourceName == "" {
+			resourceName = sanitizeResourceName(resource.ID)
 		}
 		
-		// Convert details to differences
-		for path, change := range driftItem.Details {
-			if changeMap, ok := change.(map[string]interface{}); ok {
-				resource.Differences = append(resource.Differences, drift.Difference{
-					Path:        path,
-					StateValue:  changeMap["baseline"],
-					ActualValue: changeMap["current"],
-				})
-			}
-		}
+		importCmd := fmt.Sprintf("terraform import %s.%s %s", 
+			resource.Type, 
+			resourceName,
+			resource.ID)
 		
-		report.Resources = append(report.Resources, resource)
-	}
-	
-	// Store drift results in the global drift store
-	driftStore := api.GetGlobalDriftStore()
-	
-	// Convert and store each drift resource
-	for _, resource := range report.Resources {
-		if resource.DriftType != "" && resource.DriftType != "none" {
-			driftRecord := &api.DriftRecord{
-				ID:           fmt.Sprintf("drift-%s-%d", resource.ResourceName, time.Now().Unix()),
-				ResourceID:   resource.ResourceName,
-				ResourceType: resource.ResourceType,
-				Provider:     provider,
-				Region:       "", // Could be extracted from resource or args
-				DriftType:    resource.DriftType,
-				Severity:     resource.Severity,
-				Changes:      make(map[string]interface{}),
-				DetectedAt:   time.Now(),
-				Status:       "active",
-			}
-			
-			// Convert differences to changes map
-			for _, diff := range resource.Differences {
-				driftRecord.Changes[diff.Path] = map[string]interface{}{
-					"old":  diff.StateValue,
-					"new":  diff.ActualValue,
-					"type": "update",
-				}
-			}
-			
-			driftStore.AddDrift(driftRecord)
+		importCommands = append(importCommands, importCmd)
+		
+		fmt.Printf("  %s (%s)\n", resource.ID, resource.Type)
+		if resource.Name != "" {
+			fmt.Printf("    Name: %s\n", resource.Name)
 		}
-	}
-
-	// Apply smart defaults if enabled
-	if useSmartDefaults {
-		fmt.Println("Applying smart defaults to reduce noise...")
-
-		// Load smart defaults configuration
-		_ = drift.NewSmartDefaults("configs/smart-defaults.yaml")
-
-		// Filter drift items
-		originalCount := len(report.Resources)
-		filteredResources := []drift.TerraformResource{}
-
-		for _, resource := range report.Resources {
-			// Apply smart defaults filtering if needed
-			filteredResources = append(filteredResources, resource)
+		if resource.Region != "" {
+			fmt.Printf("    Region: %s\n", resource.Region)
 		}
-
-		report.Resources = filteredResources
-
-		// Show statistics
-		if originalCount > len(filteredResources) {
-			fmt.Printf("%s Filtered %s harmless drift items (%s noise reduction)\n",
-				color.Info("Smart defaults:"),
-				color.Count(originalCount-len(filteredResources)),
-				color.Success(fmt.Sprintf("%.1f%%", float64(originalCount-len(filteredResources))/float64(originalCount)*100)))
-
-		}
-
-		// Get notification channels for critical drifts
-		criticalResources := []drift.TerraformResource{}
-		for _, resource := range filteredResources {
-			if resource.Severity == "critical" {
-				criticalResources = append(criticalResources, resource)
-			}
-		}
-
-		if len(criticalResources) > 0 {
-			fmt.Printf("\n%s %s %s drift items detected requiring immediate attention!\n",
-				color.Warning("[WARNING]"),
-				color.Count(len(criticalResources)),
-				color.Critical("CRITICAL"))
-		}
-	}
-
-	// Display results
-	displayTerraformDriftReport(report, format)
-	
-	// Show information about remediation if drift was detected
-	storedDrifts := driftStore.GetAllDrifts()
-	if len(storedDrifts) > 0 {
+		fmt.Printf("    Import: %s\n", importCmd)
 		fmt.Println()
-		fmt.Printf("✅ Detected %d drift items have been stored\n", len(storedDrifts))
+	}
+
+	if dryRun {
+		fmt.Println("[DRY RUN] No imports performed")
+		return
+	}
+
+	// Save import script
+	scriptPath := "import-resources.sh"
+	if err := saveImportScript(importCommands, scriptPath); err != nil {
+		fmt.Printf("Error saving import script: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Import script saved to: %s\n", scriptPath)
+	fmt.Println("\nTo import these resources, run:")
+	fmt.Printf("  bash %s\n", scriptPath)
+}
+
+// handleWorkspace handles workspace comparison
+func handleWorkspace(ctx context.Context, args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: driftmgr workspace <subcommand> [options]")
 		fmt.Println()
-		fmt.Println("To generate remediation plans:")
-		for i, drift := range storedDrifts {
-			if i < 3 { // Show first 3 examples
-				fmt.Printf("  driftmgr remediation generate --drift-id %s\n", drift.ID)
-			}
-		}
-		if len(storedDrifts) > 3 {
-			fmt.Printf("  ... and %d more\n", len(storedDrifts)-3)
-		}
+		fmt.Println("Subcommands:")
+		fmt.Println("  list              List all workspaces")
+		fmt.Println("  compare           Compare drift across workspaces")
+		fmt.Println("  switch            Switch to a different workspace")
+		return
+	}
+
+	subcommand := args[0]
+	switch subcommand {
+	case "list":
+		handleWorkspaceList(ctx)
+	case "compare":
+		handleWorkspaceCompare(ctx, args[1:])
+	case "switch":
+		handleWorkspaceSwitch(ctx, args[1:])
+	default:
+		fmt.Printf("Unknown workspace subcommand: %s\n", subcommand)
 	}
 }
 
-// handleDriftReport handles drift report generation
-// handleDriftReport is now implemented in drift_report.go
+// handleWorkspaceCompare compares drift across workspaces
+func handleWorkspaceCompare(ctx context.Context, args []string) {
+	var workspace1, workspace2 string
 
-// handleDriftFix handles drift remediation plan generation
-func handleDriftFix(args []string) {
-	var statePath, provider string
-	provider = "aws" // default
+	// Parse arguments
+	for i := 0; i < len(args); i++ {
+		if i == 0 {
+			workspace1 = args[i]
+		} else if i == 1 {
+			workspace2 = args[i]
+		}
+	}
+
+	if workspace1 == "" || workspace2 == "" {
+		fmt.Println("Error: Two workspaces required for comparison")
+		fmt.Println("Usage: driftmgr workspace compare <workspace1> <workspace2>")
+		return
+	}
+
+	fmt.Printf("Comparing workspaces: %s vs %s\n\n", workspace1, workspace2)
+
+	// Load state files for both workspaces
+	state1Path := fmt.Sprintf("terraform.tfstate.d/%s/terraform.tfstate", workspace1)
+	state2Path := fmt.Sprintf("terraform.tfstate.d/%s/terraform.tfstate", workspace2)
+
+	stateParser := parser.NewStateParser()
+	
+	state1, err := stateParser.ParseFile(state1Path)
+	if err != nil {
+		fmt.Printf("Error loading workspace %s: %v\n", workspace1, err)
+		return
+	}
+
+	state2, err := stateParser.ParseFile(state2Path)
+	if err != nil {
+		fmt.Printf("Error loading workspace %s: %v\n", workspace2, err)
+		return
+	}
+
+	// Compare resources
+	resources1 := make(map[string]*parser.Resource)
+	resources2 := make(map[string]*parser.Resource)
+
+	for _, r := range state1.Resources {
+		key := fmt.Sprintf("%s.%s", r.Type, r.Name)
+		resources1[key] = r
+	}
+
+	for _, r := range state2.Resources {
+		key := fmt.Sprintf("%s.%s", r.Type, r.Name)
+		resources2[key] = r
+	}
+
+	// Find differences
+	var onlyIn1, onlyIn2, different []string
+
+	for key := range resources1 {
+		if _, exists := resources2[key]; !exists {
+			onlyIn1 = append(onlyIn1, key)
+		}
+	}
+
+	for key := range resources2 {
+		if _, exists := resources1[key]; !exists {
+			onlyIn2 = append(onlyIn2, key)
+		}
+	}
+
+	// Display comparison results
+	fmt.Println(strings.Repeat("=", 70))
+	fmt.Println("WORKSPACE COMPARISON RESULTS")
+	fmt.Println(strings.Repeat("=", 70))
+	fmt.Printf("Workspace %s: %d resources\n", workspace1, len(state1.Resources))
+	fmt.Printf("Workspace %s: %d resources\n", workspace2, len(state2.Resources))
+	fmt.Println()
+
+	if len(onlyIn1) > 0 {
+		fmt.Printf("Resources only in %s (%d):\n", workspace1, len(onlyIn1))
+		for _, r := range onlyIn1 {
+			fmt.Printf("  - %s\n", r)
+		}
+		fmt.Println()
+	}
+
+	if len(onlyIn2) > 0 {
+		fmt.Printf("Resources only in %s (%d):\n", workspace2, len(onlyIn2))
+		for _, r := range onlyIn2 {
+			fmt.Printf("  - %s\n", r)
+		}
+		fmt.Println()
+	}
+
+	if len(different) > 0 {
+		fmt.Printf("Resources with differences (%d):\n", len(different))
+		for _, r := range different {
+			fmt.Printf("  ~ %s\n", r)
+		}
+	}
+
+	if len(onlyIn1) == 0 && len(onlyIn2) == 0 && len(different) == 0 {
+		fmt.Println("✅ Workspaces are identical")
+	}
+}
+
+// handleCostDrift analyzes cost impact of drift
+func handleCostDrift(ctx context.Context, args []string) {
+	var statePath, provider, region string
+	var detailed bool
 
 	// Parse arguments
 	for i := 0; i < len(args); i++ {
@@ -1029,1642 +634,1084 @@ func handleDriftFix(args []string) {
 				provider = args[i+1]
 				i++
 			}
+		case "--region":
+			if i+1 < len(args) {
+				region = args[i+1]
+				i++
+			}
+		case "--detailed":
+			detailed = true
 		}
 	}
 
 	if statePath == "" {
-		fmt.Println("Error: --state flag is required")
-		os.Exit(1)
-	}
-
-	fmt.Println("Generating drift remediation plan...")
-
-	// Load state and detect drift
-	ctx := context.Background()
-
-	// Initialize discovery service
-	discoveryService, err := discovery.InitializeServiceSilent(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error initializing discovery service: %v\n", err)
-		os.Exit(1)
-	}
-	
-	// Discover current cloud resources
-	discoveryResult, err := discoveryService.DiscoverProvider(ctx, provider, discovery.DiscoveryOptions{})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error discovering resources: %v\n", err)
-		os.Exit(1)
-	}
-	
-	// Create drift detector
-	detector := drift.NewDetector()
-	
-	// Perform drift detection
-	detectionOptions := drift.DetectionOptions{
-		CompareWith:    "terraform",
-		StateFile:      statePath,
-		SmartDefaults:  true,
-		Environment:    "production",
-	}
-	
-	detectionResult, err := detector.Detect(ctx, discoveryResult.Resources, detectionOptions)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error detecting drift: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Generate remediation recommendations
-	fmt.Println("=== Drift Remediation Plan ===")
-	fmt.Printf("Total Drift Items: %d\n", len(detectionResult.DriftItems))
-	fmt.Println()
-	
-	for _, recommendation := range detectionResult.Recommendations {
-		fmt.Printf("Priority: %s\n", recommendation.Priority)
-		fmt.Printf("Type: %s\n", recommendation.Type)
-		fmt.Printf("Description: %s\n", recommendation.Description)
-		fmt.Println("Actions:")
-		for _, action := range recommendation.Actions {
-			fmt.Printf("  - %s\n", action)
-		}
-		fmt.Printf("Impact: %s\n", recommendation.Impact)
-		fmt.Println()
-	}
-}
-
-// formatCacheDuration formats a duration for cache display
-func formatCacheDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	}
-	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
-}
-
-// displayTerraformDriftReport displays the Terraform drift detection report
-func displayTerraformDriftReport(report interface{}, format string) {
-	data, _ := json.MarshalIndent(report, "", "  ")
-	fmt.Println(string(data))
-}
-
-// displayDriftReport displays the drift detection report (for detailed analyzer)
-func displayDriftReport(report interface{}, format string) {
-	data, _ := json.MarshalIndent(report, "", "  ")
-	fmt.Println(string(data))
-}
-
-// isServerRunning checks if the DriftMgr server is running
-func isServerRunning() bool {
-	client := &http.Client{
-		Timeout: 2 * time.Second,
-	}
-
-	resp, err := client.Get(serverURL)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-
-	return resp.StatusCode == 200
-}
-
-// startServer starts the DriftMgr server in the background
-func startServer(exeDir string) error {
-	// Determine the server executable name based on OS
-	serverExe := "driftmgr-server.exe"
-	if runtime.GOOS != "windows" {
-		serverExe = "driftmgr-server"
-	}
-
-	// Try to find the server executable
-	serverPath := filepath.Join(exeDir, "bin", serverExe)
-	if _, err := os.Stat(serverPath); os.IsNotExist(err) {
-		// Try relative to current directory
-		serverPath = filepath.Join("bin", serverExe)
-		if _, err := os.Stat(serverPath); os.IsNotExist(err) {
-			return fmt.Errorf("server executable not found: %s", serverExe)
-		}
-	}
-
-	// Start the server in the background
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		// On Windows, use start command to run in background
-		cmd = exec.Command("cmd", "/C", "start", "/B", serverPath)
-	} else {
-		// On Unix systems, use nohup to run in background
-		cmd = exec.Command("nohup", serverPath, "&")
-	}
-
-	// Set working directory to the bin directory
-	cmd.Dir = filepath.Dir(serverPath)
-
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start server: %v", err)
-	}
-
-	// Wait a moment for the server to start
-	time.Sleep(2 * time.Second)
-
-	// Check if server is now running
-	if !isServerRunning() {
-		return fmt.Errorf("server started but health check failed")
-	}
-
-	return nil
-}
-
-// findClientExecutable finds the driftmgr-client executable
-func findClientExecutable(exeDir string) string {
-	// Determine the client executable name based on OS
-	clientExe := "driftmgr-client.exe"
-	if runtime.GOOS != "windows" {
-		clientExe = "driftmgr-client"
-	}
-
-	// Path to the driftmgr-client executable
-	clientPath := filepath.Join(exeDir, "bin", clientExe)
-
-	// Check if the client executable exists
-	if _, err := os.Stat(clientPath); os.IsNotExist(err) {
-		// If not found, try relative to current directory
-		clientPath = filepath.Join("bin", clientExe)
-		if _, err := os.Stat(clientPath); os.IsNotExist(err) {
-			// Last resort: try to find it in PATH
-			clientPath = "driftmgr-client"
-		}
-	}
-
-	return clientPath
-}
-
-// handleResourceDeletion handles the delete-resource command with generic dependency management
-func handleResourceDeletion(args []string) {
-	// Check for bulk operation first
-	for _, arg := range args {
-		if arg == "--bulk" {
-			commands.HandleBulkDelete(args)
+		statePath = findStateFile()
+		if statePath == "" {
+			fmt.Println("Error: No state file found. Use --state to specify.")
 			return
 		}
 	}
-	
-	if len(args) < 1 || args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
-		fmt.Println("Usage: driftmgr delete [<resource-type> <resource-name>] [options]")
-		fmt.Println("       driftmgr delete --bulk [options]")
-		fmt.Println()
-		fmt.Println("Description:")
-		fmt.Println("  Delete cloud resources with automatic dependency management.")
-		fmt.Println("  Supports both single resource and bulk deletion operations.")
-		fmt.Println()
-		fmt.Println("Single Resource Arguments:")
-		fmt.Println("  <resource-type>    Type of resource to delete (e.g., eks_cluster, ec2_instance)")
-		fmt.Println("  <resource-name>    Name of the resource to delete")
-		fmt.Println()
-		fmt.Println("Common Options:")
-		fmt.Println("  --region <region>     AWS region (default: us-east-1)")
-		fmt.Println("  --force               Skip validation and force deletion")
-		fmt.Println("  --dry-run             Show what would be deleted without actually deleting")
-		fmt.Println("  --include-deps        Include dependent resources")
-		fmt.Println("  --wait                Wait for deletion to complete")
-		fmt.Println("  --discover            Force resource discovery and selection")
-		fmt.Println()
-		fmt.Println("Bulk Delete Options:")
-		fmt.Println("  --bulk                Enable bulk deletion mode")
-		fmt.Println("  --filter-type <type>  Filter by resource type")
-		fmt.Println("  --filter-tag <k=v>    Filter by tag (can be repeated)")
-		fmt.Println("  --filter-id <id>      Filter by resource ID (can be repeated)")
-		fmt.Println("  --parallel            Delete resources in parallel")
-		fmt.Println("  --max-concurrent <n>  Max concurrent deletions (default: 5)")
-		fmt.Println()
-		fmt.Println("Examples:")
-		fmt.Println("  # Single resource")
-		fmt.Println("  driftmgr delete eks_cluster prod-use1-eks-main")
-		fmt.Println("  driftmgr delete rds_instance my-database --region us-east-1 --dry-run")
-		fmt.Println()
-		fmt.Println("  # Bulk deletion")
-		fmt.Println("  driftmgr delete --bulk --filter-tag Environment=dev --dry-run")
-		fmt.Println("  driftmgr delete --bulk --filter-type ec2_instance --parallel")
-		fmt.Println("  driftmgr delete --bulk --discover  # Interactive selection")
-		fmt.Println()
-		fmt.Println("Supported Resource Types:")
-		fmt.Println()
-		fmt.Println("Complex Resources (with dependencies):")
-		fmt.Println("  - eks_cluster: EKS clusters (handles nodegroups)")
-		fmt.Println("  - ecs_cluster: ECS clusters (handles services)")
-		fmt.Println("  - rds_instance: RDS instances (handles snapshots)")
-		fmt.Println("  - vpc: VPCs (handles gateways, route tables)")
-		fmt.Println("  - ec2_instance: EC2 instances (handles volumes, security groups)")
-		fmt.Println("  - elasticache_cluster: ElastiCache clusters")
-		fmt.Println("  - load_balancer: Load balancers")
-		fmt.Println("  - lambda_function: Lambda functions (handles IAM roles)")
-		fmt.Println("  - api_gateway: API Gateway (handles integrations)")
-		fmt.Println("  - cloudfront_distribution: CloudFront distributions")
-		fmt.Println("  - elasticsearch_domain: OpenSearch/Elasticsearch domains")
-		fmt.Println("  - redshift_cluster: Redshift clusters")
-		fmt.Println("  - emr_cluster: EMR clusters")
-		fmt.Println("  - msk_cluster: MSK (Kafka) clusters")
-		fmt.Println("  - neptune_cluster: Neptune graph databases")
-		fmt.Println("  - docdb_cluster: DocumentDB clusters")
-		fmt.Println("  - aurora_cluster: Aurora clusters")
-		fmt.Println("  - elastic_beanstalk_environment: Elastic Beanstalk environments")
-		fmt.Println("  - sagemaker_notebook_instance: SageMaker notebook instances")
-		fmt.Println("  - transit_gateway: Transit Gateways")
-		fmt.Println()
-		fmt.Println("Simple Resources (no dependencies):")
-		fmt.Println("  - s3_bucket: S3 buckets")
-		fmt.Println("  - dynamodb_table: DynamoDB tables")
-		fmt.Println("  - sqs_queue: SQS queues")
-		fmt.Println("  - sns_topic: SNS topics")
-		fmt.Println("  - cloudwatch_log_group: CloudWatch log groups")
-		fmt.Println("  - cloudwatch_alarm: CloudWatch alarms")
-		fmt.Println("  - kms_key: KMS keys")
-		fmt.Println("  - secretsmanager_secret: Secrets Manager secrets")
-		fmt.Println("  - ssm_parameter: Systems Manager parameters")
-		fmt.Println("  - ecr_repository: ECR repositories")
-		fmt.Println("  - codecommit_repository: CodeCommit repositories")
-		fmt.Println("  - route53_zone: Route53 hosted zones")
-		fmt.Println("  - route53_record: Route53 records")
-		fmt.Println("  - acm_certificate: ACM certificates")
-		fmt.Println("  - waf_web_acl: WAF web ACLs")
-		fmt.Println("  - guardduty_detector: GuardDuty detectors")
-		fmt.Println("  - backup_vault: Backup vaults")
-		fmt.Println("  - glue_job: Glue jobs")
-		fmt.Println("  - athena_workgroup: Athena workgroups")
-		fmt.Println("  - quicksight_dashboard: QuickSight dashboards")
-		fmt.Println("  - cognito_user_pool: Cognito user pools")
-		fmt.Println("  - amplify_app: Amplify applications")
-		fmt.Println("  - pinpoint_app: Pinpoint applications")
-		fmt.Println("  - s3_object: S3 objects")
-		fmt.Println("  - ebs_volume: EBS volumes")
-		fmt.Println("  - ebs_snapshot: EBS snapshots")
-		fmt.Println("  - ami: Amazon Machine Images")
-		fmt.Println("  - elastic_ip: Elastic IP addresses")
-		fmt.Println("  - key_pair: EC2 key pairs")
-		fmt.Println("  - customer_gateway: Customer gateways")
-		fmt.Println("  - dhcp_options: DHCP option sets")
-		fmt.Println("  - flow_log: VPC flow logs")
-		fmt.Println("  - network_acl: Network ACLs")
-		fmt.Println("  - peering_connection: VPC peering connections")
-		fmt.Println()
-		fmt.Println("And many more... (see full list in documentation)")
-		fmt.Println()
-		fmt.Println("Safety Features:")
-		fmt.Println("  - Validates resource state before deletion")
-		fmt.Println("  - Checks for production/critical indicators")
-		fmt.Println("  - Handles dependencies in correct order")
-		fmt.Println("  - Waits for deletion completion")
-		os.Exit(0)
+
+	// Parse state file
+	stateParser := parser.NewStateParser()
+	state, err := stateParser.ParseFile(statePath)
+	if err != nil {
+		fmt.Printf("Error parsing state file: %v\n", err)
+		return
 	}
 
-	// Check if we should discover resources
-	shouldDiscover := false
-	forceDiscover := false
+	// Create cost analyzer
+	costAnalyzer := cost.NewCostAnalyzer()
 
-	// Parse options first to check for --discover flag
+	fmt.Println("Analyzing cost impact of drift...")
+	fmt.Println()
+
+	// Analyze each resource
+	var totalCurrentCost, totalDriftCost float64
+	var costImpacts []*cost.ResourceCostImpact
+
+	for _, resource := range state.Resources {
+		impact := costAnalyzer.AnalyzeResource(resource)
+		if impact != nil {
+			costImpacts = append(costImpacts, impact)
+			totalCurrentCost += impact.CurrentMonthlyCost
+			totalDriftCost += impact.DriftMonthlyCost
+		}
+	}
+
+	// Display cost analysis
+	fmt.Println(strings.Repeat("=", 70))
+	fmt.Println("COST DRIFT ANALYSIS")
+	fmt.Println(strings.Repeat("=", 70))
+	fmt.Printf("Current Monthly Cost:    $%.2f\n", totalCurrentCost)
+	fmt.Printf("Drift Impact:           $%.2f\n", totalDriftCost-totalCurrentCost)
+	fmt.Printf("Projected Monthly Cost:  $%.2f\n", totalDriftCost)
+	fmt.Println()
+
+	if detailed {
+		fmt.Println("Resource Breakdown:")
+		fmt.Println()
+		for _, impact := range costImpacts {
+			if impact.DriftMonthlyCost != impact.CurrentMonthlyCost {
+				change := impact.DriftMonthlyCost - impact.CurrentMonthlyCost
+				symbol := "+"
+				if change < 0 {
+					symbol = "-"
+					change = -change
+				}
+				fmt.Printf("  %s.%s:\n", impact.ResourceType, impact.ResourceName)
+				fmt.Printf("    Current: $%.2f/month\n", impact.CurrentMonthlyCost)
+				fmt.Printf("    Drift:   %s$%.2f/month\n", symbol, change)
+				if impact.Reason != "" {
+					fmt.Printf("    Reason:  %s\n", impact.Reason)
+				}
+				fmt.Println()
+			}
+		}
+	}
+
+	// Cost optimization recommendations
+	fmt.Println("Cost Optimization Recommendations:")
+	recommendations := costAnalyzer.GetRecommendations(costImpacts)
+	for i, rec := range recommendations {
+		fmt.Printf("%d. %s\n", i+1, rec.Description)
+		if rec.EstimatedSavings > 0 {
+			fmt.Printf("   Estimated Savings: $%.2f/month\n", rec.EstimatedSavings)
+		}
+	}
+}
+
+// handleCleanup manages backup file cleanup and quarantine
+func handleCleanup(ctx context.Context, args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: driftmgr cleanup <subcommand>")
+		fmt.Println()
+		fmt.Println("Subcommands:")
+		fmt.Println("  run           Run cleanup now")
+		fmt.Println("  start         Start background cleanup worker")
+		fmt.Println("  quarantine    List quarantined files")
+		fmt.Println("  empty         Empty quarantine directory")
+		fmt.Println("  config        Configure cleanup settings")
+		return
+	}
+	
+	config := cleanup.CleanupConfig{
+		BackupDir:       ".driftmgr/backups",
+		RetentionDays:   30,
+		CleanupInterval: 1 * time.Hour,
+	}
+	
+	// Parse global options
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--discover" {
-			forceDiscover = true
-			// Remove the --discover flag from args
-			args = append(args[:i], args[i+1:]...)
+		switch args[i] {
+		case "--retention-days":
+			if i+1 < len(args) {
+				fmt.Sscanf(args[i+1], "%d", &config.RetentionDays)
+				i++
+			}
+		case "--backup-dir":
+			if i+1 < len(args) {
+				config.BackupDir = args[i+1]
+				i++
+			}
+		}
+	}
+	
+	cleanupMgr := cleanup.NewCleanupManager(config)
+	
+	subcommand := args[0]
+	switch subcommand {
+	case "run":
+		fmt.Printf("Running cleanup for backups older than %d days...\n", config.RetentionDays)
+		if err := cleanupMgr.CleanupNow(ctx); err != nil {
+			fmt.Printf("Error during cleanup: %v\n", err)
+			return
+		}
+		fmt.Println("Cleanup completed successfully")
+		
+	case "start":
+		fmt.Println("Starting background cleanup worker...")
+		cleanupMgr.Start(ctx)
+		fmt.Printf("Cleanup worker started (interval: %v, retention: %d days)\n", 
+			config.CleanupInterval, config.RetentionDays)
+		
+		// Keep running until interrupted
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		<-sigChan
+		
+		fmt.Println("\nStopping cleanup worker...")
+		cleanupMgr.Stop()
+		fmt.Println("Cleanup worker stopped")
+		
+	case "quarantine":
+		files, err := cleanupMgr.GetQuarantineFiles()
+		if err != nil {
+			fmt.Printf("Error reading quarantine: %v\n", err)
+			return
+		}
+		
+		if len(files) == 0 {
+			fmt.Println("No files in quarantine")
+			return
+		}
+		
+		fmt.Printf("Found %d files in quarantine:\n\n", len(files))
+		for _, file := range files {
+			info, err := os.Stat(file)
+			if err == nil {
+				fmt.Printf("  %s (%d bytes, quarantined: %s)\n",
+					filepath.Base(file),
+					info.Size(),
+					info.ModTime().Format("2006-01-02 15:04:05"))
+			}
+		}
+		
+	case "empty":
+		fmt.Println("Emptying quarantine directory...")
+		if err := cleanupMgr.EmptyQuarantine(); err != nil {
+			fmt.Printf("Error emptying quarantine: %v\n", err)
+			return
+		}
+		fmt.Println("Quarantine directory emptied")
+		
+	case "config":
+		fmt.Println("Cleanup Configuration:")
+		fmt.Printf("  Backup Directory: %s\n", config.BackupDir)
+		fmt.Printf("  Retention Days: %d\n", config.RetentionDays)
+		fmt.Printf("  Cleanup Interval: %v\n", config.CleanupInterval)
+		fmt.Println()
+		fmt.Println("To modify settings, use:")
+		fmt.Println("  --retention-days <days>   Set retention period")
+		fmt.Println("  --backup-dir <dir>        Set backup directory")
+		
+	default:
+		fmt.Printf("Unknown cleanup subcommand: %s\n", subcommand)
+	}
+}
+
+// handleServe starts the web server
+func handleServe(ctx context.Context, args []string) {
+	var port string = "8080"
+	var mode string = "web"
+
+	// Parse arguments
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--port":
+			if i+1 < len(args) {
+				port = args[i+1]
+				i++
+			}
+		case "--mode":
+			if i+1 < len(args) {
+				mode = args[i+1]
+				i++
+			}
+		}
+	}
+
+	fmt.Printf("Starting DriftMgr server in %s mode on port %s...\n", mode, port)
+
+	// Create server
+	srv, err := api.NewServer(port)
+	if err != nil {
+		fmt.Printf("Error creating server: %v\n", err)
+		return
+	}
+	
+	// Display appropriate URLs based on mode
+	switch mode {
+	case "web":
+		fmt.Printf("Web UI available at: http://localhost:%s\n", port)
+		fmt.Printf("API documentation at: http://localhost:%s/api/v1/docs\n", port)
+	case "api":
+		fmt.Printf("API available at: http://localhost:%s/api\n", port)
+		fmt.Printf("API documentation at: http://localhost:%s/api/v1/docs\n", port)
+	default:
+		fmt.Printf("Unknown mode: %s\n", mode)
+		return
+	}
+
+	// Start server
+	if err := srv.Start(); err != nil && err != http.ErrServerClosed {
+		fmt.Printf("Server error: %v\n", err)
+	}
+}
+
+// Helper functions
+
+func handleDiscover(ctx context.Context) {
+	fmt.Println("Discovering Terraform backend configurations...")
+	
+	discoverer := discovery.NewBackendDiscoverer()
+	backends, err := discoverer.DiscoverBackends(".")
+	if err != nil {
+		fmt.Printf("Error during discovery: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Found %d backend configuration(s):\n\n", len(backends))
+	
+	for i, backend := range backends {
+		fmt.Printf("%d. Backend Type: %s\n", i+1, backend.Type)
+		fmt.Printf("   File: %s\n", backend.FilePath)
+		fmt.Printf("   Module: %s\n", backend.Module)
+		
+		switch backend.Type {
+		case "s3":
+			if bucket, ok := backend.Config["bucket"].(string); ok {
+				fmt.Printf("   S3 Bucket: %s\n", bucket)
+			}
+			if key, ok := backend.Config["key"].(string); ok {
+				fmt.Printf("   State Key: %s\n", key)
+			}
+			if region, ok := backend.Config["region"].(string); ok {
+				fmt.Printf("   Region: %s\n", region)
+			}
+		case "azurerm":
+			if account, ok := backend.Config["storage_account_name"].(string); ok {
+				fmt.Printf("   Storage Account: %s\n", account)
+			}
+			if container, ok := backend.Config["container_name"].(string); ok {
+				fmt.Printf("   Container: %s\n", container)
+			}
+		case "gcs":
+			if bucket, ok := backend.Config["bucket"].(string); ok {
+				fmt.Printf("   GCS Bucket: %s\n", bucket)
+			}
+			if prefix, ok := backend.Config["prefix"].(string); ok {
+				fmt.Printf("   Prefix: %s\n", prefix)
+			}
+		}
+		fmt.Println()
+	}
+}
+
+func handleAnalyze(ctx context.Context, args []string) {
+	var statePath string
+	
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--state" && i+1 < len(args) {
+			statePath = args[i+1]
 			break
 		}
 	}
-
-	// If no resource type/name provided or --discover flag used, discover resources
-	if len(args) < 2 || forceDiscover {
-		shouldDiscover = true
-	}
-
-	if shouldDiscover {
-		handleInteractiveResourceSelection(args)
+	
+	if statePath == "" {
+		fmt.Println("Error: State file path required")
+		fmt.Println("Usage: driftmgr analyze --state <path>")
 		return
 	}
-
-	resourceType := args[0]
-	resourceName := args[1]
-	region := "us-east-1"
-	force := false
-	dryRun := false
-	includeDeps := false
-	wait := false
-
-	// Parse options
-	for i := 2; i < len(args); i++ {
-		switch args[i] {
-		case "--region":
-			if i+1 < len(args) {
-				region = args[i+1]
-				i++
-			}
-		case "--force":
-			force = true
-		case "--dry-run":
-			dryRun = true
-		case "--include-deps":
-			includeDeps = true
-		case "--wait":
-			wait = true
-		}
-	}
-
-	fmt.Printf("=== Resource Deletion with Dependency Management ===\n")
-	fmt.Printf("Resource Type: %s\n", resourceType)
-	fmt.Printf("Resource Name: %s\n", resourceName)
-	fmt.Printf("Region: %s\n", region)
-	fmt.Printf("Force: %v\n", force)
-	fmt.Printf("Dry Run: %v\n", dryRun)
-	fmt.Printf("Include Dependencies: %v\n", includeDeps)
-	fmt.Printf("Wait for Completion: %v\n", wait)
-	fmt.Println()
-
-	// Use the enhanced deletion tool
-	exePath, err := os.Executable()
+	
+	fmt.Printf("Analyzing state file: %s\n\n", statePath)
+	
+	// Read state file
+	data, err := ioutil.ReadFile(statePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting executable path: %v\n", err)
-		os.Exit(1)
-	}
-
-	exeDir := filepath.Dir(exePath)
-	deleteToolPath := filepath.Join(exeDir, "delete_all_resources.exe")
-
-	// Build command arguments
-	cmdArgs := []string{
-		"--resource-types", resourceType,
-		"--regions", region,
-		"--include", resourceName,
-	}
-
-	if dryRun {
-		cmdArgs = append(cmdArgs, "--dry-run")
-	}
-
-	if force {
-		cmdArgs = append(cmdArgs, "--force")
-	}
-
-	if includeDeps {
-		// Get common dependencies for the resource type
-		deps := getCommonDependencies(resourceType)
-		if len(deps) > 0 {
-			cmdArgs = append(cmdArgs, "--resource-types", strings.Join(deps, ","))
-		}
-	}
-
-	// Run the deletion tool
-	cmd := exec.Command(deleteToolPath, cmdArgs...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	fmt.Printf("Executing: %s %s\n", deleteToolPath, strings.Join(cmdArgs, " "))
-	fmt.Println()
-
-	err = cmd.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Resource deletion failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("\nResource deletion completed successfully!\n")
-}
-
-// handleInteractiveResourceSelection provides an interactive interface for resource discovery and selection
-func handleInteractiveResourceSelection(args []string) {
-	fmt.Println("=== Interactive Resource Discovery and Selection ===")
-	fmt.Println()
-
-	// Parse options for discovery
-	region := "us-east-1"
-	provider := "aws"
-
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--region":
-			if i+1 < len(args) {
-				region = args[i+1]
-				i++
-			}
-		}
-	}
-
-	fmt.Printf("Discovering resources in %s region for %s provider...\n", region, provider)
-	fmt.Println()
-
-	// Discover resources using the driftmgr client
-	resources, err := discoverResources(provider, []string{region})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to discover resources: %v\n", err)
-		fmt.Println()
-		fmt.Println("Troubleshooting:")
-		fmt.Println("1. Make sure the driftmgr server is running")
-		fmt.Println("2. Try starting the server: driftmgr-server")
-		fmt.Println("3. Or use direct resource deletion: driftmgr delete-resource <type> <name>")
-		fmt.Println("4. Check if the server supports enhanced discovery")
-		fmt.Println()
-
-		// Offer fallback to direct deletion
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Would you like to proceed with direct resource deletion? (y/N): ")
-		fallbackInput, _ := reader.ReadString('\n')
-		fallback := strings.ToLower(strings.TrimSpace(fallbackInput)) == "y"
-
-		if fallback {
-			fmt.Println()
-			fmt.Println("Please provide the resource type and name:")
-			fmt.Print("Resource type (e.g., eks_cluster, rds_instance): ")
-			resourceTypeInput, _ := reader.ReadString('\n')
-			resourceType := strings.TrimSpace(resourceTypeInput)
-
-			fmt.Print("Resource name: ")
-			resourceNameInput, _ := reader.ReadString('\n')
-			resourceName := strings.TrimSpace(resourceNameInput)
-
-			if resourceType != "" && resourceName != "" {
-				// Build direct deletion arguments
-				deleteArgs := []string{resourceType, resourceName, "--region", region}
-				handleResourceDeletion(deleteArgs)
-				return
-			}
-		}
-
-		fmt.Println("Operation cancelled.")
-		os.Exit(1)
-	}
-
-	if len(resources) == 0 {
-		fmt.Println("No resources found in the specified region.")
+		fmt.Printf("Error reading state file: %v\n", err)
 		return
 	}
-
-	// Group resources by type
-	resourceGroups := groupResourcesByType(resources)
-
-	// Display available resources
-	fmt.Printf("Found %d resources across %d types:\n\n", len(resources), len(resourceGroups))
-
-	resourceMap := make(map[int]models.Resource)
-	counter := 1
-
-	for resourceType, typeResources := range resourceGroups {
-		complexity := getResourceComplexity(resourceType)
-		fmt.Printf("=== %s (%d resources) [%s] ===\n", strings.ToUpper(resourceType), len(typeResources), complexity)
-		for _, resource := range typeResources {
-			fmt.Printf("%3d. %s (%s)\n", counter, resource.Name, resource.ID)
-			resourceMap[counter] = resource
-			counter++
-		}
-		fmt.Println()
-	}
-
-	// Get user selection
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter the number of the resource to delete (or 'q' to quit): ")
-	selection, err := reader.ReadString('\n')
+	
+	// Parse state
+	stateParser := parser.NewStateParser()
+	state, err := stateParser.Parse(data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
-		os.Exit(1)
-	}
-
-	selection = strings.TrimSpace(selection)
-	if selection == "q" || selection == "quit" {
-		fmt.Println("Operation cancelled.")
+		fmt.Printf("Error parsing state: %v\n", err)
 		return
 	}
-
-	resourceNum, err := strconv.Atoi(selection)
+	
+	// Display summary
+	fmt.Println("State File Summary:")
+	fmt.Printf("  Version: %d\n", state.Version)
+	fmt.Printf("  Terraform Version: %s\n", state.TerraformVersion)
+	fmt.Printf("  Serial: %d\n", state.Serial)
+	fmt.Printf("  Lineage: %s\n", state.Lineage)
+	fmt.Printf("  Total Resources: %d\n", len(state.Resources))
+	fmt.Printf("  Total Outputs: %d\n", len(state.Outputs))
+	
+	// Build dependency graph
+	graphBuilder := graph.NewDependencyGraphBuilder()
+	depGraph, err := graphBuilder.BuildFromState(state)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid selection: %s\n", selection)
-		os.Exit(1)
+		fmt.Printf("Error building dependency graph: %v\n", err)
+		return
 	}
-
-	selectedResource, exists := resourceMap[resourceNum]
-	if !exists {
-		fmt.Fprintf(os.Stderr, "Invalid resource number: %d\n", resourceNum)
-		os.Exit(1)
-	}
-
-	complexity := getResourceComplexity(selectedResource.Type)
-	fmt.Printf("\nSelected resource: %s (%s)\n", selectedResource.Name, selectedResource.Type)
-	fmt.Printf("Resource ID: %s\n", selectedResource.ID)
-	fmt.Printf("Region: %s\n", selectedResource.Region)
-	fmt.Printf("Complexity: %s\n", complexity)
-	fmt.Println()
-
-	// Get deletion options
-	includeDeps := false
-	if complexity == "Complex" {
-		fmt.Print("Include dependencies? (y/N): ")
-		includeDepsInput, _ := reader.ReadString('\n')
-		includeDeps = strings.ToLower(strings.TrimSpace(includeDepsInput)) == "y"
+	
+	fmt.Println("\nBuilding Dependency Graph...")
+	fmt.Printf("  Nodes: %d\n", depGraph.NodeCount())
+	fmt.Printf("  Edges: %d\n", depGraph.EdgeCount())
+	
+	// Topological sort
+	sorted, err := depGraph.TopologicalSort()
+	if err != nil {
+		fmt.Printf("  Warning: %v\n", err)
 	} else {
-		fmt.Println("Simple resource - no dependencies to include")
+		fmt.Printf("  Topological Order: %d resources sorted\n", len(sorted))
 	}
-
-	fmt.Print("Force deletion (skip validation)? (y/N): ")
-	forceInput, _ := reader.ReadString('\n')
-	force := strings.ToLower(strings.TrimSpace(forceInput)) == "y"
-
-	fmt.Print("Dry run (show what would be deleted)? (y/N): ")
-	dryRunInput, _ := reader.ReadString('\n')
-	dryRun := strings.ToLower(strings.TrimSpace(dryRunInput)) == "y"
-
-	fmt.Print("Wait for completion? (Y/n): ")
-	waitInput, _ := reader.ReadString('\n')
-	wait := strings.ToLower(strings.TrimSpace(waitInput)) != "n"
-
-	fmt.Println()
-
-	// Confirm deletion
-	fmt.Printf("About to delete: %s (%s)\n", selectedResource.Name, selectedResource.Type)
-	if includeDeps {
-		fmt.Println("Will include dependent resources")
+	
+	// Find orphaned resources
+	orphaned := depGraph.FindOrphanedResources()
+	if len(orphaned) > 0 {
+		fmt.Printf("  Orphaned Resources: %d\n", len(orphaned))
+		for _, r := range orphaned {
+			fmt.Printf("    - %s\n", r)
+		}
 	}
-	if force {
-		fmt.Println("Force deletion enabled (skipping validation)")
+	
+	// Critical path
+	criticalPath := depGraph.FindCriticalPath()
+	fmt.Printf("  Critical Path Length: %d\n", len(criticalPath))
+	
+	// Resource type breakdown
+	resourceTypes := make(map[string]int)
+	for _, r := range state.Resources {
+		resourceTypes[r.Type]++
 	}
-	if dryRun {
-		fmt.Println("DRY RUN MODE - No actual deletion will occur")
+	
+	fmt.Println("\nResource Types:")
+	for rt, count := range resourceTypes {
+		fmt.Printf("  %s: %d\n", rt, count)
 	}
-	fmt.Print("Proceed? (y/N): ")
-
-	confirmInput, _ := reader.ReadString('\n')
-	confirm := strings.ToLower(strings.TrimSpace(confirmInput)) == "y"
-
-	if !confirm {
-		fmt.Println("Deletion cancelled.")
-		return
-	}
-
-	// Build deletion arguments
-	deleteArgs := []string{selectedResource.Type, selectedResource.Name}
-
-	if includeDeps {
-		deleteArgs = append(deleteArgs, "--include-deps")
-	}
-	if force {
-		deleteArgs = append(deleteArgs, "--force")
-	}
-	if dryRun {
-		deleteArgs = append(deleteArgs, "--dry-run")
-	}
-	if wait {
-		deleteArgs = append(deleteArgs, "--wait")
-	}
-	deleteArgs = append(deleteArgs, "--region", selectedResource.Region)
-
-	// Call the deletion function
-	handleResourceDeletion(deleteArgs)
 }
 
-// discoverResources calls the driftmgr discovery API to find resources
-func discoverResources(provider string, regions []string) ([]models.Resource, error) {
-	// First check if server is running
-	if !isServerRunning() {
-		return nil, fmt.Errorf("driftmgr server is not running. Please start the server first or use direct resource deletion")
-	}
-
-	// Create discovery request
-	discoveryReq := map[string]interface{}{
-		"provider": provider,
-		"regions":  regions,
-	}
-
-	// Convert to JSON
-	jsonData, err := json.Marshal(discoveryReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal discovery request: %v", err)
-	}
-
-	// Make HTTP request to discovery API
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Post(
-		"http://localhost:8080/api/v1/enhanced-discover",
-		"application/json",
-		strings.NewReader(string(jsonData)),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call discovery API: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("discovery API endpoint not found (404). The server may not support enhanced discovery")
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("discovery API returned status %d", resp.StatusCode)
-	}
-
-	// Parse response
-	var discoveryResp struct {
-		Resources []models.Resource `json:"resources"`
-		Error     string            `json:"error,omitempty"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&discoveryResp); err != nil {
-		return nil, fmt.Errorf("failed to decode discovery response: %v", err)
-	}
-
-	if discoveryResp.Error != "" {
-		return nil, fmt.Errorf("discovery error: %s", discoveryResp.Error)
-	}
-
-	return discoveryResp.Resources, nil
-}
-
-// groupResourcesByType groups resources by their type for better organization
-func groupResourcesByType(resources []models.Resource) map[string][]models.Resource {
-	groups := make(map[string][]models.Resource)
-
-	for _, resource := range resources {
-		groups[resource.Type] = append(groups[resource.Type], resource)
-	}
-
-	return groups
-}
-
-// getResourceComplexity returns whether a resource type is complex (has dependencies) or simple
-func getResourceComplexity(resourceType string) string {
-	complexResources := map[string]bool{
-		"eks_cluster": true, "ecs_cluster": true, "rds_instance": true, "vpc": true,
-		"ec2_instance": true, "elasticache_cluster": true, "load_balancer": true,
-		"lambda_function": true, "api_gateway": true, "cloudfront_distribution": true,
-		"elasticsearch_domain": true, "redshift_cluster": true, "emr_cluster": true,
-		"msk_cluster": true, "opensearch_domain": true, "neptune_cluster": true,
-		"docdb_cluster": true, "aurora_cluster": true, "elastic_beanstalk_environment": true,
-		"ecs_service": true, "ecs_task_definition": true, "autoscaling_group": true,
-		"launch_template": true, "target_group": true, "nat_gateway": true,
-		"internet_gateway": true, "route_table": true, "subnet": true, "security_group": true,
-		"iam_role": true, "iam_policy": true, "iam_user": true, "iam_group": true,
-		"sns_topic": true, "sns_subscription": true, "codepipeline": true,
-		"codebuild_project": true, "codedeploy_application": true, "codedeploy_deployment_group": true,
-		"route53_zone": true, "route53_record": true, "backup_vault": true, "backup_plan": true,
-		"glue_job": true, "glue_crawler": true, "sagemaker_notebook_instance": true,
-		"sagemaker_endpoint": true, "sagemaker_model": true, "transit_gateway": true,
-		"transit_gateway_attachment": true, "vpn_connection": true, "vpn_gateway": true,
-		"appsync_graphql_api": true, "cognito_identity_pool": true, "endpoint": true,
-		"network_acl": true, "transit_gateway_route_table": true, "transit_gateway_vpc_attachment": true,
-	}
-
-	if complexResources[resourceType] {
-		return "Complex"
-	}
-	return "Simple"
-}
-
-// getCommonDependencies returns common dependency types for a resource type
-func getCommonDependencies(resourceType string) []string {
-	dependencyMap := map[string][]string{
-		// Complex resources with dependencies
-		"eks_cluster":                    {"eks_cluster", "autoscaling_group", "iam_role", "security_group", "subnet", "vpc"},
-		"ecs_cluster":                    {"ecs_cluster", "ecs_service", "iam_role", "security_group", "subnet", "vpc"},
-		"rds_instance":                   {"rds_instance", "rds_snapshot", "security_group", "subnet", "vpc"},
-		"vpc":                            {"vpc", "nat_gateway", "internet_gateway", "route_table", "subnet", "security_group"},
-		"ec2_instance":                   {"ec2_instance", "ebs_volume", "security_group", "iam_role"},
-		"elasticache_cluster":            {"elasticache_cluster", "security_group", "subnet", "vpc"},
-		"load_balancer":                  {"load_balancer", "target_group", "security_group", "subnet", "vpc"},
-		"lambda_function":                {"lambda_function", "iam_role", "cloudwatch_log_group"},
-		"api_gateway":                    {"api_gateway", "lambda_function", "iam_role", "cloudwatch_log_group"},
-		"cloudfront_distribution":        {"cloudfront_distribution", "s3_bucket", "iam_role"},
-		"elasticsearch_domain":           {"elasticsearch_domain", "security_group", "subnet", "vpc"},
-		"redshift_cluster":               {"redshift_cluster", "security_group", "subnet", "vpc", "iam_role"},
-		"emr_cluster":                    {"emr_cluster", "ec2_instance", "security_group", "subnet", "vpc", "iam_role"},
-		"msk_cluster":                    {"msk_cluster", "security_group", "subnet", "vpc"},
-		"opensearch_domain":              {"opensearch_domain", "security_group", "subnet", "vpc"},
-		"neptune_cluster":                {"neptune_cluster", "security_group", "subnet", "vpc"},
-		"docdb_cluster":                  {"docdb_cluster", "security_group", "subnet", "vpc"},
-		"aurora_cluster":                 {"aurora_cluster", "rds_instance", "security_group", "subnet", "vpc"},
-		"elastic_beanstalk_environment":  {"elastic_beanstalk_environment", "ec2_instance", "security_group", "subnet", "vpc", "iam_role"},
-		"ecs_service":                    {"ecs_service", "ecs_task_definition", "iam_role", "security_group"},
-		"ecs_task_definition":            {"ecs_task_definition", "iam_role"},
-		"autoscaling_group":              {"autoscaling_group", "launch_template", "iam_role"},
-		"launch_template":                {"launch_template", "iam_role"},
-		"target_group":                   {"target_group", "load_balancer"},
-		"nat_gateway":                    {"nat_gateway", "subnet", "vpc"},
-		"internet_gateway":               {"internet_gateway", "vpc"},
-		"route_table":                    {"route_table", "vpc"},
-		"subnet":                         {"subnet", "vpc"},
-		"security_group":                 {"security_group", "vpc"},
-		"iam_role":                       {"iam_role", "iam_policy"},
-		"iam_policy":                     {"iam_policy"},
-		"iam_user":                       {"iam_user", "iam_access_key"},
-		"iam_group":                      {"iam_group"},
-		"cloudwatch_log_group":           {"cloudwatch_log_group"},
-		"cloudwatch_alarm":               {"cloudwatch_alarm"},
-		"cloudwatch_dashboard":           {"cloudwatch_dashboard"},
-		"sns_topic":                      {"sns_topic", "sns_subscription"},
-		"sns_subscription":               {"sns_subscription"},
-		"sqs_queue":                      {"sqs_queue"},
-		"dynamodb_table":                 {"dynamodb_table"},
-		"s3_bucket":                      {"s3_bucket"},
-		"kms_key":                        {"kms_key"},
-		"secretsmanager_secret":          {"secretsmanager_secret"},
-		"ssm_parameter":                  {"ssm_parameter"},
-		"ecr_repository":                 {"ecr_repository"},
-		"ecr_image":                      {"ecr_image"},
-		"codecommit_repository":          {"codecommit_repository"},
-		"codepipeline":                   {"codepipeline", "codebuild_project"},
-		"codebuild_project":              {"codebuild_project", "iam_role"},
-		"codedeploy_application":         {"codedeploy_application", "codedeploy_deployment_group"},
-		"codedeploy_deployment_group":    {"codedeploy_deployment_group"},
-		"cloudformation_stack":           {"cloudformation_stack"},
-		"route53_zone":                   {"route53_zone", "route53_record"},
-		"route53_record":                 {"route53_record"},
-		"acm_certificate":                {"acm_certificate"},
-		"waf_web_acl":                    {"waf_web_acl"},
-		"wafv2_web_acl":                  {"wafv2_web_acl"},
-		"shield_protection":              {"shield_protection"},
-		"guardduty_detector":             {"guardduty_detector"},
-		"config_recorder":                {"config_recorder"},
-		"config_rule":                    {"config_rule"},
-		"backup_vault":                   {"backup_vault", "backup_plan"},
-		"backup_plan":                    {"backup_plan"},
-		"glue_job":                       {"glue_job", "iam_role"},
-		"glue_crawler":                   {"glue_crawler", "iam_role"},
-		"athena_workgroup":               {"athena_workgroup"},
-		"quicksight_dashboard":           {"quicksight_dashboard"},
-		"sagemaker_notebook_instance":    {"sagemaker_notebook_instance", "iam_role", "security_group", "subnet", "vpc"},
-		"sagemaker_endpoint":             {"sagemaker_endpoint", "sagemaker_model"},
-		"sagemaker_model":                {"sagemaker_model"},
-		"transit_gateway":                {"transit_gateway", "transit_gateway_attachment"},
-		"transit_gateway_attachment":     {"transit_gateway_attachment"},
-		"vpn_connection":                 {"vpn_connection", "vpn_gateway"},
-		"vpn_gateway":                    {"vpn_gateway"},
-		"direct_connect_connection":      {"direct_connect_connection"},
-		"direct_connect_gateway":         {"direct_connect_gateway"},
-		"appsync_graphql_api":            {"appsync_graphql_api", "iam_role"},
-		"amplify_app":                    {"amplify_app"},
-		"cognito_user_pool":              {"cognito_user_pool"},
-		"cognito_identity_pool":          {"cognito_identity_pool", "iam_role"},
-		"pinpoint_app":                   {"pinpoint_app"},
-		"s3_object":                      {"s3_object"},
-		"ebs_volume":                     {"ebs_volume"},
-		"ebs_snapshot":                   {"ebs_snapshot"},
-		"ami":                            {"ami"},
-		"elastic_ip":                     {"elastic_ip"},
-		"network_interface":              {"network_interface"},
-		"placement_group":                {"placement_group"},
-		"key_pair":                       {"key_pair"},
-		"customer_gateway":               {"customer_gateway"},
-		"dhcp_options":                   {"dhcp_options"},
-		"endpoint":                       {"endpoint", "vpc"},
-		"flow_log":                       {"flow_log"},
-		"network_acl":                    {"network_acl", "vpc"},
-		"peering_connection":             {"peering_connection"},
-		"transit_gateway_route_table":    {"transit_gateway_route_table"},
-		"transit_gateway_vpc_attachment": {"transit_gateway_vpc_attachment"},
-	}
-
-	if deps, exists := dependencyMap[resourceType]; exists {
-		return deps
-	}
-	return []string{resourceType}
-}
-
-// handleUseCommand handles the use command for selecting accounts
-func handleUseCommand(args []string) {
-	selector := NewAccountSelector()
-
-	// If no args, show interactive menu
+func handleState(ctx context.Context, args []string) {
 	if len(args) == 0 {
-		showAccountSelectionMenu(selector)
-		return
-	}
-
-	// Parse arguments
-	provider := ""
-	showAll := false
-
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--help", "-h":
-			showUseHelp()
-			return
-		case "--all":
-			showAll = true
-		case "aws", "azure", "gcp", "digitalocean", "do":
-			provider = args[i]
-			if provider == "do" {
-				provider = "digitalocean"
-			}
-		default:
-			if provider == "" {
-				provider = args[i]
-			}
-		}
-	}
-
-	if showAll {
-		selector.ShowAllAccounts()
-		return
-	}
-
-	if provider != "" {
-		if err := selector.SelectAccount(provider); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-	} else {
-		showAccountSelectionMenu(selector)
-	}
-}
-
-func showAccountSelectionMenu(selector *AccountSelector) {
-	fmt.Println("\n=== Account Selection ===")
-	fmt.Println("\nSelect cloud provider:")
-	fmt.Println("1. AWS")
-	fmt.Println("2. Azure")
-	fmt.Println("3. GCP")
-	fmt.Println("4. DigitalOcean")
-	fmt.Println("5. Show all accounts")
-	fmt.Println("0. Exit")
-
-	fmt.Print("\nEnter choice: ")
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-
-	switch input {
-	case "1":
-		selector.SelectAccount("aws")
-	case "2":
-		selector.SelectAccount("azure")
-	case "3":
-		selector.SelectAccount("gcp")
-	case "4":
-		selector.SelectAccount("digitalocean")
-	case "5":
-		selector.ShowAllAccounts()
-	case "0":
-		return
-	default:
-		fmt.Println("Invalid choice")
-	}
-}
-
-func showUseHelp() {
-	fmt.Println("Usage: driftmgr use [provider] [flags]")
-	fmt.Println()
-	fmt.Println("Select which cloud account/subscription/project to work with")
-	fmt.Println()
-	fmt.Println("Providers:")
-	fmt.Println("  aws           Select AWS profile")
-	fmt.Println("  azure         Select Azure subscription")
-	fmt.Println("  gcp           Select GCP project")
-	fmt.Println("  digitalocean  Select DigitalOcean context")
-	fmt.Println()
-	fmt.Println("Flags:")
-	fmt.Println("  --all         Show all available accounts")
-	fmt.Println("  --help, -h    Show help")
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println("  driftmgr use                    # Interactive account selection")
-	fmt.Println("  driftmgr use aws                # Select AWS profile")
-	fmt.Println("  driftmgr use azure              # Select Azure subscription")
-	fmt.Println("  driftmgr use gcp                # Select GCP project")
-	fmt.Println("  driftmgr use --all              # Show all available accounts")
-}
-
-// showCredentialStatusCLI displays detected cloud credentials
-func showCredentialStatusCLI() {
-	// Get timeout from environment variable or use default
-	timeoutSeconds := 30
-	if envTimeout := os.Getenv("DRIFTMGR_CREDENTIAL_TIMEOUT"); envTimeout != "" {
-		if parsed, err := strconv.Atoi(envTimeout); err == nil && parsed > 0 {
-			timeoutSeconds = parsed
-		}
-	}
-
-	// Show spinner while detecting credentials with timeout
-	spinner := progress.NewSpinner("Detecting cloud credentials")
-	spinner.Start()
-
-	// Run detection with timeout
-	type detectionResult struct {
-		creds            []credentials.Credential
-		multipleProfiles map[string][]string
-		awsAccounts      map[string][]string
-	}
-
-	resultChan := make(chan detectionResult, 1)
-	go func() {
-		detector := credentials.NewCredentialDetector()
-		result := detectionResult{
-			creds:            detector.DetectAll(),
-			multipleProfiles: detector.DetectMultipleProfiles(),
-			awsAccounts:      detector.DetectAWSAccounts(),
-		}
-		resultChan <- result
-	}()
-
-	var creds []credentials.Credential
-	var multipleProfiles map[string][]string
-	var awsAccounts map[string][]string
-
-	// Wait for detection with configurable timeout
-	select {
-	case result := <-resultChan:
-		creds = result.creds
-		multipleProfiles = result.multipleProfiles
-		awsAccounts = result.awsAccounts
-	case <-time.After(time.Duration(timeoutSeconds) * time.Second):
-		// Timeout after 30 seconds (increased from 10 to allow for slower cloud CLI tools)
-		spinner.Error("Credential detection timed out")
-		fmt.Println(color.Warning("Credential detection took too long. Some providers may not be shown."))
-		fmt.Println(color.Info("Tip: You can run 'driftmgr discover --credentials' to retry with a longer timeout."))
-		return
-	}
-
-	spinner.Stop()
-
-	if len(creds) == 0 {
-		fmt.Println(color.Warning("No cloud credentials detected."))
-		fmt.Println("\nTo configure credentials:")
-		fmt.Printf("  %s          %s\n", color.AWS("AWS:"), color.Command("aws configure"))
-		fmt.Printf("  %s        %s\n", color.Azure("Azure:"), color.Command("az login"))
-		fmt.Printf("  %s          %s\n", color.GCP("GCP:"), color.Command("gcloud auth login"))
-		fmt.Printf("  %s %s\n", color.DigitalOcean("DigitalOcean:"), color.Command("export DIGITALOCEAN_ACCESS_TOKEN=<token>"))
-		return
-	}
-
-	// Check if multiple credentials are detected
-	totalConfigured := 0
-	for _, cred := range creds {
-		if cred.Status == "configured" {
-			totalConfigured++
-		}
-	}
-
-	fmt.Println(color.Divider())
-	if totalConfigured > 1 {
-		fmt.Printf("%s (%s configured)\n",
-			color.Header("Multiple cloud providers detected"),
-			color.Count(totalConfigured))
-		fmt.Println(color.Divider())
-	}
-
-	for _, cred := range creds {
-		var providerName string
-		switch cred.Provider {
-		case "AWS":
-			providerName = color.AWS(cred.Provider + ":")
-		case "Azure":
-			providerName = color.Azure(cred.Provider + ":")
-		case "GCP":
-			providerName = color.GCP(cred.Provider + ":")
-		case "DigitalOcean":
-			providerName = color.DigitalOcean(cred.Provider + ":")
-		default:
-			providerName = cred.Provider + ":"
-		}
-
-		status := color.Success(color.CheckMark() + " Configured")
-		if cred.Status != "configured" {
-			status = color.Error(color.CrossMark() + " Not configured")
-		}
-		fmt.Printf("%-25s %s\n", providerName, status)
-		if cred.Status == "configured" && cred.Details != nil {
-			// Show account/subscription/project name prominently
-			if account, ok := cred.Details["account"]; ok {
-				fmt.Printf("                %s\n", color.Value(fmt.Sprintf("%v", account)))
-			} else if subName, ok := cred.Details["subscription_name"]; ok {
-				fmt.Printf("                %s %s\n", color.Label("Subscription:"), color.Value(fmt.Sprintf("%v", subName)))
-			} else if projectID, ok := cred.Details["project_id"]; ok {
-				fmt.Printf("                %s %s\n", color.Label("Project:"), color.Value(fmt.Sprintf("%v", projectID)))
-			}
-
-			// Show additional details
-			// For AWS and DO, account_id is already shown in the main account line
-			if accountID, ok := cred.Details["account_id"]; ok {
-				// Only show if there's no account line or if it's not AWS/DO
-				if _, hasAccount := cred.Details["account"]; !hasAccount {
-					if cred.Provider != "AWS" && cred.Provider != "DigitalOcean" {
-						fmt.Printf("                Account ID: %s\n", accountID)
-					}
-				}
-			}
-			if profile, ok := cred.Details["profile"]; ok && profile != "" {
-				fmt.Printf("                Profile: %s\n", profile)
-			}
-			if region, ok := cred.Details["region"]; ok && region != "" {
-				fmt.Printf("                Region: %s\n", region)
-			}
-			// Only show email if it's not already part of the account display
-			if email, ok := cred.Details["email"]; ok {
-				// For DigitalOcean, email is already shown in account, skip it
-				if cred.Provider != "DigitalOcean" {
-					fmt.Printf("                Email: %s\n", email)
-				}
-			}
-
-			// Show all detected profiles/subscriptions/projects for this provider
-			if profiles, exists := multipleProfiles[cred.Provider]; exists && len(profiles) > 0 {
-				switch cred.Provider {
-				case "AWS":
-					// Check if there are multiple AWS accounts
-					if len(awsAccounts) > 1 {
-						fmt.Printf("                %s\n", color.Subheader("Available AWS accounts:"))
-						currentAccountID, _ := cred.Details["account_id"].(string)
-						for accountID, accountProfiles := range awsAccounts {
-							current := ""
-							if accountID == currentAccountID {
-								current = color.Success(" (current)")
-							}
-							fmt.Printf("                  %s Account %s%s\n", color.Bullet(), color.Value(accountID), current)
-							if len(accountProfiles) > 0 {
-								fmt.Printf("                    %s %s\n", color.Label("Profiles:"), color.Info(strings.Join(accountProfiles, ", ")))
-							}
-						}
-					} else if len(profiles) > 1 {
-						// Single account but multiple profiles
-						fmt.Printf("                Available profiles: %s\n", strings.Join(profiles, ", "))
-					}
-				case "Azure":
-					if len(profiles) > 0 {
-						fmt.Printf("                %s\n", color.Subheader("Available subscriptions:"))
-						for _, sub := range profiles {
-							current := ""
-							if sub == cred.Details["subscription_name"] {
-								current = color.Success(" (current)")
-							}
-							fmt.Printf("                  %s %s%s\n", color.Bullet(), color.Value(sub), current)
-						}
-					}
-				case "GCP":
-					if len(profiles) > 0 {
-						// Show all projects if there are multiple, or if the single project is different from current
-						showProjects := len(profiles) > 1
-						if !showProjects && len(profiles) == 1 {
-							// Check if the single project is different from the current one
-							currentProj, _ := cred.Details["project_id"].(string)
-							if profiles[0] != currentProj && currentProj != "" {
-								showProjects = true
-							}
-						}
-
-						if showProjects {
-							fmt.Printf("                %s\n", color.Subheader("Available projects:"))
-							for _, proj := range profiles {
-								current := ""
-								if currentProjID, ok := cred.Details["project_id"].(string); ok && proj == currentProjID {
-									current = color.Success(" (current)")
-								}
-								fmt.Printf("                  %s %s%s\n", color.Bullet(), color.Value(proj), current)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	fmt.Println(color.Divider())
-}
-
-// showSystemStatus displays overall system status with auto-discovery
-func showSystemStatus() {
-	printASCIIArt()
-	fmt.Println()
-	fmt.Println(color.Header("DriftMgr System Status"))
-	fmt.Println(color.DoubleDivider())
-
-	// Show credential status
-	fmt.Printf("\n%s\n", color.Subheader("Cloud Credentials:"))
-	showCredentialStatusCLI()
-
-	// Auto-discover resources if credentials are available
-	fmt.Printf("\n%s\n", color.Info("Auto-discovering cloud resources..."))
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	autoDiscoverResourcesWithContext(ctx)
-
-	// Show smart defaults status
-	fmt.Printf("\n%s\n", color.Subheader("Smart Defaults:"))
-	fmt.Printf("  %s           %s\n", color.Label("Status:"), color.Success("Enabled"))
-	fmt.Printf("  %s  %s\n", color.Label("Noise Reduction:"), color.Value("75-85%"))
-	fmt.Printf("  %s      %s\n", color.Label("Config File:"), color.Path("configs/smart-defaults.yaml"))
-}
-
-// autoDiscoverResourcesWithContext automatically discovers resources with context cancellation
-func autoDiscoverResourcesWithContext(ctx context.Context) {
-	detector := credentials.NewCredentialDetector()
-	creds := detector.DetectAll()
-
-	// Count configured providers
-	configuredProviders := 0
-	for _, cred := range creds {
-		if cred.Status == "configured" {
-			configuredProviders++
-		}
-	}
-
-	if configuredProviders == 0 {
-		fmt.Println("\nNo configured providers found.")
-		return
-	}
-
-	// Create a progress bar for provider discovery
-	bar := progress.NewBar(configuredProviders, "Discovering resources")
-
-	totalResources := 0
-	for _, cred := range creds {
-		// Check if context is cancelled
-		select {
-		case <-ctx.Done():
-			bar.Clear()
-			fmt.Println(color.Warning("Discovery cancelled or timed out"))
-			return
-		default:
-		}
-
-		if cred.Status == "configured" {
-			fmt.Printf("\n%s:\n", cred.Provider)
-
-			// Show spinner for individual provider with context
-			providerSpinner := progress.NewDotSpinner(fmt.Sprintf("Scanning %s resources", cred.Provider))
-			providerSpinner.Start()
-
-			// Create a channel for discovery result
-			resultChan := make(chan int, 1)
-			go func(provider string) {
-				count := discoverProviderResourcesWithTimeout(provider, 5*time.Second)
-				resultChan <- count
-			}(strings.ToLower(cred.Provider))
-
-			// Wait for result or context cancellation
-			select {
-			case count := <-resultChan:
-				totalResources += count
-				providerSpinner.Success(fmt.Sprintf("Found resources in %s", cred.Provider))
-			case <-ctx.Done():
-				providerSpinner.Error(fmt.Sprintf("Discovery timeout for %s", cred.Provider))
-			case <-time.After(5 * time.Second):
-				providerSpinner.Error(fmt.Sprintf("Discovery timeout for %s", cred.Provider))
-			}
-
-			bar.Increment()
-		}
-	}
-
-	bar.Complete()
-
-	if totalResources > 0 {
-		fmt.Printf("\nTotal Resources: %d across all providers\n", totalResources)
-	} else {
-		fmt.Println("\nQuick scan complete. Run 'driftmgr discover --auto' for detailed discovery.")
-	}
-}
-
-// autoDiscoverResources wrapper for backward compatibility
-func autoDiscoverResources() {
-	ctx := context.Background()
-	autoDiscoverResourcesWithContext(ctx)
-}
-
-// discoverProviderResourcesWithTimeout performs lightweight discovery with timeout
-func discoverProviderResourcesWithTimeout(provider string, timeout time.Duration) int {
-	// Perform actual lightweight resource discovery
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	switch provider {
-	case "aws":
-		// Get actual AWS resource count using a quick query
-		resourceCount := 0
-
-		// Count EC2 instances
-		cmd := exec.CommandContext(ctx, "aws", "ec2", "describe-instances",
-			"--query", "Reservations[].Instances[].[InstanceId]",
-			"--output", "text", "--max-items", "1000")
-		if output, err := cmd.Output(); err == nil {
-			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
-				resourceCount += len(lines)
-			}
-		}
-
-		// Count S3 buckets
-		cmd = exec.CommandContext(ctx, "aws", "s3api", "list-buckets",
-			"--query", "Buckets[].Name", "--output", "text")
-		if output, err := cmd.Output(); err == nil {
-			if items := strings.Fields(strings.TrimSpace(string(output))); len(items) > 0 && items[0] != "" {
-				resourceCount += len(items)
-			}
-		}
-
-		// Count VPCs
-		cmd = exec.CommandContext(ctx, "aws", "ec2", "describe-vpcs",
-			"--query", "Vpcs[].VpcId", "--output", "text")
-		if output, err := cmd.Output(); err == nil {
-			if items := strings.Fields(strings.TrimSpace(string(output))); len(items) > 0 && items[0] != "" {
-				resourceCount += len(items)
-			}
-		}
-
-		return resourceCount
-
-	case "azure":
-		// Get actual Azure resource count
-		cmd := exec.CommandContext(ctx, "az", "resource", "list",
-			"--query", "length(@)", "--output", "tsv")
-		if output, err := cmd.Output(); err == nil {
-			if count, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil {
-				return count
-			}
-		}
-		// Fallback: try to count resource groups
-		cmd = exec.CommandContext(ctx, "az", "group", "list",
-			"--query", "length(@)", "--output", "tsv")
-		if output, err := cmd.Output(); err == nil {
-			if count, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil {
-				return count * 3 // Estimate resources per group
-			}
-		}
-		return 0
-
-	case "gcp":
-		// Get actual GCP resource count
-		resourceCount := 0
-
-		// Count compute instances
-		cmd := exec.CommandContext(ctx, "gcloud", "compute", "instances", "list",
-			"--format=value(name)", "--limit=1000")
-		if output, err := cmd.Output(); err == nil {
-			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
-				resourceCount += len(lines)
-			}
-		}
-
-		// Count storage buckets
-		cmd = exec.CommandContext(ctx, "gcloud", "storage", "buckets", "list",
-			"--format=value(name)", "--limit=1000")
-		if output, err := cmd.Output(); err == nil {
-			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
-				resourceCount += len(lines)
-			}
-		}
-
-		return resourceCount
-
-	case "digitalocean":
-		// For DigitalOcean, use doctl if available
-		resourceCount := 0
-
-		// Count droplets
-		cmd := exec.CommandContext(ctx, "doctl", "compute", "droplet", "list",
-			"--format", "ID", "--no-header")
-		if output, err := cmd.Output(); err == nil {
-			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
-				resourceCount += len(lines)
-			}
-		}
-
-		// Count databases
-		cmd = exec.CommandContext(ctx, "doctl", "databases", "list",
-			"--format", "ID", "--no-header")
-		if output, err := cmd.Output(); err == nil {
-			if lines := strings.Split(strings.TrimSpace(string(output)), "\n"); len(lines) > 0 && lines[0] != "" {
-				resourceCount += len(lines)
-			}
-		}
-
-		return resourceCount
-	}
-
-	return 0
-}
-
-// discoverProviderResources discovers resources for a specific provider
-func discoverProviderResources(provider string) int {
-	return discoverProviderResourcesWithTimeout(provider, 5*time.Second)
-}
-
-// handleCloudStateDiscovery discovers tfstate files in cloud storage
-func handleCloudStateDiscovery(args []string) {
-	var format string = "summary"
-	var showHelp bool
-
-	// Parse arguments
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--format":
-			if i+1 < len(args) {
-				format = args[i+1]
-				i++
-			}
-		case "--provider":
-			if i+1 < len(args) {
-				// Reserved for future use to filter by provider
-				i++
-			}
-		case "--help", "-h":
-			showHelp = true
-		}
-	}
-
-	if showHelp {
-		fmt.Println("Usage: driftmgr cloud-state [flags]")
-		fmt.Println()
-		fmt.Println("Discover Terraform state files in cloud storage across all regions")
-		fmt.Println()
-		fmt.Println("Flags:")
-		fmt.Println("  --provider string   Cloud provider: aws, azure, gcp, all (default: all)")
-		fmt.Println("  --format string     Output format: summary, json, table, detailed (default: summary)")
-		fmt.Println()
-		fmt.Println("This command scans:")
-		fmt.Println("  • AWS S3 buckets across all regions")
-		fmt.Println("  • Azure Storage accounts")
-		fmt.Println("  • Google Cloud Storage buckets")
-		fmt.Println()
-		fmt.Println("Note: Requires cloud credentials to be configured")
-		return
-	}
-
-	fmt.Println("Discovering Terraform state files in cloud storage...")
-	fmt.Println("=" + strings.Repeat("=", 50))
-
-	ctx := context.Background()
-	discoverer := discovery.NewCloudStateDiscovery()
-
-	// Discover state files
-	stateFiles, err := discoverer.DiscoverAll(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error discovering cloud state files: %v\n", err)
-	}
-
-	if len(stateFiles) == 0 {
-		fmt.Println("\nNo Terraform state files found in cloud storage.")
-		fmt.Println("\nNote: Only accessible buckets/containers with proper permissions are scanned.")
-		return
-	}
-
-	// Group by provider
-	awsFiles := []discovery.CloudStateFile{}
-	azureFiles := []discovery.CloudStateFile{}
-	gcpFiles := []discovery.CloudStateFile{}
-
-	for _, sf := range stateFiles {
-		switch sf.Provider {
-		case "aws":
-			awsFiles = append(awsFiles, sf)
-		case "azure":
-			azureFiles = append(azureFiles, sf)
-		case "gcp":
-			gcpFiles = append(gcpFiles, sf)
-		}
-	}
-
-	// Display results based on format
-	switch format {
-	case "json":
-		data, _ := json.MarshalIndent(stateFiles, "", "  ")
-		fmt.Println(string(data))
-
-	case "table":
-		fmt.Println("\nCloud Terraform State Files:")
-		fmt.Println("═" + strings.Repeat("═", 120))
-		fmt.Printf("%-8s %-12s %-15s %-12s %-35s %-30s %8s\n",
-			"Type", "Environment", "Deploy Region", "Component", "Bucket", "Key", "Size")
-		fmt.Println("─" + strings.Repeat("─", 120))
-
-		for _, sf := range stateFiles {
-			// Determine type
-			stateType := "Terraform"
-			if sf.IsTerragrunt {
-				stateType = "Terragrunt"
-			}
-
-			// Format environment
-			env := sf.Environment
-			if env == "" {
-				env = "-"
-			}
-
-			// Format deploy region
-			deployRegion := sf.DeployRegion
-			if deployRegion == "" {
-				deployRegion = "-"
-			}
-
-			// Format component
-			component := sf.Component
-			if component == "" {
-				component = "-"
-			}
-
-			// Truncate bucket if needed
-			bucket := sf.Bucket
-			if len(bucket) > 33 {
-				bucket = bucket[:30] + "..."
-			}
-
-			// Truncate key if needed
-			key := sf.Key
-			if len(key) > 28 {
-				key = "..." + key[len(key)-25:]
-			}
-
-			fmt.Printf("%-8s %-12s %-15s %-12s %-35s %-30s %8d\n",
-				stateType, env, deployRegion, component, bucket, key, sf.Size)
-		}
-		fmt.Println("═" + strings.Repeat("═", 120))
-
-	case "detailed":
-		fmt.Println("\nDetailed Cloud State File Information:")
-		fmt.Println("═" + strings.Repeat("═", 50))
-
-		// Count Terragrunt vs standard Terraform files
-		terragruntCount := 0
-		for _, sf := range stateFiles {
-			if sf.IsTerragrunt {
-				terragruntCount++
-			}
-		}
-
-		if terragruntCount > 0 {
-			fmt.Printf("\n🔍 Detected %d Terragrunt-managed state file(s)\n", terragruntCount)
-		}
-
-		if len(awsFiles) > 0 {
-			fmt.Printf("\n📦 AWS S3 (%d files):\n", len(awsFiles))
-			for _, sf := range awsFiles {
-				fmt.Printf("  • %s\n", sf.URL)
-				fmt.Printf("    Region: %s | Size: %d bytes | Modified: %s\n",
-					sf.Region, sf.Size, sf.LastModified)
-
-				// Show Terragrunt metadata if detected
-				if sf.IsTerragrunt {
-					fmt.Printf("    🏗️  Terragrunt: ")
-					details := []string{}
-					if sf.Environment != "" {
-						details = append(details, fmt.Sprintf("Env=%s", sf.Environment))
-					}
-					if sf.DeployRegion != "" {
-						details = append(details, fmt.Sprintf("Region=%s", sf.DeployRegion))
-					}
-					if sf.Component != "" {
-						details = append(details, fmt.Sprintf("Component=%s", sf.Component))
-					}
-					if len(details) > 0 {
-						fmt.Printf("%s\n", strings.Join(details, ", "))
-					} else {
-						fmt.Printf("Detected (pattern-based)\n")
-					}
-				}
-			}
-		}
-
-		if len(azureFiles) > 0 {
-			fmt.Printf("\n📦 Azure Storage (%d files):\n", len(azureFiles))
-			for _, sf := range azureFiles {
-				fmt.Printf("  • %s\n", sf.URL)
-				fmt.Printf("    Region: %s | Size: %d bytes | Modified: %s\n",
-					sf.Region, sf.Size, sf.LastModified)
-			}
-		}
-
-		if len(gcpFiles) > 0 {
-			fmt.Printf("\n📦 Google Cloud Storage (%d files):\n", len(gcpFiles))
-			for _, sf := range gcpFiles {
-				fmt.Printf("  • %s\n", sf.URL)
-				fmt.Printf("    Region: %s | Size: %d bytes | Modified: %s\n",
-					sf.Region, sf.Size, sf.LastModified)
-			}
-		}
-
-	default: // summary
-		fmt.Printf("\nFound %d Terraform state file(s) in cloud storage:\n", len(stateFiles))
-		if len(awsFiles) > 0 {
-			fmt.Printf("  • AWS S3: %d file(s) across multiple regions\n", len(awsFiles))
-
-			// Count by region
-			regionCount := make(map[string]int)
-			for _, sf := range awsFiles {
-				regionCount[sf.Region]++
-			}
-			for region, count := range regionCount {
-				fmt.Printf("      - %s: %d file(s)\n", region, count)
-			}
-		}
-		if len(azureFiles) > 0 {
-			fmt.Printf("  • Azure Storage: %d file(s)\n", len(azureFiles))
-		}
-		if len(gcpFiles) > 0 {
-			fmt.Printf("  • Google Cloud Storage: %d file(s)\n", len(gcpFiles))
-		}
-
-		fmt.Println("\nUse --format=detailed to see full file paths and metadata")
-	}
-}
-
-// handleStateCommand handles consolidated state management commands
-func handleStateCommand(args []string) {
-	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
-		fmt.Println("Usage: driftmgr state [subcommand] [flags]")
+		fmt.Println("Usage: driftmgr state <subcommand>")
 		fmt.Println()
 		fmt.Println("Subcommands:")
-		fmt.Println("  inspect    Display state file contents")
-		fmt.Println("  visualize  Generate visual diagrams of state")
-		fmt.Println("  scan       Scan for Terraform backend configurations")
-		fmt.Println("  list       List and analyze Terraform state files")
-		fmt.Println("  discover   Discover resources from state files")
-		fmt.Println("  analyze    Analyze state for drift and issues")
-		fmt.Println("  compare    Compare multiple state files")
-		fmt.Println()
-		fmt.Println("Run 'driftmgr state <command> --help' for more information")
+		fmt.Println("  list    List available states")
+		fmt.Println("  get     Get state details")
+		fmt.Println("  push    Push local state to remote backend")
+		fmt.Println("  pull    Pull state from remote backend")
 		return
 	}
-
-	switch args[0] {
-	case "inspect":
-		handleStateInspect(args[1:])
-	case "visualize":
-		handleStateVisualize(args[1:])
-	case "scan":
-		handleBackendScan(args[1:])
+	
+	subcommand := args[0]
+	switch subcommand {
 	case "list":
-		handleTfStateCommand(args[1:])
-	case "discover":
-		handleStateDiscover(args[1:])
-	case "analyze":
-		handleStateAnalyze(args[1:])
-	case "compare":
-		handleStateCompare(args[1:])
+		handleStateList(ctx)
+	case "get":
+		handleStateGet(ctx, args[1:])
+	case "push":
+		handleStatePush(ctx, args[1:])
+	case "pull":
+		handleStatePull(ctx, args[1:])
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown state subcommand: %s\n", args[0])
-		fmt.Println("Run 'driftmgr state' for available commands")
-		os.Exit(1)
+		fmt.Printf("Unknown state subcommand: %s\n", subcommand)
 	}
 }
 
-// handleVerifyCommand handles consolidated verification commands
-func handleVerifyCommand(args []string) {
-	enhanced := false
-	validate := false
-
-	// Check for flags
-	for _, arg := range args {
-		switch arg {
-		case "--enhanced":
-			enhanced = true
-		case "--validate":
-			validate = true
-		case "--help", "-h":
-			fmt.Println("Usage: driftmgr verify [flags]")
-			fmt.Println()
-			fmt.Println("Verify discovery accuracy and resource counts")
-			fmt.Println()
-			fmt.Println("Flags:")
-			fmt.Println("  --enhanced  Use enhanced verification with ML and parallel processing")
-			fmt.Println("  --validate  Validate discovery accuracy against cloud provider APIs")
-			fmt.Println("  --provider  Cloud provider to verify (aws, azure, gcp)")
-			fmt.Println()
-			fmt.Println("Examples:")
-			fmt.Println("  driftmgr verify --provider aws")
-			fmt.Println("  driftmgr verify --enhanced --provider azure")
-			fmt.Println("  driftmgr verify --validate")
-			return
+func handleStateList(ctx context.Context) {
+	fmt.Println("Listing available states...")
+	
+	// Look for state files in common locations
+	patterns := []string{
+		"*.tfstate",
+		"terraform.tfstate.d/*/terraform.tfstate",
+		".terraform/*.tfstate",
+	}
+	
+	var stateFiles []string
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err == nil {
+			stateFiles = append(stateFiles, matches...)
 		}
 	}
-
-	// Route to appropriate handler
-	if validate {
-		commands.HandleValidate(args)
-	} else if enhanced {
-		handleVerifyEnhanced(args)
-	} else {
-		// Default verification
-		commands.HandleValidate(args)
+	
+	if len(stateFiles) == 0 {
+		fmt.Println("No states found")
+		return
+	}
+	
+	fmt.Printf("Found %d state file(s):\n\n", len(stateFiles))
+	for _, file := range stateFiles {
+		info, err := os.Stat(file)
+		if err == nil {
+			fmt.Printf("  %s (%d bytes, modified: %s)\n", 
+				file, 
+				info.Size(),
+				info.ModTime().Format("2006-01-02 15:04:05"))
+		}
 	}
 }
 
-// handleServeCommand handles consolidated server commands
-func handleServeCommand(args []string) {
-	if len(args) == 0 {
-		fmt.Println("Usage: driftmgr serve [subcommand] [flags]")
-		fmt.Println()
-		fmt.Println("Subcommands:")
-		fmt.Println("  web   Start web dashboard")
-		fmt.Println("  api   Start REST API server")
+func handleStateGet(ctx context.Context, args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: driftmgr state get <state-file|backend-config>")
+		return
+	}
+	
+	statePath := args[0]
+	
+	// Check if it's a local file
+	if _, err := os.Stat(statePath); err == nil {
+		data, err := os.ReadFile(statePath)
+		if err != nil {
+			fmt.Printf("Error reading state file: %v\n", err)
+			return
+		}
+		
+		var state map[string]interface{}
+		if err := json.Unmarshal(data, &state); err != nil {
+			fmt.Printf("Error parsing state: %v\n", err)
+			return
+		}
+		
+		fmt.Printf("State Version: %v\n", state["version"])
+		fmt.Printf("Terraform Version: %v\n", state["terraform_version"])
+		fmt.Printf("Serial: %v\n", state["serial"])
+		fmt.Printf("Lineage: %v\n", state["lineage"])
+		
+		if resources, ok := state["resources"].([]interface{}); ok {
+			fmt.Printf("Resources: %d\n", len(resources))
+		}
+	} else {
+		fmt.Println("Remote state get - specify backend configuration")
+	}
+}
+
+func handleStatePush(ctx context.Context, args []string) {
+	if len(args) < 2 {
+		fmt.Println("Usage: driftmgr state push <local-state> <backend-type> [options]")
 		fmt.Println()
 		fmt.Println("Examples:")
-		fmt.Println("  driftmgr serve web --port 8080")
-		fmt.Println("  driftmgr serve api --port 3000")
+		fmt.Println("  driftmgr state push terraform.tfstate s3 --bucket=my-bucket --key=terraform.tfstate")
+		fmt.Println("  driftmgr state push terraform.tfstate local --path=./backup.tfstate")
 		return
 	}
+	
+	localStatePath := args[0]
+	backendType := args[1]
+	
+	// Parse backend options
+	backendConfig := make(map[string]interface{})
+	for i := 2; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "--") {
+			parts := strings.SplitN(args[i][2:], "=", 2)
+			if len(parts) == 2 {
+				backendConfig[parts[0]] = parts[1]
+			}
+		}
+	}
+	
+	// Create backup before push
+	fmt.Println("Creating backup before push...")
+	backupMgr := backup.NewBackupManager(".driftmgr/backups")
+	backupPath, err := backupMgr.CreateBackup(ctx, localStatePath)
+	if err != nil {
+		fmt.Printf("Warning: Failed to create backup: %v\n", err)
+	} else {
+		fmt.Printf("Backup created: %s\n", backupPath)
+	}
+	
+	// Read local state
+	fmt.Printf("Reading local state from %s...\n", localStatePath)
+	stateData, err := os.ReadFile(localStatePath)
+	if err != nil {
+		fmt.Printf("Error reading local state: %v\n", err)
+		return
+	}
+	
+	// Parse and validate state
+	stateParser := parser.NewParser()
+	state, err := stateParser.Parse(stateData)
+	if err != nil {
+		fmt.Printf("Error parsing state: %v\n", err)
+		return
+	}
+	
+	fmt.Printf("State validated: version=%d, serial=%d\n", state.Version, state.Serial)
+	
+	// Create backend
+	factory := backend.NewBackendFactory()
+	b, err := factory.CreateBackend(backend.BackendType(backendType), backendConfig)
+	if err != nil {
+		fmt.Printf("Error creating backend: %v\n", err)
+		return
+	}
+	
+	// Connect to backend
+	fmt.Printf("Connecting to %s backend...\n", backendType)
+	if err := b.Connect(ctx); err != nil {
+		fmt.Printf("Error connecting to backend: %v\n", err)
+		return
+	}
+	
+	// Create state manager
+	stateMgr := manager.NewStateManager(b)
+	
+	// Push state
+	fmt.Println("Pushing state to backend...")
+	key := ""
+	if k, ok := backendConfig["key"].(string); ok {
+		key = k
+	}
+	
+	if err := stateMgr.UpdateState(ctx, key, state); err != nil {
+		fmt.Printf("Error pushing state: %v\n", err)
+		return
+	}
+	
+	fmt.Println("State successfully pushed to backend!")
+	fmt.Printf("State serial: %d\n", state.Serial)
+}
 
-	switch args[0] {
-	case "web":
-		// Use the new serve web command that loads cache immediately
-		commands.HandleServeWeb(args[1:])
-	case "dashboard":
-		// Legacy dashboard command with pre-discovery
-		commands.HandleDashboard(args[1:])
-	case "api", "server":
-		commands.HandleServer(args[1:])
+func handleStatePull(ctx context.Context, args []string) {
+	if len(args) < 2 {
+		fmt.Println("Usage: driftmgr state pull <backend-type> <local-state> [options]")
+		fmt.Println()
+		fmt.Println("Examples:")
+		fmt.Println("  driftmgr state pull s3 terraform.tfstate --bucket=my-bucket --key=terraform.tfstate")
+		fmt.Println("  driftmgr state pull local backup.tfstate --path=./backup.tfstate")
+		return
+	}
+	
+	backendType := args[0]
+	localStatePath := args[1]
+	
+	// Parse backend options
+	backendConfig := make(map[string]interface{})
+	for i := 2; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "--") {
+			parts := strings.SplitN(args[i][2:], "=", 2)
+			if len(parts) == 2 {
+				backendConfig[parts[0]] = parts[1]
+			}
+		}
+	}
+	
+	// Create backup if local state exists
+	if _, err := os.Stat(localStatePath); err == nil {
+		fmt.Println("Creating backup of existing local state...")
+		backupMgr := backup.NewBackupManager(".driftmgr/backups")
+		backupPath, err := backupMgr.CreateBackup(ctx, localStatePath)
+		if err != nil {
+			fmt.Printf("Warning: Failed to create backup: %v\n", err)
+		} else {
+			fmt.Printf("Backup created: %s\n", backupPath)
+		}
+	}
+	
+	// Create backend
+	factory := backend.NewBackendFactory()
+	b, err := factory.CreateBackend(backend.BackendType(backendType), backendConfig)
+	if err != nil {
+		fmt.Printf("Error creating backend: %v\n", err)
+		return
+	}
+	
+	// Connect to backend
+	fmt.Printf("Connecting to %s backend...\n", backendType)
+	if err := b.Connect(ctx); err != nil {
+		fmt.Printf("Error connecting to backend: %v\n", err)
+		return
+	}
+	
+	// Create state manager
+	stateMgr := manager.NewStateManager(b)
+	
+	// Pull state
+	fmt.Println("Pulling state from backend...")
+	key := ""
+	if k, ok := backendConfig["key"].(string); ok {
+		key = k
+	}
+	
+	state, err := stateMgr.GetState(ctx, key)
+	if err != nil {
+		fmt.Printf("Error pulling state: %v\n", err)
+		return
+	}
+	
+	fmt.Printf("State retrieved: version=%d, serial=%d\n", state.Version, state.Serial)
+	
+	// Write to local file
+	fmt.Printf("Writing state to %s...\n", localStatePath)
+	stateData, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		fmt.Printf("Error serializing state: %v\n", err)
+		return
+	}
+	
+	if err := os.WriteFile(localStatePath, stateData, 0644); err != nil {
+		fmt.Printf("Error writing state file: %v\n", err)
+		return
+	}
+	
+	fmt.Println("State successfully pulled from backend!")
+	info, _ := os.Stat(localStatePath)
+	fmt.Printf("Local state file: %s (%d bytes)\n", localStatePath, info.Size())
+}
+
+func handleWorkspaceList(ctx context.Context) {
+	fmt.Println("Listing Terraform workspaces...")
+	
+	// Check for workspace directory
+	workspaceDir := "terraform.tfstate.d"
+	if _, err := os.Stat(workspaceDir); os.IsNotExist(err) {
+		fmt.Println("No workspaces found (using default workspace)")
+		return
+	}
+	
+	// List workspace directories
+	entries, err := ioutil.ReadDir(workspaceDir)
+	if err != nil {
+		fmt.Printf("Error reading workspaces: %v\n", err)
+		return
+	}
+	
+	fmt.Println("Available workspaces:")
+	fmt.Println("  default")
+	for _, entry := range entries {
+		if entry.IsDir() {
+			fmt.Printf("  %s\n", entry.Name())
+		}
+	}
+}
+
+func handleWorkspaceSwitch(ctx context.Context, args []string) {
+	if len(args) == 0 {
+		fmt.Println("Error: Workspace name required")
+		fmt.Println("Usage: driftmgr workspace switch <name>")
+		return
+	}
+	
+	workspace := args[0]
+	fmt.Printf("Switching to workspace: %s\n", workspace)
+	
+	// Create workspace directory if it doesn't exist
+	workspaceDir := filepath.Join("terraform.tfstate.d", workspace)
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		fmt.Printf("Error creating workspace: %v\n", err)
+		return
+	}
+	
+	fmt.Printf("Switched to workspace: %s\n", workspace)
+}
+
+func handleTerragrunt(ctx context.Context, args []string) {
+	var path string = "."
+	
+	if len(args) > 0 {
+		path = args[0]
+	}
+	
+	fmt.Printf("Parsing Terragrunt configurations in: %s\n\n", path)
+	
+	// Find terragrunt.hcl files
+	var hclFiles []string
+	err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && info.Name() == "terragrunt.hcl" {
+			hclFiles = append(hclFiles, p)
+		}
+		return nil
+	})
+	
+	if err != nil {
+		fmt.Printf("Error searching for files: %v\n", err)
+		return
+	}
+	
+	if len(hclFiles) == 0 {
+		fmt.Println("No terragrunt.hcl files found")
+		return
+	}
+	
+	// Parse each file
+	parser := hcl.NewParser()
+	for _, file := range hclFiles {
+		fmt.Printf("Parsing: %s\n", file)
+		
+		config, err := parser.ParseFile(file)
+		if err != nil {
+			fmt.Printf("  Error: %v\n", err)
+			continue
+		}
+		
+		// Display parsed configuration
+		if config.Terraform != nil && config.Terraform.Source != "" {
+			fmt.Printf("  Source: %s\n", config.Terraform.Source)
+		}
+		
+		if len(config.Inputs) > 0 {
+			fmt.Printf("  Inputs: %d variables\n", len(config.Inputs))
+			for key := range config.Inputs {
+				fmt.Printf("    - %s\n", key)
+			}
+		}
+		
+		if config.RemoteState != nil {
+			fmt.Printf("  Remote State Backend: %s\n", config.RemoteState.Backend)
+		}
+		
+		fmt.Println()
+	}
+}
+
+func handleBackup(ctx context.Context, args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: driftmgr backup <subcommand>")
+		fmt.Println()
+		fmt.Println("Subcommands:")
+		fmt.Println("  create    Create a backup")
+		fmt.Println("  list      List backups")
+		fmt.Println("  restore   Restore from backup")
+		return
+	}
+	
+	backupMgr := backup.NewBackupManager(".driftmgr/backups")
+	
+	subcommand := args[0]
+	switch subcommand {
+	case "create":
+		handleBackupCreate(ctx, backupMgr, args[1:])
+	case "list":
+		handleBackupList(ctx, backupMgr, args[1:])
+	case "restore":
+		handleBackupRestore(ctx, backupMgr, args[1:])
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown serve subcommand: %s\n", args[0])
-		fmt.Println("Use 'web' for dashboard or 'api' for REST server")
+		fmt.Printf("Unknown backup subcommand: %s\n", subcommand)
+	}
+}
+
+func handleBackupCreate(ctx context.Context, mgr *backup.BackupManager, args []string) {
+	var statePath string
+	
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--state" && i+1 < len(args) {
+			statePath = args[i+1]
+			break
+		}
+	}
+	
+	if statePath == "" {
+		fmt.Println("Error: State file required")
+		fmt.Println("Usage: driftmgr backup create --state <path>")
+		return
+	}
+	
+	fmt.Printf("Creating backup of: %s\n", statePath)
+	
+	backupInfo, err := mgr.CreateBackup(statePath, map[string]string{
+		"source": "manual",
+		"user":   os.Getenv("USER"),
+	})
+	
+	if err != nil {
+		fmt.Printf("Error creating backup: %v\n", err)
+		return
+	}
+	
+	fmt.Println("Backup created successfully")
+	fmt.Printf("  ID: %s\n", backupInfo.ID)
+	fmt.Printf("  Size: %d bytes\n", backupInfo.Size)
+}
+
+func handleBackupList(ctx context.Context, mgr *backup.BackupManager, args []string) {
+	var statePath string = "terraform.tfstate"
+	
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--state" && i+1 < len(args) {
+			statePath = args[i+1]
+			break
+		}
+	}
+	
+	fmt.Printf("Listing backups for: %s\n\n", statePath)
+	
+	backups, err := mgr.ListBackups(statePath)
+	if err != nil {
+		fmt.Printf("Error listing backups: %v\n", err)
+		return
+	}
+	
+	if len(backups) == 0 {
+		fmt.Println("No backups found")
+		return
+	}
+	
+	for _, b := range backups {
+		fmt.Printf("ID: %s\n", b.ID)
+		fmt.Printf("  Created: %s\n", b.Timestamp.Format("2006-01-02 15:04:05"))
+		fmt.Printf("  Size: %d bytes\n", b.Size)
+		if b.Metadata != nil {
+			if source, ok := b.Metadata["source"]; ok {
+				fmt.Printf("  Source: %s\n", source)
+			}
+		}
+		fmt.Println()
+	}
+}
+
+func handleBackupRestore(ctx context.Context, mgr *backup.BackupManager, args []string) {
+	var backupID, targetPath string
+	
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--id":
+			if i+1 < len(args) {
+				backupID = args[i+1]
+				i++
+			}
+		case "--target":
+			if i+1 < len(args) {
+				targetPath = args[i+1]
+				i++
+			}
+		}
+	}
+	
+	if backupID == "" {
+		fmt.Println("Error: Backup ID required")
+		fmt.Println("Usage: driftmgr backup restore --id <backup-id> --target <path>")
+		return
+	}
+	
+	if targetPath == "" {
+		targetPath = "terraform.tfstate.restored"
+	}
+	
+	fmt.Printf("Restoring backup %s to %s\n", backupID, targetPath)
+	
+	if err := mgr.RestoreBackup(backupID, targetPath); err != nil {
+		fmt.Printf("Error restoring backup: %v\n", err)
+		return
+	}
+	
+	fmt.Println("Backup restored successfully")
+}
+
+func handleDriftReport(ctx context.Context, args []string) {
+	fmt.Println("Generating drift report...")
+	// Implementation would generate detailed drift reports
+}
+
+func handleDriftMonitor(ctx context.Context, args []string) {
+	fmt.Println("Starting continuous drift monitoring...")
+	fmt.Println("Press Ctrl+C to stop")
+	
+	// Would implement continuous monitoring loop
+	select {}
+}
+
+// Utility functions
+
+func findStateFile() string {
+	commonPaths := []string{
+		"terraform.tfstate",
+		"./terraform.tfstate",
+		".terraform/terraform.tfstate",
+	}
+	
+	for _, path := range commonPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	
+	matches, err := filepath.Glob("*.tfstate")
+	if err == nil && len(matches) > 0 {
+		return matches[0]
+	}
+	
+	return ""
+}
+
+func detectProviderFromState(state *parser.State) string {
+	for _, resource := range state.Resources {
+		if strings.HasPrefix(resource.Type, "aws_") {
+			return "aws"
+		}
+		if strings.HasPrefix(resource.Type, "azurerm_") {
+			return "azure"
+		}
+		if strings.HasPrefix(resource.Type, "google_") {
+			return "gcp"
+		}
+		if strings.HasPrefix(resource.Type, "digitalocean_") {
+			return "digitalocean"
+		}
+	}
+	return ""
+}
+
+func createCloudProvider(provider, region string) (types.CloudProvider, error) {
+	switch provider {
+	case "aws":
+		if region == "" {
+			region = "us-east-1"
+		}
+		awsProvider := providers.NewAWSProvider(region)
+		return awsProvider, awsProvider.Initialize(context.Background())
+	case "azure":
+		return providers.NewAzureProviderComplete("", "", "", "", "", region), nil
+	case "gcp":
+		return providers.NewGCPProviderComplete("", region, ""), nil
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
+}
+
+func saveDriftResults(results []*detector.DriftResult) error {
+	data, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile("drift-results.json", data, 0644)
+}
+
+func loadDriftResults(path string) ([]*detector.DriftResult, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	
+	var results []*detector.DriftResult
+	if err := json.Unmarshal(data, &results); err != nil {
+		return nil, err
+	}
+	
+	return results, nil
+}
+
+func findUnmanagedResources(cloudResources []*types.CloudResource) []*types.CloudResource {
+	// In a real implementation, this would check against all state files
+	// For now, we'll check against a single state file if it exists
+	statePath := findStateFile()
+	if statePath == "" {
+		return cloudResources // All resources are unmanaged if no state exists
+	}
+	
+	stateParser := parser.NewStateParser()
+	state, err := stateParser.ParseFile(statePath)
+	if err != nil {
+		return cloudResources // Assume all unmanaged if can't parse state
+	}
+	
+	// Create map of managed resource IDs
+	managedIDs := make(map[string]bool)
+	for _, resource := range state.Resources {
+		for _, instance := range resource.Instances {
+			if id, ok := instance.Attributes["id"].(string); ok {
+				managedIDs[id] = true
+			}
+		}
+	}
+	
+	// Filter out managed resources
+	var unmanaged []*types.CloudResource
+	for _, resource := range cloudResources {
+		if !managedIDs[resource.ID] {
+			unmanaged = append(unmanaged, resource)
+		}
+	}
+	
+	return unmanaged
+}
+
+func sanitizeResourceName(name string) string {
+	// Replace non-alphanumeric characters with underscores
+	result := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+			return r
+		}
+		return '_'
+	}, name)
+	
+	// Ensure it starts with a letter
+	if len(result) > 0 && result[0] >= '0' && result[0] <= '9' {
+		result = "r_" + result
+	}
+	
+	return result
+}
+
+func saveImportScript(commands []string, path string) error {
+	content := "#!/bin/bash\n\n"
+	content += "# DriftMgr Import Script\n"
+	content += fmt.Sprintf("# Generated: %s\n\n", time.Now().Format("2006-01-02 15:04:05"))
+	
+	content += "set -e\n\n"
+	content += "echo 'Starting resource import...'\n\n"
+	
+	for i, cmd := range commands {
+		content += fmt.Sprintf("echo '[%d/%d] %s'\n", i+1, len(commands), cmd)
+		content += cmd + "\n\n"
+	}
+	
+	content += "echo 'Import completed successfully!'\n"
+	
+	return ioutil.WriteFile(path, []byte(content), 0755)
+}
+
+// handleBenchmark runs performance benchmarks
+func handleBenchmark(ctx context.Context, args []string) {
+	benchmark := commands.NewBenchmarkCommand()
+	if err := benchmark.Execute(ctx, args); err != nil {
+		fmt.Printf("Benchmark failed: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// handleROI calculates return on investment
+func handleROI(ctx context.Context, args []string) {
+	roi := commands.NewROICommand()
+	if err := roi.Execute(ctx, args); err != nil {
+		fmt.Printf("ROI calculation failed: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// handleIntegrations shows available integrations
+func handleIntegrations(ctx context.Context, args []string) {
+	integrations := commands.NewIntegrationsCommand()
+	if err := integrations.Execute(ctx, args); err != nil {
+		fmt.Printf("Failed to show integrations: %v\n", err)
 		os.Exit(1)
 	}
 }

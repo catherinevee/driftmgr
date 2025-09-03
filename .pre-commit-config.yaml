@@ -1,0 +1,170 @@
+# Pre-commit hooks for DriftMgr
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+default_language_version:
+  python: python3
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+        args: ['--unsafe']
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: trailing-whitespace
+        args: ['--markdown-linebreak-ext=md']
+      - id: detect-private-key
+      - id: detect-aws-credentials
+        args: ['--allow-missing-credentials']
+
+  # Go specific hooks
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+      - id: go-vet
+      - id: go-imports
+      - id: go-cyclo
+        args: ['-over=15']
+      - id: go-mod-tidy
+      - id: go-unit-tests
+        args: ['-short']
+      - id: golangci-lint
+        args: ['--timeout=5m']
+
+  # Security checks
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: .*\.(lock|sum)$
+
+  # Go security
+  - repo: local
+    hooks:
+      - id: gosec
+        name: Go Security Checker
+        entry: gosec
+        language: system
+        types: [go]
+        pass_filenames: true
+        args: ['-fmt=json', '-out=gosec-report.json', '-stdout', '-quiet', '-nosec=G104,G304']
+
+  # Go dependencies check
+  - repo: local
+    hooks:
+      - id: nancy
+        name: Nancy dependency check
+        entry: bash -c 'go list -json -deps ./... | nancy sleuth'
+        language: system
+        pass_filenames: false
+
+  # Go build check
+  - repo: local
+    hooks:
+      - id: go-build
+        name: Go build
+        entry: go build
+        language: system
+        pass_filenames: false
+        types: [go]
+        args: ['./...']
+
+  # Documentation
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.38.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix', '--config', '.markdownlint.yml']
+
+  # Dockerfile linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        args: ['--ignore', 'DL3008', '--ignore', 'DL3009']
+
+  # YAML formatting
+  - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+    rev: 0.2.3
+    hooks:
+      - id: yamlfmt
+        args: ['-w', '-c', '.yamlfmt.yml']
+
+  # Shell script checks
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: ['-x']
+
+  # Git commit message
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  # License headers
+  - repo: local
+    hooks:
+      - id: license-header
+        name: Check license headers
+        entry: scripts/check-license.sh
+        language: script
+        types: [go]
+        exclude: .*_test\.go$
+
+  # Custom checks
+  - repo: local
+    hooks:
+      - id: no-debug-statements
+        name: Check for debug statements
+        entry: bash -c 'grep -r "fmt\.Print\|log\.Print\|println" --include="*.go" . | grep -v "test.go" | grep -v "main.go" && exit 1 || exit 0'
+        language: system
+        pass_filenames: false
+        
+      - id: no-todos
+        name: Check for TODO comments
+        entry: bash -c 'grep -r "TODO\|FIXME\|XXX" --include="*.go" . | grep -v "test.go" && echo "Warning: TODO comments found" || exit 0'
+        language: system
+        pass_filenames: false
+        
+      - id: check-vendor
+        name: Check vendor directory
+        entry: bash -c 'if [ -d "vendor" ]; then echo "Error: vendor directory should not be committed"; exit 1; fi'
+        language: system
+        pass_filenames: false
+
+# Configuration for specific hooks
+exclude: |
+  (?x)^(
+    .*\.pb\.go$|
+    .*\.pb\.gw\.go$|
+    vendor/.*|
+    third_party/.*|
+    .*\.git/.*|
+    .*\.idea/.*|
+    .*\.vscode/.*|
+    web/static/vendor/.*|
+    docs/api/.*|
+    coverage\..*
+  )$
+
+fail_fast: false
+minimum_pre_commit_version: '2.20.0'

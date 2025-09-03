@@ -7,14 +7,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
-	apimodels "github.com/catherinevee/driftmgr/internal/api/models"
-	"github.com/catherinevee/driftmgr/internal/cache"
-	"github.com/catherinevee/driftmgr/internal/core/discovery"
-	"github.com/catherinevee/driftmgr/internal/core/models"
-	"github.com/catherinevee/driftmgr/internal/services"
+	"github.com/catherinevee/driftmgr/internal/discovery/resource"
+	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/google/uuid"
 )
 
@@ -38,16 +36,27 @@ type JobStatus struct {
 type DiscoveryHub struct {
 	mu               sync.RWMutex
 	jobs             map[string]*JobStatus
-	results          map[string][]apimodels.Resource
-	cache            []apimodels.Resource
+	results          map[string][]models.Resource
+	cache            []models.Resource
 	cacheTime        time.Time
 	cacheTTL         time.Duration
 	cacheVersion     int
 	cacheMetadata    CacheMetadata
-	discoveryService *discovery.Service
-	serviceManager   *services.Manager
 	globalCache      *cache.GlobalCache
 	wsBroadcast      func(messageType string, data map[string]interface{})
+	eventBus         *events.EventBus
+
+	// Cache metrics
+	cacheHits        int64
+	cacheMisses      int64
+	cacheEvictions   int64
+	metricsStartTime time.Time
+
+	// Drift detection
+	driftRecords   []*DriftRecord
+	lastDriftCheck time.Time
+	terraformState map[string]interface{}
+	stateFilePath  string
 }
 
 // CacheMetadata tracks cache freshness and versioning
@@ -71,17 +80,24 @@ func NewDiscoveryHub(discoveryService *discovery.Service) *DiscoveryHub {
 		serviceManager:   nil, // Will be initialized if needed
 		globalCache:      cache.GetGlobalCache(),
 		wsBroadcast:      nil, // Will be set later
+		eventBus:         nil, // Will be set later
+		metricsStartTime: time.Now(),
 	}
-	
+
 	// Load cache from disk if it exists
 	hub.loadCacheFromDisk()
-	
+
 	return hub
 }
 
 // SetWebSocketBroadcast sets the WebSocket broadcast function
 func (h *DiscoveryHub) SetWebSocketBroadcast(broadcast func(string, map[string]interface{})) {
 	h.wsBroadcast = broadcast
+}
+
+// SetEventBus sets the event bus for publishing events
+func (h *DiscoveryHub) SetEventBus(eventBus *events.EventBus) {
+	h.eventBus = eventBus
 }
 
 // StartDiscovery starts a new discovery job
@@ -156,6 +172,19 @@ func (h *DiscoveryHub) runDiscovery(jobID string, req DiscoveryRequest) {
 	h.updateJobStatus(jobID, "running", "Discovering resources...", 0)
 	h.sendTerminalOutput(jobID, "Initializing discovery process...", "info")
 
+	// Publish discovery started event
+	if h.eventBus != nil {
+		h.eventBus.Publish(events.Event{
+			Type:   events.DiscoveryStarted,
+			Source: "discovery_hub",
+			Data: map[string]interface{}{
+				"job_id":   jobID,
+				"provider": req.Provider,
+				"regions":  req.Regions,
+			},
+		})
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -169,7 +198,7 @@ func (h *DiscoveryHub) runDiscovery(jobID string, req DiscoveryRequest) {
 		// Create discovery options
 		options := discovery.DiscoveryOptions{
 			Regions:       req.Regions,
-			// ResourceTypes: req.ResourceTypes, // TODO: Add this field to DiscoveryRequest
+			ResourceTypes: req.ResourceTypes, // Use the ResourceTypes field from request
 			Parallel:      true,
 			MaxWorkers:    5,
 			Timeout:       5 * time.Minute,
@@ -182,6 +211,21 @@ func (h *DiscoveryHub) runDiscovery(jobID string, req DiscoveryRequest) {
 		if err != nil {
 			h.sendTerminalOutput(jobID, fmt.Sprintf("Discovery failed: %v", err), "error")
 			h.updateJobError(jobID, fmt.Sprintf("Discovery failed: %v", err))
+
+			// Publish discovery failed event
+			if h.eventBus != nil {
+				h.eventBus.Publish(events.Event{
+					Type:   events.DiscoveryFailed,
+					Source: "discovery_hub",
+					Data: map[string]interface{}{
+						"job_id":   jobID,
+						"provider": req.Provider,
+						"regions":  req.Regions,
+						"error":    err.Error(),
+						"message":  fmt.Sprintf("Discovery failed: %v", err),
+					},
+				})
+			}
 			return
 		}
 
@@ -222,35 +266,58 @@ func (h *DiscoveryHub) runDiscovery(jobID string, req DiscoveryRequest) {
 		// Send progress update with resource count
 		h.sendTerminalOutput(jobID, fmt.Sprintf("Found %d resources", len(allResources)), "success")
 		h.sendDiscoveryProgress(jobID, 90, fmt.Sprintf("Processing %d resources...", len(allResources)))
+
+		// Publish discovery progress event
+		if h.eventBus != nil {
+			h.eventBus.Publish(events.Event{
+				Type:   events.DiscoveryProgress,
+				Source: "discovery_hub",
+				Data: map[string]interface{}{
+					"job_id":   jobID,
+					"provider": req.Provider,
+					"progress": 90,
+					"message":  fmt.Sprintf("Found %d resources", len(allResources)),
+					"stats": map[string]interface{}{
+						"resource_count": len(allResources),
+					},
+				},
+			})
+		}
 	}
 
 	// Store results
 	h.mu.Lock()
 	h.results[jobID] = allResources
-	
+
 	// Track previous cache size for logging
 	prevCacheSize := len(h.cache)
-	
+
 	// Use map for efficient deduplication when merging
 	cacheMap := make(map[string]apimodels.Resource)
-	
+
 	// First, add all existing cached resources to the map
 	for _, resource := range h.cache {
 		cacheMap[resource.ID] = resource
 	}
-	
+
 	// Then, add/update with new resources (this automatically handles duplicates)
 	for _, resource := range allResources {
 		cacheMap[resource.ID] = resource
 	}
-	
+
 	// Convert map back to slice
+	oldCacheSize := len(h.cache)
 	h.cache = make([]apimodels.Resource, 0, len(cacheMap))
 	for _, resource := range cacheMap {
 		h.cache = append(h.cache, resource)
 	}
 	h.cacheTime = time.Now()
-	
+
+	// Track evictions if cache was replaced with fewer items
+	if oldCacheSize > 0 && len(h.cache) < oldCacheSize {
+		h.cacheEvictions += int64(oldCacheSize - len(h.cache))
+	}
+
 	// Store in global cache for CLI access
 	cacheKey := fmt.Sprintf("discovery:%s:web", req.Provider)
 	// Convert API resources back to models.Resource for cache
@@ -267,19 +334,19 @@ func (h *DiscoveryHub) runDiscovery(jobID string, req DiscoveryRequest) {
 		})
 	}
 	h.globalCache.Set(cacheKey, cacheResources, 5*time.Minute)
-	
+
 	// Log deduplication info
 	newResourceCount := len(allResources)
 	finalCount := len(h.cache)
 	h.cacheVersion++
 	h.updateCacheMetadata("discovery")
-	
-	fmt.Printf("[Discovery Hub] Merged %d new resources with %d cached resources, resulting in %d unique resources (v%d)\n", 
+
+	fmt.Printf("[Discovery Hub] Merged %d new resources with %d cached resources, resulting in %d unique resources (v%d)\n",
 		newResourceCount, prevCacheSize, finalCount, h.cacheVersion)
-	
+
 	// Save updated cache to disk
 	h.saveCacheToDisk()
-	
+
 	h.mu.Unlock()
 
 	h.sendTerminalOutput(jobID, "Storing results...", "info")
@@ -287,6 +354,25 @@ func (h *DiscoveryHub) runDiscovery(jobID string, req DiscoveryRequest) {
 
 	// Update job status
 	h.completeJob(jobID, len(allResources))
+
+	// Publish discovery completed event
+	if h.eventBus != nil {
+		h.eventBus.Publish(events.Event{
+			Type:   events.DiscoveryCompleted,
+			Source: "discovery_hub",
+			Data: map[string]interface{}{
+				"job_id":    jobID,
+				"provider":  req.Provider,
+				"regions":   req.Regions,
+				"resources": len(allResources),
+				"message":   fmt.Sprintf("Discovery completed: %d resources found", len(allResources)),
+				"stats": map[string]interface{}{
+					"total_resources": len(allResources),
+					"cache_size":      len(h.cache),
+				},
+			},
+		})
+	}
 }
 
 // All resources come from real cloud provider discovery only
@@ -343,7 +429,7 @@ func (h *DiscoveryHub) GetCachedResults() []apimodels.Resource {
 func (h *DiscoveryHub) GetCacheMetadata() CacheMetadata {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	h.updateFreshnessStatus()
 	return h.cacheMetadata
 }
@@ -384,7 +470,7 @@ func contains(slice []string, item string) bool {
 func (h *DiscoveryHub) PrePopulateCache(resources []apimodels.Resource) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	// Deduplicate resources before adding to cache
 	uniqueResources := make(map[string]apimodels.Resource)
 	for _, resource := range resources {
@@ -393,16 +479,16 @@ func (h *DiscoveryHub) PrePopulateCache(resources []apimodels.Resource) {
 		// This ensures only unique resources are stored
 		uniqueResources[resource.ID] = resource
 	}
-	
+
 	// Convert map back to slice
 	h.cache = make([]apimodels.Resource, 0, len(uniqueResources))
 	for _, resource := range uniqueResources {
 		h.cache = append(h.cache, resource)
 	}
 	h.cacheTime = time.Now()
-	
+
 	fmt.Printf("[Discovery Hub] Pre-populated cache with %d unique resources (deduplicated from %d)\n", len(h.cache), len(resources))
-	
+
 	// Save to disk for persistence
 	h.saveCacheToDisk()
 }
@@ -415,104 +501,104 @@ func (h *DiscoveryHub) getCachePath() string {
 		// Fallback to temp directory
 		return filepath.Join(os.TempDir(), ".driftmgr_cache.json")
 	}
-	
+
 	// Create .driftmgr directory if it doesn't exist
 	driftmgrDir := filepath.Join(homeDir, ".driftmgr")
 	os.MkdirAll(driftmgrDir, 0755)
-	
+
 	return filepath.Join(driftmgrDir, "resource_cache.json")
 }
 
 // saveCacheToDisk saves the current cache to disk
 func (h *DiscoveryHub) saveCacheToDisk() {
 	cachePath := h.getCachePath()
-	
+
 	// Create cache data structure
 	cacheData := struct {
 		Resources []apimodels.Resource `json:"resources"`
-		Timestamp time.Time  `json:"timestamp"`
+		Timestamp time.Time            `json:"timestamp"`
 	}{
 		Resources: h.cache,
 		Timestamp: h.cacheTime,
 	}
-	
+
 	// Marshal to JSON
 	data, err := json.MarshalIndent(cacheData, "", "  ")
 	if err != nil {
 		fmt.Printf("[Discovery Hub] Failed to marshal cache: %v\n", err)
 		return
 	}
-	
+
 	// Write to file
 	err = ioutil.WriteFile(cachePath, data, 0644)
 	if err != nil {
 		fmt.Printf("[Discovery Hub] Failed to save cache to disk: %v\n", err)
 		return
 	}
-	
+
 	fmt.Printf("[Discovery Hub] Saved %d resources to cache file: %s\n", len(h.cache), cachePath)
 }
 
 // loadCacheFromDisk loads the cache from disk if it exists
 func (h *DiscoveryHub) loadCacheFromDisk() {
 	cachePath := h.getCachePath()
-	
+
 	// Check if cache file exists
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		fmt.Printf("✓ No existing cache found. Fresh discovery will be performed.\n")
 		return
 	}
-	
+
 	// Read cache file
 	data, err := ioutil.ReadFile(cachePath)
 	if err != nil {
 		fmt.Printf("[Discovery Hub] Failed to read cache file: %v\n", err)
 		return
 	}
-	
+
 	// Unmarshal cache data
 	var cacheData struct {
 		Resources []apimodels.Resource `json:"resources"`
-		Timestamp time.Time  `json:"timestamp"`
+		Timestamp time.Time            `json:"timestamp"`
 	}
-	
+
 	err = json.Unmarshal(data, &cacheData)
 	if err != nil {
 		fmt.Printf("[Discovery Hub] Failed to unmarshal cache: %v\n", err)
 		return
 	}
-	
+
 	// Check if cache is still valid (not older than 24 hours)
 	if time.Since(cacheData.Timestamp) > 24*time.Hour {
 		fmt.Printf("[Discovery Hub] Cache is older than 24 hours, ignoring\n")
 		return
 	}
-	
+
 	// Deduplicate resources before loading into cache
 	uniqueResources := make(map[string]apimodels.Resource)
 	for _, resource := range cacheData.Resources {
 		uniqueResources[resource.ID] = resource
 	}
-	
+
 	// Convert map to slice
 	dedupedResources := make([]apimodels.Resource, 0, len(uniqueResources))
 	for _, resource := range uniqueResources {
 		dedupedResources = append(dedupedResources, resource)
 	}
-	
+
 	// Load cache
 	h.mu.Lock()
 	h.cache = dedupedResources
 	h.cacheTime = cacheData.Timestamp
 	h.mu.Unlock()
-	
+
 	originalCount := len(cacheData.Resources)
 	dedupedCount := len(h.cache)
 	if originalCount != dedupedCount {
-		fmt.Printf("✓ Loaded %d unique resources from cache (deduplicated from %d, last updated: %v ago)\n", 
+		fmt.Printf("✓ Loaded %d unique resources from cache (deduplicated from %d, last updated: %v ago)\n",
 			dedupedCount, originalCount, time.Since(cacheData.Timestamp))
 	} else {
-		fmt.Printf("✓ Loaded %d resources from cache (last updated: %v ago)\n", 
+		fmt.Printf("✓ Loaded %d resources from cache (last updated: %v ago)\n",
 			dedupedCount, time.Since(cacheData.Timestamp).Round(time.Minute))
 	}
 }
@@ -571,17 +657,17 @@ func (h *DiscoveryHub) completeJob(jobID string, resourceCount int) {
 		if results, ok := h.results[jobID]; ok && len(results) > 0 {
 			// Use map for efficient deduplication
 			cacheMap := make(map[string]apimodels.Resource)
-			
+
 			// Add existing cache to map
 			for _, resource := range h.cache {
 				cacheMap[resource.ID] = resource
 			}
-			
+
 			// Merge new resources (automatically handles duplicates)
 			for _, resource := range results {
 				cacheMap[resource.ID] = resource
 			}
-			
+
 			// Convert back to slice
 			h.cache = make([]apimodels.Resource, 0, len(cacheMap))
 			for _, resource := range cacheMap {
@@ -596,15 +682,15 @@ func (h *DiscoveryHub) completeJob(jobID string, resourceCount int) {
 func (h *DiscoveryHub) ClearCache() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	// Clear in-memory cache
 	h.cache = []apimodels.Resource{}
 	h.cacheTime = time.Time{}
-	
+
 	// Delete cache file
 	cachePath := h.getCachePath()
 	os.Remove(cachePath)
-	
+
 	fmt.Printf("[Discovery Hub] Cache cleared (both memory and disk)\n")
 }
 
@@ -675,7 +761,7 @@ func (h *DiscoveryHub) convertToAPIResources(resources []models.Resource) []apim
 func (h *DiscoveryHub) GetAllResources() []apimodels.Resource {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	result := make([]apimodels.Resource, len(h.cache))
 	copy(result, h.cache)
 	return result
@@ -685,16 +771,105 @@ func (h *DiscoveryHub) GetAllResources() []apimodels.Resource {
 func (h *DiscoveryHub) GetDriftRecords() []*DriftRecord {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
-	// For now, return empty slice - will implement drift detection later
-	return []*DriftRecord{}
+
+	// Perform actual drift detection by comparing cached resources with their expected state
+	driftRecords := []*DriftRecord{}
+
+	// Get Terraform state for comparison
+	tfState := h.getTerraformState()
+	if tfState == nil {
+		// If no Terraform state, check for unmanaged resources
+		for _, resource := range h.cache {
+			if !h.isResourceManaged(resource) {
+				driftRecords = append(driftRecords, &DriftRecord{
+					ResourceID:   resource.ID,
+					ResourceType: resource.Type,
+					Provider:     resource.Provider,
+					DriftType:    "UNMANAGED",
+					Severity:     "MEDIUM",
+					Details: map[string]interface{}{
+						"message":  "Resource exists in cloud but not in Terraform state",
+						"resource": resource,
+					},
+					DetectedAt: time.Now(),
+				})
+			}
+		}
+		return driftRecords
+	}
+
+	// Compare each resource with its expected state
+	for _, resource := range h.cache {
+		expectedState := h.getExpectedState(resource.ID, tfState)
+		if expectedState == nil {
+			// Resource not in Terraform state (unmanaged)
+			driftRecords = append(driftRecords, &DriftRecord{
+				ResourceID:   resource.ID,
+				ResourceType: resource.Type,
+				Provider:     resource.Provider,
+				DriftType:    "UNMANAGED",
+				Severity:     "MEDIUM",
+				Details: map[string]interface{}{
+					"message": "Resource exists in cloud but not in Terraform state",
+					"actual":  resource,
+				},
+				DetectedAt: time.Now(),
+			})
+			continue
+		}
+
+		// Compare properties for drift
+		differences := h.compareResourceProperties(expectedState, resource)
+		if len(differences) > 0 {
+			severity := h.calculateDriftSeverity(resource.Type, differences)
+			driftRecords = append(driftRecords, &DriftRecord{
+				ResourceID:   resource.ID,
+				ResourceType: resource.Type,
+				Provider:     resource.Provider,
+				DriftType:    "MODIFIED",
+				Severity:     severity,
+				Details: map[string]interface{}{
+					"differences": differences,
+					"expected":    expectedState,
+					"actual":      resource,
+				},
+				DetectedAt: time.Now(),
+			})
+		}
+	}
+
+	// Check for resources in state but not in cloud (deleted)
+	if tfState != nil {
+		for _, stateResource := range h.getStateResources(tfState) {
+			if !h.resourceExistsInCloud(stateResource.ID) {
+				driftRecords = append(driftRecords, &DriftRecord{
+					ResourceID:   stateResource.ID,
+					ResourceType: stateResource.Type,
+					Provider:     stateResource.Provider,
+					DriftType:    "DELETED",
+					Severity:     "HIGH",
+					Details: map[string]interface{}{
+						"message":  "Resource exists in Terraform state but not in cloud",
+						"expected": stateResource,
+					},
+					DetectedAt: time.Now(),
+				})
+			}
+		}
+	}
+
+	// Store drift records for future queries
+	h.driftRecords = driftRecords
+	h.lastDriftCheck = time.Now()
+
+	return driftRecords
 }
 
 // GetResourceByID returns a resource by ID
 func (h *DiscoveryHub) GetResourceByID(id string) (*apimodels.Resource, bool) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	for _, r := range h.cache {
 		if r.ID == id {
 			return &r, true
@@ -705,39 +880,86 @@ func (h *DiscoveryHub) GetResourceByID(id string) (*apimodels.Resource, bool) {
 
 // HasDrift checks if a resource has drift
 func (h *DiscoveryHub) HasDrift(resourceID string) bool {
-	// For now, return false - will implement drift detection later
-	return false
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	// Check if we have recent drift records
+	if h.driftRecords != nil && time.Since(h.lastDriftCheck) < 5*time.Minute {
+		for _, record := range h.driftRecords {
+			if record.ResourceID == resourceID {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Perform drift check for specific resource
+	resource, exists := h.GetResourceByID(resourceID)
+	if !exists {
+		return false
+	}
+
+	tfState := h.getTerraformState()
+	if tfState == nil {
+		// No state means unmanaged resource (drift)
+		return !h.isResourceManaged(*resource)
+	}
+
+	expectedState := h.getExpectedState(resourceID, tfState)
+	if expectedState == nil {
+		// Resource not in state (unmanaged drift)
+		return true
+	}
+
+	// Compare properties
+	differences := h.compareResourceProperties(expectedState, *resource)
+	return len(differences) > 0
 }
 
 // GetCachedResources returns cached resources
 func (h *DiscoveryHub) GetCachedResources() []apimodels.Resource {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	if h.cache == nil {
+		h.cacheMisses++
 		return []apimodels.Resource{}
 	}
-	
+
+	// Check if cache is fresh
+	if time.Since(h.cacheTime) > h.cacheTTL {
+		h.cacheMisses++
+		return []apimodels.Resource{}
+	}
+
+	h.cacheHits++
 	return h.cache
+}
+
+// GetCacheMetrics returns cache performance metrics
+func (h *DiscoveryHub) GetCacheMetrics() (hits, misses, evictions int64) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.cacheHits, h.cacheMisses, h.cacheEvictions
 }
 
 // GetResourcesByIDs returns resources by their IDs
 func (h *DiscoveryHub) GetResourcesByIDs(ids []string) []apimodels.Resource {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	idMap := make(map[string]bool)
 	for _, id := range ids {
 		idMap[id] = true
 	}
-	
+
 	var resources []apimodels.Resource
 	for _, resource := range h.cache {
 		if idMap[resource.ID] {
 			resources = append(resources, resource)
 		}
 	}
-	
+
 	return resources
 }
 
@@ -745,7 +967,7 @@ func (h *DiscoveryHub) GetResourcesByIDs(ids []string) []apimodels.Resource {
 func (h *DiscoveryHub) AddResource(resource apimodels.Resource) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	// Check if resource already exists
 	for i, existing := range h.cache {
 		if existing.ID == resource.ID {
@@ -754,10 +976,475 @@ func (h *DiscoveryHub) AddResource(resource apimodels.Resource) {
 			return
 		}
 	}
-	
+
 	// Add new resource
 	h.cache = append(h.cache, resource)
 	h.cacheTime = time.Now()
 	h.cacheVersion++
 	h.updateCacheMetadata("import")
+}
+
+// Helper methods for drift detection
+
+func (h *DiscoveryHub) getTerraformState() map[string]interface{} {
+	// Try to load from cached state first
+	if h.terraformState != nil && time.Since(h.lastDriftCheck) < 5*time.Minute {
+		return h.terraformState
+	}
+
+	// Load Terraform state from file if path is set
+	if h.stateFilePath != "" {
+		data, err := os.ReadFile(h.stateFilePath)
+		if err == nil {
+			var state map[string]interface{}
+			if err := json.Unmarshal(data, &state); err == nil {
+				h.terraformState = state
+				return state
+			}
+		}
+	}
+
+	// Try default locations
+	defaultPaths := []string{
+		"terraform.tfstate",
+		".terraform/terraform.tfstate",
+		"terraform.tfstate.d/default/terraform.tfstate",
+	}
+
+	for _, path := range defaultPaths {
+		if data, err := os.ReadFile(path); err == nil {
+			var state map[string]interface{}
+			if err := json.Unmarshal(data, &state); err == nil {
+				h.terraformState = state
+				h.stateFilePath = path
+				return state
+			}
+		}
+	}
+
+	return nil
+}
+
+func (h *DiscoveryHub) isResourceManaged(resource apimodels.Resource) bool {
+	// Check if resource has Terraform tags or metadata
+	if resource.Tags != nil {
+		if _, hasManaged := resource.Tags["ManagedBy"]; hasManaged {
+			return true
+		}
+		if _, hasTerraform := resource.Tags["terraform"]; hasTerraform {
+			return true
+		}
+	}
+
+	// Check if resource ID matches known managed pattern
+	// This is a simplified check - in production would be more sophisticated
+	return false
+}
+
+func (h *DiscoveryHub) getExpectedState(resourceID string, tfState map[string]interface{}) interface{} {
+	// Parse Terraform state to find the resource
+	if resources, ok := tfState["resources"].([]interface{}); ok {
+		for _, res := range resources {
+			if resMap, ok := res.(map[string]interface{}); ok {
+				if instances, ok := resMap["instances"].([]interface{}); ok {
+					for _, inst := range instances {
+						if instMap, ok := inst.(map[string]interface{}); ok {
+							if id, ok := instMap["attributes"].(map[string]interface{})["id"].(string); ok && id == resourceID {
+								return instMap["attributes"]
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (h *DiscoveryHub) compareResourceProperties(expected interface{}, actual apimodels.Resource) []string {
+	differences := []string{}
+
+	expectedMap, ok := expected.(map[string]interface{})
+	if !ok {
+		return differences
+	}
+
+	// Convert actual resource to map for comparison
+	actualMap := make(map[string]interface{})
+	actualBytes, _ := json.Marshal(actual)
+	json.Unmarshal(actualBytes, &actualMap)
+
+	// Compare each expected property
+	for key, expectedVal := range expectedMap {
+		actualVal, exists := actualMap[key]
+		if !exists {
+			differences = append(differences, fmt.Sprintf("Property '%s' exists in state but not in cloud", key))
+			continue
+		}
+
+		// Simple comparison - in production would handle nested objects
+		if fmt.Sprintf("%v", expectedVal) != fmt.Sprintf("%v", actualVal) {
+			differences = append(differences, fmt.Sprintf("Property '%s' differs: expected=%v, actual=%v", key, expectedVal, actualVal))
+		}
+	}
+
+	return differences
+}
+
+func (h *DiscoveryHub) calculateDriftSeverity(resourceType string, differences []string) string {
+	// Critical for security resources
+	if strings.Contains(resourceType, "security") || strings.Contains(resourceType, "iam") {
+		return "HIGH"
+	}
+
+	// Check for critical property changes
+	for _, diff := range differences {
+		if strings.Contains(strings.ToLower(diff), "security") ||
+			strings.Contains(strings.ToLower(diff), "encryption") ||
+			strings.Contains(strings.ToLower(diff), "public") {
+			return "HIGH"
+		}
+	}
+
+	// Severity based on number of differences
+	if len(differences) > 5 {
+		return "HIGH"
+	} else if len(differences) > 2 {
+		return "MEDIUM"
+	}
+
+	return "LOW"
+}
+
+func (h *DiscoveryHub) getStateResources(tfState map[string]interface{}) []apimodels.Resource {
+	resources := []apimodels.Resource{}
+
+	if resourcesData, ok := tfState["resources"].([]interface{}); ok {
+		for _, res := range resourcesData {
+			if resMap, ok := res.(map[string]interface{}); ok {
+				resType := resMap["type"].(string)
+				provider := resMap["provider"].(string)
+
+				if instances, ok := resMap["instances"].([]interface{}); ok {
+					for _, inst := range instances {
+						if instMap, ok := inst.(map[string]interface{}); ok {
+							if attrs, ok := instMap["attributes"].(map[string]interface{}); ok {
+								resource := apimodels.Resource{
+									ID:       fmt.Sprintf("%v", attrs["id"]),
+									Type:     resType,
+									Provider: provider,
+								}
+
+								if name, ok := attrs["name"].(string); ok {
+									resource.Name = name
+								}
+								if region, ok := attrs["region"].(string); ok {
+									resource.Region = region
+								}
+
+								resources = append(resources, resource)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return resources
+}
+
+func (h *DiscoveryHub) resourceExistsInCloud(resourceID string) bool {
+	for _, resource := range h.cache {
+		if resource.ID == resourceID {
+			return true
+		}
+	}
+	return false
+}
+
+// loadCacheFromDisk loads cached resources from disk
+func (h *DiscoveryHub) loadCacheFromDisk() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Get cache directory
+	cacheDir := h.getCacheDir()
+	cacheFile := filepath.Join(cacheDir, "discovery_cache.json")
+
+	// Check if cache file exists
+	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
+		// No cache file exists, this is not an error
+		return nil
+	}
+
+	// Read cache file
+	data, err := ioutil.ReadFile(cacheFile)
+	if err != nil {
+		// Log error but don't fail - cache is optional
+		fmt.Printf("Warning: Failed to read cache file: %v\n", err)
+		return nil
+	}
+
+	// Define cache structure
+	type cacheData struct {
+		Version   int                  `json:"version"`
+		Timestamp time.Time            `json:"timestamp"`
+		Resources []apimodels.Resource `json:"resources"`
+		Metadata  CacheMetadata        `json:"metadata"`
+	}
+
+	var cached cacheData
+	if err := json.Unmarshal(data, &cached); err != nil {
+		// Log error but don't fail - cache might be corrupted
+		fmt.Printf("Warning: Failed to parse cache file: %v\n", err)
+		// Try to delete corrupted cache
+		os.Remove(cacheFile)
+		return nil
+	}
+
+	// Check cache age
+	cacheAge := time.Since(cached.Timestamp)
+	if cacheAge > 24*time.Hour {
+		// Cache is too old, don't use it
+		fmt.Printf("Cache is too old (%v), ignoring\n", cacheAge)
+		os.Remove(cacheFile)
+		return nil
+	}
+
+	// Load cache
+	h.cache = cached.Resources
+	h.cacheTime = cached.Timestamp
+	h.cacheVersion = cached.Version
+	h.cacheMetadata = cached.Metadata
+
+	// Update cache metrics
+	h.cacheHits++
+
+	// Publish cache loaded event
+	if h.eventBus != nil {
+		h.eventBus.Publish(events.Event{
+			Type:   events.CacheLoaded,
+			Source: "discovery_hub",
+			Data: map[string]interface{}{
+				"resource_count": len(h.cache),
+				"cache_age":      cacheAge.Seconds(),
+				"cache_version":  h.cacheVersion,
+			},
+		})
+	}
+
+	fmt.Printf("Loaded %d resources from cache (age: %v)\n", len(h.cache), cacheAge)
+	return nil
+}
+
+// saveCacheToDisk saves current cache to disk
+func (h *DiscoveryHub) saveCacheToDisk() error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	// Don't save empty cache
+	if len(h.cache) == 0 {
+		return nil
+	}
+
+	// Get cache directory
+	cacheDir := h.getCacheDir()
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		// Log error but don't fail - cache is optional
+		fmt.Printf("Warning: Failed to create cache directory: %v\n", err)
+		return nil
+	}
+
+	cacheFile := filepath.Join(cacheDir, "discovery_cache.json")
+
+	// Prepare cache data
+	type cacheData struct {
+		Version   int                  `json:"version"`
+		Timestamp time.Time            `json:"timestamp"`
+		Resources []apimodels.Resource `json:"resources"`
+		Metadata  CacheMetadata        `json:"metadata"`
+	}
+
+	// Update cache metadata
+	h.cacheMetadata.Version = h.cacheVersion
+	h.cacheMetadata.LastUpdated = h.cacheTime
+	h.cacheMetadata.ResourceCount = len(h.cache)
+	h.cacheMetadata.TTL = int(h.cacheTTL.Seconds())
+
+	// Calculate freshness
+	age := time.Since(h.cacheTime)
+	if age < 5*time.Minute {
+		h.cacheMetadata.Freshness = "fresh"
+	} else if age < 1*time.Hour {
+		h.cacheMetadata.Freshness = "recent"
+	} else {
+		h.cacheMetadata.Freshness = "stale"
+	}
+
+	cached := cacheData{
+		Version:   h.cacheVersion,
+		Timestamp: h.cacheTime,
+		Resources: h.cache,
+		Metadata:  h.cacheMetadata,
+	}
+
+	// Marshal to JSON
+	data, err := json.MarshalIndent(cached, "", "  ")
+	if err != nil {
+		// Log error but don't fail - cache is optional
+		fmt.Printf("Warning: Failed to marshal cache data: %v\n", err)
+		return nil
+	}
+
+	// Write to temp file first
+	tempFile := cacheFile + ".tmp"
+	if err := ioutil.WriteFile(tempFile, data, 0644); err != nil {
+		// Log error but don't fail - cache is optional
+		fmt.Printf("Warning: Failed to write cache file: %v\n", err)
+		return nil
+	}
+
+	// Atomic rename
+	if err := os.Rename(tempFile, cacheFile); err != nil {
+		// Try direct write as fallback
+		if err := ioutil.WriteFile(cacheFile, data, 0644); err != nil {
+			fmt.Printf("Warning: Failed to save cache file: %v\n", err)
+			os.Remove(tempFile)
+			return nil
+		}
+		os.Remove(tempFile)
+	}
+
+	// Publish cache saved event
+	if h.eventBus != nil {
+		h.eventBus.Publish(events.Event{
+			Type:   events.CacheSaved,
+			Source: "discovery_hub",
+			Data: map[string]interface{}{
+				"resource_count": len(h.cache),
+				"cache_version":  h.cacheVersion,
+				"file_size":      len(data),
+			},
+		})
+	}
+
+	return nil
+}
+
+// getCacheDir returns the cache directory path
+func (h *DiscoveryHub) getCacheDir() string {
+	// Try to use user's home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to temp directory
+		return filepath.Join(os.TempDir(), ".driftmgr", "cache")
+	}
+	return filepath.Join(homeDir, ".driftmgr", "cache")
+}
+
+// InvalidateCache clears the cache and removes cache files
+func (h *DiscoveryHub) InvalidateCache() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Clear in-memory cache
+	h.cache = []apimodels.Resource{}
+	h.cacheTime = time.Time{}
+	h.cacheVersion++
+
+	// Update metrics
+	h.cacheEvictions++
+
+	// Remove cache file
+	cacheDir := h.getCacheDir()
+	cacheFile := filepath.Join(cacheDir, "discovery_cache.json")
+
+	if err := os.Remove(cacheFile); err != nil && !os.IsNotExist(err) {
+		// Log error but don't fail
+		fmt.Printf("Warning: Failed to remove cache file: %v\n", err)
+	}
+
+	// Clear global cache if available
+	if h.globalCache != nil {
+		h.globalCache.Clear()
+	}
+
+	// Publish cache invalidated event
+	if h.eventBus != nil {
+		h.eventBus.Publish(events.Event{
+			Type:   events.CacheInvalidated,
+			Source: "discovery_hub",
+			Data: map[string]interface{}{
+				"reason": "manual_invalidation",
+			},
+		})
+	}
+
+	return nil
+}
+
+// RefreshCache forces a cache refresh by re-running discovery
+func (h *DiscoveryHub) RefreshCache(ctx context.Context) error {
+	// Clear existing cache first
+	if err := h.InvalidateCache(); err != nil {
+		return fmt.Errorf("failed to invalidate cache: %w", err)
+	}
+
+	// If no discovery service, can't refresh
+	if h.discoveryService == nil {
+		return fmt.Errorf("discovery service not available")
+	}
+
+	// Run discovery for all configured providers
+	providers := []string{"aws", "azure", "gcp"}
+	var allResources []apimodels.Resource
+
+	for _, provider := range providers {
+		// Create discovery options with default regions
+		options := discovery.DiscoveryOptions{
+			Parallel:   true,
+			MaxWorkers: 5,
+			Timeout:    5 * time.Minute,
+		}
+
+		// Try to discover resources
+		result, err := h.discoveryService.DiscoverProvider(ctx, provider, options)
+		if err != nil {
+			// Log but continue with other providers
+			fmt.Printf("Warning: Failed to discover %s resources: %v\n", provider, err)
+			continue
+		}
+
+		// Convert and add resources
+		apiResources := h.convertToAPIResources(result.Resources)
+		allResources = append(allResources, apiResources...)
+	}
+
+	// Update cache
+	h.mu.Lock()
+	h.cache = allResources
+	h.cacheTime = time.Now()
+	h.cacheVersion++
+	h.mu.Unlock()
+
+	// Save to disk
+	if err := h.saveCacheToDisk(); err != nil {
+		// Log but don't fail
+		fmt.Printf("Warning: Failed to save cache to disk: %v\n", err)
+	}
+
+	// Publish cache refreshed event
+	if h.eventBus != nil {
+		h.eventBus.Publish(events.Event{
+			Type:   events.CacheRefreshed,
+			Source: "discovery_hub",
+			Data: map[string]interface{}{
+				"resource_count": len(allResources),
+				"providers":      providers,
+			},
+		})
+	}
+
+	return nil
 }

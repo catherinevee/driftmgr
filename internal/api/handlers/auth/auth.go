@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -355,8 +356,12 @@ func (ah *AuthHandler) GetUserByToken(token string) (*User, error) {
 	defer ah.mu.RUnlock()
 	
 	session, exists := ah.sessions[token]
-	if !exists || session.ExpiresAt.Before(time.Now()) {
-		return nil, nil
+	if !exists {
+		return nil, fmt.Errorf("session not found")
+	}
+	
+	if session.ExpiresAt.Before(time.Now()) {
+		return nil, fmt.Errorf("session expired")
 	}
 	
 	for _, user := range ah.users {
@@ -365,7 +370,7 @@ func (ah *AuthHandler) GetUserByToken(token string) (*User, error) {
 		}
 	}
 	
-	return nil, nil
+	return nil, fmt.Errorf("user not found for session")
 }
 
 // RegisterRoutes registers authentication routes

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/catherinevee/driftmgr/internal/deletion"
+	"github.com/catherinevee/driftmgr/internal/remediation/deletion"
 )
 
 // DeleteResourcesRequest represents a request to delete resources

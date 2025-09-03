@@ -1,0 +1,249 @@
+version: '3.8'
+
+# Docker Compose for Testing and Development
+# Includes LocalStack, Azurite, and other testing services
+
+services:
+  # LocalStack for AWS testing
+  localstack:
+    image: localstack/localstack:latest
+    container_name: driftmgr-test-localstack
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+    environment:
+      - SERVICES=s3,ec2,iam,sts,dynamodb,lambda,cloudwatch,rds,elasticache,vpc,route53
+      - DEBUG=${DEBUG:-1}
+      - DATA_DIR=/tmp/localstack/data
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - PERSISTENCE=1
+    volumes:
+      - localstack-data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts/localstack/init.sh:/docker-entrypoint-initaws.d/init.sh:ro
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Azurite for Azure Storage testing
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: driftmgr-test-azurite
+    ports:
+      - "10000:10000"  # Blob service
+      - "10001:10001"  # Queue service
+      - "10002:10002"  # Table service
+      - "10003:10003"  # Azurite metrics
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data --debug /data/debug.log
+    volumes:
+      - azurite-data:/data
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # GCP Emulator (Firestore)
+  gcp-emulator:
+    image: google/cloud-sdk:alpine
+    container_name: driftmgr-test-gcp
+    command: gcloud beta emulators firestore start --host-port=0.0.0.0:8080
+    ports:
+      - "8088:8080"  # Firestore emulator
+    environment:
+      - FIRESTORE_EMULATOR_HOST=localhost:8088
+      - GOOGLE_CLOUD_PROJECT=test-project
+    networks:
+      - test-network
+
+  # MinIO for S3-compatible storage testing
+  minio:
+    image: minio/minio:latest
+    container_name: driftmgr-test-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_DEFAULT_BUCKETS=terraform-states,drift-backups,test-bucket
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Test PostgreSQL Database
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: driftmgr-test-postgres
+    environment:
+      - POSTGRES_DB=driftmgr_test
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+      - ./scripts/db/test-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for testing
+  redis-test:
+    image: redis:7-alpine
+    container_name: driftmgr-test-redis
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Terraform State Server Mock
+  terraform-state-mock:
+    image: nginx:alpine
+    container_name: driftmgr-test-terraform
+    volumes:
+      - ./tests/fixtures/terraform-states:/usr/share/nginx/html:ro
+      - ./configs/nginx/terraform-mock.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8089:80"
+    networks:
+      - test-network
+
+  # Test SMTP Server (MailHog)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: driftmgr-test-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - test-network
+
+  # Test OAuth Provider (Mock)
+  oauth-mock:
+    image: ghcr.io/navikt/mock-oauth2-server:latest
+    container_name: driftmgr-test-oauth
+    ports:
+      - "8090:8080"
+    environment:
+      - SERVER_PORT=8080
+      - JSON_CONFIG=/config/config.json
+    volumes:
+      - ./tests/fixtures/oauth-config.json:/config/config.json:ro
+    networks:
+      - test-network
+
+  # Webhook Receiver (for testing notifications)
+  webhook-receiver:
+    image: tarampampam/webhook-tester:latest
+    container_name: driftmgr-test-webhook
+    ports:
+      - "8091:8080"
+    environment:
+      - STORAGE_DRIVER=memory
+      - MAX_REQUESTS=100
+    networks:
+      - test-network
+
+  # Test Runner Container
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: test
+    container_name: driftmgr-test-runner
+    environment:
+      # Test configuration
+      - INTEGRATION_TESTS=true
+      - TEST_PARALLEL=4
+      - COVERAGE_OUTPUT=/coverage
+      
+      # Service endpoints
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - AZURE_STORAGE_ENDPOINT=http://azurite:10000
+      - S3_ENDPOINT=http://minio:9000
+      - DATABASE_URL=postgres://test:test@postgres-test:5432/driftmgr_test?sslmode=disable
+      - REDIS_URL=redis://redis-test:6379/0
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      
+      # Test credentials
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - AZURE_STORAGE_ACCOUNT=devstoreaccount1
+      - AZURE_STORAGE_KEY=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    volumes:
+      - .:/workspace
+      - coverage-data:/coverage
+      - test-cache:/go/pkg/mod
+    networks:
+      - test-network
+    depends_on:
+      - localstack
+      - azurite
+      - minio
+      - postgres-test
+      - redis-test
+      - mailhog
+    command: |
+      sh -c "
+        echo 'Waiting for services to be ready...'
+        sleep 10
+        echo 'Running tests...'
+        make test-all
+        echo 'Generating coverage report...'
+        go tool cover -html=/coverage/coverage.out -o /coverage/coverage.html
+        echo 'Tests complete!'
+      "
+
+networks:
+  test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+
+volumes:
+  localstack-data:
+    driver: local
+  azurite-data:
+    driver: local
+  minio-data:
+    driver: local
+  postgres-test-data:
+    driver: local
+  coverage-data:
+    driver: local
+  test-cache:
+    driver: local

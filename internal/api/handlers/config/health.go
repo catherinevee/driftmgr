@@ -1,4 +1,4 @@
-package api
+package config
 
 import (
 	"encoding/json"
@@ -173,26 +173,34 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		LastDiscoveryAt: lastDiscovery,
 	}
 	
-	// Collect drift metrics
+	// Collect drift metrics - count active detection jobs
+	activeDetections := 0
+	for _, job := range s.discoveryJobs {
+		if job.Status == "running" && job.JobType == "drift-detection" {
+			activeDetections++
+		}
+	}
+	
 	driftMetrics := DriftMetrics{
 		TotalDrifts:      s.driftStore.GetDriftCount(),
-		ActiveDetections: 0, // TODO: Track active detections
+		ActiveDetections: activeDetections,
 		RemediationJobs:  len(s.remediationStore.GetAllJobs()),
 	}
 	
-	// Collect cache metrics (simplified for now)
+	// Collect cache metrics with real data
+	cacheHits, cacheMisses, cacheEvictions := s.discoveryHub.GetCacheMetrics()
 	cacheMetrics := CacheMetrics{
 		CacheSize:      len(s.discoveryHub.GetCachedResources()),
-		CacheHits:      0, // TODO: Track cache hits
-		CacheMisses:    0, // TODO: Track cache misses
-		CacheEvictions: 0, // TODO: Track evictions
+		CacheHits:      int(cacheHits),
+		CacheMisses:    int(cacheMisses),
+		CacheEvictions: int(cacheEvictions),
 	}
 	
 	// Collect WebSocket metrics
 	s.wsClientsMu.RLock()
 	wsMetrics := WebSocketMetrics{
 		ConnectedClients: len(s.wsClients),
-		MessagesSent:     0, // TODO: Track messages sent
+		MessagesSent:     int(s.GetWSMessagesSent()),
 		MessagesQueued:   len(s.broadcast),
 	}
 	s.wsClientsMu.RUnlock()

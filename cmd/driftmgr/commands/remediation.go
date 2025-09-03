@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/catherinevee/driftmgr/internal/api"
-	"github.com/catherinevee/driftmgr/internal/core/models"
-	"github.com/catherinevee/driftmgr/internal/terraform/remediation"
+	"github.com/catherinevee/driftmgr/pkg/models"
+	"github.com/catherinevee/driftmgr/internal/remediation/planner"
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 )

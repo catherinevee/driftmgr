@@ -10,10 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/core/color"
-	"github.com/catherinevee/driftmgr/internal/core/discovery"
-	"github.com/catherinevee/driftmgr/internal/core/models"
-	"github.com/catherinevee/driftmgr/internal/deletion"
+	"github.com/catherinevee/driftmgr/pkg/models"
+	"github.com/catherinevee/driftmgr/internal/remediation/deletion"
 )
 
 // BulkDeleteOptions represents options for bulk deletion
@@ -497,8 +495,12 @@ func deleteResource(ctx context.Context, resource models.Resource, opts *BulkDel
 		return provider.DeleteResource(ctx, resource)
 		
 	case "gcp":
-		// GCP deletion would be implemented here
-		return fmt.Errorf("GCP bulk deletion not yet implemented")
+		// Create GCP deletion provider
+		provider, err := deletion.NewGCPProvider()
+		if err != nil {
+			return fmt.Errorf("failed to create GCP provider: %w", err)
+		}
+		return provider.DeleteResource(ctx, resource)
 		
 	default:
 		return fmt.Errorf("unsupported provider: %s", resource.Provider)

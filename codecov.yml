@@ -1,0 +1,227 @@
+# Codecov configuration for DriftMgr
+# https://docs.codecov.io/docs/codecov-yaml
+
+# Repository configuration
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    wait_for_ci: true
+
+# Coverage configuration
+coverage:
+  precision: 2
+  round: down
+  range: "60...100"
+  
+  status:
+    project:
+      default:
+        # Basic project coverage settings
+        target: 70%
+        threshold: 2%
+        base: auto
+        if_not_found: success
+        if_ci_failed: error
+        only_pulls: false
+        
+      # Specific coverage for different components
+      unit:
+        target: 75%
+        flags:
+          - unittests
+          
+      integration:
+        target: 60%
+        flags:
+          - integration
+          
+      api:
+        target: 70%
+        paths:
+          - "internal/api/**"
+          
+      providers:
+        target: 65%
+        paths:
+          - "internal/providers/**"
+          
+      core:
+        target: 80%
+        paths:
+          - "internal/drift/**"
+          - "internal/state/**"
+          - "internal/discovery/**"
+    
+    patch:
+      default:
+        # Coverage for new/modified code
+        target: 70%
+        threshold: 5%
+        base: auto
+        if_not_found: success
+        
+    changes:
+      default:
+        # Track coverage changes
+        threshold: 2%
+
+# Parser configuration
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      macro: no
+
+# Comment configuration
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  show_carryforward_flags: false
+  show_critical_paths: true
+  
+  # Comment settings for different scenarios
+  after_n_builds: 3
+  
+# Flag configuration for different test types
+flags:
+  unittests:
+    paths:
+      - "!**/test/**"
+      - "!**/tests/**"
+      - "!**/testing/**"
+    carryforward: false
+    
+  integration:
+    paths:
+      - "internal/**"
+    carryforward: true
+    
+  e2e:
+    paths:
+      - "cmd/**"
+      - "internal/**"
+    carryforward: true
+
+# Ignore certain files/paths
+ignore:
+  - "**/*_test.go"
+  - "**/test_*.go"
+  - "**/mock_*.go"
+  - "**/fake_*.go"
+  - "test/**"
+  - "tests/**"
+  - "testing/**"
+  - "examples/**"
+  - "docs/**"
+  - "scripts/**"
+  - "configs/**"
+  - "web/**"
+  - "*.md"
+  - "*.yml"
+  - "*.yaml"
+  - "*.json"
+  - "*.txt"
+  - "go.mod"
+  - "go.sum"
+  - "Dockerfile*"
+  - "Makefile"
+  - ".github/**"
+  - ".gitignore"
+  - "vendor/**"
+
+# GitHub integration
+github_checks:
+  annotations: true
+
+# Codecov CI settings
+ci:
+  - "github.com/catherinevee/driftmgr"
+  - "!jenkins"
+  - "!circleci"
+
+# Upload settings
+uploads:
+  - name: "linux"
+    when: "os == 'linux'"
+    flags:
+      - unittests
+      - integration
+  
+  - name: "windows"
+    when: "os == 'windows'"
+    flags:
+      - unittests
+  
+  - name: "macos"
+    when: "os == 'macos'"
+    flags:
+      - unittests
+
+# Component grouping for better reporting
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        threshold: 1%
+  
+  individual_components:
+    - component_id: providers
+      name: Cloud Providers
+      paths:
+        - internal/providers/**
+    
+    - component_id: discovery
+      name: Discovery Engine
+      paths:
+        - internal/discovery/**
+    
+    - component_id: drift
+      name: Drift Detection
+      paths:
+        - internal/drift/**
+    
+    - component_id: state
+      name: State Management
+      paths:
+        - internal/state/**
+    
+    - component_id: remediation
+      name: Remediation System
+      paths:
+        - internal/remediation/**
+    
+    - component_id: api
+      name: API Server
+      paths:
+        - internal/api/**
+    
+    - component_id: cli
+      name: CLI Commands
+      paths:
+        - cmd/driftmgr/**
+
+# Profiling configuration (for performance analysis)
+profiling:
+  fixes:
+    - "master"
+    - "main"
+  
+# Notification settings
+slack:
+  enabled: false
+  url: secret:SLACK_WEBHOOK_URL
+  threshold: 1%
+  only_pulls: false
+  branches: 
+    - main
+    - develop
+  
+# Archive settings
+archive:
+  uploads: true

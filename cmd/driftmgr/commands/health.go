@@ -7,18 +7,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/observability/health"
+	"github.com/catherinevee/driftmgr/internal/api/handlers/config"
 )
 
 // HealthServer provides health check endpoints
 type HealthServer struct {
-	checker *health.HealthChecker
+	checker *config.HealthChecker
 	db      *sql.DB
 }
 
 // NewHealthServer creates a new health server
 func NewHealthServer(db *sql.DB) *HealthServer {
-	checker := health.NewHealthChecker(5 * time.Second)
+	checker := config.NewHealthChecker(5 * time.Second)
 
 	// Add database check
 	if db != nil {

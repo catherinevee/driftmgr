@@ -17,7 +17,7 @@ on:
         type: boolean
 
 env:
-  GO_VERSION: '1.23.8'
+  GO_VERSION: '1.23'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -108,15 +108,12 @@ jobs:
         go build -ldflags="$LDFLAGS" -o dist/driftmgr-$GOOS-$GOARCH$SUFFIX ./cmd/driftmgr
         
         # Build server binary
-        go build -ldflags="$LDFLAGS" -o dist/driftmgr-server-$GOOS-$GOARCH$SUFFIX ./cmd/server
+        go build -ldflags="$LDFLAGS" -o dist/driftmgr-server-$GOOS-$GOARCH$SUFFIX ./cmd/driftmgr-server
         
         # Build TUI binary if it exists
         if [ -d "cmd/driftmgr-tui" ]; then
           go build -ldflags="$LDFLAGS" -o dist/driftmgr-tui-$GOOS-$GOARCH$SUFFIX ./cmd/driftmgr-tui
         fi
-        
-        # Build validation binary
-        go build -ldflags="$LDFLAGS" -o dist/validate-discovery-$GOOS-$GOARCH$SUFFIX ./cmd/validate
         
         # Create archive
         cd dist
@@ -177,7 +174,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./deployments/docker/Dockerfile
+        file: ./Dockerfile
         platforms: linux/amd64,linux/arm64
         push: true
         tags: ${{ steps.meta.outputs.tags }}

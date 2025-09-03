@@ -4,11 +4,12 @@ import "time"
 
 // DiscoveryRequest represents a discovery job request
 type DiscoveryRequest struct {
-	Provider         string   `json:"provider"`
-	Regions          []string `json:"regions"`
-	StateFilePath    string   `json:"state_file_path,omitempty"`
-	RemediationMode  string   `json:"remediation_mode,omitempty"`
-	DriftDetection   bool     `json:"drift_detection"`
+	Provider        string   `json:"provider"`
+	Regions         []string `json:"regions"`
+	ResourceTypes   []string `json:"resource_types,omitempty"` // Filter by specific resource types
+	StateFilePath   string   `json:"state_file_path,omitempty"`
+	RemediationMode string   `json:"remediation_mode,omitempty"`
+	DriftDetection  bool     `json:"drift_detection"`
 }
 
 // DriftRecord represents a drift detection record
@@ -26,4 +27,5 @@ type DriftRecord struct {
 	DetectedAt   time.Time              `json:"detected_at"`
 	Status       string                 `json:"status"`
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	Details      map[string]interface{} `json:"details,omitempty"` // Detailed drift information
 }

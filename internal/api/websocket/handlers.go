@@ -124,6 +124,11 @@ func (c *WebSocketClient) writePump() {
 			if err := c.conn.WriteJSON(message); err != nil {
 				return
 			}
+			
+			// Track message sent
+			if c.server.apiServer != nil {
+				c.server.apiServer.IncrementWSMessagesSent()
+			}
 
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))

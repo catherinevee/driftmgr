@@ -1,0 +1,183 @@
+# Dependabot configuration for DriftMgr
+# Keeps dependencies up to date automatically
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
+version: 2
+updates:
+  # Go modules
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    reviewers:
+      - "catherinevee"
+    assignees:
+      - "catherinevee"
+    labels:
+      - "dependencies"
+      - "go"
+      - "automated"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "-"
+    open-pull-requests-limit: 10
+    groups:
+      # Group AWS SDK updates together
+      aws:
+        patterns:
+          - "github.com/aws/aws-sdk-go*"
+          - "github.com/aws/smithy-go"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      # Group Azure SDK updates together
+      azure:
+        patterns:
+          - "github.com/Azure/*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      # Group Google Cloud SDK updates together
+      gcp:
+        patterns:
+          - "cloud.google.com/*"
+          - "google.golang.org/*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      # Group test dependencies
+      test-dependencies:
+        patterns:
+          - "github.com/stretchr/testify"
+          - "github.com/golang/mock"
+          - "github.com/onsi/*"
+        update-types:
+          - "minor"
+          - "patch"
+    
+    ignore:
+      # Don't update major versions automatically for critical dependencies
+      - dependency-name: "github.com/spf13/cobra"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "github.com/hashicorp/terraform-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "github.com/open-policy-agent/opa"
+        update-types: ["version-update:semver-major"]
+    
+    # Vendor dependencies if vendor directory exists
+    vendor: false
+    
+    # Allow both direct and indirect updates
+    allow:
+      - dependency-type: "all"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    reviewers:
+      - "catherinevee"
+    assignees:
+      - "catherinevee"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "-"
+    open-pull-requests-limit: 5
+    groups:
+      # Group all GitHub Actions updates
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "America/New_York"
+    reviewers:
+      - "catherinevee"
+    assignees:
+      - "catherinevee"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "automated"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    ignore:
+      # Don't update base images automatically to major versions
+      - dependency-name: "golang"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "alpine"
+        update-types: ["version-update:semver-major"]
+
+  # NPM dependencies (if web UI exists)
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    reviewers:
+      - "catherinevee"
+    assignees:
+      - "catherinevee"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "automated"
+    commit-message:
+      prefix: "deps(web)"
+      include: "scope"
+    open-pull-requests-limit: 5
+    allow:
+      - dependency-type: "production"
+    ignore:
+      # Ignore major updates for frameworks
+      - dependency-name: "alpine"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+
+# Security updates configuration
+security-updates:
+  open-pull-requests-limit: 10
+
+# Registries configuration (if using private registries)
+registries:
+  # Example for private Go modules
+  # private-go:
+  #   type: golang
+  #   url: https://private.example.com
+  #   username: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
+  #   password: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
+
+# Enable security advisories
+enable-beta-ecosystems: true

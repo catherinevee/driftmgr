@@ -1,0 +1,288 @@
+# DriftMgr Environment Configurations
+# This file consolidates all environment-specific configurations
+# Use the DRIFTMGR_ENV environment variable to select an environment
+
+environments:
+  # Development Configuration - Optimized for local development
+  development:
+    server:
+      port: 8080
+      host: "localhost"
+      debug: true
+      tls:
+        enabled: false
+    
+    discovery:
+      timeout: 5m
+      concurrency_limit: 5
+      batch_size: 50
+      retry_attempts: 2
+      retry_delay: 2s
+      enable_caching: true
+      cache_ttl: 1m
+      cache_max_size: 100
+      api_timeout: 30s
+    
+    providers:
+      aws:
+        profile: "default"
+        regions: ["us-east-1"]
+      azure:
+        use_cli: true
+      gcp:
+        use_application_default: true
+    
+    security:
+      enable_auth: false
+      jwt_secret: "development-secret-key"
+      session_timeout: 24h
+    
+    database:
+      type: "sqlite"
+      database: "driftmgr.db"
+    
+    logging:
+      level: "debug"
+      format: "text"
+      output: "stdout"
+      colorize: true
+    
+    monitoring:
+      metrics:
+        enabled: false
+      health:
+        enabled: true
+        path: "/health"
+      tracing:
+        enabled: false
+    
+    features:
+      auto_discovery: true
+      drift_detection: true
+      cost_analysis: true
+      compliance_scanning: false
+      terraform_import: true
+      export_reports: true
+      debug_endpoints: true
+      
+    remediation:
+      enabled: true
+      dry_run: true
+      require_approval: false
+
+  # Staging Configuration - Pre-production testing
+  staging:
+    server:
+      port: 8080
+      host: "0.0.0.0"
+      debug: false
+      tls:
+        enabled: true
+        cert_file: "/etc/driftmgr/certs/server.crt"
+        key_file: "/etc/driftmgr/certs/server.key"
+    
+    discovery:
+      timeout: 15m
+      concurrency_limit: 10
+      batch_size: 75
+      retry_attempts: 3
+      retry_delay: 3s
+      enable_caching: true
+      cache_ttl: 3m
+      cache_max_size: 500
+      api_timeout: 1m
+    
+    providers:
+      aws:
+        use_iam_role: true
+        regions: ["us-east-1", "us-west-2"]
+      azure:
+        use_managed_identity: true
+        subscription_id: "${AZURE_SUBSCRIPTION_ID}"
+      gcp:
+        use_service_account: true
+        project_id: "${GCP_PROJECT_ID}"
+    
+    security:
+      enable_auth: true
+      jwt_secret: "${JWT_SECRET}"
+      session_timeout: 12h
+      max_login_attempts: 5
+      lockout_duration: 10m
+    
+    database:
+      type: "postgres"
+      host: "${DB_HOST}"
+      port: 5432
+      database: "driftmgr_staging"
+      username: "${DB_USER}"
+      password: "${DB_PASSWORD}"
+      ssl_mode: "require"
+      max_open_conns: 15
+      max_idle_conns: 5
+      conn_max_lifetime: 1h
+    
+    logging:
+      level: "info"
+      format: "json"
+      output: "stdout"
+      file:
+        enabled: true
+        path: "/var/log/driftmgr/app.log"
+        max_size: 50
+        max_backups: 5
+        max_age: 14
+    
+    monitoring:
+      metrics:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      health:
+        enabled: true
+        path: "/health"
+        liveness_path: "/health/live"
+        readiness_path: "/health/ready"
+      tracing:
+        enabled: false
+    
+    features:
+      auto_discovery: true
+      drift_detection: true
+      cost_analysis: true
+      compliance_scanning: true
+      terraform_import: true
+      export_reports: true
+      debug_endpoints: false
+      
+    remediation:
+      enabled: true
+      dry_run: true
+      require_approval: true
+      max_parallel_remediations: 3
+
+  # Production Configuration - Live environment
+  production:
+    server:
+      port: 8080
+      host: "0.0.0.0"
+      debug: false
+      tls:
+        enabled: true
+        cert_file: "/etc/driftmgr/certs/server.crt"
+        key_file: "/etc/driftmgr/certs/server.key"
+    
+    discovery:
+      timeout: 30m
+      concurrency_limit: 20
+      batch_size: 100
+      retry_attempts: 3
+      retry_delay: 5s
+      enable_caching: true
+      cache_ttl: 5m
+      cache_max_size: 1000
+      api_timeout: 2m
+    
+    providers:
+      aws:
+        use_iam_role: true
+        regions: ["us-east-1", "us-west-2", "eu-west-1"]
+      azure:
+        use_managed_identity: true
+        subscription_id: "${AZURE_SUBSCRIPTION_ID}"
+      gcp:
+        use_service_account: true
+        project_id: "${GCP_PROJECT_ID}"
+    
+    security:
+      enable_auth: true
+      jwt_secret: "${JWT_SECRET}"
+      session_timeout: 24h
+      max_login_attempts: 5
+      lockout_duration: 15m
+      password_policy:
+        min_length: 12
+        require_uppercase: true
+        require_lowercase: true
+        require_numbers: true
+        require_special: true
+      encryption:
+        enabled: true
+        key: "${ENCRYPTION_KEY}"
+    
+    database:
+      type: "postgres"
+      host: "${DB_HOST}"
+      port: 5432
+      database: "driftmgr"
+      username: "${DB_USER}"
+      password: "${DB_PASSWORD}"
+      ssl_mode: "require"
+      max_open_conns: 25
+      max_idle_conns: 10
+      conn_max_lifetime: 1h
+    
+    logging:
+      level: "info"
+      format: "json"
+      output: "stdout"
+      file:
+        enabled: true
+        path: "/var/log/driftmgr/app.log"
+        max_size: 100
+        max_backups: 7
+        max_age: 30
+    
+    monitoring:
+      metrics:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      health:
+        enabled: true
+        path: "/health"
+        liveness_path: "/health/live"
+        readiness_path: "/health/ready"
+      tracing:
+        enabled: true
+        provider: "jaeger"
+        endpoint: "${JAEGER_ENDPOINT}"
+        sample_rate: 0.1
+    
+    rate_limiting:
+      enabled: true
+      requests_per_second: 100
+      burst: 200
+    
+    notifications:
+      email:
+        enabled: true
+        smtp_host: "${SMTP_HOST}"
+        smtp_port: 587
+        smtp_user: "${SMTP_USER}"
+        smtp_password: "${SMTP_PASSWORD}"
+        from_address: "driftmgr@example.com"
+      slack:
+        enabled: false
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+      pagerduty:
+        enabled: false
+        integration_key: "${PAGERDUTY_KEY}"
+    
+    features:
+      auto_discovery: true
+      drift_detection: true
+      cost_analysis: true
+      compliance_scanning: true
+      terraform_import: true
+      export_reports: true
+      debug_endpoints: false
+      
+    remediation:
+      enabled: false  # Disabled by default for safety
+      dry_run: true
+      require_approval: true
+      max_parallel_remediations: 5
+
+# Default environment if DRIFTMGR_ENV is not set
+default_environment: "development"

@@ -10,6 +10,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// ServerMetricsInterface defines the interface for tracking server metrics
+type ServerMetricsInterface interface {
+	IncrementWSMessagesSent()
+}
+
 // EnhancedDashboardServer represents the WebSocket server
 type EnhancedDashboardServer struct {
 	clients    map[string]*WebSocketClient
@@ -22,6 +27,12 @@ type EnhancedDashboardServer struct {
 	clientsMux sync.RWMutex
 	startTime  time.Time
 	mu         sync.RWMutex
+	apiServer  ServerMetricsInterface
+}
+
+// SetAPIServer sets the API server reference for metrics tracking
+func (s *EnhancedDashboardServer) SetAPIServer(apiServer ServerMetricsInterface) {
+	s.apiServer = apiServer
 }
 
 // NewServer creates a new WebSocket server
@@ -186,5 +197,60 @@ func (s *EnhancedDashboardServer) removeClient(client *WebSocketClient) {
 	if _, exists := s.clients[client.id]; exists {
 		delete(s.clients, client.id)
 		close(client.send)
+	}
+}
+
+// Run starts the WebSocket server broadcast processing
+func (s *EnhancedDashboardServer) Run() {
+	for {
+		select {
+		case message := <-s.broadcast:
+			// Send message to all connected clients
+			s.clientsMux.RLock()
+			for _, client := range s.clients {
+				select {
+				case client.send <- convertToWSMessage(message):
+				default:
+					// Client send channel is full, skip
+				}
+			}
+			s.clientsMux.RUnlock()
+		}
+	}
+}
+
+// convertToWSMessage converts various message types to WebSocketMessage
+func convertToWSMessage(msg interface{}) WebSocketMessage {
+	if wsMsg, ok := msg.(WebSocketMessage); ok {
+		return wsMsg
+	}
+	
+	if mapMsg, ok := msg.(map[string]interface{}); ok {
+		msgType := "update"
+		if t, ok := mapMsg["type"].(string); ok {
+			msgType = t
+			delete(mapMsg, "type")
+		}
+		
+		timestamp := time.Now()
+		if ts, ok := mapMsg["timestamp"].(time.Time); ok {
+			timestamp = ts
+			delete(mapMsg, "timestamp")
+		}
+		
+		return WebSocketMessage{
+			Type:      msgType,
+			Timestamp: timestamp,
+			Data:      mapMsg,
+		}
+	}
+	
+	// Default fallback
+	return WebSocketMessage{
+		Type:      "update",
+		Timestamp: time.Now(),
+		Data: map[string]interface{}{
+			"message": fmt.Sprintf("%v", msg),
+		},
 	}
 }

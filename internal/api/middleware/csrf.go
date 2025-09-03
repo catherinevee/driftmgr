@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
 	"sync"
@@ -123,7 +125,7 @@ func (m *CSRFMiddleware) ProtectCSRF() gin.HandlerFunc {
 		if !exists {
 			// Try to get from claims
 			if claims, exists := c.Get(string(ClaimsContextKey)); exists {
-				if authClaims, ok := claims.(*auth.Claims); ok {
+				if authClaims, ok := claims.(map[string]interface{}); ok {
 					sessionID = authClaims.SessionID
 				}
 			}
@@ -158,7 +160,7 @@ func (m *CSRFMiddleware) GetCSRFToken() gin.HandlerFunc {
 		if !exists {
 			// Try to get from claims
 			if claims, exists := c.Get(string(ClaimsContextKey)); exists {
-				if authClaims, ok := claims.(*auth.Claims); ok {
+				if authClaims, ok := claims.(map[string]interface{}); ok {
 					sessionID = authClaims.SessionID
 				}
 			}
@@ -244,7 +246,7 @@ func (m *CSRFMiddleware) DoubleSubmitCookie() gin.HandlerFunc {
 		}
 
 		// Compare tokens (constant time comparison)
-		if !auth.CompareSecure(headerToken, cookieToken) {
+		if !compareSecure(headerToken, cookieToken) {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error": "CSRF token mismatch",
 			})
@@ -254,4 +256,8 @@ func (m *CSRFMiddleware) DoubleSubmitCookie() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+// compareSecure performs a constant-time comparison of two strings
+func compareSecure(a, b string) bool {
+	return hmac.Equal([]byte(a), []byte(b))
 }

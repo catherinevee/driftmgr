@@ -1,0 +1,509 @@
+# Production Configuration for DriftMgr
+# This configuration is optimized for production environments with
+# high availability, security, and performance requirements
+
+# Provider configurations
+providers:
+  aws:
+    # Use IAM roles for authentication (no hardcoded credentials)
+    assume_role_arn: ${AWS_ROLE_ARN}
+    
+    # Monitor multiple regions
+    regions:
+      - us-east-1
+      - us-west-2
+      - eu-west-1
+      - ap-southeast-1
+    
+    # Parallel discovery settings
+    max_retries: 3
+    timeout: 30
+    
+    # Resource type filters (optimize discovery)
+    resource_types:
+      - ec2
+      - rds
+      - s3
+      - lambda
+      - ecs
+      - eks
+      - vpc
+      - elb
+      - cloudfront
+      - route53
+      - iam
+      - dynamodb
+      - elasticache
+      - sns
+      - sqs
+    
+    # Tag filters for production resources
+    tag_filters:
+      Environment: production
+      ManagedBy: terraform
+
+  azure:
+    # Use managed identity or service principal
+    use_managed_identity: true
+    subscription_ids:
+      - ${AZURE_SUBSCRIPTION_ID_PROD}
+    
+    # Resource groups to monitor
+    resource_groups:
+      - rg-prod-eastus
+      - rg-prod-westus
+      - rg-prod-northeurope
+    
+    # Resource types
+    resource_types:
+      - compute
+      - storage
+      - network
+      - database
+      - web
+      - containers
+
+  gcp:
+    # Use service account
+    credentials_path: ${GOOGLE_APPLICATION_CREDENTIALS}
+    projects:
+      - ${GCP_PROJECT_PROD}
+    
+    regions:
+      - us-central1
+      - us-east1
+      - europe-west1
+    
+    resource_types:
+      - compute
+      - storage
+      - networking
+      - database
+      - kubernetes
+
+# Discovery settings
+discovery:
+  # Performance optimization
+  parallel_workers: 20
+  batch_size: 100
+  timeout: 600
+  
+  # Caching configuration
+  cache:
+    enabled: true
+    ttl: 3600  # 1 hour
+    storage: redis
+    redis_url: ${REDIS_URL}
+  
+  # Incremental discovery
+  incremental:
+    enabled: true
+    state_store: s3
+    state_bucket: ${STATE_BUCKET}
+    state_key: discovery/production/state
+  
+  # Retry policy
+  retry:
+    max_attempts: 3
+    initial_delay: 1000  # ms
+    max_delay: 30000     # ms
+    multiplier: 2
+
+# Drift detection settings
+drift:
+  # Sensitivity settings
+  sensitivity: high
+  
+  # Properties to ignore during comparison
+  ignore_properties:
+    - last_modified
+    - created_at
+    - updated_at
+    - etag
+    - generation
+  
+  # Tag drift detection
+  ignore_tags:
+    - LastScanned
+    - DriftMgrVersion
+    - AutoScaling
+  
+  # Drift severity thresholds
+  severity:
+    critical:
+      threshold: 0.9
+      properties:
+        - security_groups
+        - iam_policies
+        - network_acls
+        - encryption_settings
+    
+    high:
+      threshold: 0.7
+      properties:
+        - instance_type
+        - storage_size
+        - backup_settings
+    
+    medium:
+      threshold: 0.5
+      properties:
+        - tags
+        - descriptions
+        - monitoring_settings
+
+# State management
+state:
+  # Backend configuration
+  backend:
+    type: s3
+    config:
+      bucket: ${TF_STATE_BUCKET}
+      key_prefix: terraform-states/
+      region: us-east-1
+      encrypt: true
+      kms_key_id: ${KMS_KEY_ID}
+      
+      # State locking
+      dynamodb_table: terraform-state-locks
+      
+  # Backup settings
+  backup:
+    enabled: true
+    retention_days: 30
+    storage:
+      type: s3
+      bucket: ${BACKUP_BUCKET}
+      prefix: state-backups/
+
+# Monitoring and alerting
+monitoring:
+  # Continuous monitoring
+  enabled: true
+  interval: 300  # 5 minutes
+  
+  # Webhook notifications
+  webhooks:
+    - name: slack-critical
+      url: ${SLACK_WEBHOOK_CRITICAL}
+      events:
+        - critical_drift_detected
+        - unauthorized_change
+        - compliance_violation
+      
+    - name: slack-info
+      url: ${SLACK_WEBHOOK_INFO}
+      events:
+        - drift_detected
+        - scan_completed
+    
+    - name: pagerduty
+      url: ${PAGERDUTY_WEBHOOK}
+      events:
+        - critical_drift_detected
+        - service_error
+  
+  # Metrics export
+  metrics:
+    enabled: true
+    exporters:
+      - type: prometheus
+        endpoint: :9090
+        
+      - type: cloudwatch
+        namespace: DriftMgr
+        region: us-east-1
+      
+      - type: datadog
+        api_key: ${DATADOG_API_KEY}
+
+# Security settings
+security:
+  # Authentication
+  auth:
+    enabled: true
+    provider: okta
+    config:
+      domain: ${OKTA_DOMAIN}
+      client_id: ${OKTA_CLIENT_ID}
+      client_secret: ${OKTA_CLIENT_SECRET}
+  
+  # Encryption
+  encryption:
+    enabled: true
+    at_rest:
+      algorithm: AES-256-GCM
+      key_provider: kms
+      kms_key_id: ${KMS_KEY_ID}
+    
+    in_transit:
+      tls_version: "1.3"
+      cipher_suites:
+        - TLS_AES_128_GCM_SHA256
+        - TLS_AES_256_GCM_SHA384
+  
+  # Audit logging
+  audit:
+    enabled: true
+    destinations:
+      - type: cloudwatch
+        log_group: /aws/driftmgr/audit
+        
+      - type: s3
+        bucket: ${AUDIT_BUCKET}
+        prefix: audit-logs/
+        
+      - type: splunk
+        endpoint: ${SPLUNK_HEC_ENDPOINT}
+        token: ${SPLUNK_HEC_TOKEN}
+
+# Compliance settings
+compliance:
+  # Standards to check
+  standards:
+    - soc2
+    - hipaa
+    - pci-dss
+    - iso27001
+  
+  # Reporting
+  reporting:
+    enabled: true
+    schedule: "0 0 * * 0"  # Weekly on Sunday
+    formats:
+      - json
+      - pdf
+      - html
+    
+    destinations:
+      - type: s3
+        bucket: ${COMPLIANCE_BUCKET}
+        prefix: reports/
+      
+      - type: email
+        recipients:
+          - security@company.com
+          - compliance@company.com
+
+# Policy enforcement (OPA)
+policy:
+  enabled: true
+  engine: opa
+  
+  # Policy sources
+  sources:
+    - type: git
+      repo: ${POLICY_REPO}
+      branch: main
+      path: policies/production/
+    
+    - type: s3
+      bucket: ${POLICY_BUCKET}
+      prefix: policies/
+  
+  # Enforcement mode
+  enforcement:
+    mode: enforce  # enforce | audit | disabled
+    
+    # Actions to block
+    block_actions:
+      - resource_deletion
+      - security_group_modification
+      - iam_policy_change
+    
+    # Exceptions
+    exceptions:
+      - resource_id: sg-emergency
+        reason: Emergency access security group
+
+# Performance settings
+performance:
+  # Resource limits
+  limits:
+    max_memory: 2048  # MB
+    max_cpu: 4        # cores
+    max_goroutines: 100
+  
+  # Optimization
+  optimization:
+    # Batch processing
+    batch_processing: true
+    batch_size: 50
+    
+    # Connection pooling
+    connection_pool:
+      size: 20
+      max_idle: 10
+      timeout: 30
+    
+    # Circuit breaker
+    circuit_breaker:
+      enabled: true
+      threshold: 5
+      timeout: 60
+      half_open_requests: 3
+
+# High availability settings
+high_availability:
+  enabled: true
+  
+  # Clustering
+  cluster:
+    enabled: true
+    mode: active-passive
+    nodes:
+      - host: driftmgr-1.internal
+        port: 8080
+      - host: driftmgr-2.internal
+        port: 8080
+    
+    # Leader election
+    leader_election:
+      enabled: true
+      backend: etcd
+      etcd_endpoints:
+        - etcd-1.internal:2379
+        - etcd-2.internal:2379
+        - etcd-3.internal:2379
+  
+  # Health checks
+  health_check:
+    enabled: true
+    endpoint: /health
+    interval: 10
+    timeout: 5
+    unhealthy_threshold: 3
+
+# Disaster recovery
+disaster_recovery:
+  # Backup configuration
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention:
+      daily: 7
+      weekly: 4
+      monthly: 12
+    
+    destinations:
+      - type: s3
+        bucket: ${DR_BUCKET}
+        region: us-west-2  # Different region
+        storage_class: GLACIER
+  
+  # Recovery settings
+  recovery:
+    rpo: 3600  # Recovery Point Objective: 1 hour
+    rto: 900   # Recovery Time Objective: 15 minutes
+
+# Integration settings
+integrations:
+  # Terraform Cloud/Enterprise
+  terraform:
+    enabled: true
+    endpoint: ${TFE_ENDPOINT}
+    token: ${TFE_TOKEN}
+    organization: ${TFE_ORG}
+  
+  # ServiceNow
+  servicenow:
+    enabled: true
+    instance: ${SNOW_INSTANCE}
+    username: ${SNOW_USERNAME}
+    password: ${SNOW_PASSWORD}
+    
+    # Auto-create incidents
+    auto_incident:
+      enabled: true
+      priority_mapping:
+        critical: 1
+        high: 2
+        medium: 3
+        low: 4
+  
+  # Jira
+  jira:
+    enabled: true
+    url: ${JIRA_URL}
+    username: ${JIRA_USERNAME}
+    api_token: ${JIRA_API_TOKEN}
+    project: DRIFT
+    
+    # Auto-create issues
+    auto_issue:
+      enabled: true
+      issue_type: Bug
+      labels:
+        - drift
+        - automation
+
+# Feature flags
+features:
+  # Experimental features
+  experimental:
+    ml_drift_prediction: false
+    auto_remediation: false
+    cost_anomaly_detection: true
+  
+  # Beta features
+  beta:
+    advanced_visualization: true
+    custom_resource_providers: true
+    multi_tenancy: true
+
+# Logging configuration
+logging:
+  level: info  # debug | info | warn | error
+  format: json # json | text
+  
+  outputs:
+    - type: stdout
+      level: info
+      
+    - type: file
+      path: /var/log/driftmgr/app.log
+      max_size: 100  # MB
+      max_age: 30    # days
+      max_backups: 10
+      compress: true
+    
+    - type: syslog
+      network: tcp
+      address: syslog.internal:514
+      tag: driftmgr
+
+# API server settings
+api:
+  enabled: true
+  host: 0.0.0.0
+  port: 8080
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+    burst: 20
+  
+  # CORS settings
+  cors:
+    enabled: true
+    allowed_origins:
+      - https://app.company.com
+      - https://dashboard.company.com
+    allowed_methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    allowed_headers:
+      - Authorization
+      - Content-Type
+      - X-Request-ID
+  
+  # API versioning
+  versioning:
+    enabled: true
+    default_version: v1
+    supported_versions:
+      - v1
+      - v2-beta

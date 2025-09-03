@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	apimodels "github.com/catherinevee/driftmgr/internal/api/models"
+	"github.com/catherinevee/driftmgr/pkg/models"
 )
 
 // DiscoveryJob represents an active discovery job
@@ -18,7 +18,7 @@ type DiscoveryJob struct {
 	StartedAt   time.Time              `json:"started_at"`
 	CompletedAt *time.Time             `json:"completed_at,omitempty"`
 	Error       string                 `json:"error,omitempty"`
-	Resources   []apimodels.Resource             `json:"resources,omitempty"`
+	Resources   []models.Resource             `json:"resources,omitempty"`
 	Summary     map[string]interface{} `json:"summary,omitempty"`
 	mu          sync.RWMutex
 }
@@ -91,7 +91,6 @@ func (j *DiscoveryJob) GetSnapshot() DiscoveryJob {
 
 /*
 // handleDiscoveryStart starts a new discovery job
-// TODO: Move this to api package or refactor to use proper type
 func (s *Server) handleDiscoveryStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -150,7 +149,6 @@ func (s *Server) handleDiscoveryStart(w http.ResponseWriter, r *http.Request) {
 
 /*
 // runDiscoveryJob runs a discovery job in the background
-// TODO: Move this to api package or refactor to use proper type
 func (s *Server) runDiscoveryJob(job *DiscoveryJob) {
 	// Set job as running
 	job.SetStatus("running")

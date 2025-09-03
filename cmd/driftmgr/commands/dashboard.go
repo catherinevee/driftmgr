@@ -11,12 +11,10 @@ import (
 	"time"
 	
 	"github.com/catherinevee/driftmgr/internal/api"
-	apimodels "github.com/catherinevee/driftmgr/internal/api/models"
-	"github.com/catherinevee/driftmgr/internal/core/discovery"
-	"github.com/catherinevee/driftmgr/internal/credentials"
+	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/catherinevee/driftmgr/internal/providers/aws"
 	"github.com/catherinevee/driftmgr/internal/providers/azure"
-	"github.com/catherinevee/driftmgr/internal/providers/digitalocean"
+	// "github.com/catherinevee/driftmgr/internal/providers/digitalocean" // Provider not yet implemented
 	"github.com/catherinevee/driftmgr/internal/providers/gcp"
 )
 
