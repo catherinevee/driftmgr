@@ -16,6 +16,7 @@ Discover, analyze, and remediate drift in Terraform state files across multiple 
 [![Docker Pulls](https://img.shields.io/docker/pulls/catherinevee/driftmgr)](https://hub.docker.com/r/catherinevee/driftmgr)
 [![Multi-Cloud](https://img.shields.io/badge/☁️-AWS%20|%20Azure%20|%20GCP%20|%20DO-orange)](https://github.com/catherinevee/driftmgr#supported-providers)
 [![Terraform](https://img.shields.io/badge/Terraform-0.11→1.x-7B42BC?logo=terraform)](https://github.com/catherinevee/driftmgr#terraform-compatibility)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcatherinevee%2Fdriftmgr.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcatherinevee%2Fdriftmgr?ref=badge_shield)
 
 ## What It Does
 
@@ -330,6 +331,9 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcatherinevee%2Fdriftmgr.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcatherinevee%2Fdriftmgr?ref=badge_large)
 
 ## Support
 
