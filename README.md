@@ -11,9 +11,15 @@
 
 Advanced Terraform drift detection and remediation for multi-cloud environments.
 
-[![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go)](https://golang.org)
-[![Tests](https://img.shields.io/github/actions/workflow/status/catherinevee/driftmgr/ci.yml?branch=main&label=tests)](https://github.com/catherinevee/driftmgr/actions)
+[![Security](https://github.com/catherinevee/driftmgr/actions/workflows/security.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/security.yml)
+[![CI](https://github.com/catherinevee/driftmgr/actions/workflows/ci.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/ci.yml)
+[![Tests](https://github.com/catherinevee/driftmgr/actions/workflows/test.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/test.yml)
 [![License](https://img.shields.io/github/license/catherinevee/driftmgr)](LICENSE)
+[![CodeQL](https://github.com/catherinevee/driftmgr/actions/workflows/codeql.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/catherinevee/driftmgr/badge)](https://securityscorecards.dev/viewer/?uri=github.com/catherinevee/driftmgr)
+[![Dependency Review](https://github.com/catherinevee/driftmgr/actions/workflows/dependencies.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/dependencies.yml)
+[![codecov](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
+[![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
 
 ## Table of Contents
 
