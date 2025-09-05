@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/state"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -70,7 +70,7 @@ func (s *GCPSimulator) Initialize(ctx context.Context) error {
 }
 
 // SimulateDrift creates drift in GCP resources
-func (s *GCPSimulator) SimulateDrift(ctx context.Context, driftType DriftType, resourceID string, state *parser.TerraformState) (*SimulationResult, error) {
+func (s *GCPSimulator) SimulateDrift(ctx context.Context, driftType DriftType, resourceID string, state *state.TerraformState) (*SimulationResult, error) {
 	// Initialize if needed
 	if s.httpClient == nil {
 		if err := s.Initialize(ctx); err != nil {
@@ -100,7 +100,7 @@ func (s *GCPSimulator) SimulateDrift(ctx context.Context, driftType DriftType, r
 }
 
 // simulateLabelDrift adds or modifies labels on a GCP resource
-func (s *GCPSimulator) simulateLabelDrift(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *GCPSimulator) simulateLabelDrift(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "gcp",
 		ResourceType: resource.Type,
@@ -209,7 +209,7 @@ func (s *GCPSimulator) simulateLabelDrift(ctx context.Context, resource *parser.
 }
 
 // simulateFirewallRuleDrift adds a new firewall rule
-func (s *GCPSimulator) simulateFirewallRuleDrift(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *GCPSimulator) simulateFirewallRuleDrift(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "gcp",
 		ResourceType: "google_compute_firewall",
@@ -264,7 +264,7 @@ func (s *GCPSimulator) simulateFirewallRuleDrift(ctx context.Context, resource *
 }
 
 // simulateResourceCreation creates a new resource not in state
-func (s *GCPSimulator) simulateResourceCreation(ctx context.Context, resource *parser.Resource, state *parser.TerraformState) (*SimulationResult, error) {
+func (s *GCPSimulator) simulateResourceCreation(ctx context.Context, resource *state.Resource, state *state.TerraformState) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "gcp",
 		DriftType:    DriftTypeResourceCreation,
@@ -323,13 +323,13 @@ func (s *GCPSimulator) simulateResourceCreation(ctx context.Context, resource *p
 }
 
 // simulateAttributeChange modifies a resource attribute
-func (s *GCPSimulator) simulateAttributeChange(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *GCPSimulator) simulateAttributeChange(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	// For GCP, we'll just add a label as most attribute changes require resource recreation
 	return s.simulateLabelDrift(ctx, resource)
 }
 
 // DetectDrift detects drift in GCP resources
-func (s *GCPSimulator) DetectDrift(ctx context.Context, state *parser.TerraformState) ([]DriftItem, error) {
+func (s *GCPSimulator) DetectDrift(ctx context.Context, state *state.TerraformState) ([]DriftItem, error) {
 	var drifts []DriftItem
 
 	// Initialize if needed
@@ -345,7 +345,7 @@ func (s *GCPSimulator) DetectDrift(ctx context.Context, state *parser.TerraformS
 			continue
 		}
 
-		drift := s.checkResourceDrift(ctx, resource)
+		drift := s.checkResourceDrift(ctx, &resource)
 		if drift != nil {
 			drifts = append(drifts, *drift)
 		}
@@ -359,7 +359,7 @@ func (s *GCPSimulator) DetectDrift(ctx context.Context, state *parser.TerraformS
 }
 
 // checkResourceDrift checks a single GCP resource for drift
-func (s *GCPSimulator) checkResourceDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *GCPSimulator) checkResourceDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	switch resource.Type {
 	case "google_compute_instance":
 		return s.checkInstanceDrift(ctx, resource)
@@ -373,7 +373,7 @@ func (s *GCPSimulator) checkResourceDrift(ctx context.Context, resource *parser.
 }
 
 // checkInstanceDrift checks Compute Instance for drift
-func (s *GCPSimulator) checkInstanceDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *GCPSimulator) checkInstanceDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	instanceName := s.extractResourceName(resource)
 	zone := s.extractZone(resource)
 	if instanceName == "" || zone == "" {
@@ -410,7 +410,7 @@ func (s *GCPSimulator) checkInstanceDrift(ctx context.Context, resource *parser.
 }
 
 // checkBucketDrift checks Storage Bucket for drift
-func (s *GCPSimulator) checkBucketDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *GCPSimulator) checkBucketDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	bucketName := s.extractBucketName(resource)
 	if bucketName == "" {
 		return nil
@@ -445,7 +445,7 @@ func (s *GCPSimulator) checkBucketDrift(ctx context.Context, resource *parser.Re
 }
 
 // checkFirewallDrift checks Firewall rules for drift
-func (s *GCPSimulator) checkFirewallDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *GCPSimulator) checkFirewallDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	ruleName := s.extractResourceName(resource)
 	if ruleName == "" {
 		return nil
@@ -479,7 +479,7 @@ func (s *GCPSimulator) checkFirewallDrift(ctx context.Context, resource *parser.
 }
 
 // checkUnmanagedResources checks for resources not in state
-func (s *GCPSimulator) checkUnmanagedResources(ctx context.Context, state *parser.TerraformState) []DriftItem {
+func (s *GCPSimulator) checkUnmanagedResources(ctx context.Context, state *state.TerraformState) []DriftItem {
 	var drifts []DriftItem
 
 	// Check for drift simulation buckets
@@ -504,7 +504,7 @@ func (s *GCPSimulator) checkUnmanagedResources(ctx context.Context, state *parse
 						found := false
 						for _, resource := range state.Resources {
 							if resource.Type == "google_storage_bucket" {
-								bucketName := s.extractBucketName(resource)
+								bucketName := s.extractBucketName(&resource)
 								if bucketName == name {
 									found = true
 									break
@@ -582,16 +582,16 @@ func (s *GCPSimulator) Rollback(ctx context.Context, data *RollbackData) error {
 
 // Helper functions
 
-func (s *GCPSimulator) findResource(resourceID string, state *parser.TerraformState) *parser.Resource {
+func (s *GCPSimulator) findResource(resourceID string, state *state.TerraformState) *state.Resource {
 	for _, resource := range state.Resources {
 		if resource.ID == resourceID || resource.Name == resourceID {
-			return resource
+			return &resource
 		}
 	}
 	return nil
 }
 
-func (s *GCPSimulator) extractResourceName(resource *parser.Resource) string {
+func (s *GCPSimulator) extractResourceName(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if name, ok := resource.Instances[0].Attributes["name"].(string); ok {
 			return name
@@ -600,7 +600,7 @@ func (s *GCPSimulator) extractResourceName(resource *parser.Resource) string {
 	return ""
 }
 
-func (s *GCPSimulator) extractBucketName(resource *parser.Resource) string {
+func (s *GCPSimulator) extractBucketName(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if name, ok := resource.Instances[0].Attributes["name"].(string); ok {
 			return name
@@ -612,7 +612,7 @@ func (s *GCPSimulator) extractBucketName(resource *parser.Resource) string {
 	return ""
 }
 
-func (s *GCPSimulator) extractZone(resource *parser.Resource) string {
+func (s *GCPSimulator) extractZone(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if zone, ok := resource.Instances[0].Attributes["zone"].(string); ok {
 			return zone
@@ -621,7 +621,7 @@ func (s *GCPSimulator) extractZone(resource *parser.Resource) string {
 	return "us-central1-a" // Default zone
 }
 
-func (s *GCPSimulator) extractResourceLabels(resource *parser.Resource) map[string]string {
+func (s *GCPSimulator) extractResourceLabels(resource *state.Resource) map[string]string {
 	labels := make(map[string]string)
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if l, ok := resource.Instances[0].Attributes["labels"].(map[string]interface{}); ok {
@@ -633,7 +633,7 @@ func (s *GCPSimulator) extractResourceLabels(resource *parser.Resource) map[stri
 	return labels
 }
 
-func (s *GCPSimulator) extractResourceDescription(resource *parser.Resource) string {
+func (s *GCPSimulator) extractResourceDescription(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if desc, ok := resource.Instances[0].Attributes["description"].(string); ok {
 			return desc

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/common/errors"
+	"github.com/catherinevee/driftmgr/internal/shared/errors"
 	"github.com/catherinevee/driftmgr/internal/providers"
 )
 

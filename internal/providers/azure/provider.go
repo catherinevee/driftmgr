@@ -198,8 +198,92 @@ func (p *AzureProviderComplete) makeAPIRequest(ctx context.Context, method, path
 	return respBody, nil
 }
 
-// GetResource retrieves a specific resource from Azure
-func (p *AzureProviderComplete) GetResource(ctx context.Context, resourceType string, resourceID string) (*models.Resource, error) {
+// DiscoverResources discovers resources in the specified region (implements CloudProvider interface)
+func (p *AzureProviderComplete) DiscoverResources(ctx context.Context, region string) ([]models.Resource, error) {
+	// Azure doesn't use regions in the same way as AWS, but we can use resource groups
+	// For now, return empty list or implement actual discovery logic
+	resources := []models.Resource{}
+	
+	// TODO: Implement actual resource discovery
+	// This would involve listing various resource types from Azure
+	
+	return resources, nil
+}
+
+// GetResource retrieves a specific resource by ID (implements CloudProvider interface)
+func (p *AzureProviderComplete) GetResource(ctx context.Context, resourceID string) (*models.Resource, error) {
+	// Try to determine resource type from ID
+	// Azure resource IDs typically contain the resource type in the path
+	if strings.Contains(resourceID, "/virtualMachines/") {
+		return p.GetResourceByType(ctx, "azurerm_virtual_machine", resourceID)
+	} else if strings.Contains(resourceID, "/virtualNetworks/") {
+		return p.GetResourceByType(ctx, "azurerm_virtual_network", resourceID)
+	} else if strings.Contains(resourceID, "/networkSecurityGroups/") {
+		return p.GetResourceByType(ctx, "azurerm_network_security_group", resourceID)
+	} else if strings.Contains(resourceID, "/storageAccounts/") {
+		return p.GetResourceByType(ctx, "azurerm_storage_account", resourceID)
+	} else if strings.Contains(resourceID, "/servers/") && strings.Contains(resourceID, "Microsoft.Sql") {
+		return p.GetResourceByType(ctx, "azurerm_sql_server", resourceID)
+	} else if strings.Contains(resourceID, "/databases/") {
+		return p.GetResourceByType(ctx, "azurerm_sql_database", resourceID)
+	} else if strings.Contains(resourceID, "/vaults/") {
+		return p.GetResourceByType(ctx, "azurerm_key_vault", resourceID)
+	} else if strings.Contains(resourceID, "/sites/") {
+		return p.GetResourceByType(ctx, "azurerm_app_service", resourceID)
+	} else if strings.Contains(resourceID, "/registries/") {
+		return p.GetResourceByType(ctx, "azurerm_container_registry", resourceID)
+	} else if strings.Contains(resourceID, "/managedClusters/") {
+		return p.GetResourceByType(ctx, "azurerm_kubernetes_cluster", resourceID)
+	}
+	
+	// Extract the last part of the ID as resource name and try different types
+	parts := strings.Split(resourceID, "/")
+	if len(parts) > 0 {
+		resourceName := parts[len(parts)-1]
+		// Try common resource types
+		if res, err := p.GetResourceByType(ctx, "azurerm_virtual_machine", resourceName); err == nil {
+			return res, nil
+		}
+	}
+	
+	return nil, fmt.Errorf("unable to determine resource type for ID: %s", resourceID)
+}
+
+// ValidateCredentials checks if the provider credentials are valid (implements CloudProvider interface)
+func (p *AzureProviderComplete) ValidateCredentials(ctx context.Context) error {
+	return p.Connect(ctx)
+}
+
+// ListRegions returns available regions for the provider (implements CloudProvider interface)
+func (p *AzureProviderComplete) ListRegions(ctx context.Context) ([]string, error) {
+	// Return common Azure regions
+	return []string{
+		"eastus", "eastus2", "westus", "westus2", "centralus",
+		"northeurope", "westeurope", "uksouth", "ukwest",
+		"eastasia", "southeastasia", "japaneast", "japanwest",
+		"australiaeast", "australiasoutheast", "canadacentral", "canadaeast",
+	}, nil
+}
+
+// SupportedResourceTypes returns the list of supported resource types (implements CloudProvider interface)
+func (p *AzureProviderComplete) SupportedResourceTypes() []string {
+	return []string{
+		"azurerm_virtual_machine",
+		"azurerm_virtual_network",
+		"azurerm_subnet",
+		"azurerm_network_security_group",
+		"azurerm_storage_account",
+		"azurerm_sql_server",
+		"azurerm_sql_database",
+		"azurerm_key_vault",
+		"azurerm_app_service",
+		"azurerm_container_registry",
+		"azurerm_kubernetes_cluster",
+	}
+}
+
+// GetResourceByType retrieves a specific resource from Azure by type
+func (p *AzureProviderComplete) GetResourceByType(ctx context.Context, resourceType string, resourceID string) (*models.Resource, error) {
 	switch resourceType {
 	case "azurerm_virtual_machine":
 		return p.getVirtualMachine(ctx, resourceID)
@@ -1004,7 +1088,7 @@ func (p *AzureProviderComplete) listKubernetesClusters(ctx context.Context) ([]*
 
 // ResourceExists checks if a resource exists
 func (p *AzureProviderComplete) ResourceExists(ctx context.Context, resourceType string, resourceID string) (bool, error) {
-	_, err := p.GetResource(ctx, resourceType, resourceID)
+	_, err := p.GetResourceByType(ctx, resourceType, resourceID)
 	if err != nil {
 		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "NotFound") {
 			return false, nil

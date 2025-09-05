@@ -4,19 +4,18 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/catherinevee/driftmgr/internal/services"
 	"github.com/gorilla/mux"
 )
 
 // DiscoveryHandler handles discovery-related API requests
 type DiscoveryHandler struct {
-	service *services.DiscoveryService
+	hub *DiscoveryHub
 }
 
 // NewDiscoveryHandler creates a new discovery handler
-func NewDiscoveryHandler(service *services.DiscoveryService) *DiscoveryHandler {
+func NewDiscoveryHandler(hub *DiscoveryHub) *DiscoveryHandler {
 	return &DiscoveryHandler{
-		service: service,
+		hub: hub,
 	}
 }
 
@@ -31,7 +30,7 @@ func (h *DiscoveryHandler) RegisterRoutes(router *mux.Router) {
 
 // StartDiscovery handles POST /api/v1/discover
 func (h *DiscoveryHandler) StartDiscovery(w http.ResponseWriter, r *http.Request) {
-	var req services.DiscoveryRequest
+	var req DiscoveryRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -40,10 +39,11 @@ func (h *DiscoveryHandler) StartDiscovery(w http.ResponseWriter, r *http.Request
 	// Set async to true for API calls
 	req.Async = true
 
-	response, err := h.service.StartDiscovery(r.Context(), req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	jobID := h.hub.StartDiscovery(req)
+	
+	response := map[string]interface{}{
+		"job_id": jobID,
+		"status": "started",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -58,14 +58,14 @@ func (h *DiscoveryHandler) GetDiscoveryStatus(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	response, err := h.service.GetDiscoveryStatus(r.Context(), jobID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	status := h.hub.GetJobStatus(jobID)
+	if status == nil {
+		http.Error(w, "Job not found", http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(status)
 }
 
 // GetDiscoveryResults handles GET /api/v1/discover/results
@@ -76,14 +76,14 @@ func (h *DiscoveryHandler) GetDiscoveryResults(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response, err := h.service.GetDiscoveryResults(r.Context(), jobID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	results := h.hub.GetJobResults(jobID)
+	if results == nil {
+		http.Error(w, "Results not found", http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(results)
 }
 
 // GetCachedResources handles GET /api/v1/discovery/cached
@@ -98,11 +98,8 @@ func (h *DiscoveryHandler) GetCachedResources(w http.ResponseWriter, r *http.Req
 		region = "us-east-1" // Default region
 	}
 
-	resources, err := h.service.GetCachedResources(r.Context(), provider, region)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	resources := h.hub.GetCachedResources()
+	// TODO: Filter by provider and region if needed
 
 	response := map[string]interface{}{
 		"resources": resources,
@@ -116,10 +113,7 @@ func (h *DiscoveryHandler) GetCachedResources(w http.ResponseWriter, r *http.Req
 
 // ClearCache handles POST /api/v1/discovery/clear-cache
 func (h *DiscoveryHandler) ClearCache(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.ClearCache(r.Context()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	h.hub.ClearCache()
 
 	response := map[string]interface{}{
 		"success": true,

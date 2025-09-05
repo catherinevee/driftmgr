@@ -1,0 +1,383 @@
+name: Quality and UAT Pipeline
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly quality check
+
+env:
+  GO_VERSION: '1.23'
+
+jobs:
+  quality-analysis:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Install quality tools
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+      
+      - name: Run quality analyzer
+        run: |
+          go run quality/cmd/analyze/main.go \
+            --project . \
+            --output quality-report.json
+      
+      - name: Check quality gates
+        run: |
+          go run quality/cmd/gates/main.go \
+            --report quality-report.json \
+            --strict
+      
+      - name: Generate quality report
+        run: |
+          go run quality/cmd/report/main.go \
+            --input quality-report.json \
+            --format markdown \
+            --output QUALITY.md
+      
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-report
+          path: |
+            quality-report.json
+            QUALITY.md
+      
+      - name: Comment PR with report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('QUALITY.md', 'utf8');
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('## Code Quality Report')
+            );
+            
+            const body = `## Code Quality Report\n\n${report}`;
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body
+              });
+            }
+  
+  user-acceptance-tests:
+    name: UAT - ${{ matrix.persona }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        persona: [devops_engineer, platform_engineer, sre, security_engineer]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Setup test environment
+        run: |
+          # Create test data
+          mkdir -p test-data/{dev,staging,prod}/{networking,compute,database}
+          
+          # Initialize test Terraform stacks
+          for env in dev staging prod; do
+            for stack in networking compute database; do
+              cat > test-data/$env/$stack/main.tf <<EOF
+          terraform {
+            backend "local" {}
+          }
+          resource "null_resource" "test" {
+            count = 1
+          }
+          EOF
+            done
+          done
+      
+      - name: Run UAT for ${{ matrix.persona }}
+        run: |
+          go test -v ./tests/uat/journeys \
+            -run "Test.*${{ matrix.persona }}.*" \
+            -timeout 30m \
+            -json > uat-${{ matrix.persona }}.json
+      
+      - name: Generate UAT report
+        if: always()
+        run: |
+          go run tests/uat/cmd/report/main.go \
+            --input uat-${{ matrix.persona }}.json \
+            --persona ${{ matrix.persona }} \
+            --output uat-${{ matrix.persona }}.html
+      
+      - name: Upload UAT results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-results-${{ matrix.persona }}
+          path: |
+            uat-${{ matrix.persona }}.json
+            uat-${{ matrix.persona }}.html
+  
+  conciseness-check:
+    name: Code Conciseness Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Analyze conciseness
+        run: |
+          go run quality/cmd/conciseness/main.go \
+            --project . \
+            --output conciseness-report.json
+      
+      - name: Generate conciseness suggestions
+        run: |
+          go run quality/cmd/suggest/main.go \
+            --input conciseness-report.json \
+            --output suggestions.md
+      
+      - name: Upload conciseness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: conciseness-report
+          path: |
+            conciseness-report.json
+            suggestions.md
+      
+      - name: Auto-refactor (dry run)
+        if: github.event_name == 'pull_request'
+        run: |
+          go run quality/cmd/refactor/main.go \
+            --input conciseness-report.json \
+            --dry-run \
+            --output refactor-preview.diff
+      
+      - name: Comment refactor suggestions
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('refactor-preview.diff')) {
+              const diff = fs.readFileSync('refactor-preview.diff', 'utf8');
+              if (diff.length > 0) {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: `## Suggested Conciseness Improvements\n\n\`\`\`diff\n${diff}\n\`\`\`\n\nTo apply these changes, run: \`go run quality/cmd/refactor/main.go --apply\``
+                });
+              }
+            }
+  
+  coverage-analysis:
+    name: Test Coverage Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Run tests with coverage
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      
+      - name: Generate coverage report
+        run: |
+          go tool cover -html=coverage.out -o coverage.html
+          go tool cover -func=coverage.out > coverage.txt
+      
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "Coverage ${COVERAGE}% is below threshold of 80%"
+            exit 1
+          fi
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+      
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.out
+            coverage.html
+            coverage.txt
+  
+  quality-dashboard:
+    name: Update Quality Dashboard
+    needs: [quality-analysis, user-acceptance-tests, conciseness-check, coverage-analysis]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Aggregate quality data
+        run: |
+          # Combine all quality data
+          cat quality-report/quality-report.json \
+              uat-results-*/uat-*.json \
+              conciseness-report/conciseness-report.json \
+              coverage-report/coverage.txt > combined-quality.json
+      
+      - name: Update dashboard data
+        run: |
+          # Store quality data for dashboard
+          mkdir -p quality-data
+          cp combined-quality.json quality-data/quality-$(date +%Y%m%d-%H%M%S).json
+          
+          # Keep only last 30 days of data
+          find quality-data -name "quality-*.json" -mtime +30 -delete
+      
+      - name: Deploy dashboard
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./quality-data
+          destination_dir: data
+  
+  auto-improvement:
+    name: Automated Improvement PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Run auto-improvements
+        run: |
+          # Run conciseness refactoring
+          go run quality/cmd/refactor/main.go \
+            --auto-approve \
+            --safe-only
+          
+          # Run import organization
+          goimports -w .
+          
+          # Run formatting
+          gofmt -s -w .
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Auto: Code quality improvements"
+          title: "Automated Code Quality Improvements"
+          body: |
+            ## Automated Quality Improvements
+            
+            This PR contains automated code quality improvements:
+            - Code conciseness refactoring
+            - Import organization
+            - Code formatting
+            
+            ### Review Guidelines
+            - Verify functionality is preserved
+            - Check readability improvements
+            - Ensure no logic changes
+            
+            Generated by the weekly quality pipeline.
+          branch: auto-quality-improvements
+          delete-branch: true
+  
+  quality-summary:
+    name: Quality Summary
+    needs: [quality-analysis, user-acceptance-tests, conciseness-check, coverage-analysis]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Generate summary
+        run: |
+          echo "# Quality Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add quality score
+          if [ -f quality-report/quality-report.json ]; then
+            SCORE=$(jq -r '.summary.quality_score' quality-report/quality-report.json)
+            echo "## Quality Score: ${SCORE}/100" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Add coverage
+          if [ -f coverage-report/coverage.txt ]; then
+            echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            tail -n 1 coverage-report/coverage.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Add UAT results
+          echo "## UAT Results" >> $GITHUB_STEP_SUMMARY
+          for persona in devops_engineer platform_engineer sre security_engineer; do
+            if [ -f uat-results-$persona/uat-$persona.json ]; then
+              echo "- $persona: ✅" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- $persona: ❌" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View detailed reports in the artifacts section." >> $GITHUB_STEP_SUMMARY

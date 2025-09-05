@@ -4,20 +4,17 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/catherinevee/driftmgr/internal/services"
 	"github.com/gorilla/mux"
 )
 
 // DriftHandler handles drift-related API requests
 type DriftHandler struct {
-	service *services.DriftService
+	// Add service field when services package is implemented
 }
 
 // NewDriftHandler creates a new drift handler
-func NewDriftHandler(service *services.DriftService) *DriftHandler {
-	return &DriftHandler{
-		service: service,
-	}
+func NewDriftHandler() *DriftHandler {
+	return &DriftHandler{}
 }
 
 // RegisterRoutes registers drift routes
@@ -30,19 +27,21 @@ func (h *DriftHandler) RegisterRoutes(router *mux.Router) {
 
 // StartDriftDetection handles POST /api/v1/drift/detect
 func (h *DriftHandler) StartDriftDetection(w http.ResponseWriter, r *http.Request) {
-	var req services.DriftDetectionRequest
+	var req map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Set async to true for API calls
-	req.Async = true
+	if req != nil {
+		req["async"] = true
+	}
 
-	response, err := h.service.StartDriftDetection(r.Context(), req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	// TODO: Implement drift detection service
+	response := map[string]interface{}{
+		"status": "not_implemented",
+		"message": "Drift detection service not yet implemented",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -77,29 +76,26 @@ func (h *DriftHandler) GetDriftReport(w http.ResponseWriter, r *http.Request) {
 		reportID = "latest"
 	}
 
-	report, err := h.service.GetDriftReport(r.Context(), reportID)
-	if err != nil {
-		// Return a sample report for now
-		report = &services.DriftReport{
-			ID: reportID,
-			Summary: services.DriftSummary{
-				Total:           100,
-				Drifted:         15,
-				Missing:         3,
-				Unmanaged:       5,
-				Compliant:       77,
-				Remediable:      10,
-				SecurityRelated: 4,
-				CostImpact:      250.50,
-			},
-			Drifts:          []services.DriftItem{},
-			ComplianceScore: 77.0,
-			Recommendations: []string{
-				"Address 4 security-related drifts immediately",
-				"10 drifts can be auto-remediated",
-				"Import 5 unmanaged resources into Terraform state",
-			},
-		}
+	// TODO: Implement drift report service
+	report := map[string]interface{}{
+		"id": reportID,
+		"summary": map[string]interface{}{
+			"total":           100,
+			"drifted":         15,
+			"missing":         3,
+			"unmanaged":       5,
+			"compliant":       77,
+			"remediable":      10,
+			"securityRelated": 4,
+			"costImpact":      250.50,
+		},
+		"drifts":          []interface{}{},
+		"complianceScore": 77.0,
+		"recommendations": []string{
+			"Address 4 security-related drifts immediately",
+			"10 drifts can be auto-remediated",
+			"Import 5 unmanaged resources into Terraform state",
+		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")

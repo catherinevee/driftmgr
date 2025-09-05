@@ -208,7 +208,7 @@ version: '3.8'
 
 services:
   driftmgr:
-    image: catherinevee/driftmgr:latest
+    image: catherinevee/driftmgr:v3.0.0
     ports:
       - "8080:8080"
     environment:

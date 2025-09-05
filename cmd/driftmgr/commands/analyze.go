@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/catherinevee/driftmgr/internal/state/manager"
-	"github.com/catherinevee/driftmgr/internal/state/parser"
-	"github.com/catherinevee/driftmgr/internal/analysis/graph"
-	"github.com/catherinevee/driftmgr/internal/analysis/health"
-	"github.com/catherinevee/driftmgr/internal/analysis/cost"
-	"github.com/catherinevee/driftmgr/internal/discovery/backend"
+	"github.com/catherinevee/driftmgr/internal/state"
+	"github.com/catherinevee/driftmgr/internal/state"
+	"github.com/catherinevee/driftmgr/internal/graph"
+	"github.com/catherinevee/driftmgr/internal/health"
+	"github.com/catherinevee/driftmgr/internal/cost"
+	"github.com/catherinevee/driftmgr/internal/discovery"
 )
 
 var analyzeCmd = &cobra.Command{

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/pkg/models"
-	"github.com/catherinevee/driftmgr/internal/remediation/deletion"
+	"github.com/catherinevee/driftmgr/internal/remediation"
 )
 
 // BulkDeleteOptions represents options for bulk deletion

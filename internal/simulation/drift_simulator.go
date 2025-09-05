@@ -9,8 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/providers"
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/state"
 )
 
 // DriftSimulator creates controlled drift for testing
@@ -205,13 +204,13 @@ func (s *DriftSimulator) Rollback(ctx context.Context) error {
 }
 
 // parseStateFile reads and parses the Terraform state file
-func (s *DriftSimulator) parseStateFile() (*parser.TerraformState, error) {
+func (s *DriftSimulator) parseStateFile() (*state.TerraformState, error) {
 	data, err := ioutil.ReadFile(s.stateFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
 
-	var state parser.TerraformState
+	var state state.TerraformState
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("failed to parse state file: %w", err)
 	}
@@ -220,16 +219,16 @@ func (s *DriftSimulator) parseStateFile() (*parser.TerraformState, error) {
 }
 
 // selectTargetResource selects a resource from the state to target
-func (s *DriftSimulator) selectTargetResource(state *parser.TerraformState) *parser.Resource {
-	if len(state.Resources) == 0 {
+func (s *DriftSimulator) selectTargetResource(tfState *state.TerraformState) *state.Resource {
+	if len(tfState.Resources) == 0 {
 		return nil
 	}
 
 	// Filter resources by provider
-	var providerResources []*parser.Resource
-	for _, resource := range state.Resources {
-		if strings.HasPrefix(resource.Type, s.provider) {
-			providerResources = append(providerResources, resource)
+	providerResources := make([]*state.Resource, 0)
+	for i := range tfState.Resources {
+		if strings.HasPrefix(tfState.Resources[i].Type, s.provider) {
+			providerResources = append(providerResources, &tfState.Resources[i])
 		}
 	}
 

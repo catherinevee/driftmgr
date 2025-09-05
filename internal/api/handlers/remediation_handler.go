@@ -4,20 +4,17 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/catherinevee/driftmgr/internal/services"
 	"github.com/gorilla/mux"
 )
 
 // RemediationHandler handles remediation-related API requests
 type RemediationHandler struct {
-	service *services.RemediationService
+	// Add service field when services package is implemented
 }
 
 // NewRemediationHandler creates a new remediation handler
-func NewRemediationHandler(service *services.RemediationService) *RemediationHandler {
-	return &RemediationHandler{
-		service: service,
-	}
+func NewRemediationHandler() *RemediationHandler {
+	return &RemediationHandler{}
 }
 
 // RegisterRoutes registers remediation routes

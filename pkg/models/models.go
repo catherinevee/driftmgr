@@ -27,6 +27,42 @@ type Resource struct {
 	CostEstimate *CostEstimate          `json:"cost_estimate,omitempty"`
 }
 
+// GetTagsAsMap returns tags as a map[string]string
+func (r *Resource) GetTagsAsMap() map[string]string {
+	if r.Tags == nil {
+		return make(map[string]string)
+	}
+	
+	// If tags are already a map[string]string, return them
+	if tags, ok := r.Tags.(map[string]string); ok {
+		return tags
+	}
+	
+	// If tags are map[string]interface{}, convert them
+	if tags, ok := r.Tags.(map[string]interface{}); ok {
+		result := make(map[string]string)
+		for k, v := range tags {
+			if str, ok := v.(string); ok {
+				result[k] = str
+			} else {
+				result[k] = ""
+			}
+		}
+		return result
+	}
+	
+	// If tags are []string, convert to map with empty values
+	if tags, ok := r.Tags.([]string); ok {
+		result := make(map[string]string)
+		for _, tag := range tags {
+			result[tag] = ""
+		}
+		return result
+	}
+	
+	return make(map[string]string)
+}
+
 // CostEstimate provides cost estimation information for a resource
 type CostEstimate struct {
 	HourlyCost       float64   `json:"hourly_cost"`

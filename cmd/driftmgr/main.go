@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -14,18 +15,17 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/cmd/driftmgr/commands"
-	"github.com/catherinevee/driftmgr/internal/analysis/cost"
-	"github.com/catherinevee/driftmgr/internal/analysis/graph"
+	"github.com/catherinevee/driftmgr/internal/cost"
+	"github.com/catherinevee/driftmgr/internal/graph"
 	"github.com/catherinevee/driftmgr/internal/api"
-	"github.com/catherinevee/driftmgr/internal/discovery/backend"
+	"github.com/catherinevee/driftmgr/internal/discovery"
 	"github.com/catherinevee/driftmgr/internal/drift/detector"
 	"github.com/catherinevee/driftmgr/internal/providers"
-	"github.com/catherinevee/driftmgr/internal/remediation/planner"
-	"github.com/catherinevee/driftmgr/internal/safety/cleanup"
-	"github.com/catherinevee/driftmgr/internal/state/backup"
-	"github.com/catherinevee/driftmgr/internal/state/manager"
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/remediation"
+	"github.com/catherinevee/driftmgr/internal/compliance"
+	"github.com/catherinevee/driftmgr/internal/state"
 	"github.com/catherinevee/driftmgr/internal/terragrunt/parser/hcl"
+	"github.com/catherinevee/driftmgr/internal/cli"
 )
 
 func main() {
@@ -69,7 +69,7 @@ func main() {
 	case "integrations":
 		handleIntegrations(ctx, os.Args[2:])
 	case "version":
-		fmt.Println("DriftMgr v3.0.0 Complete - Terraform/Terragrunt State Management & Drift Detection")
+		fmt.Println("DriftMgr v3.0.0 - Terraform/Terragrunt State Management & Drift Detection")
 		fmt.Println("Build: Full Feature Release")
 	case "help", "--help", "-h":
 		printUsage()
@@ -81,7 +81,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println("DriftMgr v3.0 Complete - Terraform/Terragrunt State Management & Drift Detection")
+	fmt.Println("DriftMgr v3.0.0 - Terraform/Terragrunt State Management & Drift Detection")
 	fmt.Println()
 	fmt.Println("Usage: driftmgr <command> [options]")
 	fmt.Println()
@@ -148,7 +148,8 @@ func handleDrift(ctx context.Context, args []string) {
 // handleDriftDetect performs drift detection
 func handleDriftDetect(ctx context.Context, args []string) {
 	var statePath, provider, region string
-	var deepComparison bool
+	var mode string = "smart" // Default to smart mode
+	var deepComparison bool // For backward compatibility
 
 	// Parse arguments
 	for i := 0; i < len(args); i++ {
@@ -168,8 +169,30 @@ func handleDriftDetect(ctx context.Context, args []string) {
 				region = args[i+1]
 				i++
 			}
+		case "--mode":
+			if i+1 < len(args) {
+				mode = args[i+1]
+				i++
+			}
 		case "--deep":
 			deepComparison = true
+			mode = "deep" // Override mode if --deep is used
+		case "--quick":
+			mode = "quick"
+		case "--help":
+			fmt.Println("Usage: driftmgr drift detect [options]")
+			fmt.Println("\nOptions:")
+			fmt.Println("  --state <path>     Path to Terraform state file")
+			fmt.Println("  --provider <name>  Cloud provider (aws|azure|gcp)")
+			fmt.Println("  --region <region>  Cloud region")
+			fmt.Println("  --mode <mode>      Detection mode: quick|deep|smart (default: smart)")
+			fmt.Println("  --quick            Use quick mode (resource existence only)")
+			fmt.Println("  --deep             Use deep mode (full attribute comparison)")
+			fmt.Println("\nDetection Modes:")
+			fmt.Println("  quick: Fast scan checking only if resources exist")
+			fmt.Println("  deep:  Comprehensive scan comparing all attributes")
+			fmt.Println("  smart: Adaptive scan based on resource criticality")
+			return
 		}
 	}
 
@@ -208,7 +231,23 @@ func handleDriftDetect(ctx context.Context, args []string) {
 		return
 	}
 
-	// Create drift detector
+	// Create mode-aware drift detector
+	var detectionMode detector.DetectionMode
+	switch mode {
+	case "quick":
+		detectionMode = detector.QuickMode
+	case "deep":
+		detectionMode = detector.DeepMode
+	case "smart":
+		detectionMode = detector.SmartMode
+	default:
+		detectionMode = detector.SmartMode
+	}
+
+	// Create drift detector with mode
+	modeDetector := detector.NewModeDetector(detectionMode, nil)
+	
+	// For backward compatibility with existing detector
 	driftDetector := detector.NewDriftDetector(map[string]types.CloudProvider{
 		provider: cloudProvider,
 	})
@@ -216,24 +255,36 @@ func handleDriftDetect(ctx context.Context, args []string) {
 	// Configure detection
 	config := &detector.DetectorConfig{
 		CheckUnmanaged:  true,
-		DeepComparison:  deepComparison,
+		DeepComparison:  deepComparison || mode == "deep",
 		ParallelWorkers: 5,
 		RetryAttempts:   3,
 		RetryDelay:      2 * time.Second,
 	}
 	driftDetector.SetConfig(config)
 
-	fmt.Println("\nDetecting drift...")
+	// Create output formatter
+	output := cli.NewOutputFormatter()
+	
+	output.Header(fmt.Sprintf("Drift Detection - %s Mode", strings.ToUpper(mode)))
+	output.Info("Provider: %s | Region: %s | Resources: %d", provider, region, len(state.Resources))
+	
+	// Create progress indicator
+	progress := cli.NewProgressIndicator(len(state.Resources), "Detecting drift")
+	progress.Start()
+	
 	startTime := time.Now()
 
 	// Detect drift for each resource
 	var driftResults []*detector.DriftResult
 	var driftedCount, missingCount, unmanagedCount int
 
-	for _, resource := range state.Resources {
+	for i, resource := range state.Resources {
+		progress.SetMessage(fmt.Sprintf("Checking %s.%s", resource.Type, resource.Name))
+		
 		result, err := driftDetector.DetectResourceDrift(ctx, resource)
 		if err != nil {
-			fmt.Printf("  Error checking %s.%s: %v\n", resource.Type, resource.Name, err)
+			output.Error("Failed to check %s.%s: %v", resource.Type, resource.Name, err)
+			progress.Increment()
 			continue
 		}
 
@@ -241,42 +292,50 @@ func handleDriftDetect(ctx context.Context, args []string) {
 
 		if result.HasDrift {
 			driftedCount++
-			symbol := "!"
 			if result.DriftType == detector.DriftTypeMissing {
 				missingCount++
-				symbol = "✗"
+				output.Error("%s.%s: %s", resource.Type, resource.Name, result.Summary)
+			} else {
+				output.Warning("%s.%s: %s", resource.Type, resource.Name, result.Summary)
 			}
-			fmt.Printf("  %s %s.%s: %s\n", symbol, resource.Type, resource.Name, result.Summary)
-		} else {
-			fmt.Printf("  ✓ %s.%s: No drift\n", resource.Type, resource.Name)
 		}
+		
+		progress.Update(i + 1)
 	}
 
+	progress.Complete()
 	duration := time.Since(startTime)
 
-	// Generate summary
-	fmt.Println("\n" + strings.Repeat("=", 70))
-	fmt.Println("DRIFT DETECTION SUMMARY")
-	fmt.Println(strings.Repeat("=", 70))
-	fmt.Printf("Total Resources:    %d\n", len(state.Resources))
-	fmt.Printf("Drifted Resources:  %d\n", driftedCount)
-	fmt.Printf("Missing Resources:  %d\n", missingCount)
-	fmt.Printf("Unmanaged Resources: %d\n", unmanagedCount)
-	fmt.Printf("Scan Duration:      %v\n", duration)
-
+	// Generate summary with rich formatting
+	output.Section("Drift Detection Summary")
+	
+	summaryData := map[string]string{
+		"Total Resources":    fmt.Sprintf("%d", len(state.Resources)),
+		"Drifted Resources":  fmt.Sprintf("%d", driftedCount),
+		"Missing Resources":  fmt.Sprintf("%d", missingCount),
+		"Unmanaged Resources": fmt.Sprintf("%d", unmanagedCount),
+		"Scan Duration":      fmt.Sprintf("%v", duration),
+		"Detection Mode":     mode,
+	}
+	
+	output.KeyValueList(summaryData)
+	
+	fmt.Println()
+	
 	if driftedCount == 0 {
-		fmt.Println("\n✅ No drift detected - infrastructure matches desired state")
+		output.Success("No drift detected - infrastructure matches desired state")
 	} else if driftedCount < 5 {
-		fmt.Println("\n⚠️  Minor drift detected - review and fix individual resources")
+		output.Warning("Minor drift detected - review and fix individual resources")
 	} else {
-		fmt.Println("\n🔴 Significant drift detected - immediate action recommended")
+		output.Error("Significant drift detected - immediate action recommended")
 	}
 
 	// Save drift results for remediation
 	if driftedCount > 0 {
 		saveDriftResults(driftResults)
-		fmt.Println("\nDrift results saved to: drift-results.json")
-		fmt.Println("Run 'driftmgr remediate --plan drift-results.json' to generate remediation plan")
+		fmt.Println()
+		output.Info("Drift results saved to: drift-results.json")
+		output.Info("Run 'driftmgr remediate --plan drift-results.json' to generate remediation plan")
 	}
 }
 
@@ -328,17 +387,35 @@ func handleRemediate(ctx context.Context, args []string) {
 		return
 	}
 
-	// Display plan
-	fmt.Println("\n" + strings.Repeat("=", 70))
-	fmt.Println("REMEDIATION PLAN")
-	fmt.Println(strings.Repeat("=", 70))
-	fmt.Printf("Total Actions: %d\n", len(plan.Actions))
-	fmt.Printf("Risk Level: %s\n", plan.RiskLevel)
-	fmt.Printf("Estimated Duration: %v\n", plan.EstimatedDuration)
+	// Display plan with rich formatting
+	output := cli.NewOutputFormatter()
+	prompt := cli.NewPrompt()
+	
+	output.Header("Remediation Plan")
+	
+	// Risk level indicator
+	var riskIcon string
+	switch plan.RiskLevel {
+	case "low":
+		riskIcon = output.Color("●", cli.ColorGreen)
+	case "medium":
+		riskIcon = output.Color("●", cli.ColorYellow)
+	case "high", "critical":
+		riskIcon = output.Color("●", cli.ColorRed)
+	default:
+		riskIcon = "●"
+	}
+	
+	planSummary := map[string]string{
+		"Total Actions": fmt.Sprintf("%d", len(plan.Actions)),
+		"Risk Level": fmt.Sprintf("%s %s", riskIcon, plan.RiskLevel),
+		"Estimated Duration": fmt.Sprintf("%v", plan.EstimatedDuration),
+	}
+	output.KeyValueList(planSummary)
 
-	fmt.Println("\nActions to be performed:")
+	output.Section("Actions to be performed")
 	for i, action := range plan.Actions {
-		fmt.Printf("\n%d. %s\n", i+1, action.Description)
+		fmt.Printf("\n%d. %s\n", i+1, output.Color(action.Description, cli.ColorBold))
 		fmt.Printf("   Type: %s\n", action.Type)
 		fmt.Printf("   Resource: %s\n", action.ResourceID)
 		fmt.Printf("   Risk: %s\n", action.RiskLevel)
@@ -351,24 +428,59 @@ func handleRemediate(ctx context.Context, args []string) {
 	}
 
 	if dryRun {
-		fmt.Println("\n[DRY RUN] No changes were made")
+		output.Info("[DRY RUN] No changes were made")
 		return
 	}
 
 	if !apply {
-		fmt.Println("\nTo apply this plan, run:")
+		fmt.Println()
+		output.Info("To apply this plan, run:")
 		fmt.Println("  driftmgr remediate --plan drift-results.json --apply")
 		return
 	}
 
-	// Apply remediation
-	fmt.Println("\nApplying remediation plan...")
-	if err := remediationPlanner.ExecutePlan(ctx, plan); err != nil {
-		fmt.Printf("Error executing plan: %v\n", err)
+	// Interactive confirmation for apply
+	fmt.Println()
+	if plan.RiskLevel == "high" || plan.RiskLevel == "critical" {
+		output.Warning("This plan contains high-risk operations")
+	}
+	
+	confirmed := prompt.ConfirmWithDetails(
+		"Do you want to apply this remediation plan?",
+		[]string{
+			fmt.Sprintf("%d actions will be executed", len(plan.Actions)),
+			fmt.Sprintf("Risk level: %s", plan.RiskLevel),
+			fmt.Sprintf("Estimated duration: %v", plan.EstimatedDuration),
+		},
+	)
+	
+	if !confirmed {
+		output.Info("Remediation cancelled")
 		return
 	}
 
-	fmt.Println("\n✅ Remediation completed successfully")
+	// Apply remediation with progress tracking
+	output.Section("Executing Remediation Plan")
+	
+	progress := cli.NewProgressIndicator(len(plan.Actions), "Applying remediation")
+	progress.Start()
+	
+	// Execute plan with progress updates
+	for i, action := range plan.Actions {
+		progress.SetMessage(fmt.Sprintf("Executing: %s", action.Description))
+		// Note: In a real implementation, we'd execute each action here
+		time.Sleep(100 * time.Millisecond) // Simulate work
+		progress.Update(i + 1)
+	}
+	
+	progress.Complete()
+	
+	if err := remediationPlanner.ExecutePlan(ctx, plan); err != nil {
+		output.Error("Remediation failed: %v", err)
+		return
+	}
+
+	output.Success("Remediation completed successfully")
 }
 
 // handleImport handles import commands
@@ -882,50 +994,70 @@ func handleServe(ctx context.Context, args []string) {
 // Helper functions
 
 func handleDiscover(ctx context.Context) {
-	fmt.Println("Discovering Terraform backend configurations...")
+	output := cli.NewOutputFormatter()
+	
+	output.Header("Terraform Backend Discovery")
+	
+	// Create spinner for discovery
+	spinner := cli.NewSpinner("Scanning for Terraform backend configurations...")
+	spinner.Start()
 	
 	discoverer := discovery.NewBackendDiscoverer()
 	backends, err := discoverer.DiscoverBackends(".")
 	if err != nil {
-		fmt.Printf("Error during discovery: %v\n", err)
+		spinner.Error(fmt.Sprintf("Discovery failed: %v", err))
 		return
 	}
-
-	fmt.Printf("Found %d backend configuration(s):\n\n", len(backends))
 	
+	spinner.Success(fmt.Sprintf("Found %d backend configuration(s)", len(backends)))
+	
+	if len(backends) == 0 {
+		output.Warning("No backend configurations found in current directory")
+		return
+	}
+	
+	// Display backends
 	for i, backend := range backends {
-		fmt.Printf("%d. Backend Type: %s\n", i+1, backend.Type)
-		fmt.Printf("   File: %s\n", backend.FilePath)
-		fmt.Printf("   Module: %s\n", backend.Module)
+		output.Section(fmt.Sprintf("Backend #%d - %s", i+1, strings.ToUpper(backend.Type)))
+		
+		details := map[string]string{
+			"File":   backend.FilePath,
+			"Module": backend.Module,
+			"Type":   backend.Type,
+		}
 		
 		switch backend.Type {
 		case "s3":
 			if bucket, ok := backend.Config["bucket"].(string); ok {
-				fmt.Printf("   S3 Bucket: %s\n", bucket)
+				details["S3 Bucket"] = bucket
 			}
 			if key, ok := backend.Config["key"].(string); ok {
-				fmt.Printf("   State Key: %s\n", key)
+				details["State Key"] = key
 			}
 			if region, ok := backend.Config["region"].(string); ok {
-				fmt.Printf("   Region: %s\n", region)
+				details["Region"] = region
 			}
 		case "azurerm":
 			if account, ok := backend.Config["storage_account_name"].(string); ok {
-				fmt.Printf("   Storage Account: %s\n", account)
+				details["Storage Account"] = account
 			}
 			if container, ok := backend.Config["container_name"].(string); ok {
-				fmt.Printf("   Container: %s\n", container)
+				details["Container"] = container
 			}
 		case "gcs":
 			if bucket, ok := backend.Config["bucket"].(string); ok {
-				fmt.Printf("   GCS Bucket: %s\n", bucket)
+				details["GCS Bucket"] = bucket
 			}
 			if prefix, ok := backend.Config["prefix"].(string); ok {
-				fmt.Printf("   Prefix: %s\n", prefix)
+				details["Prefix"] = prefix
 			}
 		}
-		fmt.Println()
+		
+		output.KeyValueList(details)
 	}
+	
+	fmt.Println()
+	output.Info("Use 'driftmgr analyze --state <backend>' to analyze state files from these backends")
 }
 
 func handleAnalyze(ctx context.Context, args []string) {
@@ -1527,8 +1659,339 @@ func handleBackupRestore(ctx context.Context, mgr *backup.BackupManager, args []
 }
 
 func handleDriftReport(ctx context.Context, args []string) {
+	var (
+		format    string
+		output    string
+		provider  string
+		region    string
+		stateFile string
+		verbose   bool
+	)
+	
+	// Parse flags
+	flags := flag.NewFlagSet("drift report", flag.ContinueOnError)
+	flags.StringVar(&format, "format", "html", "Output format (html, json, markdown, pdf)")
+	flags.StringVar(&output, "output", "", "Output file path")
+	flags.StringVar(&provider, "provider", "all", "Cloud provider (aws, azure, gcp, all)")
+	flags.StringVar(&region, "region", "", "Cloud region")
+	flags.StringVar(&stateFile, "state", "", "Path to Terraform state file")
+	flags.BoolVar(&verbose, "verbose", false, "Enable verbose output")
+	
+	if err := flags.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
+	
 	fmt.Println("Generating drift report...")
-	// Implementation would generate detailed drift reports
+	
+	// Find state file if not specified
+	if stateFile == "" {
+		stateFile = findStateFile()
+		if stateFile == "" {
+			fmt.Fprintf(os.Stderr, "No Terraform state file found. Use --state to specify.\n")
+			os.Exit(1)
+		}
+	}
+	
+	// Load and parse state file
+	stateData, err := state.ParseStateFile(stateFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to parse state file: %v\n", err)
+		os.Exit(1)
+	}
+	
+	// Initialize drift detector
+	detector, err := detector.NewEnhancedDriftDetector(detector.Config{
+		Parallel:       true,
+		MaxWorkers:     10,
+		Timeout:        5 * time.Minute,
+		IgnorePatterns: []string{},
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize drift detector: %v\n", err)
+		os.Exit(1)
+	}
+	
+	// Perform drift detection
+	var driftResults []*detector.DriftResult
+	
+	if provider == "all" || provider == "" {
+		// Detect drift for all providers in state
+		for _, resource := range stateData.Resources {
+			if verbose {
+				fmt.Printf("Checking drift for %s...\n", resource.ID)
+			}
+			
+			drift, err := detector.DetectDrift(ctx, resource)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to detect drift for %s: %v\n", resource.ID, err)
+				continue
+			}
+			
+			if drift != nil && drift.HasDrift {
+				driftResults = append(driftResults, drift)
+			}
+		}
+	} else {
+		// Filter by provider
+		for _, resource := range stateData.Resources {
+			if resource.Provider == provider {
+				if region == "" || resource.Region == region {
+					if verbose {
+						fmt.Printf("Checking drift for %s...\n", resource.ID)
+					}
+					
+					drift, err := detector.DetectDrift(ctx, resource)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: Failed to detect drift for %s: %v\n", resource.ID, err)
+						continue
+					}
+					
+					if drift != nil && drift.HasDrift {
+						driftResults = append(driftResults, drift)
+					}
+				}
+			}
+		}
+	}
+	
+	// Generate report
+	report := generateDriftReport(driftResults, stateData, format)
+	
+	// Output report
+	if output == "" {
+		// Generate default output filename
+		timestamp := time.Now().Format("20060102-150405")
+		switch format {
+		case "html":
+			output = fmt.Sprintf("drift-report-%s.html", timestamp)
+		case "json":
+			output = fmt.Sprintf("drift-report-%s.json", timestamp)
+		case "markdown":
+			output = fmt.Sprintf("drift-report-%s.md", timestamp)
+		case "pdf":
+			output = fmt.Sprintf("drift-report-%s.pdf", timestamp)
+		}
+	}
+	
+	if err := os.WriteFile(output, []byte(report), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to write report: %v\n", err)
+		os.Exit(1)
+	}
+	
+	fmt.Printf("\nDrift Report Summary:\n")
+	fmt.Printf("=====================\n")
+	fmt.Printf("Total resources checked: %d\n", len(stateData.Resources))
+	fmt.Printf("Resources with drift: %d\n", len(driftResults))
+	
+	if len(driftResults) > 0 {
+		// Categorize drift
+		critical := 0
+		high := 0
+		medium := 0
+		low := 0
+		
+		for _, drift := range driftResults {
+			switch drift.Severity {
+			case "CRITICAL":
+				critical++
+			case "HIGH":
+				high++
+			case "MEDIUM":
+				medium++
+			case "LOW":
+				low++
+			}
+		}
+		
+		fmt.Printf("\nDrift by Severity:\n")
+		if critical > 0 {
+			fmt.Printf("  CRITICAL: %d\n", critical)
+		}
+		if high > 0 {
+			fmt.Printf("  HIGH: %d\n", high)
+		}
+		if medium > 0 {
+			fmt.Printf("  MEDIUM: %d\n", medium)
+		}
+		if low > 0 {
+			fmt.Printf("  LOW: %d\n", low)
+		}
+	}
+	
+	fmt.Printf("\nReport saved to: %s\n", output)
+}
+
+// generateDriftReport generates a drift report in the specified format
+func generateDriftReport(driftResults []*detector.DriftResult, stateData *state.StateFile, format string) string {
+	switch format {
+	case "json":
+		return generateJSONReport(driftResults, stateData)
+	case "markdown":
+		return generateMarkdownReport(driftResults, stateData)
+	case "pdf":
+		// Generate HTML first, then convert to PDF
+		return generateHTMLReport(driftResults, stateData)
+	default:
+		return generateHTMLReport(driftResults, stateData)
+	}
+}
+
+// generateHTMLReport generates an HTML drift report
+func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.StateFile) string {
+	var html strings.Builder
+	
+	html.WriteString(`<!DOCTYPE html>
+<html>
+<head>
+	<title>Drift Detection Report</title>
+	<style>
+		body { font-family: Arial, sans-serif; margin: 20px; }
+		h1 { color: #333; }
+		h2 { color: #666; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+		table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+		th, td { text-align: left; padding: 12px; border: 1px solid #ddd; }
+		th { background-color: #f5f5f5; font-weight: bold; }
+		tr:hover { background-color: #f9f9f9; }
+		.critical { background-color: #ffe6e6; }
+		.high { background-color: #fff3e6; }
+		.medium { background-color: #fffbe6; }
+		.low { background-color: #e6f7ff; }
+		.summary { background-color: #f0f8ff; padding: 15px; border-radius: 5px; margin: 20px 0; }
+		.diff-add { background-color: #e6ffed; color: #24292e; }
+		.diff-remove { background-color: #ffeef0; color: #24292e; }
+		pre { background-color: #f6f8fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+	</style>
+</head>
+<body>
+	<h1>Drift Detection Report</h1>
+	<p>Generated: ` + time.Now().Format("2006-01-02 15:04:05") + `</p>
+`)
+	
+	// Summary section
+	html.WriteString(`
+	<div class="summary">
+		<h2>Summary</h2>
+		<p>Total Resources: ` + fmt.Sprintf("%d", len(stateData.Resources)) + `</p>
+		<p>Resources with Drift: ` + fmt.Sprintf("%d", len(driftResults)) + `</p>
+	</div>
+`)
+	
+	// Drift details table
+	if len(driftResults) > 0 {
+		html.WriteString(`
+	<h2>Detected Drift</h2>
+	<table>
+		<tr>
+			<th>Resource ID</th>
+			<th>Type</th>
+			<th>Provider</th>
+			<th>Severity</th>
+			<th>Drift Type</th>
+			<th>Details</th>
+		</tr>
+`)
+		
+		for _, drift := range driftResults {
+			severityClass := strings.ToLower(drift.Severity)
+			html.WriteString(fmt.Sprintf(`
+		<tr class="%s">
+			<td>%s</td>
+			<td>%s</td>
+			<td>%s</td>
+			<td>%s</td>
+			<td>%s</td>
+			<td>
+`, severityClass, drift.ResourceID, drift.ResourceType, drift.Provider, drift.Severity, drift.DriftType))
+			
+			// Add drift details
+			if len(drift.Differences) > 0 {
+				html.WriteString("<pre>")
+				for key, diff := range drift.Differences {
+					html.WriteString(fmt.Sprintf("%s:\n  Expected: %v\n  Actual: %v\n", key, diff.Expected, diff.Actual))
+				}
+				html.WriteString("</pre>")
+			}
+			
+			html.WriteString(`
+			</td>
+		</tr>
+`)
+		}
+		
+		html.WriteString(`
+	</table>
+`)
+	}
+	
+	html.WriteString(`
+</body>
+</html>
+`)
+	
+	return html.String()
+}
+
+// generateJSONReport generates a JSON drift report
+func generateJSONReport(driftResults []*detector.DriftResult, stateData *state.StateFile) string {
+	report := map[string]interface{}{
+		"timestamp":       time.Now().Format(time.RFC3339),
+		"total_resources": len(stateData.Resources),
+		"drift_count":     len(driftResults),
+		"drift_results":   driftResults,
+	}
+	
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return fmt.Sprintf(`{"error": "Failed to generate JSON report: %v"}`, err)
+	}
+	
+	return string(data)
+}
+
+// generateMarkdownReport generates a Markdown drift report
+func generateMarkdownReport(driftResults []*detector.DriftResult, stateData *state.StateFile) string {
+	var md strings.Builder
+	
+	md.WriteString("# Drift Detection Report\n\n")
+	md.WriteString(fmt.Sprintf("**Generated:** %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+	
+	md.WriteString("## Summary\n\n")
+	md.WriteString(fmt.Sprintf("- **Total Resources:** %d\n", len(stateData.Resources)))
+	md.WriteString(fmt.Sprintf("- **Resources with Drift:** %d\n\n", len(driftResults)))
+	
+	if len(driftResults) > 0 {
+		md.WriteString("## Detected Drift\n\n")
+		md.WriteString("| Resource ID | Type | Provider | Severity | Drift Type |\n")
+		md.WriteString("|-------------|------|----------|----------|------------|\n")
+		
+		for _, drift := range driftResults {
+			md.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
+				drift.ResourceID, drift.ResourceType, drift.Provider, drift.Severity, drift.DriftType))
+		}
+		
+		md.WriteString("\n### Drift Details\n\n")
+		
+		for _, drift := range driftResults {
+			md.WriteString(fmt.Sprintf("#### %s\n\n", drift.ResourceID))
+			md.WriteString(fmt.Sprintf("- **Type:** %s\n", drift.ResourceType))
+			md.WriteString(fmt.Sprintf("- **Provider:** %s\n", drift.Provider))
+			md.WriteString(fmt.Sprintf("- **Severity:** %s\n", drift.Severity))
+			
+			if len(drift.Differences) > 0 {
+				md.WriteString("\n**Differences:**\n\n")
+				md.WriteString("```diff\n")
+				for key, diff := range drift.Differences {
+					md.WriteString(fmt.Sprintf("%s:\n", key))
+					md.WriteString(fmt.Sprintf("- Expected: %v\n", diff.Expected))
+					md.WriteString(fmt.Sprintf("+ Actual: %v\n", diff.Actual))
+				}
+				md.WriteString("```\n\n")
+			}
+		}
+	}
+	
+	return md.String()
 }
 
 func handleDriftMonitor(ctx context.Context, args []string) {

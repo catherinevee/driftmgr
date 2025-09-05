@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/state"
 )
 
 // AzureSimulator simulates drift in Azure resources
@@ -48,7 +48,7 @@ func (s *AzureSimulator) Initialize(ctx context.Context) error {
 }
 
 // SimulateDrift creates drift in Azure resources
-func (s *AzureSimulator) SimulateDrift(ctx context.Context, driftType DriftType, resourceID string, state *parser.TerraformState) (*SimulationResult, error) {
+func (s *AzureSimulator) SimulateDrift(ctx context.Context, driftType DriftType, resourceID string, state *state.TerraformState) (*SimulationResult, error) {
 	// Initialize if needed
 	if s.accessToken == "" {
 		if err := s.Initialize(ctx); err != nil {
@@ -78,7 +78,7 @@ func (s *AzureSimulator) SimulateDrift(ctx context.Context, driftType DriftType,
 }
 
 // simulateTagDrift adds or modifies tags on an Azure resource
-func (s *AzureSimulator) simulateTagDrift(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *AzureSimulator) simulateTagDrift(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "azure",
 		ResourceType: resource.Type,
@@ -154,7 +154,7 @@ func (s *AzureSimulator) simulateTagDrift(ctx context.Context, resource *parser.
 }
 
 // simulateNSGRuleDrift adds a new rule to a Network Security Group
-func (s *AzureSimulator) simulateNSGRuleDrift(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *AzureSimulator) simulateNSGRuleDrift(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "azure",
 		ResourceType: resource.Type,
@@ -226,7 +226,7 @@ func (s *AzureSimulator) simulateNSGRuleDrift(ctx context.Context, resource *par
 }
 
 // simulateResourceCreation creates a new resource not in state
-func (s *AzureSimulator) simulateResourceCreation(ctx context.Context, resource *parser.Resource, state *parser.TerraformState) (*SimulationResult, error) {
+func (s *AzureSimulator) simulateResourceCreation(ctx context.Context, resource *state.Resource, state *state.TerraformState) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "azure",
 		DriftType:    DriftTypeResourceCreation,
@@ -277,13 +277,13 @@ func (s *AzureSimulator) simulateResourceCreation(ctx context.Context, resource 
 }
 
 // simulateAttributeChange modifies a resource attribute
-func (s *AzureSimulator) simulateAttributeChange(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *AzureSimulator) simulateAttributeChange(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	// For Azure, we'll just add a tag as attribute changes often require resource recreation
 	return s.simulateTagDrift(ctx, resource)
 }
 
 // DetectDrift detects drift in Azure resources
-func (s *AzureSimulator) DetectDrift(ctx context.Context, state *parser.TerraformState) ([]DriftItem, error) {
+func (s *AzureSimulator) DetectDrift(ctx context.Context, state *state.TerraformState) ([]DriftItem, error) {
 	var drifts []DriftItem
 
 	// Initialize if needed
@@ -299,7 +299,7 @@ func (s *AzureSimulator) DetectDrift(ctx context.Context, state *parser.Terrafor
 			continue
 		}
 
-		drift := s.checkResourceDrift(ctx, resource)
+		drift := s.checkResourceDrift(ctx, &resource)
 		if drift != nil {
 			drifts = append(drifts, *drift)
 		}
@@ -313,7 +313,7 @@ func (s *AzureSimulator) DetectDrift(ctx context.Context, state *parser.Terrafor
 }
 
 // checkResourceDrift checks a single Azure resource for drift
-func (s *AzureSimulator) checkResourceDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *AzureSimulator) checkResourceDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	// Build API URL
 	var apiURL string
 	resourceGroup := s.extractResourceGroup(resource)
@@ -381,7 +381,7 @@ func (s *AzureSimulator) checkResourceDrift(ctx context.Context, resource *parse
 }
 
 // checkUnmanagedResources checks for resources not in state
-func (s *AzureSimulator) checkUnmanagedResources(ctx context.Context, state *parser.TerraformState) []DriftItem {
+func (s *AzureSimulator) checkUnmanagedResources(ctx context.Context, state *state.TerraformState) []DriftItem {
 	var drifts []DriftItem
 
 	// List all resource groups
@@ -406,7 +406,7 @@ func (s *AzureSimulator) checkUnmanagedResources(ctx context.Context, state *par
 						found := false
 						for _, resource := range state.Resources {
 							if resource.Type == "azurerm_resource_group" {
-								rgName := s.extractResourceName(resource)
+								rgName := s.extractResourceName(&resource)
 								if rgName == name {
 									found = true
 									break
@@ -459,16 +459,16 @@ func (s *AzureSimulator) Rollback(ctx context.Context, data *RollbackData) error
 
 // Helper functions
 
-func (s *AzureSimulator) findResource(resourceID string, state *parser.TerraformState) *parser.Resource {
+func (s *AzureSimulator) findResource(resourceID string, state *state.TerraformState) *state.Resource {
 	for _, resource := range state.Resources {
 		if resource.ID == resourceID || resource.Name == resourceID {
-			return resource
+			return &resource
 		}
 	}
 	return nil
 }
 
-func (s *AzureSimulator) extractResourceGroup(resource *parser.Resource) string {
+func (s *AzureSimulator) extractResourceGroup(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if rg, ok := resource.Instances[0].Attributes["resource_group_name"].(string); ok {
 			return rg
@@ -477,7 +477,7 @@ func (s *AzureSimulator) extractResourceGroup(resource *parser.Resource) string 
 	return ""
 }
 
-func (s *AzureSimulator) extractResourceName(resource *parser.Resource) string {
+func (s *AzureSimulator) extractResourceName(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if name, ok := resource.Instances[0].Attributes["name"].(string); ok {
 			return name
@@ -486,7 +486,7 @@ func (s *AzureSimulator) extractResourceName(resource *parser.Resource) string {
 	return ""
 }
 
-func (s *AzureSimulator) extractResourceTags(resource *parser.Resource) map[string]string {
+func (s *AzureSimulator) extractResourceTags(resource *state.Resource) map[string]string {
 	tags := make(map[string]string)
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if t, ok := resource.Instances[0].Attributes["tags"].(map[string]interface{}); ok {

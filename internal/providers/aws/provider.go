@@ -65,8 +65,45 @@ func (p *AWSProvider) Initialize(ctx context.Context) error {
 	return nil
 }
 
-// GetResource retrieves a specific AWS resource
-func (p *AWSProvider) GetResource(ctx context.Context, resourceType string, resourceID string) (*models.Resource, error) {
+// GetResource retrieves a specific resource by ID (implements CloudProvider interface)
+func (p *AWSProvider) GetResource(ctx context.Context, resourceID string) (*models.Resource, error) {
+	// Try to determine resource type from ID format
+	// AWS resource IDs often have patterns we can use
+	var resourceType string
+	
+	switch {
+	case strings.HasPrefix(resourceID, "i-"):
+		resourceType = "aws_instance"
+	case strings.HasPrefix(resourceID, "sg-"):
+		resourceType = "aws_security_group"
+	case strings.HasPrefix(resourceID, "vpc-"):
+		resourceType = "aws_vpc"
+	case strings.HasPrefix(resourceID, "subnet-"):
+		resourceType = "aws_subnet"
+	case strings.HasPrefix(resourceID, "arn:aws:iam"):
+		resourceType = "aws_iam_role"
+	case strings.HasPrefix(resourceID, "arn:aws:lambda"):
+		resourceType = "aws_lambda_function"
+	case strings.HasPrefix(resourceID, "arn:aws:dynamodb"):
+		resourceType = "aws_dynamodb_table"
+	default:
+		// For S3 buckets and RDS instances, we might need to try both
+		// Try as S3 bucket first
+		if resource, err := p.GetResourceByType(ctx, "aws_s3_bucket", resourceID); err == nil {
+			return resource, nil
+		}
+		// Try as RDS instance
+		if resource, err := p.GetResourceByType(ctx, "aws_db_instance", resourceID); err == nil {
+			return resource, nil
+		}
+		return nil, fmt.Errorf("unable to determine resource type for ID: %s", resourceID)
+	}
+	
+	return p.GetResourceByType(ctx, resourceType, resourceID)
+}
+
+// GetResourceByType retrieves a specific AWS resource by type and ID
+func (p *AWSProvider) GetResourceByType(ctx context.Context, resourceType string, resourceID string) (*models.Resource, error) {
 	// Initialize if not already done
 	if p.ec2Client == nil {
 		if err := p.Initialize(ctx); err != nil {
@@ -129,6 +166,69 @@ func (p *AWSProvider) ListResources(ctx context.Context) ([]*models.Resource, er
 // GetProviderName returns the provider name
 func (p *AWSProvider) GetProviderName() string {
 	return "aws"
+}
+
+// Name returns the provider name (implements CloudProvider interface)
+func (p *AWSProvider) Name() string {
+	return "aws"
+}
+
+// DiscoverResources discovers resources in the specified region (implements CloudProvider interface)
+func (p *AWSProvider) DiscoverResources(ctx context.Context, region string) ([]models.Resource, error) {
+	// If a specific region is provided, update the provider region
+	if region != "" && region != p.region {
+		p.region = region
+		// Re-initialize with new region
+		if err := p.Initialize(ctx); err != nil {
+			return nil, err
+		}
+	}
+	
+	// Use ListResources to get resources
+	resources, err := p.ListResources(ctx)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert []*models.Resource to []models.Resource
+	result := make([]models.Resource, len(resources))
+	for i, r := range resources {
+		result[i] = *r
+	}
+	
+	return result, nil
+}
+
+// ValidateCredentials checks if the provider credentials are valid (implements CloudProvider interface)
+func (p *AWSProvider) ValidateCredentials(ctx context.Context) error {
+	// Initialize will validate credentials
+	return p.Initialize(ctx)
+}
+
+// ListRegions returns available regions for the provider (implements CloudProvider interface)
+func (p *AWSProvider) ListRegions(ctx context.Context) ([]string, error) {
+	// Return common AWS regions
+	return []string{
+		"us-east-1", "us-east-2", "us-west-1", "us-west-2",
+		"eu-west-1", "eu-west-2", "eu-west-3", "eu-central-1",
+		"ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "ap-northeast-2",
+		"ap-south-1", "sa-east-1", "ca-central-1",
+	}, nil
+}
+
+// SupportedResourceTypes returns the list of supported resource types (implements CloudProvider interface)
+func (p *AWSProvider) SupportedResourceTypes() []string {
+	return []string{
+		"AWS::EC2::Instance",
+		"AWS::S3::Bucket",
+		"AWS::RDS::DBInstance",
+		"AWS::IAM::Role",
+		"AWS::Lambda::Function",
+		"AWS::DynamoDB::Table",
+		"AWS::EC2::SecurityGroup",
+		"AWS::EC2::VPC",
+		"AWS::EC2::Subnet",
+	}
 }
 
 // EC2 Instance methods

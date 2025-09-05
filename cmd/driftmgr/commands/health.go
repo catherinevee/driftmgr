@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/api/handlers/config"
+	"github.com/catherinevee/driftmgr/internal/api/handlers"
 )
 
 // HealthServer provides health check endpoints

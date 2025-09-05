@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/state"
 )
 
 // AWSSimulator simulates drift in AWS resources
@@ -46,7 +46,7 @@ func (s *AWSSimulator) Initialize(ctx context.Context) error {
 }
 
 // SimulateDrift creates drift in AWS resources
-func (s *AWSSimulator) SimulateDrift(ctx context.Context, driftType DriftType, resourceID string, state *parser.TerraformState) (*SimulationResult, error) {
+func (s *AWSSimulator) SimulateDrift(ctx context.Context, driftType DriftType, resourceID string, state *state.TerraformState) (*SimulationResult, error) {
 	// Initialize clients if not already done
 	if s.ec2Client == nil {
 		if err := s.Initialize(ctx); err != nil {
@@ -76,7 +76,7 @@ func (s *AWSSimulator) SimulateDrift(ctx context.Context, driftType DriftType, r
 }
 
 // simulateTagDrift adds or modifies tags on a resource
-func (s *AWSSimulator) simulateTagDrift(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *AWSSimulator) simulateTagDrift(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "aws",
 		ResourceType: resource.Type,
@@ -209,7 +209,7 @@ func (s *AWSSimulator) simulateTagDrift(ctx context.Context, resource *parser.Re
 }
 
 // simulateSecurityGroupRuleDrift adds a new rule to a security group
-func (s *AWSSimulator) simulateSecurityGroupRuleDrift(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *AWSSimulator) simulateSecurityGroupRuleDrift(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "aws",
 		ResourceType: resource.Type,
@@ -280,7 +280,7 @@ func (s *AWSSimulator) simulateSecurityGroupRuleDrift(ctx context.Context, resou
 }
 
 // simulateResourceCreation creates a new resource not in state
-func (s *AWSSimulator) simulateResourceCreation(ctx context.Context, resource *parser.Resource, state *parser.TerraformState) (*SimulationResult, error) {
+func (s *AWSSimulator) simulateResourceCreation(ctx context.Context, resource *state.Resource, state *state.TerraformState) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "aws",
 		DriftType:    DriftTypeResourceCreation,
@@ -337,7 +337,7 @@ func (s *AWSSimulator) simulateResourceCreation(ctx context.Context, resource *p
 }
 
 // simulateAttributeChange modifies a resource attribute
-func (s *AWSSimulator) simulateAttributeChange(ctx context.Context, resource *parser.Resource) (*SimulationResult, error) {
+func (s *AWSSimulator) simulateAttributeChange(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
 	result := &SimulationResult{
 		Provider:     "aws",
 		ResourceType: resource.Type,
@@ -409,7 +409,7 @@ func (s *AWSSimulator) simulateAttributeChange(ctx context.Context, resource *pa
 }
 
 // DetectDrift detects drift in AWS resources
-func (s *AWSSimulator) DetectDrift(ctx context.Context, state *parser.TerraformState) ([]DriftItem, error) {
+func (s *AWSSimulator) DetectDrift(ctx context.Context, state *state.TerraformState) ([]DriftItem, error) {
 	var drifts []DriftItem
 
 	// Initialize clients if needed
@@ -425,7 +425,7 @@ func (s *AWSSimulator) DetectDrift(ctx context.Context, state *parser.TerraformS
 			continue
 		}
 
-		drift := s.checkResourceDrift(ctx, resource)
+		drift := s.checkResourceDrift(ctx, &resource)
 		if drift != nil {
 			drifts = append(drifts, *drift)
 		}
@@ -439,7 +439,7 @@ func (s *AWSSimulator) DetectDrift(ctx context.Context, state *parser.TerraformS
 }
 
 // checkResourceDrift checks a single resource for drift
-func (s *AWSSimulator) checkResourceDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *AWSSimulator) checkResourceDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	switch resource.Type {
 	case "aws_instance":
 		return s.checkInstanceDrift(ctx, resource)
@@ -453,7 +453,7 @@ func (s *AWSSimulator) checkResourceDrift(ctx context.Context, resource *parser.
 }
 
 // checkInstanceDrift checks EC2 instance for drift
-func (s *AWSSimulator) checkInstanceDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *AWSSimulator) checkInstanceDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	instanceID := s.extractInstanceID(resource)
 	if instanceID == "" {
 		return nil
@@ -491,7 +491,7 @@ func (s *AWSSimulator) checkInstanceDrift(ctx context.Context, resource *parser.
 }
 
 // checkBucketDrift checks S3 bucket for drift
-func (s *AWSSimulator) checkBucketDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *AWSSimulator) checkBucketDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	bucketName := s.extractBucketName(resource)
 	if bucketName == "" {
 		return nil
@@ -548,7 +548,7 @@ func (s *AWSSimulator) checkBucketDrift(ctx context.Context, resource *parser.Re
 }
 
 // checkSecurityGroupDrift checks security group for drift
-func (s *AWSSimulator) checkSecurityGroupDrift(ctx context.Context, resource *parser.Resource) *DriftItem {
+func (s *AWSSimulator) checkSecurityGroupDrift(ctx context.Context, resource *state.Resource) *DriftItem {
 	sgID := s.extractSecurityGroupID(resource)
 	if sgID == "" {
 		return nil
@@ -588,7 +588,7 @@ func (s *AWSSimulator) checkSecurityGroupDrift(ctx context.Context, resource *pa
 }
 
 // checkUnmanagedResources checks for resources not in state
-func (s *AWSSimulator) checkUnmanagedResources(ctx context.Context, state *parser.TerraformState) []DriftItem {
+func (s *AWSSimulator) checkUnmanagedResources(ctx context.Context, state *state.TerraformState) []DriftItem {
 	var drifts []DriftItem
 
 	// Check for drift simulation buckets
@@ -600,7 +600,7 @@ func (s *AWSSimulator) checkUnmanagedResources(ctx context.Context, state *parse
 				found := false
 				for _, resource := range state.Resources {
 					if resource.Type == "aws_s3_bucket" {
-						bucketName := s.extractBucketName(resource)
+						bucketName := s.extractBucketName(&resource)
 						if bucketName == *bucket.Name {
 							found = true
 							break
@@ -654,16 +654,16 @@ func (s *AWSSimulator) Rollback(ctx context.Context, data *RollbackData) error {
 
 // Helper functions
 
-func (s *AWSSimulator) findResource(resourceID string, state *parser.TerraformState) *parser.Resource {
+func (s *AWSSimulator) findResource(resourceID string, state *state.TerraformState) *state.Resource {
 	for _, resource := range state.Resources {
 		if resource.ID == resourceID || resource.Name == resourceID {
-			return resource
+			return &resource
 		}
 	}
 	return nil
 }
 
-func (s *AWSSimulator) extractInstanceID(resource *parser.Resource) string {
+func (s *AWSSimulator) extractInstanceID(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if id, ok := resource.Instances[0].Attributes["id"].(string); ok {
 			return id
@@ -672,7 +672,7 @@ func (s *AWSSimulator) extractInstanceID(resource *parser.Resource) string {
 	return ""
 }
 
-func (s *AWSSimulator) extractBucketName(resource *parser.Resource) string {
+func (s *AWSSimulator) extractBucketName(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if name, ok := resource.Instances[0].Attributes["bucket"].(string); ok {
 			return name
@@ -684,7 +684,7 @@ func (s *AWSSimulator) extractBucketName(resource *parser.Resource) string {
 	return ""
 }
 
-func (s *AWSSimulator) extractSecurityGroupID(resource *parser.Resource) string {
+func (s *AWSSimulator) extractSecurityGroupID(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if id, ok := resource.Instances[0].Attributes["id"].(string); ok {
 			return id
@@ -693,7 +693,7 @@ func (s *AWSSimulator) extractSecurityGroupID(resource *parser.Resource) string 
 	return ""
 }
 
-func (s *AWSSimulator) extractResourceARN(resource *parser.Resource) string {
+func (s *AWSSimulator) extractResourceARN(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if arn, ok := resource.Instances[0].Attributes["arn"].(string); ok {
 			return arn
@@ -705,7 +705,7 @@ func (s *AWSSimulator) extractResourceARN(resource *parser.Resource) string {
 	return ""
 }
 
-func (s *AWSSimulator) extractInstanceSecurityGroup(ctx context.Context, resource *parser.Resource) string {
+func (s *AWSSimulator) extractInstanceSecurityGroup(ctx context.Context, resource *state.Resource) string {
 	instanceID := s.extractInstanceID(resource)
 	if instanceID == "" {
 		return ""
@@ -726,7 +726,7 @@ func (s *AWSSimulator) extractInstanceSecurityGroup(ctx context.Context, resourc
 	return ""
 }
 
-func (s *AWSSimulator) extractResourceTags(resource *parser.Resource) map[string]string {
+func (s *AWSSimulator) extractResourceTags(resource *state.Resource) map[string]string {
 	tags := make(map[string]string)
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if t, ok := resource.Instances[0].Attributes["tags"].(map[string]interface{}); ok {
@@ -738,7 +738,7 @@ func (s *AWSSimulator) extractResourceTags(resource *parser.Resource) map[string
 	return tags
 }
 
-func (s *AWSSimulator) extractBucketVersioning(resource *parser.Resource) string {
+func (s *AWSSimulator) extractBucketVersioning(resource *state.Resource) string {
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if v, ok := resource.Instances[0].Attributes["versioning"].(map[string]interface{}); ok {
 			if enabled, ok := v["enabled"].(bool); ok && enabled {
@@ -749,7 +749,7 @@ func (s *AWSSimulator) extractBucketVersioning(resource *parser.Resource) string
 	return ""
 }
 
-func (s *AWSSimulator) extractSecurityGroupRules(resource *parser.Resource) []map[string]interface{} {
+func (s *AWSSimulator) extractSecurityGroupRules(resource *state.Resource) []map[string]interface{} {
 	var rules []map[string]interface{}
 	if resource.Instances != nil && len(resource.Instances) > 0 {
 		if ingress, ok := resource.Instances[0].Attributes["ingress"].([]interface{}); ok {

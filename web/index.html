@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DriftMgr Console</title>
+    <title>DriftMgr v3.0 - Terraform State Intelligence Platform</title>
     
     <!-- Tailwind CSS and DaisyUI -->
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.19/dist/full.min.css" rel="stylesheet" type="text/css" />
@@ -15,375 +15,543 @@
     <!-- Alpine.js for reactivity -->
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     
-    <!-- Chart.js -->
+    <!-- Chart.js for visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- Custom Tailwind Config -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'aws-squid': '#232f3e',
-                        'aws-dark': '#161e2e',
-                        'aws-orange': '#ff9900',
-                        'aws-orange-light': '#ffac31',
-                        'aws-blue': '#146EB4',
-                        'aws-gray': '#687078',
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Vis.js for dependency graphs -->
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     
     <style>
-        /* Override DaisyUI theme colors for AWS look */
-        [data-theme="corporate"] {
-            --p: 27 100% 50%;  /* AWS Orange */
-            --pf: 27 100% 45%; /* Darker Orange */
-            --pc: 0 0% 100%;   /* White on primary */
-            --n: 211 25% 19%;  /* AWS Squid Ink */
-            --nf: 211 25% 15%; /* Darker */
-            --nc: 0 0% 100%;   /* White on neutral */
-            --b1: 0 0% 100%;   /* Base white */
-            --b2: 0 0% 96%;    /* Light gray */
-            --b3: 0 0% 92%;    /* Medium gray */
+        /* Clean, professional styling */
+        :root {
+            --primary-color: #7B42BC; /* Terraform purple */
+            --secondary-color: #ff9900; /* AWS orange */
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --warning-color: #f59e0b;
         }
         
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+        .terraform-gradient {
+            background: linear-gradient(135deg, #7B42BC 0%, #5E2CA5 100%);
         }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
+        
+        .tab-active {
+            border-bottom: 3px solid var(--primary-color);
+            color: var(--primary-color);
         }
-        ::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 4px;
+        
+        /* WebSocket status indicator */
+        .ws-connected {
+            animation: pulse 2s infinite;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #555;
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
     </style>
 </head>
-<body x-data="driftMgrApp()" class="min-h-screen bg-base-200">
-    <!-- AWS Console Navigation Bar -->
-    <nav class="navbar bg-aws-squid text-white min-h-12 h-12 px-4">
+<body x-data="driftMgrV3App()" x-init="init()" class="min-h-screen bg-gray-50">
+    
+    <!-- Top Navigation Bar -->
+    <nav class="navbar bg-white shadow-sm border-b">
         <div class="navbar-start">
-            <a class="text-lg font-bold text-white">⚡ DriftMgr Console</a>
+            <div class="flex items-center gap-3">
+                <div class="text-2xl font-mono font-bold text-primary">DriftMgr</div>
+                <div class="badge badge-primary">v3.0</div>
+                <div x-show="wsConnected" class="badge badge-success gap-1">
+                    <div class="w-2 h-2 bg-green-500 rounded-full ws-connected"></div>
+                    <span>Connected</span>
+                </div>
+            </div>
         </div>
         
         <div class="navbar-center">
-            <div class="form-control">
-                <input type="text" 
-                       placeholder="Search resources, services, and docs" 
-                       class="input input-sm w-96 bg-white/10 text-white placeholder-white/60 border-transparent focus:bg-white focus:text-gray-900 focus:placeholder-gray-500"/>
+            <!-- Quick Actions Bar -->
+            <div class="flex gap-2">
+                <button @click="discoverBackends()" class="btn btn-sm btn-primary">
+                    <i class="fas fa-search"></i> Discover Backends
+                </button>
+                <button @click="runDriftDetection()" class="btn btn-sm btn-warning">
+                    <i class="fas fa-sync"></i> Detect Drift
+                </button>
+                <button @click="openImportWizard()" class="btn btn-sm btn-success">
+                    <i class="fas fa-file-import"></i> Import Resources
+                </button>
             </div>
         </div>
         
         <div class="navbar-end gap-2">
-            <div class="dropdown dropdown-end">
-                <label tabindex="0" class="btn btn-ghost btn-sm text-white">
-                    <i class="fas fa-bell"></i>
-                    <span x-show="notifications > 0" class="badge badge-warning badge-sm" x-text="notifications"></span>
-                </label>
-            </div>
+            <!-- Environment Selector -->
+            <select x-model="selectedEnvironment" class="select select-sm select-bordered">
+                <option value="development">Development</option>
+                <option value="staging">Staging</option>
+                <option value="production">Production</option>
+            </select>
             
-            <button class="btn btn-ghost btn-sm text-white">
-                <i class="fas fa-globe"></i>
-                <span class="text-aws-orange">Global</span>
-            </button>
-            
+            <!-- Notifications -->
             <div class="dropdown dropdown-end">
-                <label tabindex="0" class="btn btn-ghost btn-sm text-white">
-                    <i class="fas fa-user-circle"></i>
-                    <span x-text="currentUser?.username || 'Account'"></span>
+                <label tabindex="0" class="btn btn-ghost btn-circle">
+                    <div class="indicator">
+                        <i class="fas fa-bell"></i>
+                        <span x-show="notifications.length > 0" class="badge badge-xs badge-primary indicator-item" x-text="notifications.length"></span>
+                    </div>
                 </label>
-                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52 text-gray-800">
-                    <li class="menu-title">
-                        <span x-text="currentUser?.role || 'User'"></span>
-                    </li>
-                    <li><a @click="currentView = 'settings'">Settings</a></li>
-                    <li><a @click="logout()">Sign out</a></li>
+                <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-80 max-h-96 overflow-y-auto">
+                    <template x-for="notification in notifications" :key="notification.id">
+                        <li>
+                            <div class="alert" :class="'alert-' + notification.type">
+                                <div>
+                                    <span x-text="notification.message"></span>
+                                    <div class="text-xs opacity-60" x-text="notification.timestamp"></div>
+                                </div>
+                            </div>
+                        </li>
+                    </template>
                 </ul>
             </div>
-            
-            <button class="btn btn-ghost btn-sm text-white">
-                <i class="fas fa-question-circle"></i>
-            </button>
         </div>
     </nav>
-
-    <!-- Service Navigation -->
-    <div class="navbar min-h-11 h-11 bg-base-100 border-b px-4">
-        <div class="navbar-start">
-            <div class="text-sm breadcrumbs">
-                <ul>
-                    <li>DriftMgr</li>
-                    <li class="font-bold" x-text="currentViewTitle"></li>
-                </ul>
+    
+    <!-- Main Navigation Tabs (v3.0 Architecture Aligned) -->
+    <div class="tabs tabs-boxed bg-white shadow-sm p-2">
+        <a @click="currentView = 'backends'" :class="currentView === 'backends' ? 'tab-active' : ''" class="tab">
+            <i class="fas fa-database mr-2"></i> Backend Discovery
+        </a>
+        <a @click="currentView = 'states'" :class="currentView === 'states' ? 'tab-active' : ''" class="tab">
+            <i class="fas fa-file-code mr-2"></i> State Management
+        </a>
+        <a @click="currentView = 'drift'" :class="currentView === 'drift' ? 'tab-active' : ''" class="tab">
+            <i class="fas fa-exchange-alt mr-2"></i> Drift Detection
+        </a>
+        <a @click="currentView = 'resources'" :class="currentView === 'resources' ? 'tab-active' : ''" class="tab">
+            <i class="fas fa-cube mr-2"></i> Resources
+        </a>
+        <a @click="currentView = 'terragrunt'" :class="currentView === 'terragrunt' ? 'tab-active' : ''" class="tab">
+            <i class="fas fa-layer-group mr-2"></i> Terragrunt
+        </a>
+        <a @click="currentView = 'remediation'" :class="currentView === 'remediation' ? 'tab-active' : ''" class="tab">
+            <i class="fas fa-tools mr-2"></i> Remediation
+        </a>
+        <a @click="currentView = 'compliance'" :class="currentView === 'compliance' ? 'tab-active' : ''" class="tab">
+            <i class="fas fa-shield-alt mr-2"></i> Compliance
+        </a>
+        <a @click="currentView = 'monitoring'" :class="currentView === 'monitoring' ? 'tab-active' : ''" class="tab">
+            <i class="fas fa-chart-line mr-2"></i> Monitoring
+        </a>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="container mx-auto p-4">
+        
+        <!-- Backend Discovery View (New in v3.0) -->
+        <div x-show="currentView === 'backends'" class="space-y-4">
+            <div class="card bg-white shadow-lg">
+                <div class="card-body">
+                    <h2 class="card-title">
+                        <i class="fas fa-database"></i> Remote Backend Discovery
+                    </h2>
+                    
+                    <!-- Backend Types -->
+                    <div class="grid grid-cols-4 gap-4 mt-4">
+                        <div class="stat bg-base-100 rounded-lg shadow">
+                            <div class="stat-figure text-primary">
+                                <i class="fab fa-aws text-3xl"></i>
+                            </div>
+                            <div class="stat-title">S3 Backends</div>
+                            <div class="stat-value" x-text="backends.s3.count">0</div>
+                            <div class="stat-desc">
+                                <span x-text="backends.s3.states"></span> state files
+                            </div>
+                        </div>
+                        
+                        <div class="stat bg-base-100 rounded-lg shadow">
+                            <div class="stat-figure text-info">
+                                <i class="fab fa-microsoft text-3xl"></i>
+                            </div>
+                            <div class="stat-title">Azure Storage</div>
+                            <div class="stat-value" x-text="backends.azure.count">0</div>
+                            <div class="stat-desc">
+                                <span x-text="backends.azure.states"></span> state files
+                            </div>
+                        </div>
+                        
+                        <div class="stat bg-base-100 rounded-lg shadow">
+                            <div class="stat-figure text-success">
+                                <i class="fab fa-google text-3xl"></i>
+                            </div>
+                            <div class="stat-title">GCS Backends</div>
+                            <div class="stat-value" x-text="backends.gcs.count">0</div>
+                            <div class="stat-desc">
+                                <span x-text="backends.gcs.states"></span> state files
+                            </div>
+                        </div>
+                        
+                        <div class="stat bg-base-100 rounded-lg shadow">
+                            <div class="stat-figure text-warning">
+                                <i class="fas fa-folder text-3xl"></i>
+                            </div>
+                            <div class="stat-title">Local</div>
+                            <div class="stat-value" x-text="backends.local.count">0</div>
+                            <div class="stat-desc">
+                                <span x-text="backends.local.states"></span> state files
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Discovery Actions -->
+                    <div class="flex gap-2 mt-4">
+                        <button @click="scanForBackends()" class="btn btn-primary">
+                            <i class="fas fa-radar"></i> Scan for Backends
+                        </button>
+                        <button @click="configureBackend()" class="btn btn-secondary">
+                            <i class="fas fa-cog"></i> Configure Backend
+                        </button>
+                        <button @click="testConnections()" class="btn btn-accent">
+                            <i class="fas fa-plug"></i> Test Connections
+                        </button>
+                    </div>
+                    
+                    <!-- Backend List -->
+                    <div class="overflow-x-auto mt-4">
+                        <table class="table table-zebra w-full">
+                            <thead>
+                                <tr>
+                                    <th>Backend Type</th>
+                                    <th>Location</th>
+                                    <th>State Files</th>
+                                    <th>Last Accessed</th>
+                                    <th>Lock Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="backend in backendsList" :key="backend.id">
+                                    <tr>
+                                        <td>
+                                            <span class="badge" :class="getBackendBadgeClass(backend.type)" x-text="backend.type"></span>
+                                        </td>
+                                        <td x-text="backend.location"></td>
+                                        <td x-text="backend.stateCount"></td>
+                                        <td x-text="backend.lastAccessed"></td>
+                                        <td>
+                                            <span x-show="!backend.locked" class="badge badge-success">Unlocked</span>
+                                            <span x-show="backend.locked" class="badge badge-error">Locked</span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button @click="exploreBackend(backend)" class="btn btn-xs btn-info">
+                                                    <i class="fas fa-folder-open"></i>
+                                                </button>
+                                                <button @click="pullState(backend)" class="btn btn-xs btn-success">
+                                                    <i class="fas fa-download"></i>
+                                                </button>
+                                                <button @click="pushState(backend)" class="btn btn-xs btn-warning">
+                                                    <i class="fas fa-upload"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <div class="navbar-end gap-2">
-            <!-- WebSocket Status Indicator -->
-            <div class="tooltip tooltip-bottom" :data-tip="wsConnected ? 'Real-time updates connected' : 'Real-time updates disconnected'">
-                <div class="flex items-center gap-2 px-3">
-                    <i id="ws-status-indicator" class="fas fa-circle text-xs" 
-                       :class="wsConnected ? 'text-success' : 'text-error'"></i>
-                    <span class="text-xs" x-text="wsConnected ? 'Live' : 'Offline'"></span>
-                </div>
-            </div>
-            
-            <button @click="refreshData()" class="btn btn-outline btn-sm">
-                <i class="fas fa-sync-alt" :class="{'animate-spin': loading}"></i>
-                Refresh
-            </button>
-            <div class="dropdown dropdown-end">
-                <label tabindex="0" class="btn btn-primary btn-sm">
-                    <i class="fas fa-cog"></i>
-                    Actions
-                </label>
-                <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-                    <li><a @click="exportResources()">Export</a></li>
-                    <li><a @click="importResources()">Import</a></li>
-                    <li><a @click="currentView = 'settings'">Settings</a></li>
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <!-- Main Console Layout -->
-    <div class="flex h-[calc(100vh-6rem)]">
-        <!-- Sidebar Navigation -->
-        <aside class="w-60 bg-base-100 border-r overflow-y-auto">
-            <!-- Navigation Section -->
-            <div class="menu p-2">
-                <li class="menu-title">
-                    <span class="text-xs uppercase font-bold">Navigation</span>
-                </li>
-                <li>
-                    <a @click="currentView = 'dashboard'" 
-                       :class="{'active bg-orange-50 text-aws-orange border-l-4 border-aws-orange': currentView === 'dashboard'}">
-                        <i class="fas fa-tachometer-alt w-4"></i>
-                        Dashboard
-                    </a>
-                </li>
-                <li>
-                    <a @click="currentView = 'resources'" 
-                       :class="{'active bg-orange-50 text-aws-orange border-l-4 border-aws-orange': currentView === 'resources'}">
-                        <i class="fas fa-server w-4"></i>
-                        Resources
-                    </a>
-                </li>
-                <li>
-                    <a @click="currentView = 'discovery'" 
-                       :class="{'active bg-orange-50 text-aws-orange border-l-4 border-aws-orange': currentView === 'discovery'}">
-                        <i class="fas fa-search w-4"></i>
-                        Discovery
-                    </a>
-                </li>
-                <li>
-                    <a @click="currentView = 'drift'" 
-                       :class="{'active bg-orange-50 text-aws-orange border-l-4 border-aws-orange': currentView === 'drift'}">
-                        <i class="fas fa-exchange-alt w-4"></i>
-                        Drift Detection
-                    </a>
-                </li>
-                <li>
-                    <a @click="currentView = 'remediation'" 
-                       :class="{'active bg-orange-50 text-aws-orange border-l-4 border-aws-orange': currentView === 'remediation'}">
-                        <i class="fas fa-wrench w-4"></i>
-                        Remediation
-                    </a>
-                </li>
-            </div>
-            
-            <div class="divider my-0"></div>
-            
-            <!-- Cloud Providers Section -->
-            <div class="menu p-2">
-                <li class="menu-title">
-                    <span class="text-xs uppercase font-bold">Cloud Providers</span>
-                </li>
-                <template x-for="provider in providers" :key="provider.name">
-                    <li>
-                        <a @click="selectProvider(provider.name)" class="justify-between">
-                            <span>
-                                <i :class="provider.icon + ' w-4'"></i>
-                                <span x-text="provider.label"></span>
-                            </span>
-                            <span x-show="provider.configured" class="badge badge-success badge-xs">Active</span>
-                        </a>
-                    </li>
-                </template>
-            </div>
-            
-            <div class="divider my-0"></div>
-            
-            <!-- Advanced Section -->
-            <div class="menu p-2">
-                <li class="menu-title">
-                    <span class="text-xs uppercase font-bold">Advanced</span>
-                </li>
-                <li>
-                    <a @click="currentView = 'state'" 
-                       :class="{'active bg-orange-50 text-aws-orange border-l-4 border-aws-orange': currentView === 'state'}">
-                        <i class="fas fa-file-code w-4"></i>
-                        State Files
-                    </a>
-                </li>
-                <li>
-                    <a @click="currentView = 'audit'">
-                        <i class="fas fa-clipboard-list w-4"></i>
-                        Audit Logs
-                    </a>
-                </li>
-                <li>
-                    <a @click="currentView = 'settings'">
-                        <i class="fas fa-cog w-4"></i>
-                        Settings
-                    </a>
-                </li>
-            </div>
-        </aside>
-
-        <!-- Main Content Area -->
-        <main class="flex-1 overflow-y-auto p-6 bg-gray-50">
-            <!-- Loading Progress (DaisyUI Style) -->
-            <div x-show="isLoading && loadingMessage" class="alert alert-info mb-4">
-                <span class="loading loading-spinner loading-sm"></span>
-                <div class="flex-1">
-                    <div class="flex justify-between items-center mb-2">
-                        <span x-text="loadingMessage"></span>
-                        <strong x-text="`${Math.round(loadingProgress)}%`"></strong>
-                    </div>
-                    <progress class="progress progress-primary w-full" :value="loadingProgress" max="100"></progress>
-                </div>
-            </div>
-
-            <!-- Dashboard View -->
-            <div x-show="currentView === 'dashboard'">
-                <!-- Metrics Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body p-4">
-                            <p class="text-xs text-gray-500 uppercase">Total Resources</p>
-                            <p class="text-2xl font-bold" x-text="stats.total"></p>
-                            <p class="text-xs text-success flex items-center gap-1">
-                                <i class="fas fa-arrow-up"></i> 12% from last scan
-                            </p>
-                        </div>
+        <!-- State Management View (Enhanced for v3.0) -->
+        <div x-show="currentView === 'states'" class="space-y-4">
+            <div class="card bg-white shadow-lg">
+                <div class="card-body">
+                    <h2 class="card-title">
+                        <i class="fas fa-file-code"></i> Terraform State Management
+                    </h2>
+                    
+                    <!-- State Operations -->
+                    <div class="tabs tabs-boxed">
+                        <a @click="stateTab = 'browser'" :class="stateTab === 'browser' ? 'tab-active' : ''" class="tab">Browse States</a>
+                        <a @click="stateTab = 'operations'" :class="stateTab === 'operations' ? 'tab-active' : ''" class="tab">Operations</a>
+                        <a @click="stateTab = 'history'" :class="stateTab === 'history' ? 'tab-active' : ''" class="tab">History</a>
+                        <a @click="stateTab = 'dependencies'" :class="stateTab === 'dependencies' ? 'tab-active' : ''" class="tab">Dependencies</a>
                     </div>
                     
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body p-4">
-                            <p class="text-xs text-gray-500 uppercase">Drifted Resources</p>
-                            <p class="text-2xl font-bold" x-text="stats.drifted"></p>
-                            <p class="text-xs text-error flex items-center gap-1">
-                                <i class="fas fa-arrow-up"></i> 5 new drifts
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body p-4">
-                            <p class="text-xs text-gray-500 uppercase">Compliance Score</p>
-                            <p class="text-2xl font-bold">
-                                <span x-text="stats.complianceScore"></span>%
-                            </p>
-                            <p class="text-xs text-success flex items-center gap-1">
-                                <i class="fas fa-check-circle"></i> Healthy
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body p-4">
-                            <p class="text-xs text-gray-500 uppercase">Active Providers</p>
-                            <p class="text-2xl font-bold" x-text="stats.activeProviders"></p>
-                            <p class="text-xs text-gray-500">AWS, Azure, GCP</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Charts Section -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body">
-                            <div class="flex justify-between items-center mb-4">
-                                <h2 class="card-title text-lg">Resources by Provider</h2>
-                                <button class="btn btn-ghost btn-xs">
-                                    <i class="fas fa-download"></i>
-                                    Export
-                                </button>
+                    <!-- State Browser Tab -->
+                    <div x-show="stateTab === 'browser'" class="mt-4">
+                        <div class="grid grid-cols-3 gap-4">
+                            <!-- State File List -->
+                            <div class="col-span-1 border-r pr-4">
+                                <h3 class="font-bold mb-2">State Files</h3>
+                                <div class="space-y-2">
+                                    <template x-for="state in stateFiles" :key="state.path">
+                                        <div @click="selectState(state)" class="cursor-pointer p-2 hover:bg-base-200 rounded" :class="selectedState?.path === state.path ? 'bg-primary/10' : ''">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <div class="font-semibold" x-text="state.name"></div>
+                                                    <div class="text-xs opacity-60" x-text="state.backend"></div>
+                                                </div>
+                                                <span class="badge badge-sm" x-text="state.resourceCount + ' resources'"></span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
-                            <canvas id="providerChart" style="max-height: 250px;"></canvas>
+                            
+                            <!-- State Details -->
+                            <div class="col-span-2 pl-4">
+                                <div x-show="selectedState">
+                                    <h3 class="font-bold mb-2">State Details</h3>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span>Version:</span>
+                                            <span class="font-mono" x-text="selectedState?.version"></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Serial:</span>
+                                            <span class="font-mono" x-text="selectedState?.serial"></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Lineage:</span>
+                                            <span class="font-mono text-xs" x-text="selectedState?.lineage"></span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Terraform Version:</span>
+                                            <span class="font-mono" x-text="selectedState?.terraformVersion"></span>
+                                        </div>
+                                        
+                                        <!-- Resource List -->
+                                        <div class="mt-4">
+                                            <h4 class="font-semibold mb-2">Resources</h4>
+                                            <div class="max-h-64 overflow-y-auto">
+                                                <template x-for="resource in selectedState?.resources" :key="resource.address">
+                                                    <div class="flex items-center justify-between p-2 hover:bg-base-200 rounded">
+                                                        <div>
+                                                            <div class="font-mono text-sm" x-text="resource.address"></div>
+                                                            <div class="text-xs opacity-60" x-text="resource.type"></div>
+                                                        </div>
+                                                        <div class="badge badge-sm" x-text="resource.provider"></div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body">
-                            <div class="flex justify-between items-center mb-4">
-                                <h2 class="card-title text-lg">Drift Severity Distribution</h2>
-                                <button class="btn btn-ghost btn-xs">
-                                    <i class="fas fa-filter"></i>
-                                    Filter
-                                </button>
+                    <!-- State Operations Tab -->
+                    <div x-show="stateTab === 'operations'" class="mt-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="card bg-base-100">
+                                <div class="card-body">
+                                    <h3 class="card-title text-lg">Push State</h3>
+                                    <p class="text-sm opacity-60">Upload local state to remote backend</p>
+                                    <div class="form-control">
+                                        <label class="label">Local State File</label>
+                                        <input type="file" class="file-input file-input-bordered" x-model="pushStateFile">
+                                    </div>
+                                    <div class="form-control">
+                                        <label class="label">Target Backend</label>
+                                        <select class="select select-bordered" x-model="pushTarget">
+                                            <option value="s3">S3</option>
+                                            <option value="azure">Azure Storage</option>
+                                            <option value="gcs">GCS</option>
+                                        </select>
+                                    </div>
+                                    <button @click="pushStateToBackend()" class="btn btn-primary">
+                                        <i class="fas fa-upload"></i> Push State
+                                    </button>
+                                </div>
                             </div>
-                            <canvas id="severityChart" style="max-height: 250px;"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Drifts Table -->
-                <div class="card bg-base-100 shadow-sm border">
-                    <div class="card-body">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="card-title text-lg">Recent Configuration Drifts</h2>
-                            <button @click="currentView = 'drift'" class="btn btn-ghost btn-sm">
-                                View All
-                            </button>
+                            
+                            <div class="card bg-base-100">
+                                <div class="card-body">
+                                    <h3 class="card-title text-lg">Pull State</h3>
+                                    <p class="text-sm opacity-60">Download state from remote backend</p>
+                                    <div class="form-control">
+                                        <label class="label">Source Backend</label>
+                                        <select class="select select-bordered" x-model="pullSource">
+                                            <option value="s3">S3</option>
+                                            <option value="azure">Azure Storage</option>
+                                            <option value="gcs">GCS</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-control">
+                                        <label class="label">State Key</label>
+                                        <input type="text" class="input input-bordered" x-model="pullStateKey" placeholder="path/to/state.tfstate">
+                                    </div>
+                                    <button @click="pullStateFromBackend()" class="btn btn-success">
+                                        <i class="fas fa-download"></i> Pull State
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         
+                        <!-- Advanced Operations -->
+                        <div class="grid grid-cols-3 gap-4 mt-4">
+                            <button @click="moveResource()" class="btn btn-outline">
+                                <i class="fas fa-arrows-alt"></i> Move Resource
+                            </button>
+                            <button @click="removeResource()" class="btn btn-outline btn-error">
+                                <i class="fas fa-trash"></i> Remove Resource
+                            </button>
+                            <button @click="importResource()" class="btn btn-outline btn-success">
+                                <i class="fas fa-file-import"></i> Import Resource
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Terragrunt View (New in v3.0) -->
+        <div x-show="currentView === 'terragrunt'" class="space-y-4">
+            <div class="card bg-white shadow-lg">
+                <div class="card-body">
+                    <h2 class="card-title">
+                        <i class="fas fa-layer-group"></i> Terragrunt Configuration
+                    </h2>
+                    
+                    <!-- Terragrunt Modules -->
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <h3 class="font-bold mb-2">Module Hierarchy</h3>
+                            <div class="tree">
+                                <template x-for="module in terragruntModules" :key="module.path">
+                                    <div class="ml-4">
+                                        <div class="flex items-center gap-2 p-2 hover:bg-base-200 rounded cursor-pointer" @click="selectTerragruntModule(module)">
+                                            <i class="fas fa-folder" x-show="module.hasChildren"></i>
+                                            <i class="fas fa-file" x-show="!module.hasChildren"></i>
+                                            <span x-text="module.name"></span>
+                                            <span class="badge badge-xs" x-text="module.dependencies.length + ' deps'" x-show="module.dependencies.length > 0"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="font-bold mb-2">Module Details</h3>
+                            <div x-show="selectedTerragruntModule" class="space-y-2">
+                                <div>
+                                    <span class="font-semibold">Path:</span>
+                                    <span class="font-mono text-sm" x-text="selectedTerragruntModule?.path"></span>
+                                </div>
+                                <div>
+                                    <span class="font-semibold">Source:</span>
+                                    <span class="font-mono text-sm" x-text="selectedTerragruntModule?.source"></span>
+                                </div>
+                                <div>
+                                    <span class="font-semibold">Dependencies:</span>
+                                    <ul class="list-disc ml-4">
+                                        <template x-for="dep in selectedTerragruntModule?.dependencies" :key="dep">
+                                            <li class="font-mono text-sm" x-text="dep"></li>
+                                        </template>
+                                    </ul>
+                                </div>
+                                
+                                <!-- Terragrunt Actions -->
+                                <div class="flex gap-2 mt-4">
+                                    <button @click="runTerragruntPlan()" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-clipboard-list"></i> Plan
+                                    </button>
+                                    <button @click="runTerragruntApply()" class="btn btn-sm btn-success">
+                                        <i class="fas fa-check"></i> Apply
+                                    </button>
+                                    <button @click="runTerragruntRunAll()" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-play"></i> Run All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Dependency Graph -->
+                    <div class="mt-4">
+                        <h3 class="font-bold mb-2">Dependency Graph</h3>
+                        <div id="terragrunt-dependency-graph" class="h-96 border rounded-lg"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Compliance View (New in v3.0) -->
+        <div x-show="currentView === 'compliance'" class="space-y-4">
+            <div class="card bg-white shadow-lg">
+                <div class="card-body">
+                    <h2 class="card-title">
+                        <i class="fas fa-shield-alt"></i> Compliance & Governance
+                    </h2>
+                    
+                    <!-- Policy Engine Status -->
+                    <div class="alert alert-info mt-4">
+                        <i class="fas fa-info-circle"></i>
+                        <div>
+                            <h3 class="font-bold">OPA Policy Engine</h3>
+                            <p>Status: <span class="badge badge-success">Active</span></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Compliance Reports -->
+                    <div class="grid grid-cols-3 gap-4 mt-4">
+                        <div class="card bg-base-100">
+                            <div class="card-body">
+                                <h3 class="card-title">SOC2 Compliance</h3>
+                                <div class="radial-progress text-primary" style="--value:85;">85%</div>
+                                <button @click="generateReport('soc2')" class="btn btn-primary btn-sm">
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="card bg-base-100">
+                            <div class="card-body">
+                                <h3 class="card-title">HIPAA Compliance</h3>
+                                <div class="radial-progress text-success" style="--value:92;">92%</div>
+                                <button @click="generateReport('hipaa')" class="btn btn-success btn-sm">
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="card bg-base-100">
+                            <div class="card-body">
+                                <h3 class="card-title">PCI-DSS Compliance</h3>
+                                <div class="radial-progress text-warning" style="--value:78;">78%</div>
+                                <button @click="generateReport('pci-dss')" class="btn btn-warning btn-sm">
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Policy Violations -->
+                    <div class="mt-4">
+                        <h3 class="font-bold mb-2">Policy Violations</h3>
                         <div class="overflow-x-auto">
-                            <table class="table table-sm">
+                            <table class="table table-zebra w-full">
                                 <thead>
                                     <tr>
+                                        <th>Policy</th>
                                         <th>Resource</th>
-                                        <th>Provider</th>
-                                        <th>Region</th>
-                                        <th>Drift Type</th>
                                         <th>Severity</th>
-                                        <th>Detected</th>
+                                        <th>Description</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <template x-for="drift in recentDrifts" :key="drift.id">
-                                        <tr class="hover">
+                                    <template x-for="violation in policyViolations" :key="violation.id">
+                                        <tr>
+                                            <td x-text="violation.policy"></td>
+                                            <td class="font-mono text-sm" x-text="violation.resource"></td>
                                             <td>
-                                                <a href="#" class="link link-primary font-semibold" x-text="drift.resourceName"></a>
+                                                <span class="badge" :class="getSeverityClass(violation.severity)" x-text="violation.severity"></span>
                                             </td>
+                                            <td x-text="violation.description"></td>
                                             <td>
-                                                <span class="badge badge-info badge-sm" x-text="drift.provider.toUpperCase()"></span>
-                                            </td>
-                                            <td x-text="drift.region"></td>
-                                            <td x-text="drift.type"></td>
-                                            <td>
-                                                <span class="badge badge-sm" 
-                                                      :class="{
-                                                          'badge-error': drift.severity === 'high',
-                                                          'badge-warning': drift.severity === 'medium',
-                                                          'badge-success': drift.severity === 'low'
-                                                      }"
-                                                      x-text="drift.severity.toUpperCase()">
-                                                </span>
-                                            </td>
-                                            <td class="text-xs" x-text="formatDate(drift.detected)"></td>
-                                            <td>
-                                                <button @click="remediateDrift(drift)" class="btn btn-xs btn-ghost">
+                                                <button @click="remediateViolation(violation)" class="btn btn-xs btn-primary">
                                                     Remediate
                                                 </button>
                                             </td>
@@ -395,2008 +563,91 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Resources View -->
-            <div x-show="currentView === 'resources'" style="display: none;">
-                <div class="card bg-base-100 shadow-sm border">
-                    <div class="card-body">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="card-title text-lg">Cloud Resources</h2>
-                            <div class="flex gap-2">
-                                <button @click="exportResources()" class="btn btn-ghost btn-sm">
-                                    <i class="fas fa-download"></i>
-                                    Export
-                                </button>
-                                <button @click="importResources()" class="btn btn-ghost btn-sm">
-                                    <i class="fas fa-upload"></i>
-                                    Import
-                                </button>
-                                <button @click="deleteSelected()" class="btn btn-primary btn-sm" :disabled="selectedResources.length === 0">
-                                    <i class="fas fa-trash"></i>
-                                    Delete Selected
-                                </button>
-                            </div>
+        </div>
+        
+        <!-- Monitoring View (Enhanced for v3.0) -->
+        <div x-show="currentView === 'monitoring'" class="space-y-4">
+            <div class="card bg-white shadow-lg">
+                <div class="card-body">
+                    <h2 class="card-title">
+                        <i class="fas fa-chart-line"></i> Continuous Monitoring
+                    </h2>
+                    
+                    <!-- Real-time Metrics -->
+                    <div class="grid grid-cols-4 gap-4 mt-4">
+                        <div class="stat bg-base-100 rounded-lg shadow">
+                            <div class="stat-title">Discovery Rate</div>
+                            <div class="stat-value text-primary" x-text="metrics.discoveryRate + '/min'">0/min</div>
+                            <div class="stat-desc">Resources discovered</div>
                         </div>
                         
-                        <!-- Filters -->
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                            <div class="form-control">
-                                <label class="label">
-                                    <span class="label-text text-xs">Search</span>
-                                </label>
-                                <input type="text" placeholder="Search resources..." 
-                                       class="input input-bordered input-sm w-full" 
-                                       x-model="searchTerm">
-                            </div>
-                            
-                            <div class="form-control">
-                                <label class="label">
-                                    <span class="label-text text-xs">Provider</span>
-                                </label>
-                                <select class="select select-bordered select-sm w-full" x-model="filterProvider">
-                                    <option value="">All Providers</option>
-                                    <option value="aws">AWS</option>
-                                    <option value="azure">Azure</option>
-                                    <option value="gcp">GCP</option>
-                                    <option value="digitalocean">DigitalOcean</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-control">
-                                <label class="label">
-                                    <span class="label-text text-xs">Region</span>
-                                </label>
-                                <select class="select select-bordered select-sm w-full" x-model="filterRegion">
-                                    <option value="">All Regions</option>
-                                    <template x-for="region in availableRegions" :key="region">
-                                        <option :value="region" x-text="region"></option>
-                                    </template>
-                                </select>
-                            </div>
-                            
-                            <div class="form-control">
-                                <label class="label">
-                                    <span class="label-text text-xs">Resource Type</span>
-                                </label>
-                                <select class="select select-bordered select-sm w-full" x-model="filterType">
-                                    <option value="">All Types</option>
-                                    <template x-for="type in availableTypes" :key="type">
-                                        <option :value="type" x-text="type"></option>
-                                    </template>
-                                </select>
-                            </div>
+                        <div class="stat bg-base-100 rounded-lg shadow">
+                            <div class="stat-title">Drift Detection</div>
+                            <div class="stat-value text-warning" x-text="metrics.driftRate + '%'">0%</div>
+                            <div class="stat-desc">Drift percentage</div>
                         </div>
-
-                        <!-- Resources Table -->
-                        <div class="overflow-x-auto">
-                            <table class="table table-sm" x-show="filteredResources.length > 0">
-                                <thead>
-                                    <tr>
-                                        <th>
-                                            <label>
-                                                <input type="checkbox" class="checkbox checkbox-sm" 
-                                                       @change="selectAllResources($event)">
-                                            </label>
-                                        </th>
-                                        <th>Resource ID</th>
-                                        <th>Name</th>
-                                        <th>Type</th>
-                                        <th>Provider</th>
-                                        <th>Region</th>
-                                        <th>Status</th>
-                                        <th>Last Modified</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template x-for="resource in filteredResources" :key="resource.id">
-                                        <tr class="hover">
-                                            <th>
-                                                <label>
-                                                    <input type="checkbox" class="checkbox checkbox-sm" 
-                                                           :value="resource.id" 
-                                                           x-model="selectedResources">
-                                                </label>
-                                            </th>
-                                            <td>
-                                                <a href="#" class="link link-primary" x-text="resource.id"></a>
-                                            </td>
-                                            <td x-text="resource.name"></td>
-                                            <td x-text="resource.type"></td>
-                                            <td>
-                                                <span class="badge badge-info badge-sm" x-text="resource.provider.toUpperCase()"></span>
-                                            </td>
-                                            <td x-text="resource.region"></td>
-                                            <td>
-                                                <span class="badge badge-sm" 
-                                                      :class="{
-                                                          'badge-success': resource.status === 'active' || resource.status === 'managed',
-                                                          'badge-warning': resource.status === 'drift' || resource.status === 'warning',
-                                                          'badge-error': resource.status === 'error' || resource.status === 'unmanaged',
-                                                          'badge-info': resource.status === 'unknown'
-                                                      }"
-                                                      x-text="resource.status || 'unknown'">
-                                                </span>
-                                            </td>
-                                            <td class="text-xs" x-text="formatDate(resource.lastModified)"></td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                            
-                            <!-- Empty State -->
-                            <div x-show="filteredResources.length === 0" class="text-center py-8">
-                                <i class="fas fa-cloud text-6xl text-gray-300 mb-4"></i>
-                                <p class="text-gray-500 mb-4">
-                                    <span x-show="resources.length === 0">No resources discovered yet</span>
-                                    <span x-show="resources.length > 0 && filteredResources.length === 0">No resources match your filters</span>
-                                </p>
-                                <div class="flex gap-2 justify-center">
-                                    <button @click="currentView = 'discovery'" class="btn btn-primary btn-sm" x-show="resources.length === 0">
-                                        <i class="fas fa-search"></i>
-                                        Start Discovery
-                                    </button>
-                                    <button @click="clearFilters()" class="btn btn-ghost btn-sm" x-show="resources.length > 0 && filteredResources.length === 0">
-                                        Clear Filters
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Discovery View -->
-            <div x-show="currentView === 'discovery'" style="display: none;">
-                <div class="card bg-base-100 shadow-sm border">
-                    <div class="card-body">
-                        <h2 class="card-title text-lg mb-4">Resource Discovery</h2>
                         
-                        <div class="max-w-xl">
-                            <div class="form-control mb-4">
-                                <label class="label">
-                                    <span class="label-text">Cloud Provider</span>
-                                </label>
-                                <select class="select select-bordered w-full" x-model="discoveryForm.provider">
-                                    <option value="">All Providers</option>
-                                    <option value="aws">Amazon Web Services</option>
-                                    <option value="azure">Microsoft Azure</option>
-                                    <option value="gcp">Google Cloud Platform</option>
-                                    <option value="digitalocean">DigitalOcean</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-control mb-4">
-                                <label class="label">
-                                    <span class="label-text">Regions (comma-separated)</span>
-                                </label>
-                                <input type="text" 
-                                       class="input input-bordered w-full" 
-                                       x-model="discoveryForm.regions" 
-                                       placeholder="e.g., us-east-1, us-west-2">
-                            </div>
-                            
-                            <div class="form-control mb-6">
-                                <label class="label cursor-pointer justify-start gap-2">
-                                    <input type="checkbox" class="checkbox checkbox-primary" 
-                                           x-model="discoveryForm.autoRemediate">
-                                    <span class="label-text">Enable Auto-Remediation</span>
-                                </label>
-                            </div>
-                            
-                            <button @click="startDiscovery()" class="btn btn-primary" :disabled="discovering">
-                                <span x-show="!discovering" class="flex items-center gap-2">
-                                    <i class="fas fa-search"></i>
-                                    Start Discovery
-                                </span>
-                                <span x-show="discovering" class="flex items-center gap-2">
-                                    <span class="loading loading-spinner loading-sm"></span>
-                                    Discovering...
-                                </span>
-                            </button>
+                        <div class="stat bg-base-100 rounded-lg shadow">
+                            <div class="stat-title">Remediation Success</div>
+                            <div class="stat-value text-success" x-text="metrics.remediationSuccess + '%'">0%</div>
+                            <div class="stat-desc">Auto-remediation rate</div>
                         </div>
-
-                        <!-- Discovery Progress -->
-                        <div x-show="discoveryJob" class="mt-6">
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i>
-                                <div class="flex-1">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <strong>Discovery in Progress</strong>
-                                        <span x-text="`${discoveryJob?.progress || 0}%`"></span>
-                                    </div>
-                                    <progress class="progress progress-primary w-full" 
-                                              :value="discoveryJob?.progress || 0" 
-                                              max="100"></progress>
-                                    <div class="text-sm mt-2" x-text="discoveryJob?.message"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Discovery Results -->
-                        <div x-show="discoveryResults.length > 0" class="mt-6">
-                            <h3 class="font-semibold mb-3">Discovery Results</h3>
-                            <div class="alert alert-success">
-                                <i class="fas fa-check-circle"></i>
-                                <span>Discovered <strong x-text="discoveryResults.length"></strong> resources</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- State Files View -->
-            <div x-show="currentView === 'state'" style="display: none;">
-                <!-- State Files Overview -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body p-4">
-                            <p class="text-xs text-gray-500 uppercase">Auto-Detected Files</p>
-                            <p class="text-2xl font-bold" x-text="stateFiles.length"></p>
-                            <p class="text-xs text-success flex items-center gap-1">
-                                <i class="fas fa-check-circle"></i> Last scan: 2 min ago
-                            </p>
+                        
+                        <div class="stat bg-base-100 rounded-lg shadow">
+                            <div class="stat-title">Cost Impact</div>
+                            <div class="stat-value text-error" x-text="'$' + metrics.costImpact">$0</div>
+                            <div class="stat-desc">Monthly drift cost</div>
                         </div>
                     </div>
                     
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body p-4">
-                            <p class="text-xs text-gray-500 uppercase">Total Resources</p>
-                            <p class="text-2xl font-bold" x-text="totalStateResources"></p>
-                            <p class="text-xs text-gray-500">Across all state files</p>
+                    <!-- Event Stream -->
+                    <div class="mt-4">
+                        <h3 class="font-bold mb-2">Event Stream</h3>
+                        <div class="max-h-64 overflow-y-auto bg-base-100 rounded-lg p-4 font-mono text-sm">
+                            <template x-for="event in eventStream" :key="event.id">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-xs opacity-60" x-text="event.timestamp"></span>
+                                    <span class="badge badge-xs" :class="getEventTypeClass(event.type)" x-text="event.type"></span>
+                                    <span x-text="event.message"></span>
+                                </div>
+                            </template>
                         </div>
                     </div>
                     
-                    <div class="card bg-base-100 shadow-sm border">
-                        <div class="card-body p-4">
-                            <p class="text-xs text-gray-500 uppercase">Drift Detected</p>
-                            <p class="text-2xl font-bold" x-text="stateDrifts"></p>
-                            <p class="text-xs text-warning flex items-center gap-1">
-                                <i class="fas fa-exclamation-triangle"></i> Requires attention
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- State Files Management -->
-                <div class="card bg-base-100 shadow-sm border mb-6">
-                    <div class="card-body">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="card-title text-lg">Terraform & Terragrunt State Files</h2>
-                            <div class="flex gap-2">
-                                <button @click="scanStateFiles()" class="btn btn-ghost btn-sm">
-                                    <i class="fas fa-sync-alt" :class="{'animate-spin': scanningStates}"></i>
-                                    Rescan
-                                </button>
-                                <button @click="uploadStateFile()" class="btn btn-ghost btn-sm">
-                                    <i class="fas fa-upload"></i>
-                                    Upload
-                                </button>
-                                <button @click="compareStates()" class="btn btn-primary btn-sm" 
-                                        :disabled="selectedStateFiles.length !== 2">
-                                    <i class="fas fa-code-compare"></i>
-                                    Compare
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Filter Tabs -->
-                        <div class="tabs tabs-boxed mb-4">
-                            <a class="tab" :class="{'tab-active': stateFilter === 'all'}" 
-                               @click="stateFilter = 'all'">
-                                All Files
-                                <span class="badge badge-sm ml-2" x-text="stateFiles.length"></span>
-                            </a>
-                            <a class="tab" :class="{'tab-active': stateFilter === 'terraform'}" 
-                               @click="stateFilter = 'terraform'">
-                                Terraform
-                                <span class="badge badge-sm ml-2" x-text="stateFiles.filter(f => f.type === 'terraform').length"></span>
-                            </a>
-                            <a class="tab" :class="{'tab-active': stateFilter === 'terragrunt'}" 
-                               @click="stateFilter = 'terragrunt'">
-                                Terragrunt
-                                <span class="badge badge-sm ml-2" x-text="stateFiles.filter(f => f.type === 'terragrunt').length"></span>
-                            </a>
-                            <a class="tab" :class="{'tab-active': stateFilter === 'remote'}" 
-                               @click="stateFilter = 'remote'">
-                                Remote Backends
-                                <span class="badge badge-sm ml-2" x-text="stateFiles.filter(f => f.backend === 'remote').length"></span>
-                            </a>
-                        </div>
-
-                        <!-- State Files Table -->
-                        <div class="overflow-x-auto">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>
-                                            <label>
-                                                <input type="checkbox" class="checkbox checkbox-sm" 
-                                                       @change="selectAllStateFiles($event)">
-                                            </label>
-                                        </th>
-                                        <th>File Path</th>
-                                        <th>Type</th>
-                                        <th>Backend</th>
-                                        <th>Provider</th>
-                                        <th>Resources</th>
-                                        <th>Size</th>
-                                        <th>Last Modified</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template x-for="file in filteredStateFiles" :key="file.id">
-                                        <tr class="hover">
-                                            <th>
-                                                <label>
-                                                    <input type="checkbox" class="checkbox checkbox-sm" 
-                                                           :value="file.id" 
-                                                           x-model="selectedStateFiles">
-                                                </label>
-                                            </th>
-                                            <td>
-                                                <div>
-                                                    <a href="#" @click="viewStateDetails(file)" 
-                                                       class="link link-primary font-mono text-xs" 
-                                                       x-text="file.path"></a>
-                                                    <div class="text-xs text-gray-500" x-text="file.workspace"></div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span class="badge badge-ghost badge-sm" 
-                                                      :class="{'badge-info': file.type === 'terraform', 'badge-success': file.type === 'terragrunt'}"
-                                                      x-text="file.type"></span>
-                                            </td>
-                                            <td>
-                                                <span class="text-xs" x-text="file.backend"></span>
-                                            </td>
-                                            <td>
-                                                <div class="flex gap-1">
-                                                    <template x-for="provider in file.providers" :key="provider">
-                                                        <span class="badge badge-sm" x-text="provider"></span>
-                                                    </template>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span class="font-semibold" x-text="file.resourceCount"></span>
-                                            </td>
-                                            <td>
-                                                <span class="text-xs" x-text="file.size"></span>
-                                            </td>
-                                            <td>
-                                                <span class="text-xs" x-text="formatDate(file.modified)"></span>
-                                            </td>
-                                            <td>
-                                                <span class="badge badge-sm" 
-                                                      :class="{
-                                                          'badge-success': file.status === 'synced',
-                                                          'badge-warning': file.status === 'drift',
-                                                          'badge-error': file.status === 'error'
-                                                      }">
-                                                    <i class="fas fa-circle text-xs mr-1"></i>
-                                                    <span x-text="file.status"></span>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <div class="dropdown dropdown-end">
-                                                    <label tabindex="0" class="btn btn-ghost btn-xs">
-                                                        <i class="fas fa-ellipsis-v"></i>
-                                                    </label>
-                                                    <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-                                                        <li><a @click="viewStateDetails(file)">
-                                                            <i class="fas fa-eye"></i> View Details
-                                                        </a></li>
-                                                        <li><a @click="analyzeState(file)">
-                                                            <i class="fas fa-chart-bar"></i> Analyze
-                                                        </a></li>
-                                                        <li><a @click="detectStateDrift(file)">
-                                                            <i class="fas fa-exchange-alt"></i> Detect Drift
-                                                        </a></li>
-                                                        <li><a @click="downloadState(file)">
-                                                            <i class="fas fa-download"></i> Download
-                                                        </a></li>
-                                                        <li class="text-error"><a @click="removeState(file)">
-                                                            <i class="fas fa-trash"></i> Remove
-                                                        </a></li>
-                                                    </ul>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- State File Analysis Section -->
-                <div x-show="selectedStateFile" class="card bg-base-100 shadow-sm border">
-                    <div class="card-body">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="card-title text-lg">
-                                State File Analysis: <span class="font-mono text-sm" x-text="selectedStateFile?.name"></span>
-                            </h2>
-                            <button @click="selectedStateFile = null" class="btn btn-ghost btn-sm">
-                                <i class="fas fa-times"></i>
+                    <!-- Webhook Configuration -->
+                    <div class="mt-4">
+                        <h3 class="font-bold mb-2">Webhook Receivers</h3>
+                        <div class="flex gap-2">
+                            <button @click="configureWebhook('eventbridge')" class="btn btn-sm" :class="webhooks.eventbridge ? 'btn-success' : 'btn-outline'">
+                                <i class="fab fa-aws"></i> EventBridge
                             </button>
-                        </div>
-
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            <!-- Resource Breakdown -->
-                            <div>
-                                <h3 class="font-semibold mb-3">Resource Breakdown</h3>
-                                <canvas id="stateResourceChart"></canvas>
-                            </div>
-
-                            <!-- State Metadata -->
-                            <div>
-                                <h3 class="font-semibold mb-3">State Information</h3>
-                                <div class="space-y-2">
-                                    <div class="flex justify-between py-2 border-b">
-                                        <span class="text-gray-500">Terraform Version</span>
-                                        <span class="font-mono text-sm" x-text="selectedStateFile?.terraformVersion"></span>
-                                    </div>
-                                    <div class="flex justify-between py-2 border-b">
-                                        <span class="text-gray-500">Serial</span>
-                                        <span class="font-mono text-sm" x-text="selectedStateFile?.serial"></span>
-                                    </div>
-                                    <div class="flex justify-between py-2 border-b">
-                                        <span class="text-gray-500">Lineage</span>
-                                        <span class="font-mono text-xs" x-text="selectedStateFile?.lineage"></span>
-                                    </div>
-                                    <div class="flex justify-between py-2 border-b">
-                                        <span class="text-gray-500">Last Updated</span>
-                                        <span class="text-sm" x-text="formatDate(selectedStateFile?.lastUpdated)"></span>
-                                    </div>
-                                    <div class="flex justify-between py-2">
-                                        <span class="text-gray-500">Backend Type</span>
-                                        <span class="badge badge-sm" x-text="selectedStateFile?.backend"></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Resources List -->
-                        <div class="mt-6">
-                            <h3 class="font-semibold mb-3">Resources in State</h3>
-                            <div class="overflow-x-auto">
-                                <table class="table table-xs">
-                                    <thead>
-                                        <tr>
-                                            <th>Resource Type</th>
-                                            <th>Name</th>
-                                            <th>Provider</th>
-                                            <th>Mode</th>
-                                            <th>Instances</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <template x-for="resource in selectedStateFile?.resources" :key="resource.id">
-                                            <tr>
-                                                <td class="font-mono text-xs" x-text="resource.type"></td>
-                                                <td class="font-mono text-xs" x-text="resource.name"></td>
-                                                <td><span class="badge badge-xs" x-text="resource.provider"></span></td>
-                                                <td x-text="resource.mode"></td>
-                                                <td x-text="resource.instances"></td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
+                            <button @click="configureWebhook('eventgrid')" class="btn btn-sm" :class="webhooks.eventgrid ? 'btn-success' : 'btn-outline'">
+                                <i class="fab fa-microsoft"></i> Event Grid
+                            </button>
+                            <button @click="configureWebhook('pubsub')" class="btn btn-sm" :class="webhooks.pubsub ? 'btn-success' : 'btn-outline'">
+                                <i class="fab fa-google"></i> Pub/Sub
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-        </main>
+        </div>
+        
     </div>
-
-    <script>
-        function driftMgrApp() {
-            return {
-                // Authentication
-                authToken: null,
-                currentUser: null,
-                
-                // Current view management
-                currentView: 'dashboard',
-                currentViewTitle: 'Dashboard',
-                loading: false,
-                isLoading: false,
-                loadingMessage: '',
-                loadingProgress: 0,
-                loadingTimeout: null,
-                notifications: 3,
-                
-                // WebSocket connection
-                ws: null,
-                wsConnected: false,
-                wsReconnectAttempts: 0,
-                wsMaxReconnectAttempts: 5,
-                wsReconnectDelay: 1000,
-                
-                // Data
-                stats: {
-                    total: 156,
-                    drifted: 23,
-                    compliant: 133,
-                    complianceScore: 85,
-                    activeProviders: 3
-                },
-                
-                providers: [
-                    { name: 'aws', label: 'AWS', icon: 'fab fa-aws', configured: true },
-                    { name: 'azure', label: 'Azure', icon: 'fab fa-microsoft', configured: true },
-                    { name: 'gcp', label: 'GCP', icon: 'fab fa-google', configured: true },
-                    { name: 'digitalocean', label: 'DigitalOcean', icon: 'fas fa-water', configured: false }
-                ],
-                
-                recentDrifts: [
-                    {
-                        id: 1,
-                        resourceName: 'prod-web-server-1',
-                        provider: 'aws',
-                        region: 'us-east-1',
-                        type: 'Configuration',
-                        severity: 'high',
-                        detected: new Date().toISOString()
-                    },
-                    {
-                        id: 2,
-                        resourceName: 'database-primary',
-                        provider: 'azure',
-                        region: 'eastus',
-                        type: 'Tag',
-                        severity: 'medium',
-                        detected: new Date().toISOString()
-                    },
-                    {
-                        id: 3,
-                        resourceName: 'loadbalancer-01',
-                        provider: 'gcp',
-                        region: 'us-central1',
-                        type: 'Permission',
-                        severity: 'low',
-                        detected: new Date().toISOString()
-                    }
-                ],
-                
-                resources: [],
-                filteredResources: [],
-                paginatedResources: [],
-                selectedResources: [],
-                searchTerm: '',
-                filterProvider: '',
-                filterRegion: '',
-                filterType: '',
-                availableRegions: ['us-east-1', 'us-west-2', 'eu-west-1', 'ap-northeast-1'],
-                availableTypes: ['EC2 Instance', 'S3 Bucket', 'RDS Database', 'Lambda Function'],
-                currentPage: 1,
-                itemsPerPage: 20,
-                totalPages: 1,
-                
-                discoveryForm: {
-                    provider: '',
-                    regions: '',
-                    autoRemediate: false
-                },
-                discovering: false,
-                discoveryJob: null,
-                discoveryResults: [],
-                
-                // State Files Data
-                stateFiles: [], // Will be populated from API
-                stateFilesLoading: false,
-                stateFilesError: null,
-                filteredStateFiles: [],
-                selectedStateFiles: [],
-                selectedStateFile: null,
-                stateFilter: 'all',
-                scanningStates: false,
-                totalStateResources: 342,
-                stateDrifts: 12,
-                
-                // Data Transformation Functions
-                transformResource(resource) {
-                    // Transform backend resource to frontend format
-                    return {
-                        id: resource.id || resource.ID || `resource-${Date.now()}`,
-                        name: resource.name || resource.Name || 'Unknown',
-                        type: resource.type || resource.Type || resource.resource_type || 'Unknown',
-                        provider: resource.provider || resource.Provider || 'unknown',
-                        region: resource.region || resource.Region || resource.location || 'global',
-                        status: resource.status || resource.Status || 'unknown',
-                        managed_by: resource.managed_by || resource.ManagedBy || resource.manager || 'terraform',
-                        created_at: resource.created_at || resource.CreatedAt || resource.created || new Date().toISOString(),
-                        compliance_status: resource.compliance_status || resource.ComplianceStatus || 'unknown',
-                        tags: resource.tags || resource.Tags || {},
-                        drift_status: resource.drift_status || resource.DriftStatus || 'none',
-                        last_modified: resource.last_modified || resource.LastModified || resource.modified || null
-                    };
-                },
-                
-                transformStateFile(file, index) {
-                    // Transform backend state file to frontend format
-                    return {
-                        id: file.id || index + 1,
-                        path: file.path || file.full_path || '',
-                        name: file.name || (file.path ? file.path.split('/').pop() : `state-${index + 1}.tfstate`),
-                        workspace: file.workspace || 'default',
-                        type: this.detectStateFileType(file),
-                        backend: file.backend || 'local',
-                        providers: this.extractProviders(file),
-                        resourceCount: file.resource_count || file.resourceCount || file.resources_count || 0,
-                        size: file.size ? this.formatFileSize(file.size) : '0 KB',
-                        modified: file.last_modified || file.modified || file.LastModified || new Date().toISOString(),
-                        status: this.mapStateFileStatus(file.status),
-                        terraformVersion: file.terraform_version || file.version || file.Version || 'unknown',
-                        serial: file.serial || file.Serial || 0,
-                        lineage: file.lineage || file.Lineage || '',
-                        error: file.error || file.Error || null,
-                        resources: file.resources || []
-                    };
-                },
-                
-                detectStateFileType(file) {
-                    // Detect if it's terraform or terragrunt
-                    if (file.type) return file.type;
-                    if (file.path && file.path.includes('terragrunt')) return 'terragrunt';
-                    if (file.path && file.path.endsWith('.tfstate')) return 'terraform';
-                    return file.backend === 'local' ? 'terraform' : 'terraform';
-                },
-                
-                extractProviders(file) {
-                    // Extract providers from file data
-                    if (Array.isArray(file.providers)) return file.providers;
-                    if (file.provider) return [file.provider];
-                    if (file.resources && Array.isArray(file.resources)) {
-                        const providers = new Set();
-                        file.resources.forEach(r => {
-                            if (r.provider) providers.add(r.provider);
-                        });
-                        return Array.from(providers);
-                    }
-                    return [];
-                },
-                
-                mapStateFileStatus(status) {
-                    // Map backend status to frontend status
-                    const statusMap = {
-                        'synced': 'synced',
-                        'drift_detected': 'drift',
-                        'drift': 'drift',
-                        'error': 'error',
-                        'unknown': 'unknown',
-                        'managed': 'synced',
-                        'unmanaged': 'drift'
-                    };
-                    return statusMap[status] || 'unknown';
-                },
-                
-                transformDrift(drift) {
-                    // Transform backend drift to frontend format
-                    return {
-                        id: drift.id || drift.ID || `drift-${Date.now()}`,
-                        resourceName: drift.resource_name || drift.ResourceName || drift.name || 'Unknown',
-                        resourceId: drift.resource_id || drift.ResourceID || drift.id,
-                        provider: (drift.provider || drift.Provider || 'unknown').toLowerCase(),
-                        region: drift.region || drift.Region || 'unknown',
-                        type: drift.drift_type || drift.DriftType || drift.type || 'Configuration',
-                        severity: this.mapDriftSeverity(drift.severity || drift.Severity),
-                        detected: drift.detected_at || drift.DetectedAt || drift.detected || new Date().toISOString(),
-                        details: drift.details || drift.Details || {},
-                        canRemediate: drift.can_remediate !== false,
-                        remediationAction: drift.remediation_action || drift.RemediationAction || null
-                    };
-                },
-                
-                mapDriftSeverity(severity) {
-                    // Map and normalize drift severity
-                    const severityMap = {
-                        'critical': 'high',
-                        'high': 'high',
-                        'medium': 'medium',
-                        'moderate': 'medium',
-                        'low': 'low',
-                        'info': 'low',
-                        'informational': 'low'
-                    };
-                    return severityMap[(severity || '').toLowerCase()] || 'medium';
-                },
-                
-                transformRemediationJob(job) {
-                    // Transform backend remediation job to frontend format
-                    return {
-                        id: job.id || job.ID || `job-${Date.now()}`,
-                        resourceId: job.resource_id || job.ResourceID,
-                        resourceType: job.resource_type || job.ResourceType || job.type,
-                        provider: job.provider || job.Provider,
-                        region: job.region || job.Region,
-                        status: this.mapJobStatus(job.status || job.Status),
-                        action: job.action || job.Action,
-                        createdAt: job.created_at || job.CreatedAt || new Date().toISOString(),
-                        startedAt: job.started_at || job.StartedAt,
-                        completedAt: job.completed_at || job.CompletedAt,
-                        error: job.error || job.Error,
-                        details: job.details || job.Details || {},
-                        progress: job.progress || 0,
-                        message: job.message || ''
-                    };
-                },
-                
-                mapJobStatus(status) {
-                    // Map backend job status to frontend status
-                    const statusMap = {
-                        'pending': 'pending',
-                        'queued': 'pending',
-                        'in_progress': 'running',
-                        'running': 'running',
-                        'completed': 'completed',
-                        'success': 'completed',
-                        'failed': 'failed',
-                        'error': 'failed',
-                        'cancelled': 'cancelled'
-                    };
-                    return statusMap[(status || '').toLowerCase()] || 'unknown';
-                },
-                
-                // Methods
-                init() {
-                    // Check authentication first
-                    this.checkAuth();
-                },
-                
-                checkAuth() {
-                    // Get token from storage
-                    this.authToken = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-                    const userInfo = localStorage.getItem('user_info') || sessionStorage.getItem('user_info');
-                    
-                    if (!this.authToken) {
-                        // Redirect to login
-                        window.location.href = '/login.html';
-                        return;
-                    }
-                    
-                    // Parse user info
-                    if (userInfo) {
-                        try {
-                            this.currentUser = JSON.parse(userInfo);
-                        } catch (e) {
-                            console.error('Failed to parse user info');
-                        }
-                    }
-                    
-                    // Validate token
-                    this.validateToken().then(valid => {
-                        if (valid) {
-                            // Continue with initialization
-                            this.loadDashboardData();
-                            this.initCharts();
-                            this.loadStateFiles();
-                            this.connectWebSocket();
-                        } else {
-                            // Token invalid, redirect to login
-                            this.logout();
-                        }
-                    });
-                },
-                
-                async validateToken() {
-                    try {
-                        const response = await fetch('/api/v1/auth/validate', {
-                            headers: this.getAuthHeaders()
-                        });
-                        return response.ok;
-                    } catch (error) {
-                        console.error('Token validation error:', error);
-                        return false;
-                    }
-                },
-                
-                getAuthHeaders() {
-                    return {
-                        'Authorization': `Bearer ${this.authToken}`,
-                        'Content-Type': 'application/json'
-                    };
-                },
-                
-                logout() {
-                    // Clear auth data
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('user_info');
-                    sessionStorage.removeItem('auth_token');
-                    sessionStorage.removeItem('user_info');
-                    
-                    // Close WebSocket
-                    if (this.ws) {
-                        this.ws.close();
-                    }
-                    
-                    // Redirect to login
-                    window.location.href = '/login.html';
-                },
-                
-                async makeAuthenticatedRequest(url, options = {}) {
-                    const defaultOptions = {
-                        headers: this.getAuthHeaders()
-                    };
-                    
-                    const mergedOptions = {
-                        ...defaultOptions,
-                        ...options,
-                        headers: {
-                            ...defaultOptions.headers,
-                            ...(options.headers || {})
-                        }
-                    };
-                    
-                    const response = await fetch(url, mergedOptions);
-                    
-                    // Check for auth errors
-                    if (response.status === 401) {
-                        this.logout();
-                        throw new Error('Authentication required');
-                    }
-                    
-                    return response;
-                    
-                    // Watch for view changes
-                    this.$watch('currentView', (value) => {
-                        const titles = {
-                            dashboard: 'Dashboard',
-                            resources: 'Resources',
-                            discovery: 'Discovery',
-                            drift: 'Drift Detection',
-                            remediation: 'Remediation',
-                            state: 'State Files',
-                            audit: 'Audit Logs',
-                            settings: 'Settings'
-                        };
-                        this.currentViewTitle = titles[value] || 'Dashboard';
-                        
-                        if (value === 'state') {
-                            this.filterStateFiles();
-                        }
-                    });
-                    
-                    // Watch state filter changes
-                    this.$watch('stateFilter', () => {
-                        this.filterStateFiles();
-                    });
-                    
-                    // Setup periodic stats refresh
-                    setInterval(() => {
-                        if (this.wsConnected) {
-                            this.ws.send(JSON.stringify({ type: 'get_stats' }));
-                        }
-                    }, 30000); // Every 30 seconds
-                    
-                    // Add WebSocket status indicator
-                    this.wsStatusInterval = setInterval(() => {
-                        this.updateWebSocketStatus();
-                    }, 5000);
-                },
-                
-                updateWebSocketStatus() {
-                    // Update visual indicator of WebSocket status
-                    const indicator = document.getElementById('ws-status-indicator');
-                    if (indicator) {
-                        indicator.className = this.wsConnected ? 'text-success' : 'text-error';
-                        indicator.title = this.wsConnected ? 'Connected' : 'Disconnected';
-                    }
-                },
-                
-                connectWebSocket() {
-                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    const wsUrl = `${protocol}//${window.location.host}/ws`;
-                    
-                    try {
-                        this.ws = new WebSocket(wsUrl);
-                        
-                        this.ws.onopen = () => {
-                            console.log('WebSocket connected');
-                            this.wsConnected = true;
-                            this.wsReconnectAttempts = 0;
-                            this.showNotification('Real-time updates connected', 'success');
-                        };
-                        
-                        this.ws.onmessage = (event) => {
-                            try {
-                                const data = JSON.parse(event.data);
-                                this.handleWebSocketMessage(data);
-                            } catch (error) {
-                                console.error('Failed to parse WebSocket message:', error);
-                            }
-                        };
-                        
-                        this.ws.onerror = (error) => {
-                            console.error('WebSocket error:', error);
-                            this.wsConnected = false;
-                        };
-                        
-                        this.ws.onclose = () => {
-                            console.log('WebSocket disconnected');
-                            this.wsConnected = false;
-                            this.reconnectWebSocket();
-                        };
-                        
-                        // Send ping every 30 seconds to keep connection alive
-                        setInterval(() => {
-                            if (this.wsConnected && this.ws.readyState === WebSocket.OPEN) {
-                                this.ws.send(JSON.stringify({ type: 'ping' }));
-                            }
-                        }, 30000);
-                        
-                    } catch (error) {
-                        console.error('Failed to connect WebSocket:', error);
-                        this.wsConnected = false;
-                        this.reconnectWebSocket();
-                    }
-                },
-                
-                reconnectWebSocket() {
-                    if (this.wsReconnectAttempts < this.wsMaxReconnectAttempts) {
-                        this.wsReconnectAttempts++;
-                        const delay = this.wsReconnectDelay * Math.pow(2, this.wsReconnectAttempts - 1);
-                        console.log(`Reconnecting WebSocket in ${delay}ms (attempt ${this.wsReconnectAttempts})`);
-                        
-                        setTimeout(() => {
-                            this.connectWebSocket();
-                        }, delay);
-                    } else {
-                        console.error('Max WebSocket reconnection attempts reached');
-                        this.showNotification('Real-time updates disconnected', 'warning');
-                    }
-                },
-                
-                handleWebSocketMessage(data) {
-                    switch (data.type) {
-                        case 'connected':
-                            console.log('WebSocket connected:', data.message);
-                            if (data.stats) {
-                                this.updateStatsFromWebSocket(data.stats);
-                            }
-                            break;
-                            
-                        case 'stats_update':
-                            if (data.stats) {
-                                this.updateStatsFromWebSocket(data.stats);
-                            }
-                            break;
-                            
-                        case 'job_update':
-                            this.handleJobUpdate(data);
-                            break;
-                            
-                        case 'job_status':
-                            this.handleJobStatusUpdate(data);
-                            break;
-                            
-                        case 'discovery_update':
-                            this.handleDiscoveryUpdate(data);
-                            break;
-                            
-                        case 'pong':
-                            // Ping response received
-                            break;
-                            
-                        default:
-                            console.log('Unknown WebSocket message type:', data.type);
-                    }
-                },
-                
-                updateStatsFromWebSocket(stats) {
-                    if (stats.total_resources !== undefined) {
-                        this.stats.totalResources = stats.total_resources;
-                    }
-                    
-                    if (stats.remediation_jobs) {
-                        const jobs = stats.remediation_jobs;
-                        if (jobs.in_progress !== undefined && jobs.pending !== undefined) {
-                            this.stats.activeRemediations = jobs.in_progress + jobs.pending;
-                        }
-                    }
-                    
-                    // Recalculate compliance if needed
-                    if (this.stats.totalResources > 0) {
-                        const compliantResources = this.stats.totalResources - this.stats.driftedResources - this.stats.unmanagedResources;
-                        this.stats.complianceRate = Math.round((compliantResources / this.stats.totalResources) * 100);
-                    }
-                },
-                
-                handleJobUpdate(data) {
-                    console.log('Job update received:', data);
-                    
-                    // Update remediation jobs list if we have it
-                    if (this.remediationJobs && data.job_id) {
-                        const jobIndex = this.remediationJobs.findIndex(j => j.id === data.job_id);
-                        if (jobIndex >= 0) {
-                            this.remediationJobs[jobIndex].status = data.status;
-                            if (data.details) {
-                                this.remediationJobs[jobIndex].details = data.details;
-                            }
-                        }
-                    }
-                    
-                    // Show notification for important status changes
-                    if (data.status === 'completed') {
-                        this.showNotification(`Job ${data.job_id} completed successfully`, 'success');
-                    } else if (data.status === 'failed') {
-                        this.showNotification(`Job ${data.job_id} failed`, 'error');
-                    }
-                },
-                
-                handleJobStatusUpdate(data) {
-                    console.log('Job status update:', data);
-                    // Update specific job status in UI
-                },
-                
-                handleDiscoveryUpdate(data) {
-                    console.log('Discovery update:', data);
-                    // Update discovery progress or results
-                    if (data.progress !== undefined) {
-                        this.discoveryProgress = data.progress;
-                    }
-                },
-                
-                async loadStateFiles() {
-                    this.stateFilesLoading = true;
-                    this.stateFilesError = null;
-                    
-                    try {
-                        const response = await this.makeAuthenticatedRequest('/api/v1/state/discover');
-                        if (!response.ok) {
-                            throw new Error(`Failed to load state files: ${response.statusText}`);
-                        }
-                        
-                        const data = await response.json();
-                        
-                        // Handle the response structure properly
-                        if (data) {
-                            // Check if data is an array directly or has a state_files property
-                            const files = Array.isArray(data) ? data : (data.state_files || data.files || []);
-                            
-                            // Ensure we have an array
-                            if (Array.isArray(files)) {
-                                // Process and transform state files using transformation function
-                                this.stateFiles = files.map((file, index) => this.transformStateFile(file, index));
-                                this.filterStateFiles();
-                            } else {
-                                // No files found or unexpected structure
-                                this.stateFiles = [];
-                                console.warn('No state files found or unexpected response structure:', data);
-                            }
-                        } else {
-                            this.stateFiles = [];
-                        }
-                    } catch (error) {
-                        console.error('Failed to load state files:', error);
-                        this.stateFilesError = error.message || 'Failed to load state files';
-                        this.stateFiles = [];
-                        
-                        // Don't show error notification on initial load if no files exist
-                        if (this.stateFiles.length > 0 || this.currentView === 'state') {
-                            this.showNotification(`Error loading state files: ${error.message}`, 'error');
-                        }
-                    } finally {
-                        this.stateFilesLoading = false;
-                    }
-                },
-                
-                formatFileSize(bytes) {
-                    if (typeof bytes === 'string') return bytes; // Already formatted
-                    if (bytes < 1024) return bytes + ' B';
-                    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-                    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-                    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
-                },
-                
-                async loadDashboardData() {
-                    this.startLoading('Loading dashboard data...', 3000);
-                    
-                    try {
-                        // Fetch real statistics from multiple endpoints
-                        this.updateLoadingProgress(20, 'Fetching resource statistics...');
-                        
-                        // Fetch discovery results for stats
-                        const discoveryPromise = fetch('/api/v1/discovery/cached')
-                            .then(res => res.ok ? res.json() : {})
-                            .catch(() => ({}));
-                        
-                        this.updateLoadingProgress(40, 'Loading drift report...');
-                        
-                        // Fetch drift report
-                        const driftPromise = fetch('/api/v1/drift/report')
-                            .then(res => res.ok ? res.json() : {})
-                            .catch(() => ({}));
-                        
-                        this.updateLoadingProgress(60, 'Loading remediation jobs...');
-                        
-                        // Fetch remediation jobs
-                        const remediationPromise = fetch('/api/v1/remediation/jobs')
-                            .then(res => res.ok ? res.json() : {})
-                            .catch(() => ({}));
-                        
-                        this.updateLoadingProgress(80, 'Processing data...');
-                        
-                        // Wait for all data
-                        const [discoveryData, driftData, remediationData] = await Promise.all([
-                            discoveryPromise,
-                            driftPromise,
-                            remediationPromise
-                        ]);
-                        
-                        // Update stats with real data
-                        this.updateDashboardStats(discoveryData, driftData, remediationData);
-                        
-                        // Update other dashboard data
-                        if (driftData && driftData.drifts) {
-                            this.recentDrifts = Array.isArray(driftData.drifts) 
-                                ? driftData.drifts.slice(0, 5) 
-                                : [];
-                        }
-                        
-                        if (remediationData && remediationData.jobs) {
-                            this.remediationJobs = Array.isArray(remediationData.jobs)
-                                ? remediationData.jobs
-                                : [];
-                        }
-                        
-                        this.updateLoadingProgress(100, 'Dashboard loaded');
-                        
-                    } catch (error) {
-                        console.error('Error loading dashboard:', error);
-                        this.showNotification('Failed to load dashboard data', 'error');
-                    } finally {
-                        this.stopLoading();
-                    }
-                },
-                
-                updateDashboardStats(discoveryData, driftData, remediationData) {
-                    // Update stats with real data, fallback to 0 if not available
-                    if (discoveryData) {
-                        this.stats.totalResources = discoveryData.total_resources || 
-                                                   discoveryData.resources_found || 
-                                                   (Array.isArray(discoveryData.resources) ? discoveryData.resources.length : 0) ||
-                                                   0;
-                        
-                        // Update provider chart with resource data
-                        if (discoveryData.resources) {
-                            this.updateProviderChart(discoveryData.resources);
-                        } else if (Array.isArray(discoveryData)) {
-                            this.updateProviderChart(discoveryData);
-                        }
-                    }
-                    
-                    if (driftData) {
-                        this.stats.driftedResources = driftData.drifted_count || 
-                                                      driftData.total_drifts ||
-                                                      (Array.isArray(driftData.drifts) ? driftData.drifts.length : 0) ||
-                                                      0;
-                        
-                        this.stats.unmanagedResources = driftData.unmanaged_count || 
-                                                        driftData.unmanaged_resources ||
-                                                        0;
-                        
-                        // Update severity chart with drift data
-                        if (driftData.drifts && Array.isArray(driftData.drifts)) {
-                            this.updateSeverityChart(driftData.drifts);
-                        }
-                    }
-                    
-                    if (remediationData) {
-                        // Count active remediation jobs
-                        let activeCount = 0;
-                        if (remediationData.in_progress !== undefined) {
-                            activeCount = remediationData.in_progress + (remediationData.pending || 0);
-                        } else if (Array.isArray(remediationData.jobs)) {
-                            activeCount = remediationData.jobs.filter(j => 
-                                j.status === 'in_progress' || j.status === 'pending'
-                            ).length;
-                        }
-                        this.stats.activeRemediations = activeCount;
-                    }
-                    
-                    // Calculate compliance percentage
-                    if (this.stats.totalResources > 0) {
-                        const compliantResources = this.stats.totalResources - this.stats.driftedResources - this.stats.unmanagedResources;
-                        this.stats.complianceRate = Math.round((compliantResources / this.stats.totalResources) * 100);
-                    } else {
-                        this.stats.complianceRate = 100; // No resources means 100% compliant
-                    }
-                },
-                
-                async loadDriftData() {
-                    try {
-                        const response = await fetch('/api/v1/drift/report');
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data && data.drifts) {
-                                this.recentDrifts = Array.isArray(data.drifts) ? data.drifts : [];
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Failed to load drift data:', error);
-                    }
-                },
-                
-                initCharts() {
-                    // Provider Chart
-                    const providerCtx = document.getElementById('providerChart');
-                    if (providerCtx) {
-                        this.providerChart = new Chart(providerCtx, {
-                            type: 'doughnut',
-                            data: {
-                                labels: ['AWS', 'Azure', 'GCP', 'DigitalOcean'],
-                                datasets: [{
-                                    data: [0, 0, 0, 0], // Will be updated with real data
-                                    backgroundColor: [
-                                        '#FF9900',
-                                        '#0078D4',
-                                        '#4285F4',
-                                        '#0080FF'
-                                    ]
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        position: 'right',
-                                    }
-                                }
-                            }
-                        });
-                    }
-                    
-                    // Severity Chart
-                    const severityCtx = document.getElementById('severityChart');
-                    if (severityCtx) {
-                        this.severityChart = new Chart(severityCtx, {
-                            type: 'bar',
-                            data: {
-                                labels: ['Critical', 'High', 'Medium', 'Low'],
-                                datasets: [{
-                                    label: 'Drift Count',
-                                    data: [0, 0, 0, 0], // Will be updated with real data
-                                    backgroundColor: [
-                                        '#dc2626',
-                                        '#ea580c',
-                                        '#facc15',
-                                        '#16a34a'
-                                    ]
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                scales: {
-                                    y: {
-                                        beginAtZero: true
-                                    }
-                                }
-                            }
-                        });
-                    }
-                },
-                
-                startLoading(message = 'Loading...', estimatedTime = 3000) {
-                    this.isLoading = true;
-                    this.loadingProgress = 0;
-                    this.loadingMessage = message;
-                    
-                    // Clear any existing intervals and timeouts
-                    if (this.loadingInterval) {
-                        clearInterval(this.loadingInterval);
-                    }
-                    if (this.loadingTimeout) {
-                        clearTimeout(this.loadingTimeout);
-                    }
-                    
-                    const increment = 100 / (estimatedTime / 100);
-                    this.loadingInterval = setInterval(() => {
-                        if (this.loadingProgress < 90) {
-                            this.loadingProgress = Math.min(90, this.loadingProgress + increment);
-                        }
-                    }, 100);
-                    
-                    // Add timeout to prevent loading from getting stuck
-                    this.loadingTimeout = setTimeout(() => {
-                        console.warn('Loading timeout reached for:', message);
-                        this.stopLoading();
-                        this.showNotification('Operation is taking longer than expected', 'warning');
-                    }, estimatedTime + 5000); // Give extra 5 seconds
-                },
-                
-                updateLoadingProgress(progress, message = null) {
-                    this.loadingProgress = Math.min(100, progress);
-                    if (message) {
-                        this.loadingMessage = message;
-                    }
-                    
-                    // Reset timeout when progress is updated
-                    if (this.loadingTimeout) {
-                        clearTimeout(this.loadingTimeout);
-                        this.loadingTimeout = setTimeout(() => {
-                            console.warn('Loading stalled at', progress + '%');
-                            this.stopLoading();
-                        }, 10000); // 10 seconds after last update
-                    }
-                },
-                
-                stopLoading() {
-                    this.loadingProgress = 100;
-                    
-                    // Clear all intervals and timeouts
-                    if (this.loadingInterval) {
-                        clearInterval(this.loadingInterval);
-                        this.loadingInterval = null;
-                    }
-                    if (this.loadingTimeout) {
-                        clearTimeout(this.loadingTimeout);
-                        this.loadingTimeout = null;
-                    }
-                    
-                    setTimeout(() => {
-                        this.isLoading = false;
-                        this.loadingMessage = '';
-                        this.loadingProgress = 0;
-                    }, 500);
-                },
-                
-                refreshData() {
-                    this.loading = true;
-                    this.loadDashboardData();
-                    setTimeout(() => {
-                        this.loading = false;
-                    }, 2000);
-                },
-                
-                selectProvider(provider) {
-                    console.log('Selected provider:', provider);
-                },
-                
-                updateProviderChart(resources) {
-                    if (!this.providerChart) return;
-                    
-                    const providerCounts = {
-                        aws: 0,
-                        azure: 0,
-                        gcp: 0,
-                        digitalocean: 0
-                    };
-                    
-                    // Count resources by provider
-                    resources.forEach(resource => {
-                        const provider = (resource.provider || resource.Provider || '').toLowerCase();
-                        if (providerCounts.hasOwnProperty(provider)) {
-                            providerCounts[provider]++;
-                        }
-                    });
-                    
-                    // Update chart data
-                    this.providerChart.data.datasets[0].data = [
-                        providerCounts.aws,
-                        providerCounts.azure,
-                        providerCounts.gcp,
-                        providerCounts.digitalocean
-                    ];
-                    this.providerChart.update();
-                },
-                
-                updateSeverityChart(drifts) {
-                    if (!this.severityChart) return;
-                    
-                    const severityCounts = {
-                        critical: 0,
-                        high: 0,
-                        medium: 0,
-                        low: 0
-                    };
-                    
-                    // Count drifts by severity
-                    drifts.forEach(drift => {
-                        const severity = this.mapDriftSeverity(drift.severity || drift.Severity);
-                        if (severity === 'high') {
-                            severityCounts.high++;
-                        } else if (severity === 'medium') {
-                            severityCounts.medium++;
-                        } else if (severity === 'low') {
-                            severityCounts.low++;
-                        }
-                    });
-                    
-                    // Update chart data
-                    this.severityChart.data.datasets[0].data = [
-                        severityCounts.critical,
-                        severityCounts.high,
-                        severityCounts.medium,
-                        severityCounts.low
-                    ];
-                    this.severityChart.update();
-                },
-                
-                filterResources() {
-                    this.filteredResources = this.resources.filter(resource => {
-                        const matchesSearch = !this.searchTerm || 
-                            resource.name.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-                            resource.id.toLowerCase().includes(this.searchTerm.toLowerCase());
-                        
-                        const matchesProvider = !this.filterProvider || resource.provider === this.filterProvider;
-                        const matchesRegion = !this.filterRegion || resource.region === this.filterRegion;
-                        const matchesType = !this.filterType || resource.type === this.filterType;
-                        
-                        return matchesSearch && matchesProvider && matchesRegion && matchesType;
-                    });
-                    
-                    // Update pagination
-                    this.totalPages = Math.ceil(this.filteredResources.length / this.itemsPerPage);
-                    this.currentPage = 1;
-                    this.updatePagination();
-                },
-                
-                updatePagination() {
-                    const start = (this.currentPage - 1) * this.itemsPerPage;
-                    const end = start + this.itemsPerPage;
-                    this.paginatedResources = this.filteredResources.slice(start, end);
-                },
-                
-                nextPage() {
-                    if (this.currentPage < this.totalPages) {
-                        this.currentPage++;
-                        this.updatePagination();
-                    }
-                },
-                
-                prevPage() {
-                    if (this.currentPage > 1) {
-                        this.currentPage--;
-                        this.updatePagination();
-                    }
-                },
-                
-                goToPage(page) {
-                    if (page >= 1 && page <= this.totalPages) {
-                        this.currentPage = page;
-                        this.updatePagination();
-                    }
-                },
-                
-                clearFilters() {
-                    this.searchTerm = '';
-                    this.filterProvider = '';
-                    this.filterRegion = '';
-                    this.filterType = '';
-                    this.filterResources();
-                },
-                
-                async loadResources() {
-                    try {
-                        const response = await fetch('/api/v1/resources');
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (Array.isArray(data)) {
-                                this.resources = data.map(r => this.transformResource(r));
-                            } else if (data.resources) {
-                                this.resources = data.resources.map(r => this.transformResource(r));
-                            }
-                            this.filterResources();
-                        }
-                    } catch (error) {
-                        console.error('Failed to load resources:', error);
-                    }
-                },
-                
-                formatDate(date) {
-                    if (!date) return 'N/A';
-                    const d = new Date(date);
-                    if (isNaN(d.getTime())) return 'N/A';
-                    return d.toLocaleString();
-                },
-                
-                async remediateDrift(drift) {
-                    console.log('Remediating drift:', drift);
-                    
-                    try {
-                        this.startLoading('Initiating drift remediation...', 5000);
-                        
-                        const response = await fetch('/api/v1/remediation/auto', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                resource_id: drift.resource_id || drift.id,
-                                drift_type: drift.type || 'MODIFIED',
-                                provider: drift.provider || 'aws',
-                                region: drift.region || '',
-                                resource_type: drift.resource_type || drift.resourceType || ''
-                            })
-                        });
-                        
-                        if (!response.ok) {
-                            const errorData = await response.json().catch(() => ({}));
-                            throw new Error(errorData.error || `Failed to remediate: ${response.statusText}`);
-                        }
-                        
-                        const result = await response.json();
-                        
-                        if (result.success) {
-                            this.showNotification(
-                                `Remediation job ${result.job_id || 'initiated'} for ${drift.resource_id || drift.id}`,
-                                'success'
-                            );
-                            
-                            // Refresh drift data if we're on the drift view
-                            if (this.currentView === 'drift') {
-                                this.loadDriftData();
-                            }
-                        } else {
-                            this.showNotification(
-                                result.message || 'Remediation failed',
-                                'error'
-                            );
-                        }
-                    } catch (error) {
-                        console.error('Remediation error:', error);
-                        this.showNotification(
-                            `Failed to remediate drift: ${error.message}`,
-                            'error'
-                        );
-                    } finally {
-                        this.stopLoading();
-                    }
-                },
-                
-                async startDiscovery() {
-                    this.discovering = true;
-                    this.startLoading('Initializing resource discovery...', 30000);
-                    
-                    try {
-                        // Start real discovery process via API
-                        const response = await fetch('/api/v1/discovery/start', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                providers: this.selectedProviders || ['aws'],
-                                regions: this.selectedRegions || ['us-east-1']
-                            })
-                        });
-                        
-                        if (!response.ok) {
-                            throw new Error(`Discovery failed: ${response.statusText}`);
-                        }
-                        
-                        const data = await response.json();
-                        this.discoveryJob = {
-                            id: data.job_id || 'discovery-' + Date.now(),
-                            status: 'running',
-                            progress: 0,
-                            message: 'Scanning cloud resources...'
-                        };
-                        
-                        // Poll for discovery progress
-                        const pollInterval = setInterval(async () => {
-                            try {
-                                const statusResponse = await fetch(`/api/v1/discovery/status/${this.discoveryJob.id}`);
-                                if (statusResponse.ok) {
-                                    const status = await statusResponse.json();
-                                    this.discoveryJob.progress = status.progress || 0;
-                                    this.discoveryJob.status = status.status || 'running';
-                                    this.discoveryJob.message = status.message || 'Discovering resources...';
-                                    
-                                    this.updateLoadingProgress(
-                                        20 + (this.discoveryJob.progress * 0.7),
-                                        `${this.discoveryJob.message} ${this.discoveryJob.progress}%`
-                                    );
-                                    
-                                    if (status.status === 'completed' || status.status === 'failed') {
-                                        clearInterval(pollInterval);
-                                        this.discovering = false;
-                                        this.stopLoading();
-                                        
-                                        if (status.status === 'completed') {
-                                            // Fetch discovered resources
-                                            const resourcesResponse = await fetch('/api/v1/discovery');
-                                            if (resourcesResponse.ok) {
-                                                const resourcesData = await resourcesResponse.json();
-                                                this.discoveryResults = resourcesData.resources || [];
-                                                this.showNotification(`Discovery complete: ${this.discoveryResults.length} resources found`, 'success');
-                                            }
-                                        } else {
-                                            this.showNotification('Discovery failed: ' + (status.error || 'Unknown error'), 'error');
-                                        }
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('Error polling discovery status:', error);
-                            }
-                        }, 2000);
-                        
-                        // Store interval for cleanup
-                        this.discoveryPollInterval = pollInterval;
-                        
-                    } catch (error) {
-                        console.error('Discovery error:', error);
-                        this.discovering = false;
-                        this.stopLoading();
-                        this.showNotification(`Failed to start discovery: ${error.message}`, 'error');
-                    }
-                },
-                
-                selectAllResources(event) {
-                    if (event.target.checked) {
-                        this.selectedResources = this.filteredResources.map(r => r.id);
-                    } else {
-                        this.selectedResources = [];
-                    }
-                },
-                
-                async exportResources() {
-                    this.startLoading('Preparing resources for export...', 5000);
-                    
-                    try {
-                        const response = await fetch('/api/v1/resources/export', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                resources: this.selectedResources.length > 0 ? this.selectedResources : this.filteredResources.map(r => r.id),
-                                format: 'json' // or 'csv', 'terraform'
-                            })
-                        });
-                        
-                        if (!response.ok) {
-                            throw new Error(`Export failed: ${response.statusText}`);
-                        }
-                        
-                        // Handle file download
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `resources-export-${new Date().toISOString().split('T')[0]}.json`;
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        
-                        this.showNotification('Resources exported successfully', 'success');
-                    } catch (error) {
-                        console.error('Export error:', error);
-                        this.showNotification(`Failed to export resources: ${error.message}`, 'error');
-                    } finally {
-                        this.stopLoading();
-                    }
-                },
-                
-                async importResources() {
-                    // Create file input for import
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.json,.csv,.tf';
-                    
-                    input.onchange = async (e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        
-                        this.startLoading(`Importing resources from ${file.name}...`, 10000);
-                        
-                        try {
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            
-                            const response = await fetch('/api/v1/resources/import', {
-                                method: 'POST',
-                                body: formData
-                            });
-                            
-                            if (!response.ok) {
-                                throw new Error(`Import failed: ${response.statusText}`);
-                            }
-                            
-                            const result = await response.json();
-                            
-                            // Refresh resources
-                            await this.loadResources();
-                            
-                            this.showNotification(
-                                `Successfully imported ${result.imported || 0} resources`,
-                                'success'
-                            );
-                        } catch (error) {
-                            console.error('Import error:', error);
-                            this.showNotification(`Failed to import resources: ${error.message}`, 'error');
-                        } finally {
-                            this.stopLoading();
-                        }
-                    };
-                    
-                    input.click();
-                },
-                
-                async deleteSelected() {
-                    if (this.selectedResources.length === 0) {
-                        this.showNotification('No resources selected', 'warning');
-                        return;
-                    }
-                    
-                    if (!confirm(`Are you sure you want to delete ${this.selectedResources.length} selected resources?`)) {
-                        return;
-                    }
-                    
-                    this.startLoading(`Deleting ${this.selectedResources.length} resources...`, 15000);
-                    
-                    try {
-                        const response = await fetch('/api/v1/resources/delete', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                resource_ids: this.selectedResources
-                            })
-                        });
-                        
-                        if (!response.ok) {
-                            throw new Error(`Delete failed: ${response.statusText}`);
-                        }
-                        
-                        const result = await response.json();
-                        
-                        // Remove deleted resources from list
-                        this.resources = this.resources.filter(r => !this.selectedResources.includes(r.id));
-                        this.selectedResources = [];
-                        this.filterResources();
-                        
-                        this.showNotification(
-                            `Successfully deleted ${result.deleted || this.selectedResources.length} resources`,
-                            'success'
-                        );
-                    } catch (error) {
-                        console.error('Delete error:', error);
-                        this.showNotification(`Failed to delete resources: ${error.message}`, 'error');
-                    } finally {
-                        this.stopLoading();
-                    }
-                },
-                
-                // State Files Methods
-                filterStateFiles() {
-                    if (this.stateFilter === 'all') {
-                        this.filteredStateFiles = this.stateFiles;
-                    } else if (this.stateFilter === 'remote') {
-                        this.filteredStateFiles = this.stateFiles.filter(f => f.backend === 'remote' || f.backend === 's3');
-                    } else {
-                        this.filteredStateFiles = this.stateFiles.filter(f => f.type === this.stateFilter);
-                    }
-                },
-                
-                async scanStateFiles() {
-                    this.scanningStates = true;
-                    this.startLoading('Scanning for Terraform and Terragrunt state files...', 5000);
-                    
-                    // Simulate scanning
-                    setTimeout(() => {
-                        this.updateLoadingProgress(50, 'Found 3 new state files...');
-                        setTimeout(() => {
-                            this.updateLoadingProgress(100, 'Scan complete');
-                            this.scanningStates = false;
-                            this.stopLoading();
-                            
-                            // Fetch real state files from the server instead of adding mock files
-                            fetch('/api/v1/state/discover')
-                                .then(res => res.json())
-                                .then(data => {
-                                    if (data && data.state_files) {
-                                        // Add discovered state files
-                                        data.state_files.forEach(file => {
-                                            // Check if file already exists
-                                            if (!this.stateFiles.find(f => f.path === file.path)) {
-                                                this.stateFiles.push({
-                                                    id: this.stateFiles.length + 1,
-                                                    ...file
-                                                });
-                                            }
-                                        });
-                                        this.filterStateFiles();
-                                        this.showNotification(`Found ${data.state_files.length} state files`, 'success');
-                                    }
-                                })
-                                .catch(err => {
-                                    console.error('Failed to scan state files:', err);
-                                    this.showNotification('Failed to scan for state files', 'error');
-                                });
-                        }, 2000);
-                    }, 2000);
-                },
-                
-                async uploadStateFile() {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.tfstate,.tfstate.backup';
-                    
-                    input.onchange = async (e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        
-                        this.startLoading(`Uploading ${file.name}...`, 10000);
-                        
-                        try {
-                            const formData = new FormData();
-                            formData.append('file', file);
-                            
-                            const response = await fetch('/api/v1/state/upload', {
-                                method: 'POST',
-                                body: formData
-                            });
-                            
-                            if (!response.ok) {
-                                throw new Error(`Upload failed: ${response.statusText}`);
-                            }
-                            
-                            const result = await response.json();
-                            
-                            // Reload state files
-                            await this.loadStateFiles();
-                            
-                            this.showNotification(
-                                `State file uploaded successfully: ${result.resource_count || 0} resources`,
-                                'success'
-                            );
-                        } catch (error) {
-                            console.error('Upload error:', error);
-                            this.showNotification(`Failed to upload state file: ${error.message}`, 'error');
-                        } finally {
-                            this.stopLoading();
-                        }
-                    };
-                    
-                    input.click();
-                },
-                
-                async compareStates() {
-                    if (this.selectedStateFiles.length !== 2) {
-                        this.showNotification('Please select exactly 2 state files to compare', 'warning');
-                        return;
-                    }
-                    
-                    const files = this.stateFiles.filter(f => this.selectedStateFiles.includes(f.id));
-                    this.startLoading(`Comparing ${files[0].name} with ${files[1].name}...`, 5000);
-                    
-                    try {
-                        const response = await fetch('/api/v1/state/compare', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                file1: files[0].path,
-                                file2: files[1].path
-                            })
-                        });
-                        
-                        if (!response.ok) {
-                            throw new Error(`Comparison failed: ${response.statusText}`);
-                        }
-                        
-                        const comparison = await response.json();
-                        
-                        // Show comparison results (you could open a modal here)
-                        this.stateComparison = {
-                            file1: files[0],
-                            file2: files[1],
-                            differences: comparison.differences || [],
-                            added: comparison.added || [],
-                            removed: comparison.removed || [],
-                            modified: comparison.modified || []
-                        };
-                        
-                        this.showNotification(
-                            `Found ${comparison.differences?.length || 0} differences between state files`,
-                            'info'
-                        );
-                    } catch (error) {
-                        console.error('Comparison error:', error);
-                        this.showNotification(`Failed to compare state files: ${error.message}`, 'error');
-                    } finally {
-                        this.stopLoading();
-                    }
-                },
-                
-                selectAllStateFiles(event) {
-                    if (event.target.checked) {
-                        this.selectedStateFiles = this.filteredStateFiles.map(f => f.id);
-                    } else {
-                        this.selectedStateFiles = [];
-                    }
-                },
-                
-                viewStateDetails(file) {
-                    this.selectedStateFile = file;
-                    // Initialize state resource chart if needed
-                    setTimeout(() => {
-                        const ctx = document.getElementById('stateResourceChart');
-                        if (ctx && !ctx.chartInstance) {
-                            ctx.chartInstance = new Chart(ctx, {
-                                type: 'pie',
-                                data: {
-                                    labels: ['EC2 Instances', 'S3 Buckets', 'RDS', 'Lambda', 'Other'],
-                                    datasets: [{
-                                        data: [35, 20, 15, 10, 20],
-                                        backgroundColor: [
-                                            '#FF9900',
-                                            '#146EB4',
-                                            '#36C5F0',
-                                            '#FF6F61',
-                                            '#95A99C'
-                                        ]
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false
-                                }
-                            });
-                        }
-                    }, 100);
-                },
-                
-                analyzeState(file) {
-                    console.log('Analyzing state file:', file);
-                    this.viewStateDetails(file);
-                },
-                
-                async detectStateDrift(file) {
-                    this.startLoading(`Detecting drift for ${file.name}...`, 3000);
-                    
-                    setTimeout(() => {
-                        this.updateLoadingProgress(100, 'Drift detection complete');
-                        this.stopLoading();
-                        
-                        // Update file status
-                        const fileIndex = this.stateFiles.findIndex(f => f.id === file.id);
-                        if (fileIndex !== -1) {
-                            this.stateFiles[fileIndex].status = 'drift';
-                            this.stateDrifts++;
-                        }
-                        this.filterStateFiles();
-                    }, 3000);
-                },
-                
-                async downloadState(file) {
-                    this.startLoading(`Downloading ${file.name}...`, 3000);
-                    
-                    try {
-                        const response = await fetch(`/api/v1/state/download?path=${encodeURIComponent(file.path)}`);
-                        
-                        if (!response.ok) {
-                            throw new Error(`Download failed: ${response.statusText}`);
-                        }
-                        
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = file.name;
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        
-                        this.showNotification('State file downloaded successfully', 'success');
-                    } catch (error) {
-                        console.error('Download error:', error);
-                        this.showNotification(`Failed to download state file: ${error.message}`, 'error');
-                    } finally {
-                        this.stopLoading();
-                    }
-                },
-                
-                removeState(file) {
-                    if (confirm(`Remove state file ${file.name} from tracking?`)) {
-                        const index = this.stateFiles.findIndex(f => f.id === file.id);
-                        if (index !== -1) {
-                            this.stateFiles.splice(index, 1);
-                            this.totalStateResources -= file.resourceCount;
-                            this.filterStateFiles();
-                        }
-                    }
-                }
-            };
-        }
-    </script>
+    
+    <!-- Progress Modal for Long Operations -->
+    <div x-show="showProgress" class="modal modal-open">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg" x-text="progressTitle">Operation in Progress</h3>
+            <p class="py-4" x-text="progressMessage">Processing...</p>
+            <progress class="progress progress-primary w-full" :value="progressValue" max="100"></progress>
+            <div class="modal-action">
+                <button @click="cancelOperation()" class="btn btn-error">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load the v3.0 aligned JavaScript -->
+    <script src="js/app.js"></script>
 </body>
 </html>

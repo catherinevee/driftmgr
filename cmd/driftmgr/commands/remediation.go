@@ -9,7 +9,7 @@ import (
 
 	"github.com/catherinevee/driftmgr/internal/api"
 	"github.com/catherinevee/driftmgr/pkg/models"
-	"github.com/catherinevee/driftmgr/internal/remediation/planner"
+	"github.com/catherinevee/driftmgr/internal/remediation"
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 )

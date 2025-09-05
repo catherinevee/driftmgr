@@ -9,7 +9,8 @@ import (
 
 	"github.com/catherinevee/driftmgr/internal/drift/comparator"
 	"github.com/catherinevee/driftmgr/internal/providers"
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/state"
+	"github.com/catherinevee/driftmgr/pkg/models"
 )
 
 // DriftDetector detects configuration drift between desired and actual state
@@ -124,7 +125,7 @@ func NewDriftDetector(cloudProviders map[string]providers.CloudProvider) *DriftD
 }
 
 // DetectDrift performs drift detection on a Terraform state
-func (dd *DriftDetector) DetectDrift(ctx context.Context, state *parser.TerraformState) (*DriftReport, error) {
+func (dd *DriftDetector) DetectDrift(ctx context.Context, state *state.TerraformState) (*DriftReport, error) {
 	report := &DriftReport{
 		Timestamp:      time.Now(),
 		TotalResources: dd.countResources(state),
@@ -152,11 +153,16 @@ func (dd *DriftDetector) DetectDrift(ctx context.Context, state *parser.Terrafor
 			wg.Add(1)
 			semaphore <- struct{}{}
 			
-			go func(res parser.Resource, inst parser.Instance, idx int) {
+			// Capture loop variables for goroutine
+			resCopy := resource
+			instCopy := instance
+			idxCopy := i
+			
+			go func() {
 				defer wg.Done()
 				defer func() { <-semaphore }()
 				
-				result, err := dd.checkResourceDrift(ctx, res, inst, idx)
+				result, err := dd.checkResourceDrift(ctx, resCopy, instCopy, idxCopy)
 				if err != nil {
 					select {
 					case errorChan <- err:
@@ -168,7 +174,7 @@ func (dd *DriftDetector) DetectDrift(ctx context.Context, state *parser.Terrafor
 				if result != nil {
 					resultChan <- *result
 				}
-			}(resource, instance, i)
+			}()
 		}
 	}
 
@@ -203,8 +209,8 @@ func (dd *DriftDetector) DetectDrift(ctx context.Context, state *parser.Terrafor
 }
 
 // checkResourceDrift checks a single resource for drift
-func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource parser.Resource, 
-	instance parser.Instance, index int) (*DriftResult, error) {
+func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource state.Resource, 
+	instance state.Instance, index int) (*DriftResult, error) {
 	
 	// Get provider
 	providerName := dd.extractProviderName(resource.Provider)
@@ -228,11 +234,11 @@ func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource parser
 	}
 
 	// Get actual state from cloud with retry
-	var actualResource *types.CloudResource
+	var actualResource *models.Resource
 	var lastErr error
 	
 	for attempt := 0; attempt < dd.config.RetryAttempts; attempt++ {
-		actualResource, lastErr = provider.GetResource(ctx, resource.Type, resourceID)
+		actualResource, lastErr = provider.GetResource(ctx, resourceID)
 		if lastErr == nil {
 			break
 		}
@@ -289,7 +295,7 @@ func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource parser
 }
 
 // findUnmanagedResources finds resources that exist in cloud but not in state
-func (dd *DriftDetector) findUnmanagedResources(ctx context.Context, state *parser.TerraformState) ([]DriftResult, error) {
+func (dd *DriftDetector) findUnmanagedResources(ctx context.Context, state *state.TerraformState) ([]DriftResult, error) {
 	unmanagedResults := make([]DriftResult, 0)
 
 	// Build map of managed resources
@@ -305,8 +311,8 @@ func (dd *DriftDetector) findUnmanagedResources(ctx context.Context, state *pars
 
 	// Check each provider for unmanaged resources
 	for providerName, provider := range dd.providers {
-		// Get all resources from provider
-		allResources, err := provider.ListResources(ctx)
+		// Get all resources from provider (use empty region to get all)
+		allResources, err := provider.DiscoverResources(ctx, "")
 		if err != nil {
 			continue
 		}
@@ -417,7 +423,7 @@ func (dd *DriftDetector) isImportantField(path string) bool {
 }
 
 // analyzeImpact analyzes the impact of drift
-func (dd *DriftDetector) analyzeImpact(resource parser.Resource, differences []comparator.Difference) []string {
+func (dd *DriftDetector) analyzeImpact(resource state.Resource, differences []comparator.Difference) []string {
 	impacts := make([]string, 0)
 
 	for _, diff := range differences {
@@ -565,7 +571,7 @@ func (dd *DriftDetector) generateRecommendations(report *DriftReport) []string {
 
 // Helper methods
 
-func (dd *DriftDetector) countResources(state *parser.TerraformState) int {
+func (dd *DriftDetector) countResources(state *state.TerraformState) int {
 	count := 0
 	for _, resource := range state.Resources {
 		count += len(resource.Instances)
@@ -590,7 +596,7 @@ func (dd *DriftDetector) extractResourceID(attributes map[string]interface{}) (s
 	return "", fmt.Errorf("resource ID not found")
 }
 
-func (dd *DriftDetector) formatResourceAddress(resource parser.Resource, index int) string {
+func (dd *DriftDetector) formatResourceAddress(resource state.Resource, index int) string {
 	if len(resource.Instances) == 1 {
 		return fmt.Sprintf("%s.%s", resource.Type, resource.Name)
 	}

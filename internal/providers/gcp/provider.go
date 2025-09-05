@@ -151,8 +151,96 @@ func (p *GCPProviderComplete) makeAPIRequest(ctx context.Context, method, url st
 	return respBody, nil
 }
 
-// GetResource retrieves a specific resource from GCP
-func (p *GCPProviderComplete) GetResource(ctx context.Context, resourceType string, resourceID string) (*models.Resource, error) {
+// DiscoverResources discovers resources in the specified region (implements CloudProvider interface)
+func (p *GCPProviderComplete) DiscoverResources(ctx context.Context, region string) ([]models.Resource, error) {
+	// GCP uses zones within regions, update zone if region is provided
+	if region != "" {
+		p.zone = region + "-a" // Default to zone a in the region
+	}
+	
+	resources := []models.Resource{}
+	
+	// TODO: Implement actual resource discovery
+	// This would involve listing various resource types from GCP
+	
+	return resources, nil
+}
+
+// GetResource retrieves a specific resource by ID (implements CloudProvider interface)
+func (p *GCPProviderComplete) GetResource(ctx context.Context, resourceID string) (*models.Resource, error) {
+	// Try to determine resource type from ID
+	// GCP resource IDs can have various formats
+	
+	// Try as different resource types
+	resourceTypes := []string{
+		"google_compute_instance",
+		"google_compute_network",
+		"google_compute_subnetwork",
+		"google_compute_firewall",
+		"google_compute_disk",
+		"google_storage_bucket",
+		"google_sql_database_instance",
+		"google_container_cluster",
+	}
+	
+	// Extract resource name from potential full path
+	parts := strings.Split(resourceID, "/")
+	resourceName := resourceID
+	if len(parts) > 0 {
+		resourceName = parts[len(parts)-1]
+	}
+	
+	// Try each resource type
+	for _, resType := range resourceTypes {
+		if res, err := p.GetResourceByType(ctx, resType, resourceName); err == nil {
+			return res, nil
+		}
+	}
+	
+	return nil, fmt.Errorf("unable to find resource with ID: %s", resourceID)
+}
+
+// ValidateCredentials checks if the provider credentials are valid (implements CloudProvider interface)
+func (p *GCPProviderComplete) ValidateCredentials(ctx context.Context) error {
+	return p.Connect(ctx)
+}
+
+// ListRegions returns available regions for the provider (implements CloudProvider interface)
+func (p *GCPProviderComplete) ListRegions(ctx context.Context) ([]string, error) {
+	// Return common GCP regions
+	return []string{
+		"us-central1", "us-east1", "us-east4", "us-west1", "us-west2", "us-west3", "us-west4",
+		"europe-west1", "europe-west2", "europe-west3", "europe-west4", "europe-west6",
+		"asia-east1", "asia-east2", "asia-northeast1", "asia-northeast2", "asia-northeast3",
+		"asia-south1", "asia-southeast1", "asia-southeast2",
+		"australia-southeast1", "southamerica-east1", "northamerica-northeast1",
+	}, nil
+}
+
+// SupportedResourceTypes returns the list of supported resource types (implements CloudProvider interface)
+func (p *GCPProviderComplete) SupportedResourceTypes() []string {
+	return []string{
+		"google_compute_instance",
+		"google_compute_network",
+		"google_compute_subnetwork",
+		"google_compute_firewall",
+		"google_compute_disk",
+		"google_storage_bucket",
+		"google_sql_database_instance",
+		"google_sql_database",
+		"google_container_cluster",
+		"google_pubsub_topic",
+		"google_pubsub_subscription",
+		"google_cloud_function",
+		"google_cloud_run_service",
+		"google_redis_instance",
+		"google_kms_key_ring",
+		"google_kms_crypto_key",
+	}
+}
+
+// GetResourceByType retrieves a specific resource from GCP by type
+func (p *GCPProviderComplete) GetResourceByType(ctx context.Context, resourceType string, resourceID string) (*models.Resource, error) {
 	switch resourceType {
 	case "google_compute_instance":
 		return p.getComputeInstance(ctx, resourceID)
@@ -1148,7 +1236,7 @@ func (p *GCPProviderComplete) listKMSKeyRings(ctx context.Context) ([]*models.Re
 
 // ResourceExists checks if a resource exists
 func (p *GCPProviderComplete) ResourceExists(ctx context.Context, resourceType string, resourceID string) (bool, error) {
-	_, err := p.GetResource(ctx, resourceType, resourceID)
+	_, err := p.GetResourceByType(ctx, resourceType, resourceID)
 	if err != nil {
 		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "notFound") {
 			return false, nil

@@ -4,20 +4,17 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/catherinevee/driftmgr/internal/services"
 	"github.com/gorilla/mux"
 )
 
 // StateHandler handles state-related API requests
 type StateHandler struct {
-	service *services.StateService
+	// Add service field when services package is implemented
 }
 
 // NewStateHandler creates a new state handler
-func NewStateHandler(service *services.StateService) *StateHandler {
-	return &StateHandler{
-		service: service,
-	}
+func NewStateHandler() *StateHandler {
+	return &StateHandler{}
 }
 
 // RegisterRoutes registers state routes

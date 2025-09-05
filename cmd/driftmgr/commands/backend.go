@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	// "github.com/catherinevee/driftmgr/internal/discovery/backend/discovery" // Not yet implemented
-	"github.com/catherinevee/driftmgr/internal/discovery/backend"
-	// "github.com/catherinevee/driftmgr/internal/discovery/backend/providers/s3" // Not yet implemented
-	// "github.com/catherinevee/driftmgr/internal/discovery/backend/providers/azure" // Not yet implemented
-	// "github.com/catherinevee/driftmgr/internal/discovery/backend/providers/gcs" // Not yet implemented
+	// "github.com/catherinevee/driftmgr/internal/discovery/discovery" // Not yet implemented
+	"github.com/catherinevee/driftmgr/internal/discovery"
+	// "github.com/catherinevee/driftmgr/internal/discovery/providers/s3" // Not yet implemented
+	// "github.com/catherinevee/driftmgr/internal/discovery/providers/azure" // Not yet implemented
+	// "github.com/catherinevee/driftmgr/internal/discovery/providers/gcs" // Not yet implemented
 )
 
 var backendCmd = &cobra.Command{

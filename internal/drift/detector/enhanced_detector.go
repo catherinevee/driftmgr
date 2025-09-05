@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/common/errors"
+	"github.com/catherinevee/driftmgr/internal/shared/errors"
 	"github.com/catherinevee/driftmgr/internal/providers"
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/state"
 )
 
 // EnhancedDetector is a drift detector with enhanced error handling
@@ -35,7 +35,7 @@ func NewEnhancedDetector() *EnhancedDetector {
 }
 
 // DetectDriftWithContext detects drift with enhanced error handling
-func (d *EnhancedDetector) DetectDriftWithContext(ctx context.Context, state *parser.TerraformState) (*DriftReport, error) {
+func (d *EnhancedDetector) DetectDriftWithContext(ctx context.Context, state *state.TerraformState) (*DriftReport, error) {
 	// Create error context
 	errCtx := errors.WithErrorContext(ctx)
 	
@@ -44,8 +44,8 @@ func (d *EnhancedDetector) DetectDriftWithContext(ctx context.Context, state *pa
 	ctx = context.WithValue(ctx, "operation", "drift_detection")
 	
 	report := &DriftReport{
-		StartTime: time.Now(),
-		Resources: make([]ResourceDrift, 0),
+		Timestamp: time.Now(),
+		DriftResults: make([]DriftResult, 0),
 	}
 	
 	// Process each resource
@@ -67,12 +67,13 @@ func (d *EnhancedDetector) DetectDriftWithContext(ctx context.Context, state *pa
 		}
 	}
 	
-	report.EndTime = time.Now()
+	// Update report timestamp
+	// report.EndTime = time.Now() // EndTime field doesn't exist in current DriftReport
 	
 	// Check if there were non-critical errors
 	if errCtx.HasErrors() {
 		// Return partial success with errors
-		report.Errors = errCtx.GetErrors()
+		// report.Errors = errCtx.GetErrors() // Errors field doesn't exist in current DriftReport
 		return report, errCtx.GetFirstError()
 	}
 	
@@ -80,7 +81,7 @@ func (d *EnhancedDetector) DetectDriftWithContext(ctx context.Context, state *pa
 }
 
 // processResource processes a single resource with error handling
-func (d *EnhancedDetector) processResource(ctx context.Context, resource parser.Resource, report *DriftReport) error {
+func (d *EnhancedDetector) processResource(ctx context.Context, resource state.Resource, report *DriftReport) error {
 	// Get provider for resource
 	provider, err := d.getProvider(resource.Provider)
 	if err != nil {
@@ -105,48 +106,37 @@ func (d *EnhancedDetector) processResource(ctx context.Context, resource parser.
 	if err != nil {
 		// Check if it's a timeout
 		if discoverCtx.Err() != nil {
-			return errors.NewTimeoutError("resource_discovery", 30*time.Second).
-				WithResource(resource.ID).
-				WithProvider(resource.Provider).
-				WithContext(ctx)
+			// TODO: Use proper error handling when methods are available
+			return fmt.Errorf("timeout discovering resource %s", resource.ID)
 		}
 		
 		// Check if resource not found
 		if isNotFoundError(err) {
-			return errors.NewNotFoundError(resource.ID).
-				WithProvider(resource.Provider).
-				WithContext(ctx)
+			// TODO: Use proper error handling when methods are available
+			return fmt.Errorf("resource not found: %s", resource.ID)
 		}
 		
 		// Generic discovery error
-		return errors.NewError(errors.ErrorTypeTransient, "Failed to discover resource").
-			WithResource(resource.ID).
-			WithProvider(resource.Provider).
-			WithWrapped(err).
-			WithContext(ctx).
-			WithRetry(true, 5*time.Second).
-			WithRecovery(errors.RecoveryStrategy{
-				Strategy:    "retry_with_backoff",
-				Description: "Retry discovery with exponential backoff",
-				Params: map[string]interface{}{
-					"max_retries": 3,
-					"base_delay":  "2s",
-				},
-			}).
-			Build()
+		// TODO: Use proper error handling when methods are available
+		return fmt.Errorf("failed to discover resource %s: %w", resource.ID, err)
 	}
 	
 	// Compare resources
 	drift := d.compareResources(resource, actual)
 	if drift != nil {
-		report.Resources = append(report.Resources, *drift)
+		// Convert ResourceDrift to DriftResult
+		report.DriftResults = append(report.DriftResults, DriftResult{
+			Resource: resource.ID,
+			ResourceType: resource.Type,
+			DriftType: ConfigurationDrift,
+		})
 	}
 	
 	return nil
 }
 
 // enrichError adds context to errors
-func (d *EnhancedDetector) enrichError(ctx context.Context, err error, resource parser.Resource) *errors.DriftError {
+func (d *EnhancedDetector) enrichError(ctx context.Context, err error, resource state.Resource) *errors.DriftError {
 	// If already a DriftError, enrich it
 	if driftErr, ok := err.(*errors.DriftError); ok {
 		return driftErr.
@@ -223,13 +213,13 @@ func (d *EnhancedDetector) getProvider(providerName string) (providers.CloudProv
 	return provider, nil
 }
 
-func (d *EnhancedDetector) discoverResource(ctx context.Context, provider providers.CloudProvider, resource parser.Resource) (interface{}, error) {
+func (d *EnhancedDetector) discoverResource(ctx context.Context, provider providers.CloudProvider, resource state.Resource) (interface{}, error) {
 	// Simulate resource discovery
 	// In real implementation, this would call provider.DiscoverResource()
 	return nil, nil
 }
 
-func (d *EnhancedDetector) compareResources(desired parser.Resource, actual interface{}) *ResourceDrift {
+func (d *EnhancedDetector) compareResources(desired state.Resource, actual interface{}) *ResourceDrift {
 	// Simulate resource comparison
 	// In real implementation, this would do deep comparison
 	return nil
@@ -251,13 +241,6 @@ func isNotFoundError(err error) bool {
 	return false
 }
 
-// DriftReport represents the drift detection report
-type DriftReport struct {
-	StartTime time.Time
-	EndTime   time.Time
-	Resources []ResourceDrift
-	Errors    []error
-}
 
 // ResourceDrift represents drift for a single resource
 type ResourceDrift struct {

@@ -4,20 +4,49 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/catherinevee/driftmgr/internal/providers/aws"
 	"github.com/catherinevee/driftmgr/internal/providers/azure"
 	"github.com/catherinevee/driftmgr/internal/providers/gcp"
 )
 
+// NewProvider creates a new provider based on the provider name
+func NewProvider(providerName string, config map[string]interface{}) (CloudProvider, error) {
+	switch strings.ToLower(providerName) {
+	case "aws":
+		region := ""
+		if r, ok := config["region"].(string); ok {
+			region = r
+		}
+		return NewAWSProvider(region), nil
+	case "azure":
+		subscriptionID := ""
+		resourceGroup := ""
+		if s, ok := config["subscription_id"].(string); ok {
+			subscriptionID = s
+		}
+		if r, ok := config["resource_group"].(string); ok {
+			resourceGroup = r
+		}
+		return NewAzureProviderComplete(subscriptionID, resourceGroup, "", "", "", ""), nil
+	case "gcp":
+		projectID := ""
+		if p, ok := config["project_id"].(string); ok {
+			projectID = p
+		}
+		return NewGCPProvider(projectID, ""), nil
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", providerName)
+	}
+}
+
 // NewAWSProvider creates a new AWS provider with the specified region
 func NewAWSProvider(region string) *aws.AWSProvider {
 	if region == "" {
 		region = "us-east-1"
 	}
-	return &aws.AWSProvider{
-		Region: region,
-	}
+	return aws.NewAWSProvider(region)
 }
 
 // NewAzureProviderComplete creates a new Azure provider with full API implementation
@@ -39,18 +68,18 @@ func NewAzureProviderComplete(subscriptionID, resourceGroup, tenantID, clientID,
 		region = "eastus"
 	}
 	
-	provider := &azure.AzureProviderComplete{
-		subscriptionID: subscriptionID,
-		resourceGroup:  resourceGroup,
-		tenantID:       tenantID,
-		clientID:       clientID,
-		clientSecret:   clientSecret,
-		region:         region,
-	}
+	// Create provider with available constructor
+	provider := azure.NewAzureProviderComplete(subscriptionID, resourceGroup)
+	
+	// Set auth credentials through environment or other means
+	// The provider will pick up credentials from environment variables during Initialize
+	os.Setenv("AZURE_TENANT_ID", tenantID)
+	os.Setenv("AZURE_CLIENT_ID", clientID)
+	os.Setenv("AZURE_CLIENT_SECRET", clientSecret)
 	
 	// Initialize authentication
 	ctx := context.Background()
-	if err := provider.authenticate(ctx); err != nil {
+	if err := provider.Connect(ctx); err != nil {
 		// Log error but don't fail - authentication will be retried on first use
 		fmt.Printf("Warning: Azure authentication failed during initialization: %v\n", err)
 	}
@@ -77,15 +106,17 @@ func NewGCPProviderComplete(projectID, region, credentialsPath string) *gcp.GCPP
 		region = "us-central1"
 	}
 	
-	provider := &gcp.GCPProviderComplete{
-		projectID:       projectID,
-		region:          region,
-		credentialsPath: credentialsPath,
+	// Set credentials path in environment for provider to pick up
+	if credentialsPath != "" {
+		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credentialsPath)
 	}
+	
+	// Create provider with available constructor
+	provider := gcp.NewGCPProviderComplete(projectID)
 	
 	// Initialize authentication
 	ctx := context.Background()
-	if err := provider.authenticate(ctx); err != nil {
+	if err := provider.Connect(ctx); err != nil {
 		// Log error but don't fail - authentication will be retried on first use
 		fmt.Printf("Warning: GCP authentication failed during initialization: %v\n", err)
 	}

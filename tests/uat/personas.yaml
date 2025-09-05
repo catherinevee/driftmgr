@@ -1,0 +1,92 @@
+personas:
+  devops_engineer:
+    name: "Alex - DevOps Engineer"
+    experience: "3+ years with Terraform"
+    goals:
+      - Quickly detect drift in production
+      - Automate remediation workflows
+      - Minimize false positives
+      - Reduce manual intervention time
+    pain_points:
+      - Complex state file structures
+      - API rate limiting
+      - Manual drift resolution
+      - Unclear error messages
+    typical_workflows:
+      - Daily drift checks
+      - Weekly remediation cycles
+      - Emergency drift fixes
+      - Post-incident analysis
+    success_metrics:
+      - Time to detect drift < 30 seconds
+      - Remediation accuracy > 99%
+      - False positive rate < 1%
+  
+  platform_engineer:
+    name: "Jordan - Platform Engineer"
+    experience: "5+ years infrastructure"
+    goals:
+      - Monitor multiple environments
+      - Enforce compliance policies
+      - Track drift trends over time
+      - Generate audit reports
+    pain_points:
+      - Large-scale state management
+      - Cross-team coordination
+      - Audit requirements
+      - Resource relationship tracking
+    typical_workflows:
+      - Multi-account scanning
+      - Compliance reporting
+      - Drift analytics
+      - Resource dependency analysis
+    success_metrics:
+      - Scan 1000+ resources in < 5 minutes
+      - Compliance coverage > 95%
+      - Report generation < 10 seconds
+  
+  sre:
+    name: "Sam - Site Reliability Engineer"
+    experience: "2+ years operations"
+    goals:
+      - Rapid incident response
+      - Automated rollback capabilities
+      - Clear drift visibility
+      - Minimize MTTR
+    pain_points:
+      - Alert fatigue
+      - Time to detection
+      - Remediation confidence
+      - Lack of context in alerts
+    typical_workflows:
+      - Incident investigation
+      - Emergency remediations
+      - Post-mortem analysis
+      - On-call response
+    success_metrics:
+      - Alert accuracy > 98%
+      - Time to remediation < 5 minutes
+      - Rollback success rate 100%
+  
+  security_engineer:
+    name: "Riley - Security Engineer"
+    experience: "4+ years security & compliance"
+    goals:
+      - Detect security policy violations
+      - Ensure compliance standards
+      - Track configuration changes
+      - Generate audit trails
+    pain_points:
+      - Policy drift detection
+      - Compliance reporting complexity
+      - Change attribution
+      - Real-time alerting delays
+    typical_workflows:
+      - Security policy validation
+      - Compliance audits
+      - Change review
+      - Incident forensics
+    success_metrics:
+      - Policy violation detection 100%
+      - Audit report accuracy 100%
+      - Real-time alert latency < 1 minute

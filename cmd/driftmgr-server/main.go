@@ -4058,8 +4058,7 @@ func handleExport(w http.ResponseWriter, r *http.Request) {
 		exportErr = exportToSVG(stateFile, outputPath, req.Options)
 	case "json":
 		exportErr = exportToJSON(stateFile, outputPath, req.Options)
-	case "dot":
-		exportErr = exportToDOT(stateFile, outputPath, req.Options)
+	// DOT export removed - not aligned with core drift detection purpose
 	case "pdf":
 		exportErr = exportToPDF(stateFile, outputPath, req.Options)
 	case "html":
@@ -4216,48 +4215,7 @@ func exportToJSON(stateFile *models.StateFile, outputPath string, options map[st
 	return os.WriteFile(outputPath, jsonData, 0644)
 }
 
-// exportToDOT exports the state file as a Graphviz DOT file
-func exportToDOT(stateFile *models.StateFile, outputPath string, options map[string]interface{}) error {
-	var dot strings.Builder
-	
-	// Start DOT graph
-	dot.WriteString("digraph TerraformState {\n")
-	dot.WriteString("  rankdir=LR;\n")
-	dot.WriteString("  node [shape=box, style=rounded];\n")
-	dot.WriteString("  \n")
-	
-	// Add nodes for each resource
-	for _, resource := range stateFile.Resources {
-		// Escape resource ID for DOT format
-		nodeID := strings.ReplaceAll(resource.ID, ".", "_")
-		nodeID = strings.ReplaceAll(nodeID, "-", "_")
-		
-		// Create node with label
-		label := fmt.Sprintf("%s\\n%s", resource.Type, resource.Name)
-		color := getResourceColor(resource.Type)
-		
-		dot.WriteString(fmt.Sprintf("  %s [label=\"%s\", fillcolor=\"%s\", style=\"filled,rounded\"];\n", 
-			nodeID, label, color))
-	}
-	
-	dot.WriteString("  \n")
-	
-	// Add edges for relationships
-	relationships := extractRelationships(stateFile)
-	for _, rel := range relationships {
-		fromID := strings.ReplaceAll(rel.From, ".", "_")
-		fromID = strings.ReplaceAll(fromID, "-", "_")
-		toID := strings.ReplaceAll(rel.To, ".", "_")
-		toID = strings.ReplaceAll(toID, "-", "_")
-		
-		dot.WriteString(fmt.Sprintf("  %s -> %s [label=\"%s\"];\n", fromID, toID, rel.Type))
-	}
-	
-	dot.WriteString("}\n")
-	
-	// Write to file
-	return os.WriteFile(outputPath, []byte(dot.String()), 0644)
-}
+// Visualization exports removed - focus on drift detection and remediation
 
 // exportToPDF exports the state file as a PDF document
 func exportToPDF(stateFile *models.StateFile, outputPath string, options map[string]interface{}) error {
@@ -11098,73 +11056,8 @@ func createGCPFirewallRule(ctx context.Context, projectID string, drift *models.
 	return nil
 }
 
-// Additional helper functions for other GCP resources would follow similar patterns...
-
-func createGCPPersistentDisk(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for persistent disk creation
-	log.Printf("Creating GCP persistent disk: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPPubSubTopic(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for Pub/Sub topic creation
-	log.Printf("Creating GCP Pub/Sub topic: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPPubSubSubscription(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for Pub/Sub subscription creation
-	log.Printf("Creating GCP Pub/Sub subscription: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPBigTableInstance(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for BigTable instance creation
-	log.Printf("Creating GCP BigTable instance: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPSpannerInstance(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for Spanner instance creation
-	log.Printf("Creating GCP Spanner instance: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPStaticIP(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for static IP creation
-	log.Printf("Creating GCP static IP: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPDNSZone(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for DNS zone creation
-	log.Printf("Creating GCP DNS zone: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPLoadBalancer(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for load balancer creation
-	log.Printf("Creating GCP load balancer: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPMemorystoreRedis(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for Memorystore Redis creation
-	log.Printf("Creating GCP Memorystore Redis: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPServiceAccount(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for service account creation
-	log.Printf("Creating GCP service account: %s", drift.ResourceID)
-	return nil
-}
-
-func createGCPKMSKey(ctx context.Context, projectID string, drift *models.DriftResult) error {
-	// Implementation for KMS key creation
-	log.Printf("Creating GCP KMS key: %s", drift.ResourceID)
-	return nil
-}
+// GCP remediation focuses on importing existing resources to Terraform state
+// and removing unmanaged resources, not creating new ones from scratch
 
 func createGCPGenericResource(ctx context.Context, projectID string, drift *models.DriftResult) error {
 	// Generic resource creation using Resource Manager API
