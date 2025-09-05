@@ -123,3 +123,8 @@ func (w *WindowsWorker) GetLockingProcesses(path string) ([]string, error) {
 	// For now, return empty list
 	return []string{}, nil
 }
+
+// newPlatformWorker creates a Windows worker on Windows platforms
+func newPlatformWorker() CleanupWorker {
+	return NewWindowsWorker()
+}

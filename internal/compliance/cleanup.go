@@ -50,8 +50,9 @@ func NewCleanupManager(config CleanupConfig) *CleanupManager {
 	quarantineDir := filepath.Join(config.BackupDir, ".quarantine")
 	os.MkdirAll(quarantineDir, 0755)
 	
-	// Select platform-specific worker - Windows only for now
-	worker := NewWindowsWorker()
+	// Select platform-specific worker based on build tags
+	var worker CleanupWorker
+	worker = newPlatformWorker()
 	
 	return &CleanupManager{
 		backupDir:       config.BackupDir,

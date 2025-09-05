@@ -45,3 +45,8 @@ func (w *UnixWorker) IsLocked(path string) bool {
 	syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 	return false
 }
+
+// newPlatformWorker creates a Unix worker on Unix platforms
+func newPlatformWorker() CleanupWorker {
+	return NewUnixWorker()
+}
