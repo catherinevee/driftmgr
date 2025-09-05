@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"sync"
 	"time"
-
 )
 
 // CheckType represents the type of health check
@@ -57,18 +56,18 @@ func (h *HealthChecker) Start(ctx context.Context) {
 func (h *HealthChecker) GetStatus(ctx context.Context) (map[string]interface{}, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	status := map[string]interface{}{
 		"status": "healthy",
 		"checks": []map[string]interface{}{},
 	}
-	
+
 	for _, check := range h.checks {
 		checkStatus := map[string]interface{}{
 			"name": check.Name(),
 			"type": check.Type(),
 		}
-		
+
 		if err := check.Check(ctx); err != nil {
 			checkStatus["status"] = "unhealthy"
 			checkStatus["error"] = err.Error()
@@ -78,11 +77,11 @@ func (h *HealthChecker) GetStatus(ctx context.Context) (map[string]interface{}, 
 		} else {
 			checkStatus["status"] = "healthy"
 		}
-		
+
 		checks := status["checks"].([]map[string]interface{})
 		status["checks"] = append(checks, checkStatus)
 	}
-	
+
 	return status, nil
 }
 
@@ -97,7 +96,7 @@ func (h *HealthChecker) GetLivenessStatus(ctx context.Context) (map[string]inter
 func (h *HealthChecker) GetReadinessStatus(ctx context.Context) (map[string]interface{}, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	for _, check := range h.checks {
 		if check.Type() == CheckTypeReadiness && check.Critical() {
 			if err := check.Check(ctx); err != nil {
@@ -108,7 +107,7 @@ func (h *HealthChecker) GetReadinessStatus(ctx context.Context) (map[string]inte
 			}
 		}
 	}
-	
+
 	return map[string]interface{}{
 		"status": "ready",
 	}, nil

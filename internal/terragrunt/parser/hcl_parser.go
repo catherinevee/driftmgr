@@ -16,20 +16,20 @@ import (
 
 // TerragruntConfig represents a parsed terragrunt.hcl file
 type TerragruntConfig struct {
-	TerraformSource   string                       `json:"terraform_source"`
-	Inputs            map[string]interface{}       `json:"inputs,omitempty"`
-	Dependencies      []Dependency                 `json:"dependencies,omitempty"`
-	DependencyBlocks  []DependencyBlock            `json:"dependency_blocks,omitempty"`
-	RemoteState       *RemoteStateConfig           `json:"remote_state,omitempty"`
-	Locals            map[string]interface{}       `json:"locals,omitempty"`
-	Include           []IncludeConfig              `json:"include,omitempty"`
-	Generate          map[string]GenerateConfig    `json:"generate,omitempty"`
-	Hooks             map[string]HookConfig        `json:"hooks,omitempty"`
-	Skip              bool                         `json:"skip,omitempty"`
-	IamRole           string                       `json:"iam_role,omitempty"`
-	TerraformVersionConstraint string              `json:"terraform_version_constraint,omitempty"`
-	FilePath          string                       `json:"file_path"`
-	WorkingDir        string                       `json:"working_dir"`
+	TerraformSource            string                    `json:"terraform_source"`
+	Inputs                     map[string]interface{}    `json:"inputs,omitempty"`
+	Dependencies               []Dependency              `json:"dependencies,omitempty"`
+	DependencyBlocks           []DependencyBlock         `json:"dependency_blocks,omitempty"`
+	RemoteState                *RemoteStateConfig        `json:"remote_state,omitempty"`
+	Locals                     map[string]interface{}    `json:"locals,omitempty"`
+	Include                    []IncludeConfig           `json:"include,omitempty"`
+	Generate                   map[string]GenerateConfig `json:"generate,omitempty"`
+	Hooks                      map[string]HookConfig     `json:"hooks,omitempty"`
+	Skip                       bool                      `json:"skip,omitempty"`
+	IamRole                    string                    `json:"iam_role,omitempty"`
+	TerraformVersionConstraint string                    `json:"terraform_version_constraint,omitempty"`
+	FilePath                   string                    `json:"file_path"`
+	WorkingDir                 string                    `json:"working_dir"`
 }
 
 // Dependency represents a module dependency
@@ -41,44 +41,44 @@ type Dependency struct {
 
 // DependencyBlock represents a dependency block in terragrunt
 type DependencyBlock struct {
-	Name            string   `json:"name"`
-	ConfigPath      string   `json:"config_path"`
-	MockOutputs     map[string]interface{} `json:"mock_outputs,omitempty"`
-	MockOutputsMerge bool    `json:"mock_outputs_merge,omitempty"`
-	Skip            bool     `json:"skip,omitempty"`
+	Name             string                 `json:"name"`
+	ConfigPath       string                 `json:"config_path"`
+	MockOutputs      map[string]interface{} `json:"mock_outputs,omitempty"`
+	MockOutputsMerge bool                   `json:"mock_outputs_merge,omitempty"`
+	Skip             bool                   `json:"skip,omitempty"`
 }
 
 // RemoteStateConfig represents remote state configuration
 type RemoteStateConfig struct {
-	Backend      string                 `json:"backend"`
-	Generate     *GenerateConfig        `json:"generate,omitempty"`
-	Config       map[string]interface{} `json:"config"`
-	DisableInit  bool                   `json:"disable_init,omitempty"`
-	DisableDependencyOptimization bool `json:"disable_dependency_optimization,omitempty"`
+	Backend                       string                 `json:"backend"`
+	Generate                      *GenerateConfig        `json:"generate,omitempty"`
+	Config                        map[string]interface{} `json:"config"`
+	DisableInit                   bool                   `json:"disable_init,omitempty"`
+	DisableDependencyOptimization bool                   `json:"disable_dependency_optimization,omitempty"`
 }
 
 // IncludeConfig represents an include block
 type IncludeConfig struct {
-	Name         string   `json:"name,omitempty"`
-	Path         string   `json:"path"`
-	Expose       bool     `json:"expose,omitempty"`
-	MergeStrategy string  `json:"merge_strategy,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Path          string `json:"path"`
+	Expose        bool   `json:"expose,omitempty"`
+	MergeStrategy string `json:"merge_strategy,omitempty"`
 }
 
 // GenerateConfig represents a generate block
 type GenerateConfig struct {
-	Path              string `json:"path"`
-	IfExists          string `json:"if_exists,omitempty"`
-	Contents          string `json:"contents"`
-	DisableSignature  bool   `json:"disable_signature,omitempty"`
+	Path             string `json:"path"`
+	IfExists         string `json:"if_exists,omitempty"`
+	Contents         string `json:"contents"`
+	DisableSignature bool   `json:"disable_signature,omitempty"`
 }
 
 // HookConfig represents a hook configuration
 type HookConfig struct {
-	Commands       []string `json:"commands"`
-	Execute        []string `json:"execute"`
-	WorkingDir     string   `json:"working_dir,omitempty"`
-	RunOnError     bool     `json:"run_on_error,omitempty"`
+	Commands   []string `json:"commands"`
+	Execute    []string `json:"execute"`
+	WorkingDir string   `json:"working_dir,omitempty"`
+	RunOnError bool     `json:"run_on_error,omitempty"`
 }
 
 // Parser handles parsing of Terragrunt HCL files
@@ -258,7 +258,7 @@ func (p *Parser) parseRemoteStateBlock(block *hclsyntax.Block, config *Terragrun
 // parseIncludeBlock parses an include block
 func (p *Parser) parseIncludeBlock(block *hclsyntax.Block, config *TerragruntConfig) error {
 	include := IncludeConfig{}
-	
+
 	// Include blocks can have labels (names)
 	if len(block.Labels) > 0 {
 		include.Name = block.Labels[0]
@@ -292,7 +292,7 @@ func (p *Parser) parseIncludeBlock(block *hclsyntax.Block, config *TerragruntCon
 // parseDependencyBlock parses a dependency block
 func (p *Parser) parseDependencyBlock(block *hclsyntax.Block, config *TerragruntConfig) error {
 	dep := DependencyBlock{}
-	
+
 	// Dependency blocks have labels (names)
 	if len(block.Labels) > 0 {
 		dep.Name = block.Labels[0]
@@ -351,7 +351,7 @@ func (p *Parser) parseDependenciesBlock(block *hclsyntax.Block, config *Terragru
 // parseGenerateBlock parses a generate block
 func (p *Parser) parseGenerateBlock(block *hclsyntax.Block, config *TerragruntConfig) error {
 	gen := GenerateConfig{}
-	
+
 	// Generate blocks have labels (names)
 	var genName string
 	if len(block.Labels) > 0 {
@@ -499,7 +499,7 @@ func (p *Parser) ctyToInterface(val cty.Value) interface{} {
 // ctyToMap converts a cty.Value to map[string]interface{}
 func (p *Parser) ctyToMap(val cty.Value) map[string]interface{} {
 	result := make(map[string]interface{})
-	
+
 	if val.Type().IsMapType() || val.Type().IsObjectType() {
 		for it := val.ElementIterator(); it.Next(); {
 			k, v := it.Element()
@@ -508,7 +508,7 @@ func (p *Parser) ctyToMap(val cty.Value) map[string]interface{} {
 			}
 		}
 	}
-	
+
 	return result
 }
 
@@ -522,19 +522,19 @@ func (p *Parser) getTerragruntFunctions() map[string]function.Function {
 // FindTerragruntFiles finds all terragrunt.hcl files in a directory tree
 func FindTerragruntFiles(rootDir string) ([]string, error) {
 	var files []string
-	
+
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if !info.IsDir() && strings.HasSuffix(path, "terragrunt.hcl") {
 			files = append(files, path)
 		}
-		
+
 		return nil
 	})
-	
+
 	return files, err
 }
 
@@ -544,7 +544,7 @@ func (p *Parser) ParseDirectory(dir string) ([]*TerragruntConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var configs []*TerragruntConfig
 	for _, file := range files {
 		config, err := p.ParseFile(file)
@@ -555,6 +555,6 @@ func (p *Parser) ParseDirectory(dir string) ([]*TerragruntConfig, error) {
 		}
 		configs = append(configs, config)
 	}
-	
+
 	return configs, nil
 }

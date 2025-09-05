@@ -15,24 +15,24 @@ import (
 
 // IncrementalDiscovery provides efficient incremental resource discovery
 type IncrementalDiscovery struct {
-	providers       map[string]providers.CloudProvider
-	cache           *DiscoveryCache
-	changeTracker   *ChangeTracker
-	bloomFilter     *bloom.BloomFilter
-	config          DiscoveryConfig
-	mu              sync.RWMutex
+	providers     map[string]providers.CloudProvider
+	cache         *DiscoveryCache
+	changeTracker *ChangeTracker
+	bloomFilter   *bloom.BloomFilter
+	config        DiscoveryConfig
+	mu            sync.RWMutex
 }
 
 // DiscoveryConfig configures incremental discovery
 type DiscoveryConfig struct {
-	CacheDuration      time.Duration
-	BloomFilterSize    uint
-	BloomFilterHashes  uint
-	ParallelWorkers    int
-	BatchSize          int
-	UseCloudTrails     bool
-	UseResourceTags    bool
-	DifferentialSync   bool
+	CacheDuration     time.Duration
+	BloomFilterSize   uint
+	BloomFilterHashes uint
+	ParallelWorkers   int
+	BatchSize         int
+	UseCloudTrails    bool
+	UseResourceTags   bool
+	DifferentialSync  bool
 }
 
 // DiscoveryCache caches resource states with TTL
@@ -105,7 +105,7 @@ func NewIncrementalDiscovery(config DiscoveryConfig) *IncrementalDiscovery {
 	if config.BatchSize == 0 {
 		config.BatchSize = 100
 	}
-	
+
 	return &IncrementalDiscovery{
 		providers:     make(map[string]providers.CloudProvider),
 		cache:         NewDiscoveryCache(),
@@ -126,24 +126,24 @@ func (d *IncrementalDiscovery) RegisterProvider(name string, provider providers.
 func (d *IncrementalDiscovery) DiscoverIncremental(ctx context.Context) (*DiscoveryResult, error) {
 	startTime := time.Now()
 	result := &DiscoveryResult{}
-	
+
 	// Step 1: Get changed resources from cloud trails/audit logs
 	changedResources := d.getChangedResources(ctx)
-	
+
 	// Step 2: Check bloom filter for potentially changed resources
 	potentialChanges := d.checkBloomFilter(changedResources)
-	
+
 	// Step 3: Perform differential discovery
 	if d.config.DifferentialSync {
 		d.performDifferentialSync(ctx, potentialChanges, result)
 	} else {
 		d.performFullDiscovery(ctx, result)
 	}
-	
+
 	// Step 4: Update cache and bloom filter
 	d.updateCache(result)
 	d.updateBloomFilter(result)
-	
+
 	result.DiscoveryTime = time.Since(startTime)
 	return result, nil
 }
@@ -153,11 +153,11 @@ func (d *IncrementalDiscovery) getChangedResources(ctx context.Context) []string
 	if !d.config.UseCloudTrails {
 		return nil
 	}
-	
+
 	d.changeTracker.mu.RLock()
 	lastCheck := d.changeTracker.lastDiscovery["global"]
 	d.changeTracker.mu.RUnlock()
-	
+
 	if d.changeTracker.changeLogReader != nil {
 		changes, err := d.changeTracker.changeLogReader.GetChanges(ctx, lastCheck)
 		if err == nil {
@@ -168,17 +168,17 @@ func (d *IncrementalDiscovery) getChangedResources(ctx context.Context) []string
 			return resourceIDs
 		}
 	}
-	
+
 	return nil
 }
 
 // checkBloomFilter checks for potentially changed resources
 func (d *IncrementalDiscovery) checkBloomFilter(knownChanges []string) []string {
 	var potentialChanges []string
-	
+
 	// Add known changes
 	potentialChanges = append(potentialChanges, knownChanges...)
-	
+
 	// Check cached resources for potential changes
 	d.cache.mu.RLock()
 	for id, resource := range d.cache.resources {
@@ -188,7 +188,7 @@ func (d *IncrementalDiscovery) checkBloomFilter(knownChanges []string) []string 
 		}
 	}
 	d.cache.mu.RUnlock()
-	
+
 	return potentialChanges
 }
 
@@ -196,29 +196,29 @@ func (d *IncrementalDiscovery) checkBloomFilter(knownChanges []string) []string 
 func (d *IncrementalDiscovery) performDifferentialSync(ctx context.Context, targetResources []string, result *DiscoveryResult) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	
+
 	// Create worker pool
 	workerChan := make(chan string, len(targetResources))
 	resultChan := make(chan interface{}, len(targetResources))
-	
+
 	var wg sync.WaitGroup
 	for i := 0; i < d.config.ParallelWorkers; i++ {
 		wg.Add(1)
 		go d.discoveryWorker(ctx, workerChan, resultChan, &wg)
 	}
-	
+
 	// Queue resources for discovery
 	for _, resourceID := range targetResources {
 		workerChan <- resourceID
 	}
 	close(workerChan)
-	
+
 	// Wait for workers to complete
 	go func() {
 		wg.Wait()
 		close(resultChan)
 	}()
-	
+
 	// Collect results
 	for resource := range resultChan {
 		if resource != nil {
@@ -242,9 +242,9 @@ func (d *IncrementalDiscovery) performDifferentialSync(ctx context.Context, targ
 func (d *IncrementalDiscovery) performFullDiscovery(ctx context.Context, result *DiscoveryResult) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	
+
 	currentResources := make(map[string]interface{})
-	
+
 	// Discover from all providers
 	for name, provider := range d.providers {
 		resources, err := provider.DiscoverResources(ctx, "")
@@ -252,11 +252,11 @@ func (d *IncrementalDiscovery) performFullDiscovery(ctx context.Context, result 
 			fmt.Printf("Error discovering from %s: %v\n", name, err)
 			continue
 		}
-		
+
 		for _, resource := range resources {
 			id := getResourceID(resource)
 			currentResources[id] = resource
-			
+
 			// Check cache
 			if cached := d.cache.Get(id); cached != nil {
 				if !d.resourcesEqual(cached, resource) {
@@ -271,7 +271,7 @@ func (d *IncrementalDiscovery) performFullDiscovery(ctx context.Context, result 
 			}
 		}
 	}
-	
+
 	// Detect deletions
 	d.cache.mu.RLock()
 	for id := range d.cache.resources {
@@ -285,7 +285,7 @@ func (d *IncrementalDiscovery) performFullDiscovery(ctx context.Context, result 
 // discoveryWorker is a worker for parallel resource discovery
 func (d *IncrementalDiscovery) discoveryWorker(ctx context.Context, workerChan chan string, resultChan chan interface{}, wg *sync.WaitGroup) {
 	defer wg.Done()
-	
+
 	for resourceID := range workerChan {
 		// Discover specific resource
 		resource := d.discoverResource(ctx, resourceID)
@@ -314,7 +314,7 @@ func (d *IncrementalDiscovery) updateCache(result *DiscoveryResult) {
 	for _, resource := range result.UpdatedResources {
 		d.cache.Put(resource)
 	}
-	
+
 	// Remove deleted resources from cache
 	for _, id := range result.DeletedResources {
 		d.cache.Delete(id)
@@ -342,7 +342,7 @@ func (d *IncrementalDiscovery) resourcesEqual(cached *CachedResource, current in
 			return cached.ETag == etag
 		}
 	}
-	
+
 	// Use checksum comparison
 	currentChecksum := d.calculateChecksum(current)
 	return cached.Checksum == currentChecksum
@@ -368,17 +368,17 @@ func NewDiscoveryCache() *DiscoveryCache {
 func (c *DiscoveryCache) Get(id string) *CachedResource {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	resource, exists := c.resources[id]
 	if !exists {
 		return nil
 	}
-	
+
 	// Check if cached resource has expired
 	if time.Since(resource.LastChecked) > resource.TTL {
 		return nil
 	}
-	
+
 	return resource
 }
 
@@ -386,7 +386,7 @@ func (c *DiscoveryCache) Get(id string) *CachedResource {
 func (c *DiscoveryCache) Put(resource interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	id := getResourceID(resource)
 	cached := &CachedResource{
 		ID:          id,
@@ -394,7 +394,7 @@ func (c *DiscoveryCache) Put(resource interface{}) {
 		LastChecked: time.Now(),
 		TTL:         5 * time.Minute,
 	}
-	
+
 	// Extract additional metadata
 	if resMap, ok := resource.(map[string]interface{}); ok {
 		cached.Attributes = resMap
@@ -405,7 +405,7 @@ func (c *DiscoveryCache) Put(resource interface{}) {
 			cached.LastModified = modified
 		}
 	}
-	
+
 	c.resources[id] = cached
 }
 

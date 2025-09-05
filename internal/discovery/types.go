@@ -2,11 +2,11 @@ package discovery
 
 // ValidationResult represents validation results
 type ValidationResult struct {
-	Region        string   `json:"region"`
-	DriftmgrCount int      `json:"driftmgr_count"`
-	CLICount      int      `json:"cli_count"`
-	Match         bool     `json:"match"`
-	MissingInCLI  []string `json:"missing_in_cli,omitempty"`
+	Region            string   `json:"region"`
+	DriftmgrCount     int      `json:"driftmgr_count"`
+	CLICount          int      `json:"cli_count"`
+	Match             bool     `json:"match"`
+	MissingInCLI      []string `json:"missing_in_cli,omitempty"`
 	MissingInDriftmgr []string `json:"missing_in_driftmgr,omitempty"`
 }
 

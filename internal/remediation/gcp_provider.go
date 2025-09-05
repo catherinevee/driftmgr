@@ -25,16 +25,16 @@ import (
 
 // GCPProvider implements CloudProvider for Google Cloud Platform
 type GCPProvider struct {
-	projectID           string
-	storageClient       *storage.Client
-	resourceManager     *cloudresourcemanager.Service
-	containerService    *container.Service
-	computeService      *compute.Service
-	sqlService          *sqladmin.Service
-	pubsubClient        *pubsub.Client
-	functionsService    *cloudfunctions.Service
-	dataprocClient      *dataproc.ClusterControllerClient
-	bigqueryClient      *bigquery.Client
+	projectID        string
+	storageClient    *storage.Client
+	resourceManager  *cloudresourcemanager.Service
+	containerService *container.Service
+	computeService   *compute.Service
+	sqlService       *sqladmin.Service
+	pubsubClient     *pubsub.Client
+	functionsService *cloudfunctions.Service
+	dataprocClient   *dataproc.ClusterControllerClient
+	bigqueryClient   *bigquery.Client
 }
 
 // NewGCPProvider creates a new GCP provider
@@ -105,16 +105,16 @@ func NewGCPProvider() (*GCPProvider, error) {
 	}
 
 	return &GCPProvider{
-		projectID:           projectID,
-		storageClient:       storageClient,
-		resourceManager:     resourceManager,
-		containerService:    containerService,
-		computeService:      computeService,
-		sqlService:          sqlService,
-		pubsubClient:        pubsubClient,
-		functionsService:    functionsService,
-		dataprocClient:      dataprocClient,
-		bigqueryClient:      bigqueryClient,
+		projectID:        projectID,
+		storageClient:    storageClient,
+		resourceManager:  resourceManager,
+		containerService: containerService,
+		computeService:   computeService,
+		sqlService:       sqlService,
+		pubsubClient:     pubsubClient,
+		functionsService: functionsService,
+		dataprocClient:   dataprocClient,
+		bigqueryClient:   bigqueryClient,
 	}, nil
 }
 
@@ -353,8 +353,8 @@ func (gp *GCPProvider) discoverComputeInstances(ctx context.Context, accountID s
 			var networkInterfaces []map[string]interface{}
 			for _, nic := range instance.NetworkInterfaces {
 				nicData := map[string]interface{}{
-					"network":    nic.Network,
-					"subnetwork": nic.Subnetwork,
+					"network":     nic.Network,
+					"subnetwork":  nic.Subnetwork,
 					"internal_ip": nic.NetworkIP,
 				}
 				if len(nic.AccessConfigs) > 0 && nic.AccessConfigs[0].NatIP != "" {
@@ -380,14 +380,14 @@ func (gp *GCPProvider) discoverComputeInstances(ctx context.Context, accountID s
 				State:    instance.Status,
 				Created:  createdTime,
 				Metadata: map[string]string{
-					"zone":               zoneName,
-					"machine_type":       instance.MachineType,
-					"status":             instance.Status,
-					"network_interfaces": fmt.Sprintf("%v", networkInterfaces),
-					"disks":              fmt.Sprintf("%v", disks),
-					"tags":               fmt.Sprintf("%v", instance.Tags),
-					"labels":             fmt.Sprintf("%v", instance.Labels),
-					"can_ip_forward":     fmt.Sprintf("%v", instance.CanIpForward),
+					"zone":                zoneName,
+					"machine_type":        instance.MachineType,
+					"status":              instance.Status,
+					"network_interfaces":  fmt.Sprintf("%v", networkInterfaces),
+					"disks":               fmt.Sprintf("%v", disks),
+					"tags":                fmt.Sprintf("%v", instance.Tags),
+					"labels":              fmt.Sprintf("%v", instance.Labels),
+					"can_ip_forward":      fmt.Sprintf("%v", instance.CanIpForward),
 					"deletion_protection": fmt.Sprintf("%v", instance.DeletionProtection),
 				},
 			})
@@ -480,9 +480,9 @@ func (gp *GCPProvider) discoverVPCNetworks(ctx context.Context, accountID string
 		var peerings []map[string]interface{}
 		for _, peering := range network.Peerings {
 			peeringData := map[string]interface{}{
-				"name":         peering.Name,
-				"network":      peering.Network,
-				"state":        peering.State,
+				"name":               peering.Name,
+				"network":            peering.Network,
+				"state":              peering.State,
 				"auto_create_routes": peering.AutoCreateRoutes,
 			}
 			peerings = append(peerings, peeringData)
@@ -533,13 +533,13 @@ func (gp *GCPProvider) discoverVPCNetworks(ctx context.Context, accountID string
 					State:    "ACTIVE",
 					Created:  createdTime,
 					Metadata: map[string]string{
-						"network":                subnet.Network,
-						"ip_cidr_range":          subnet.IpCidrRange,
-						"gateway_address":        subnet.GatewayAddress,
+						"network":                  subnet.Network,
+						"ip_cidr_range":            subnet.IpCidrRange,
+						"gateway_address":          subnet.GatewayAddress,
 						"private_ip_google_access": fmt.Sprintf("%v", subnet.PrivateIpGoogleAccess),
-						"enable_flow_logs":       fmt.Sprintf("%v", subnet.EnableFlowLogs),
-						"purpose":                subnet.Purpose,
-						"role":                   subnet.Role,
+						"enable_flow_logs":         fmt.Sprintf("%v", subnet.EnableFlowLogs),
+						"purpose":                  subnet.Purpose,
+						"role":                     subnet.Role,
 					},
 				})
 			}
@@ -573,12 +573,12 @@ func (gp *GCPProvider) discoverLoadBalancers(ctx context.Context, accountID stri
 				State:    "ACTIVE",
 				Created:  createdTime,
 				Metadata: map[string]string{
-					"ip_address":    rule.IPAddress,
-					"ip_protocol":   rule.IPProtocol,
-					"port_range":    rule.PortRange,
-					"target":        rule.Target,
+					"ip_address":            rule.IPAddress,
+					"ip_protocol":           rule.IPProtocol,
+					"port_range":            rule.PortRange,
+					"target":                rule.Target,
 					"load_balancing_scheme": rule.LoadBalancingScheme,
-					"network_tier":  rule.NetworkTier,
+					"network_tier":          rule.NetworkTier,
 				},
 			})
 		}
@@ -610,14 +610,14 @@ func (gp *GCPProvider) discoverLoadBalancers(ctx context.Context, accountID stri
 					State:    "ACTIVE",
 					Created:  createdTime,
 					Metadata: map[string]string{
-						"ip_address":    rule.IPAddress,
-						"ip_protocol":   rule.IPProtocol,
-						"port_range":    rule.PortRange,
-						"target":        rule.Target,
-						"backend_service": rule.BackendService,
+						"ip_address":            rule.IPAddress,
+						"ip_protocol":           rule.IPProtocol,
+						"port_range":            rule.PortRange,
+						"target":                rule.Target,
+						"backend_service":       rule.BackendService,
 						"load_balancing_scheme": rule.LoadBalancingScheme,
-						"network":       rule.Network,
-						"subnetwork":    rule.Subnetwork,
+						"network":               rule.Network,
+						"subnetwork":            rule.Subnetwork,
 					},
 				})
 			}
@@ -639,10 +639,10 @@ func (gp *GCPProvider) discoverLoadBalancers(ctx context.Context, accountID stri
 			var backends []map[string]interface{}
 			for _, backend := range service.Backends {
 				backendData := map[string]interface{}{
-					"group":              backend.Group,
-					"balancing_mode":     backend.BalancingMode,
-					"capacity_scaler":    backend.CapacityScaler,
-					"max_utilization":    backend.MaxUtilization,
+					"group":           backend.Group,
+					"balancing_mode":  backend.BalancingMode,
+					"capacity_scaler": backend.CapacityScaler,
+					"max_utilization": backend.MaxUtilization,
 				}
 				backends = append(backends, backendData)
 			}
@@ -656,16 +656,16 @@ func (gp *GCPProvider) discoverLoadBalancers(ctx context.Context, accountID stri
 				State:    "ACTIVE",
 				Created:  createdTime,
 				Metadata: map[string]string{
-					"protocol":             service.Protocol,
-					"port":                 fmt.Sprintf("%d", service.Port),
-					"port_name":            service.PortName,
-					"timeout_sec":          fmt.Sprintf("%d", service.TimeoutSec),
-					"enable_cdn":           fmt.Sprintf("%v", service.EnableCDN),
-					"session_affinity":     service.SessionAffinity,
-					"affinity_cookie_ttl":  fmt.Sprintf("%d", service.AffinityCookieTtlSec),
+					"protocol":              service.Protocol,
+					"port":                  fmt.Sprintf("%d", service.Port),
+					"port_name":             service.PortName,
+					"timeout_sec":           fmt.Sprintf("%d", service.TimeoutSec),
+					"enable_cdn":            fmt.Sprintf("%v", service.EnableCDN),
+					"session_affinity":      service.SessionAffinity,
+					"affinity_cookie_ttl":   fmt.Sprintf("%d", service.AffinityCookieTtlSec),
 					"load_balancing_scheme": service.LoadBalancingScheme,
-					"backends":             fmt.Sprintf("%v", backends),
-					"health_checks":        fmt.Sprintf("%v", service.HealthChecks),
+					"backends":              fmt.Sprintf("%v", backends),
+					"health_checks":         fmt.Sprintf("%v", service.HealthChecks),
 				},
 			})
 		}
@@ -697,11 +697,11 @@ func (gp *GCPProvider) discoverLoadBalancers(ctx context.Context, accountID stri
 					State:    "ACTIVE",
 					Created:  createdTime,
 					Metadata: map[string]string{
-						"instances":      fmt.Sprintf("%v", pool.Instances),
-						"health_checks":  fmt.Sprintf("%v", pool.HealthChecks),
+						"instances":        fmt.Sprintf("%v", pool.Instances),
+						"health_checks":    fmt.Sprintf("%v", pool.HealthChecks),
 						"session_affinity": pool.SessionAffinity,
-						"failover_ratio": fmt.Sprintf("%f", pool.FailoverRatio),
-						"backup_pool":    pool.BackupPool,
+						"failover_ratio":   fmt.Sprintf("%f", pool.FailoverRatio),
+						"backup_pool":      pool.BackupPool,
 					},
 				})
 			}
@@ -743,9 +743,9 @@ func (gp *GCPProvider) discoverSQLInstances(ctx context.Context, accountID strin
 		var replicaConfig map[string]interface{}
 		if instance.ReplicaConfiguration != nil {
 			replicaConfig = map[string]interface{}{
-				"kind":                      instance.ReplicaConfiguration.Kind,
+				"kind":                        instance.ReplicaConfiguration.Kind,
 				"mysql_replica_configuration": instance.ReplicaConfiguration.MysqlReplicaConfiguration,
-				"failover_target":           instance.ReplicaConfiguration.FailoverTarget,
+				"failover_target":             instance.ReplicaConfiguration.FailoverTarget,
 			}
 		}
 
@@ -753,11 +753,11 @@ func (gp *GCPProvider) discoverSQLInstances(ctx context.Context, accountID strin
 		var backupConfig map[string]interface{}
 		if instance.Settings != nil && instance.Settings.BackupConfiguration != nil {
 			backupConfig = map[string]interface{}{
-				"enabled":                instance.Settings.BackupConfiguration.Enabled,
-				"start_time":             instance.Settings.BackupConfiguration.StartTime,
+				"enabled":                        instance.Settings.BackupConfiguration.Enabled,
+				"start_time":                     instance.Settings.BackupConfiguration.StartTime,
 				"point_in_time_recovery_enabled": instance.Settings.BackupConfiguration.PointInTimeRecoveryEnabled,
 				"transaction_log_retention_days": instance.Settings.BackupConfiguration.TransactionLogRetentionDays,
-				"location":               instance.Settings.BackupConfiguration.Location,
+				"location":                       instance.Settings.BackupConfiguration.Location,
 			}
 		}
 
@@ -770,18 +770,18 @@ func (gp *GCPProvider) discoverSQLInstances(ctx context.Context, accountID strin
 			State:    instance.State,
 			Created:  createdTime,
 			Metadata: map[string]string{
-				"database_version":      instance.DatabaseVersion,
-				"tier":                  instance.Settings.Tier,
-				"backend_type":          instance.BackendType,
-				"connection_name":       instance.ConnectionName,
-				"instance_type":         instance.InstanceType,
-				"master_instance_name":  instance.MasterInstanceName,
-				"max_disk_size":         fmt.Sprintf("%d", instance.MaxDiskSize),
-				"current_disk_size":     fmt.Sprintf("%d", instance.CurrentDiskSize),
-				"ip_addresses":          fmt.Sprintf("%v", ipAddresses),
-				"replica_configuration": fmt.Sprintf("%v", replicaConfig),
-				"backup_configuration":  fmt.Sprintf("%v", backupConfig),
-				"maintenance_version":   instance.MaintenanceVersion,
+				"database_version":       instance.DatabaseVersion,
+				"tier":                   instance.Settings.Tier,
+				"backend_type":           instance.BackendType,
+				"connection_name":        instance.ConnectionName,
+				"instance_type":          instance.InstanceType,
+				"master_instance_name":   instance.MasterInstanceName,
+				"max_disk_size":          fmt.Sprintf("%d", instance.MaxDiskSize),
+				"current_disk_size":      fmt.Sprintf("%d", instance.CurrentDiskSize),
+				"ip_addresses":           fmt.Sprintf("%v", ipAddresses),
+				"replica_configuration":  fmt.Sprintf("%v", replicaConfig),
+				"backup_configuration":   fmt.Sprintf("%v", backupConfig),
+				"maintenance_version":    instance.MaintenanceVersion,
 				"disk_encryption_status": fmt.Sprintf("%v", instance.DiskEncryptionStatus),
 			},
 		})
@@ -836,11 +836,11 @@ func (gp *GCPProvider) discoverPubSubTopics(ctx context.Context, accountID strin
 			Created:  time.Now(), // PubSub API doesn't provide creation time
 			Metadata: map[string]string{
 				"message_storage_policy": fmt.Sprintf("%v", config.MessageStoragePolicy),
-				"kms_key_name":          config.KMSKeyName,
-				"schema_settings":       fmt.Sprintf("%v", config.SchemaSettings),
-				"retention_duration":    fmt.Sprintf("%v", config.RetentionDuration),
-				"subscriptions":         fmt.Sprintf("%v", subscriptions),
-				"labels":                fmt.Sprintf("%v", config.Labels),
+				"kms_key_name":           config.KMSKeyName,
+				"schema_settings":        fmt.Sprintf("%v", config.SchemaSettings),
+				"retention_duration":     fmt.Sprintf("%v", config.RetentionDuration),
+				"subscriptions":          fmt.Sprintf("%v", subscriptions),
+				"labels":                 fmt.Sprintf("%v", config.Labels),
 			},
 		})
 	}
@@ -872,15 +872,15 @@ func (gp *GCPProvider) discoverPubSubTopics(ctx context.Context, accountID strin
 			State:    "ACTIVE",
 			Created:  time.Now(), // PubSub API doesn't provide creation time
 			Metadata: map[string]string{
-				"topic":                     config.Topic.ID(),
-				"ack_deadline":              fmt.Sprintf("%v", config.AckDeadline),
-				"retain_acked_messages":     fmt.Sprintf("%v", config.RetainAckedMessages),
+				"topic":                      config.Topic.ID(),
+				"ack_deadline":               fmt.Sprintf("%v", config.AckDeadline),
+				"retain_acked_messages":      fmt.Sprintf("%v", config.RetainAckedMessages),
 				"message_retention_duration": fmt.Sprintf("%v", config.RetentionDuration),
-				"enable_message_ordering":   fmt.Sprintf("%v", config.EnableMessageOrdering),
-				"dead_letter_policy":        fmt.Sprintf("%v", config.DeadLetterPolicy),
-				"retry_policy":              fmt.Sprintf("%v", config.RetryPolicy),
-				"push_config":               fmt.Sprintf("%v", config.PushConfig),
-				"labels":                    fmt.Sprintf("%v", config.Labels),
+				"enable_message_ordering":    fmt.Sprintf("%v", config.EnableMessageOrdering),
+				"dead_letter_policy":         fmt.Sprintf("%v", config.DeadLetterPolicy),
+				"retry_policy":               fmt.Sprintf("%v", config.RetryPolicy),
+				"push_config":                fmt.Sprintf("%v", config.PushConfig),
+				"labels":                     fmt.Sprintf("%v", config.Labels),
 			},
 		})
 	}
@@ -944,23 +944,23 @@ func (gp *GCPProvider) discoverCloudFunctions(ctx context.Context, accountID str
 				State:    state,
 				Created:  updatedTime, // Using update time as creation time is not available
 				Metadata: map[string]string{
-					"entry_point":         function.EntryPoint,
-					"timeout":             function.Timeout,
-					"available_memory_mb": fmt.Sprintf("%d", function.AvailableMemoryMb),
-					"runtime":             function.Runtime,
-					"source_archive_url":  function.SourceArchiveUrl,
-					"source_repository":   fmt.Sprintf("%v", function.SourceRepository),
-					"event_trigger":       fmt.Sprintf("%v", function.EventTrigger),
-					"https_trigger":       fmt.Sprintf("%v", function.HttpsTrigger),
-					"service_account":     function.ServiceAccountEmail,
-					"vpc_connector":       function.VpcConnector,
-					"ingress_settings":    function.IngressSettings,
-					"max_instances":       fmt.Sprintf("%d", function.MaxInstances),
-					"min_instances":       fmt.Sprintf("%d", function.MinInstances),
+					"entry_point":           function.EntryPoint,
+					"timeout":               function.Timeout,
+					"available_memory_mb":   fmt.Sprintf("%d", function.AvailableMemoryMb),
+					"runtime":               function.Runtime,
+					"source_archive_url":    function.SourceArchiveUrl,
+					"source_repository":     fmt.Sprintf("%v", function.SourceRepository),
+					"event_trigger":         fmt.Sprintf("%v", function.EventTrigger),
+					"https_trigger":         fmt.Sprintf("%v", function.HttpsTrigger),
+					"service_account":       function.ServiceAccountEmail,
+					"vpc_connector":         function.VpcConnector,
+					"ingress_settings":      function.IngressSettings,
+					"max_instances":         fmt.Sprintf("%d", function.MaxInstances),
+					"min_instances":         fmt.Sprintf("%d", function.MinInstances),
 					"environment_variables": fmt.Sprintf("%v", function.EnvironmentVariables),
-					"labels":              fmt.Sprintf("%v", function.Labels),
-					"version_id":          fmt.Sprintf("%d", function.VersionId),
-					"build_id":            function.BuildId,
+					"labels":                fmt.Sprintf("%v", function.Labels),
+					"version_id":            fmt.Sprintf("%d", function.VersionId),
+					"build_id":              function.BuildId,
 				},
 			})
 		}
@@ -1035,29 +1035,29 @@ func (gp *GCPProvider) discoverDataprocClusters(ctx context.Context, accountID s
 			if cluster.Config != nil {
 				if cluster.Config.MasterConfig != nil {
 					masterConfig = map[string]interface{}{
-						"num_instances":   cluster.Config.MasterConfig.NumInstances,
-						"machine_type":    cluster.Config.MasterConfig.MachineTypeUri,
-						"disk_size_gb":    cluster.Config.MasterConfig.DiskConfig.GetBootDiskSizeGb(),
-						"disk_type":       cluster.Config.MasterConfig.DiskConfig.GetBootDiskType(),
-						"preemptibility":  cluster.Config.MasterConfig.Preemptibility,
+						"num_instances":  cluster.Config.MasterConfig.NumInstances,
+						"machine_type":   cluster.Config.MasterConfig.MachineTypeUri,
+						"disk_size_gb":   cluster.Config.MasterConfig.DiskConfig.GetBootDiskSizeGb(),
+						"disk_type":      cluster.Config.MasterConfig.DiskConfig.GetBootDiskType(),
+						"preemptibility": cluster.Config.MasterConfig.Preemptibility,
 					}
 				}
 				if cluster.Config.WorkerConfig != nil {
 					workerConfig = map[string]interface{}{
-						"num_instances":   cluster.Config.WorkerConfig.NumInstances,
-						"machine_type":    cluster.Config.WorkerConfig.MachineTypeUri,
-						"disk_size_gb":    cluster.Config.WorkerConfig.DiskConfig.GetBootDiskSizeGb(),
-						"disk_type":       cluster.Config.WorkerConfig.DiskConfig.GetBootDiskType(),
-						"preemptibility":  cluster.Config.WorkerConfig.Preemptibility,
+						"num_instances":  cluster.Config.WorkerConfig.NumInstances,
+						"machine_type":   cluster.Config.WorkerConfig.MachineTypeUri,
+						"disk_size_gb":   cluster.Config.WorkerConfig.DiskConfig.GetBootDiskSizeGb(),
+						"disk_type":      cluster.Config.WorkerConfig.DiskConfig.GetBootDiskType(),
+						"preemptibility": cluster.Config.WorkerConfig.Preemptibility,
 					}
 				}
 				if cluster.Config.SecondaryWorkerConfig != nil {
 					secondaryWorkerConfig = map[string]interface{}{
-						"num_instances":   cluster.Config.SecondaryWorkerConfig.NumInstances,
-						"machine_type":    cluster.Config.SecondaryWorkerConfig.MachineTypeUri,
-						"disk_size_gb":    cluster.Config.SecondaryWorkerConfig.DiskConfig.GetBootDiskSizeGb(),
-						"disk_type":       cluster.Config.SecondaryWorkerConfig.DiskConfig.GetBootDiskType(),
-						"preemptibility":  cluster.Config.SecondaryWorkerConfig.Preemptibility,
+						"num_instances":  cluster.Config.SecondaryWorkerConfig.NumInstances,
+						"machine_type":   cluster.Config.SecondaryWorkerConfig.MachineTypeUri,
+						"disk_size_gb":   cluster.Config.SecondaryWorkerConfig.DiskConfig.GetBootDiskSizeGb(),
+						"disk_type":      cluster.Config.SecondaryWorkerConfig.DiskConfig.GetBootDiskType(),
+						"preemptibility": cluster.Config.SecondaryWorkerConfig.Preemptibility,
 					}
 				}
 			}
@@ -1161,16 +1161,16 @@ func (gp *GCPProvider) discoverBigQueryDatasets(ctx context.Context, accountID s
 			State:    "ACTIVE",
 			Created:  createdTime,
 			Metadata: map[string]string{
-				"description":             metadata.Description,
-				"friendly_name":           metadata.Name,
-				"location":                metadata.Location,
-				"default_table_expiration": fmt.Sprintf("%v", metadata.DefaultTableExpiration),
+				"description":                  metadata.Description,
+				"friendly_name":                metadata.Name,
+				"location":                     metadata.Location,
+				"default_table_expiration":     fmt.Sprintf("%v", metadata.DefaultTableExpiration),
 				"default_partition_expiration": fmt.Sprintf("%v", metadata.DefaultPartitionExpiration),
-				"labels":                  fmt.Sprintf("%v", metadata.Labels),
-				"access":                  fmt.Sprintf("%v", accessList),
-				"table_count":             fmt.Sprintf("%d", tableCount),
-				"last_modified":           fmt.Sprintf("%v", metadata.LastModifiedTime),
-				"etag":                    metadata.ETag,
+				"labels":                       fmt.Sprintf("%v", metadata.Labels),
+				"access":                       fmt.Sprintf("%v", accessList),
+				"table_count":                  fmt.Sprintf("%d", tableCount),
+				"last_modified":                fmt.Sprintf("%v", metadata.LastModifiedTime),
+				"etag":                         metadata.ETag,
 			},
 		})
 
@@ -1208,20 +1208,20 @@ func (gp *GCPProvider) discoverBigQueryDatasets(ctx context.Context, accountID s
 				State:    "ACTIVE",
 				Created:  tableCreatedTime,
 				Metadata: map[string]string{
-					"dataset_id":          dataset.DatasetID,
-					"description":         tableMetadata.Description,
-					"type":                string(tableMetadata.Type),
-					"num_bytes":           fmt.Sprintf("%d", tableMetadata.NumBytes),
-					"num_rows":            fmt.Sprintf("%d", tableMetadata.NumRows),
-					"last_modified":       fmt.Sprintf("%v", tableMetadata.LastModifiedTime),
-					"expiration_time":     fmt.Sprintf("%v", tableMetadata.ExpirationTime),
-					"labels":              fmt.Sprintf("%v", tableMetadata.Labels),
-					"clustering_fields":   fmt.Sprintf("%v", tableMetadata.Clustering),
-					"time_partitioning":   fmt.Sprintf("%v", tableMetadata.TimePartitioning),
-					"range_partitioning":  fmt.Sprintf("%v", tableMetadata.RangePartitioning),
+					"dataset_id":               dataset.DatasetID,
+					"description":              tableMetadata.Description,
+					"type":                     string(tableMetadata.Type),
+					"num_bytes":                fmt.Sprintf("%d", tableMetadata.NumBytes),
+					"num_rows":                 fmt.Sprintf("%d", tableMetadata.NumRows),
+					"last_modified":            fmt.Sprintf("%v", tableMetadata.LastModifiedTime),
+					"expiration_time":          fmt.Sprintf("%v", tableMetadata.ExpirationTime),
+					"labels":                   fmt.Sprintf("%v", tableMetadata.Labels),
+					"clustering_fields":        fmt.Sprintf("%v", tableMetadata.Clustering),
+					"time_partitioning":        fmt.Sprintf("%v", tableMetadata.TimePartitioning),
+					"range_partitioning":       fmt.Sprintf("%v", tableMetadata.RangePartitioning),
 					"require_partition_filter": fmt.Sprintf("%v", tableMetadata.RequirePartitionFilter),
-					"schema":              fmt.Sprintf("%v", tableMetadata.Schema),
-					"etag":                tableMetadata.ETag,
+					"schema":                   fmt.Sprintf("%v", tableMetadata.Schema),
+					"etag":                     tableMetadata.ETag,
 				},
 			})
 		}
@@ -1294,7 +1294,7 @@ func (gp *GCPProvider) deleteSQLInstance(ctx context.Context, resource models.Re
 func (gp *GCPProvider) deletePubSubTopic(ctx context.Context, resource models.Resource) error {
 	// Get the topic
 	topic := gp.pubsubClient.Topic(resource.Name)
-	
+
 	// Delete the topic
 	err := topic.Delete(ctx)
 	if err != nil {

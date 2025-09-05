@@ -25,9 +25,9 @@ import (
 	"github.com/catherinevee/driftmgr/internal/providers"
 	"github.com/catherinevee/driftmgr/internal/remediation"
 	"github.com/catherinevee/driftmgr/internal/state"
-	statelib "github.com/catherinevee/driftmgr/internal/state"
 	backup "github.com/catherinevee/driftmgr/internal/state"
 	parser "github.com/catherinevee/driftmgr/internal/state"
+	statelib "github.com/catherinevee/driftmgr/internal/state"
 	"github.com/catherinevee/driftmgr/internal/terragrunt/parser/hcl"
 	types "github.com/catherinevee/driftmgr/pkg/models"
 )
@@ -153,7 +153,7 @@ func handleDrift(ctx context.Context, args []string) {
 func handleDriftDetect(ctx context.Context, args []string) {
 	var statePath, provider, region string
 	var mode string = "smart" // Default to smart mode
-	var deepComparison bool // For backward compatibility
+	var deepComparison bool   // For backward compatibility
 
 	// Parse arguments
 	for i := 0; i < len(args); i++ {
@@ -241,24 +241,24 @@ func handleDriftDetect(ctx context.Context, args []string) {
 
 	// Configure detection
 	config := &detector.DetectorConfig{
-		CheckUnmanaged:  true,
-		DeepComparison:  deepComparison || mode == "deep",
+		CheckUnmanaged:    true,
+		DeepComparison:    deepComparison || mode == "deep",
 		ParallelDiscovery: true,
-		RetryAttempts:   3,
-		RetryDelay:      2 * time.Second,
+		RetryAttempts:     3,
+		RetryDelay:        2 * time.Second,
 	}
 	driftDetector.SetConfig(config)
 
 	// Create output formatter
 	output := cli.NewOutputFormatter()
-	
+
 	output.Header(fmt.Sprintf("Drift Detection - %s Mode", strings.ToUpper(mode)))
 	output.Info("Provider: %s | Region: %s | Resources: %d", provider, region, len(stateFile.Resources))
-	
+
 	// Create progress indicator
 	progress := cli.NewProgressIndicator(len(stateFile.Resources), "Detecting drift")
 	progress.Start()
-	
+
 	startTime := time.Now()
 
 	// Detect drift for each resource
@@ -267,11 +267,11 @@ func handleDriftDetect(ctx context.Context, args []string) {
 
 	for i, resource := range stateFile.Resources {
 		progress.SetMessage(fmt.Sprintf("Checking %s.%s", resource.Type, resource.Name))
-		
+
 		// Simplified drift detection
 		modelResource := types.Resource{
-			ID:   resource.Name,
-			Type: resource.Type,
+			ID:       resource.Name,
+			Type:     resource.Type,
 			Provider: provider,
 		}
 		result, err := driftDetector.DetectResourceDrift(ctx, modelResource)
@@ -292,7 +292,7 @@ func handleDriftDetect(ctx context.Context, args []string) {
 				output.Warning("%s.%s: Configuration drift detected", resource.Type, resource.Name)
 			}
 		}
-		
+
 		progress.Update(i + 1)
 	}
 
@@ -301,20 +301,20 @@ func handleDriftDetect(ctx context.Context, args []string) {
 
 	// Generate summary with rich formatting
 	output.Section("Drift Detection Summary")
-	
+
 	summaryData := map[string]string{
-		"Total Resources":    fmt.Sprintf("%d", len(stateFile.Resources)),
-		"Drifted Resources":  fmt.Sprintf("%d", driftedCount),
-		"Missing Resources":  fmt.Sprintf("%d", missingCount),
+		"Total Resources":     fmt.Sprintf("%d", len(stateFile.Resources)),
+		"Drifted Resources":   fmt.Sprintf("%d", driftedCount),
+		"Missing Resources":   fmt.Sprintf("%d", missingCount),
 		"Unmanaged Resources": fmt.Sprintf("%d", unmanagedCount),
-		"Scan Duration":      fmt.Sprintf("%v", duration),
-		"Detection Mode":     mode,
+		"Scan Duration":       fmt.Sprintf("%v", duration),
+		"Detection Mode":      mode,
 	}
-	
+
 	output.KeyValueList(summaryData)
-	
+
 	fmt.Println()
-	
+
 	if driftedCount == 0 {
 		output.Success("No drift detected - infrastructure matches desired state")
 	} else if driftedCount < 5 {
@@ -372,7 +372,7 @@ func handleRemediate(ctx context.Context, args []string) {
 	remediationPlanner := remediation.NewRemediationPlanner(nil)
 
 	fmt.Println("Generating remediation plan...")
-	
+
 	// Create drift report from results
 	var driftResultsSlice []detector.DriftResult
 	for _, r := range driftResults {
@@ -381,11 +381,11 @@ func handleRemediate(ctx context.Context, args []string) {
 		}
 	}
 	driftReport := &detector.DriftReport{
-		Timestamp: time.Now(),
+		Timestamp:    time.Now(),
 		DriftResults: driftResultsSlice,
 	}
-	
-	// Create remediation plan  
+
+	// Create remediation plan
 	plan, err := remediationPlanner.CreatePlan(ctx, driftReport, nil)
 	if err != nil {
 		fmt.Printf("Error creating remediation plan: %v\n", err)
@@ -395,9 +395,9 @@ func handleRemediate(ctx context.Context, args []string) {
 	// Display plan with rich formatting
 	output := cli.NewOutputFormatter()
 	prompt := cli.NewPrompt()
-	
+
 	output.Header("Remediation Plan")
-	
+
 	// Risk level indicator
 	var riskIcon string
 	switch plan.RiskLevel {
@@ -410,10 +410,10 @@ func handleRemediate(ctx context.Context, args []string) {
 	default:
 		riskIcon = "●"
 	}
-	
+
 	planSummary := map[string]string{
-		"Total Actions": fmt.Sprintf("%d", len(plan.Actions)),
-		"Risk Level": fmt.Sprintf("%s %v", riskIcon, plan.RiskLevel),
+		"Total Actions":      fmt.Sprintf("%d", len(plan.Actions)),
+		"Risk Level":         fmt.Sprintf("%s %v", riskIcon, plan.RiskLevel),
 		"Estimated Duration": fmt.Sprintf("%v", plan.EstimatedDuration),
 	}
 	output.KeyValueList(planSummary)
@@ -424,7 +424,7 @@ func handleRemediate(ctx context.Context, args []string) {
 		fmt.Printf("   Type: %s\n", action.Type)
 		fmt.Printf("   Resource: %s\n", action.Resource)
 		fmt.Printf("   Risk: %s\n", action.RiskLevel)
-		
+
 		if action.Type == remediation.ActionTypeImport {
 			fmt.Printf("   Command: terraform import %s %s\n", action.Resource, action.Resource)
 		} else if action.Type == remediation.ActionTypeUpdate {
@@ -449,7 +449,7 @@ func handleRemediate(ctx context.Context, args []string) {
 	if plan.RiskLevel == remediation.RiskLevelHigh || plan.RiskLevel == remediation.RiskLevelCritical {
 		output.Warning("This plan contains high-risk operations")
 	}
-	
+
 	confirmed := prompt.ConfirmWithDetails(
 		"Do you want to apply this remediation plan?",
 		[]string{
@@ -458,7 +458,7 @@ func handleRemediate(ctx context.Context, args []string) {
 			fmt.Sprintf("Estimated duration: %v", plan.EstimatedDuration),
 		},
 	)
-	
+
 	if !confirmed {
 		output.Info("Remediation cancelled")
 		return
@@ -466,10 +466,10 @@ func handleRemediate(ctx context.Context, args []string) {
 
 	// Apply remediation with progress tracking
 	output.Section("Executing Remediation Plan")
-	
+
 	progress := cli.NewProgressIndicator(len(plan.Actions), "Applying remediation")
 	progress.Start()
-	
+
 	// Execute plan with progress updates
 	for i, action := range plan.Actions {
 		progress.SetMessage(fmt.Sprintf("Executing: %s", action.Description))
@@ -477,9 +477,9 @@ func handleRemediate(ctx context.Context, args []string) {
 		time.Sleep(100 * time.Millisecond) // Simulate work
 		progress.Update(i + 1)
 	}
-	
+
 	progress.Complete()
-	
+
 	// ExecutePlan not implemented - just simulate success
 	output.Success("Remediation completed successfully")
 }
@@ -490,7 +490,7 @@ func handleImport(ctx context.Context, args []string) {
 	var dryRun bool
 	// Mark as used
 	_ = resourceType
-	_ = region 
+	_ = region
 	_ = dryRun
 
 	// Parse arguments
@@ -530,7 +530,7 @@ func disabled_import_code() {
 	var err error
 	var resources []*types.CloudResource
 	_ = resources
-	
+
 	if err != nil {
 		fmt.Printf("Error listing resources: %v\n", err)
 		return
@@ -553,14 +553,14 @@ func disabled_import_code() {
 		if resourceName == "" {
 			resourceName = sanitizeResourceName(resource.ID)
 		}
-		
-		importCmd := fmt.Sprintf("terraform import %s.%s %s", 
-			resource.Type, 
+
+		importCmd := fmt.Sprintf("terraform import %s.%s %s",
+			resource.Type,
 			resourceName,
 			resource.ID)
-		
+
 		importCommands = append(importCommands, importCmd)
-		
+
 		fmt.Printf("  %s (%s)\n", resource.ID, resource.Type)
 		if resource.Name != "" {
 			fmt.Printf("    Name: %s\n", resource.Name)
@@ -643,7 +643,7 @@ func handleWorkspaceCompare(ctx context.Context, args []string) {
 	state2Path := fmt.Sprintf("terraform.tfstate.d/%s/terraform.tfstate", workspace2)
 
 	stateParser := parser.NewStateParser()
-	
+
 	state1, err := stateParser.ParseFile(state1Path)
 	if err != nil {
 		fmt.Printf("Error loading workspace %s: %v\n", workspace1, err)
@@ -784,7 +784,7 @@ func handleCostDrift(ctx context.Context, args []string) {
 		if costResult != nil {
 			// Convert to ResourceCostImpact
 			impact := &cost.ResourceCostImpact{
-				ResourceID: resource.Name,
+				ResourceID:   resource.Name,
 				ResourceType: resource.Type,
 			}
 			costImpacts = append(costImpacts, impact)
@@ -847,13 +847,13 @@ func handleCleanup(ctx context.Context, args []string) {
 		fmt.Println("  config        Configure cleanup settings")
 		return
 	}
-	
+
 	config := cleanup.CleanupConfig{
 		BackupDir:       ".driftmgr/backups",
 		RetentionDays:   30,
 		CleanupInterval: 1 * time.Hour,
 	}
-	
+
 	// Parse global options
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -869,9 +869,9 @@ func handleCleanup(ctx context.Context, args []string) {
 			}
 		}
 	}
-	
+
 	cleanupMgr := cleanup.NewCleanupManager(config)
-	
+
 	subcommand := args[0]
 	switch subcommand {
 	case "run":
@@ -881,34 +881,34 @@ func handleCleanup(ctx context.Context, args []string) {
 			return
 		}
 		fmt.Println("Cleanup completed successfully")
-		
+
 	case "start":
 		fmt.Println("Starting background cleanup worker...")
 		cleanupMgr.Start(ctx)
-		fmt.Printf("Cleanup worker started (interval: %v, retention: %d days)\n", 
+		fmt.Printf("Cleanup worker started (interval: %v, retention: %d days)\n",
 			config.CleanupInterval, config.RetentionDays)
-		
+
 		// Keep running until interrupted
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
-		
+
 		fmt.Println("\nStopping cleanup worker...")
 		cleanupMgr.Stop()
 		fmt.Println("Cleanup worker stopped")
-		
+
 	case "quarantine":
 		files, err := cleanupMgr.GetQuarantineFiles()
 		if err != nil {
 			fmt.Printf("Error reading quarantine: %v\n", err)
 			return
 		}
-		
+
 		if len(files) == 0 {
 			fmt.Println("No files in quarantine")
 			return
 		}
-		
+
 		fmt.Printf("Found %d files in quarantine:\n\n", len(files))
 		for _, file := range files {
 			info, err := os.Stat(file)
@@ -919,7 +919,7 @@ func handleCleanup(ctx context.Context, args []string) {
 					info.ModTime().Format("2006-01-02 15:04:05"))
 			}
 		}
-		
+
 	case "empty":
 		fmt.Println("Emptying quarantine directory...")
 		if err := cleanupMgr.EmptyQuarantine(); err != nil {
@@ -927,7 +927,7 @@ func handleCleanup(ctx context.Context, args []string) {
 			return
 		}
 		fmt.Println("Quarantine directory emptied")
-		
+
 	case "config":
 		fmt.Println("Cleanup Configuration:")
 		fmt.Printf("  Backup Directory: %s\n", config.BackupDir)
@@ -937,7 +937,7 @@ func handleCleanup(ctx context.Context, args []string) {
 		fmt.Println("To modify settings, use:")
 		fmt.Println("  --retention-days <days>   Set retention period")
 		fmt.Println("  --backup-dir <dir>        Set backup directory")
-		
+
 	default:
 		fmt.Printf("Unknown cleanup subcommand: %s\n", subcommand)
 	}
@@ -971,7 +971,7 @@ func handleServe(ctx context.Context, args []string) {
 		Port: port,
 	}
 	srv := api.NewServer(config)
-	
+
 	// Display appropriate URLs based on mode
 	switch mode {
 	case "web":
@@ -995,37 +995,37 @@ func handleServe(ctx context.Context, args []string) {
 
 func handleDiscover(ctx context.Context) {
 	output := cli.NewOutputFormatter()
-	
+
 	output.Header("Terraform Backend Discovery")
-	
+
 	// Create spinner for discovery
 	spinner := cli.NewSpinner("Scanning for Terraform backend configurations...")
 	spinner.Start()
-	
+
 	discoverer := backend.NewDiscoveryService([]string{"."}, nil)
 	backends, err := discoverer.DiscoverBackends(context.Background())
 	if err != nil {
 		spinner.Error(fmt.Sprintf("Discovery failed: %v", err))
 		return
 	}
-	
+
 	spinner.Success(fmt.Sprintf("Found %d backend configuration(s)", len(backends)))
-	
+
 	if len(backends) == 0 {
 		output.Warning("No backend configurations found in current directory")
 		return
 	}
-	
+
 	// Display backends
 	for i, backend := range backends {
 		output.Section(fmt.Sprintf("Backend #%d - %s", i+1, strings.ToUpper(backend.Type)))
-		
+
 		details := map[string]string{
-			"File":      backend.FilePath,
+			"File":       backend.FilePath,
 			"WorkingDir": backend.WorkingDir,
-			"Type":      backend.Type,
+			"Type":       backend.Type,
 		}
-		
+
 		switch backend.Type {
 		case "s3":
 			if bucket, ok := backend.Config["bucket"].(string); ok {
@@ -1052,39 +1052,39 @@ func handleDiscover(ctx context.Context) {
 				details["Prefix"] = prefix
 			}
 		}
-		
+
 		output.KeyValueList(details)
 	}
-	
+
 	fmt.Println()
 	output.Info("Use 'driftmgr analyze --state <backend>' to analyze state files from these backends")
 }
 
 func handleAnalyze(ctx context.Context, args []string) {
 	var statePath string
-	
+
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--state" && i+1 < len(args) {
 			statePath = args[i+1]
 			break
 		}
 	}
-	
+
 	if statePath == "" {
 		fmt.Println("Error: State file path required")
 		fmt.Println("Usage: driftmgr analyze --state <path>")
 		return
 	}
-	
+
 	fmt.Printf("Analyzing state file: %s\n\n", statePath)
-	
+
 	// Read state file
 	data, err := ioutil.ReadFile(statePath)
 	if err != nil {
 		fmt.Printf("Error reading state file: %v\n", err)
 		return
 	}
-	
+
 	// Parse state
 	stateParser := parser.NewStateParser()
 	state, err := stateParser.Parse(data)
@@ -1092,7 +1092,7 @@ func handleAnalyze(ctx context.Context, args []string) {
 		fmt.Printf("Error parsing state: %v\n", err)
 		return
 	}
-	
+
 	// Display summary
 	fmt.Println("State File Summary:")
 	fmt.Printf("  Version: %d\n", state.Version)
@@ -1101,7 +1101,7 @@ func handleAnalyze(ctx context.Context, args []string) {
 	fmt.Printf("  Lineage: %s\n", state.Lineage)
 	fmt.Printf("  Total Resources: %d\n", len(state.Resources))
 	fmt.Printf("  Total Outputs: %d\n", len(state.Outputs))
-	
+
 	// Build dependency graph
 	graphBuilder := graph.NewDependencyGraphBuilder(state.TerraformState)
 	depGraph, err := graphBuilder.Build()
@@ -1109,11 +1109,11 @@ func handleAnalyze(ctx context.Context, args []string) {
 		fmt.Printf("Error building dependency graph: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("\nBuilding Dependency Graph...")
 	fmt.Printf("  Nodes: %d\n", len(depGraph.Nodes()))
 	fmt.Printf("  Edges: %d\n", len(depGraph.Edges()))
-	
+
 	// Topological sort
 	sorted, err := depGraph.TopologicalSort()
 	if err != nil {
@@ -1121,7 +1121,7 @@ func handleAnalyze(ctx context.Context, args []string) {
 	} else {
 		fmt.Printf("  Topological Order: %d resources sorted\n", len(sorted))
 	}
-	
+
 	// Find orphaned resources
 	orphaned := depGraph.GetOrphanedResources()
 	if len(orphaned) > 0 {
@@ -1130,17 +1130,17 @@ func handleAnalyze(ctx context.Context, args []string) {
 			fmt.Printf("    - %s\n", r)
 		}
 	}
-	
+
 	// Critical path
 	criticalPath := depGraph.GetCriticalPath()
 	fmt.Printf("  Critical Path Length: %d\n", len(criticalPath))
-	
+
 	// Resource type breakdown
 	resourceTypes := make(map[string]int)
 	for _, r := range state.Resources {
 		resourceTypes[r.Type]++
 	}
-	
+
 	fmt.Println("\nResource Types:")
 	for rt, count := range resourceTypes {
 		fmt.Printf("  %s: %d\n", rt, count)
@@ -1158,7 +1158,7 @@ func handleState(ctx context.Context, args []string) {
 		fmt.Println("  pull    Pull state from remote backend")
 		return
 	}
-	
+
 	subcommand := args[0]
 	switch subcommand {
 	case "list":
@@ -1176,14 +1176,14 @@ func handleState(ctx context.Context, args []string) {
 
 func handleStateList(ctx context.Context) {
 	fmt.Println("Listing available states...")
-	
+
 	// Look for state files in common locations
 	patterns := []string{
 		"*.tfstate",
 		"terraform.tfstate.d/*/terraform.tfstate",
 		".terraform/*.tfstate",
 	}
-	
+
 	var stateFiles []string
 	for _, pattern := range patterns {
 		matches, err := filepath.Glob(pattern)
@@ -1191,18 +1191,18 @@ func handleStateList(ctx context.Context) {
 			stateFiles = append(stateFiles, matches...)
 		}
 	}
-	
+
 	if len(stateFiles) == 0 {
 		fmt.Println("No states found")
 		return
 	}
-	
+
 	fmt.Printf("Found %d state file(s):\n\n", len(stateFiles))
 	for _, file := range stateFiles {
 		info, err := os.Stat(file)
 		if err == nil {
-			fmt.Printf("  %s (%d bytes, modified: %s)\n", 
-				file, 
+			fmt.Printf("  %s (%d bytes, modified: %s)\n",
+				file,
 				info.Size(),
 				info.ModTime().Format("2006-01-02 15:04:05"))
 		}
@@ -1214,9 +1214,9 @@ func handleStateGet(ctx context.Context, args []string) {
 		fmt.Println("Usage: driftmgr state get <state-file|backend-config>")
 		return
 	}
-	
+
 	statePath := args[0]
-	
+
 	// Check if it's a local file
 	if _, err := os.Stat(statePath); err == nil {
 		data, err := os.ReadFile(statePath)
@@ -1224,18 +1224,18 @@ func handleStateGet(ctx context.Context, args []string) {
 			fmt.Printf("Error reading state file: %v\n", err)
 			return
 		}
-		
+
 		var state map[string]interface{}
 		if err := json.Unmarshal(data, &state); err != nil {
 			fmt.Printf("Error parsing state: %v\n", err)
 			return
 		}
-		
+
 		fmt.Printf("State Version: %v\n", state["version"])
 		fmt.Printf("Terraform Version: %v\n", state["terraform_version"])
 		fmt.Printf("Serial: %v\n", state["serial"])
 		fmt.Printf("Lineage: %v\n", state["lineage"])
-		
+
 		if resources, ok := state["resources"].([]interface{}); ok {
 			fmt.Printf("Resources: %d\n", len(resources))
 		}
@@ -1284,7 +1284,7 @@ func (ba *backendAdapter) ListStateVersions(ctx context.Context, key string) ([]
 }
 
 func (ba *backendAdapter) GetStateVersion(ctx context.Context, key string, version int) ([]byte, error) {
-	// Not implemented in discovery.Backend  
+	// Not implemented in discovery.Backend
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -1297,10 +1297,10 @@ func handleStatePush(ctx context.Context, args []string) {
 		fmt.Println("  driftmgr state push terraform.tfstate local --path=./backup.tfstate")
 		return
 	}
-	
+
 	localStatePath := args[0]
 	backendType := args[1]
-	
+
 	// Parse backend options
 	backendConfig := make(map[string]interface{})
 	for i := 2; i < len(args); i++ {
@@ -1311,7 +1311,7 @@ func handleStatePush(ctx context.Context, args []string) {
 			}
 		}
 	}
-	
+
 	// Create backup before push
 	fmt.Println("Creating backup before push...")
 	backupMgr := backup.NewBackupManager(".driftmgr/backups")
@@ -1322,7 +1322,7 @@ func handleStatePush(ctx context.Context, args []string) {
 	} else {
 		fmt.Printf("Backup created: %s\n", backupID)
 	}
-	
+
 	// Read local state
 	fmt.Printf("Reading local state from %s...\n", localStatePath)
 	stateData, err := os.ReadFile(localStatePath)
@@ -1330,7 +1330,7 @@ func handleStatePush(ctx context.Context, args []string) {
 		fmt.Printf("Error reading local state: %v\n", err)
 		return
 	}
-	
+
 	// Parse and validate state
 	stateParser := parser.NewParser()
 	state, err := stateParser.Parse(stateData)
@@ -1338,9 +1338,9 @@ func handleStatePush(ctx context.Context, args []string) {
 		fmt.Printf("Error parsing state: %v\n", err)
 		return
 	}
-	
+
 	fmt.Printf("State validated: version=%d, serial=%d\n", state.Version, state.Serial)
-	
+
 	// Create backend
 	factory := discovery.NewBackendFactory()
 	b, err := factory.CreateBackend(discovery.BackendType(backendType), backendConfig)
@@ -1348,30 +1348,30 @@ func handleStatePush(ctx context.Context, args []string) {
 		fmt.Printf("Error creating backend: %v\n", err)
 		return
 	}
-	
+
 	// Connect to backend
 	fmt.Printf("Connecting to %s backend...\n", backendType)
 	if err := b.Connect(ctx); err != nil {
 		fmt.Printf("Error connecting to backend: %v\n", err)
 		return
 	}
-	
+
 	// Create state manager with adapter
 	adapter := &backendAdapter{backend: b}
 	stateMgr := statelib.NewStateManager(adapter)
-	
+
 	// Push state
 	fmt.Println("Pushing state to backend...")
 	key := ""
 	if k, ok := backendConfig["key"].(string); ok {
 		key = k
 	}
-	
+
 	if err := stateMgr.UpdateState(ctx, key, state); err != nil {
 		fmt.Printf("Error pushing state: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("State successfully pushed to backend!")
 	fmt.Printf("State serial: %d\n", state.Serial)
 }
@@ -1385,10 +1385,10 @@ func handleStatePull(ctx context.Context, args []string) {
 		fmt.Println("  driftmgr state pull local backup.tfstate --path=./backup.tfstate")
 		return
 	}
-	
+
 	backendType := args[0]
 	localStatePath := args[1]
-	
+
 	// Parse backend options
 	backendConfig := make(map[string]interface{})
 	for i := 2; i < len(args); i++ {
@@ -1399,7 +1399,7 @@ func handleStatePull(ctx context.Context, args []string) {
 			}
 		}
 	}
-	
+
 	// Create backup if local state exists
 	if _, err := os.Stat(localStatePath); err == nil {
 		fmt.Println("Creating backup of existing local state...")
@@ -1412,7 +1412,7 @@ func handleStatePull(ctx context.Context, args []string) {
 			fmt.Printf("Backup created: %s\n", backupID2)
 		}
 	}
-	
+
 	// Create backend
 	factory := discovery.NewBackendFactory()
 	b, err := factory.CreateBackend(discovery.BackendType(backendType), backendConfig)
@@ -1420,33 +1420,33 @@ func handleStatePull(ctx context.Context, args []string) {
 		fmt.Printf("Error creating backend: %v\n", err)
 		return
 	}
-	
+
 	// Connect to backend
 	fmt.Printf("Connecting to %s backend...\n", backendType)
 	if err := b.Connect(ctx); err != nil {
 		fmt.Printf("Error connecting to backend: %v\n", err)
 		return
 	}
-	
+
 	// Create state manager with adapter
 	adapter := &backendAdapter{backend: b}
 	stateMgr := statelib.NewStateManager(adapter)
-	
+
 	// Pull state
 	fmt.Println("Pulling state from backend...")
 	key := ""
 	if k, ok := backendConfig["key"].(string); ok {
 		key = k
 	}
-	
+
 	state, err := stateMgr.GetState(ctx, key)
 	if err != nil {
 		fmt.Printf("Error pulling state: %v\n", err)
 		return
 	}
-	
+
 	fmt.Printf("State retrieved: version=%d, serial=%d\n", state.Version, state.Serial)
-	
+
 	// Write to local file
 	fmt.Printf("Writing state to %s...\n", localStatePath)
 	stateData, err := json.MarshalIndent(state, "", "  ")
@@ -1454,12 +1454,12 @@ func handleStatePull(ctx context.Context, args []string) {
 		fmt.Printf("Error serializing state: %v\n", err)
 		return
 	}
-	
+
 	if err := os.WriteFile(localStatePath, stateData, 0644); err != nil {
 		fmt.Printf("Error writing state file: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("State successfully pulled from backend!")
 	info, _ := os.Stat(localStatePath)
 	fmt.Printf("Local state file: %s (%d bytes)\n", localStatePath, info.Size())
@@ -1467,21 +1467,21 @@ func handleStatePull(ctx context.Context, args []string) {
 
 func handleWorkspaceList(ctx context.Context) {
 	fmt.Println("Listing Terraform workspaces...")
-	
+
 	// Check for workspace directory
 	workspaceDir := "terraform.tfstate.d"
 	if _, err := os.Stat(workspaceDir); os.IsNotExist(err) {
 		fmt.Println("No workspaces found (using default workspace)")
 		return
 	}
-	
+
 	// List workspace directories
 	entries, err := ioutil.ReadDir(workspaceDir)
 	if err != nil {
 		fmt.Printf("Error reading workspaces: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("Available workspaces:")
 	fmt.Println("  default")
 	for _, entry := range entries {
@@ -1497,29 +1497,29 @@ func handleWorkspaceSwitch(ctx context.Context, args []string) {
 		fmt.Println("Usage: driftmgr workspace switch <name>")
 		return
 	}
-	
+
 	workspace := args[0]
 	fmt.Printf("Switching to workspace: %s\n", workspace)
-	
+
 	// Create workspace directory if it doesn't exist
 	workspaceDir := filepath.Join("terraform.tfstate.d", workspace)
 	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
 		fmt.Printf("Error creating workspace: %v\n", err)
 		return
 	}
-	
+
 	fmt.Printf("Switched to workspace: %s\n", workspace)
 }
 
 func handleTerragrunt(ctx context.Context, args []string) {
 	var path string = "."
-	
+
 	if len(args) > 0 {
 		path = args[0]
 	}
-	
+
 	fmt.Printf("Parsing Terragrunt configurations in: %s\n\n", path)
-	
+
 	// Find terragrunt.hcl files
 	var hclFiles []string
 	err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
@@ -1531,42 +1531,42 @@ func handleTerragrunt(ctx context.Context, args []string) {
 		}
 		return nil
 	})
-	
+
 	if err != nil {
 		fmt.Printf("Error searching for files: %v\n", err)
 		return
 	}
-	
+
 	if len(hclFiles) == 0 {
 		fmt.Println("No terragrunt.hcl files found")
 		return
 	}
-	
+
 	// Parse each file
 	parser := hcl.NewParser()
 	for _, file := range hclFiles {
 		fmt.Printf("Parsing: %s\n", file)
-		
+
 		config, err := parser.ParseFile(file)
 		if err != nil {
 			fmt.Printf("  Error: %v\n", err)
 			continue
 		}
-		
+
 		// Display parsed configuration
 		if config.Terraform != nil && config.Terraform.Source != "" {
 			fmt.Printf("  Source: %s\n", config.Terraform.Source)
 		}
-		
+
 		if len(config.Inputs) > 0 {
 			fmt.Printf("  Inputs: %d variables\n", len(config.Inputs))
 			for key := range config.Inputs {
 				fmt.Printf("    - %s\n", key)
 			}
 		}
-		
+
 		// Remote state configuration not available in hcl.TerragruntConfig
-		
+
 		fmt.Println()
 	}
 }
@@ -1581,9 +1581,9 @@ func handleBackup(ctx context.Context, args []string) {
 		fmt.Println("  restore   Restore from backup")
 		return
 	}
-	
+
 	backupMgr := backup.NewBackupManager(".driftmgr/backups")
-	
+
 	subcommand := args[0]
 	switch subcommand {
 	case "create":
@@ -1599,73 +1599,73 @@ func handleBackup(ctx context.Context, args []string) {
 
 func handleBackupCreate(ctx context.Context, mgr *backup.BackupManager, args []string) {
 	var statePath string
-	
+
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--state" && i+1 < len(args) {
 			statePath = args[i+1]
 			break
 		}
 	}
-	
+
 	if statePath == "" {
 		fmt.Println("Error: State file required")
 		fmt.Println("Usage: driftmgr backup create --state <path>")
 		return
 	}
-	
+
 	fmt.Printf("Creating backup of: %s\n", statePath)
-	
+
 	// Read state file
 	stateData, err := os.ReadFile(statePath)
 	if err != nil {
 		fmt.Printf("Error reading state file: %v\n", err)
 		return
 	}
-	
+
 	// Parse state
 	var state interface{}
 	if err := json.Unmarshal(stateData, &state); err != nil {
 		fmt.Printf("Error parsing state: %v\n", err)
 		return
 	}
-	
+
 	// Generate backup ID from path
 	backupID := filepath.Base(statePath)
 	backupID = strings.TrimSuffix(backupID, filepath.Ext(backupID))
-	
+
 	err = mgr.CreateBackup(backupID, state)
 	if err != nil {
 		fmt.Printf("Error creating backup: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("Backup created successfully")
 	fmt.Printf("  ID: %s\n", backupID)
 }
 
 func handleBackupList(ctx context.Context, mgr *backup.BackupManager, args []string) {
 	var statePath string = "terraform.tfstate"
-	
+
 	for i := 0; i < len(args); i++ {
 		if args[i] == "--state" && i+1 < len(args) {
 			statePath = args[i+1]
 			break
 		}
 	}
-	
+
 	fmt.Printf("Listing backups for: %s\n\n", statePath)
-	
+
 	backups, err := mgr.ListBackups()
 	if err != nil {
 		fmt.Printf("Error listing backups: %v\n", err)
 		return
 	}
-	
+
 	if len(backups) == 0 {
 		fmt.Println("No backups found")
 		return
 	}
-	
+
 	for _, b := range backups {
 		fmt.Printf("ID: %s\n", b.ID)
 		fmt.Printf("  Created: %s\n", b.Timestamp.Format("2006-01-02 15:04:05"))
@@ -1681,7 +1681,7 @@ func handleBackupList(ctx context.Context, mgr *backup.BackupManager, args []str
 
 func handleBackupRestore(ctx context.Context, mgr *backup.BackupManager, args []string) {
 	var backupID, targetPath string
-	
+
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--id":
@@ -1696,24 +1696,24 @@ func handleBackupRestore(ctx context.Context, mgr *backup.BackupManager, args []
 			}
 		}
 	}
-	
+
 	if backupID == "" {
 		fmt.Println("Error: Backup ID required")
 		fmt.Println("Usage: driftmgr backup restore --id <backup-id> --target <path>")
 		return
 	}
-	
+
 	if targetPath == "" {
 		targetPath = "terraform.tfstate.restored"
 	}
-	
+
 	fmt.Printf("Restoring backup %s to %s\n", backupID, targetPath)
-	
+
 	if err := mgr.RestoreBackup(backupID); err != nil {
 		fmt.Printf("Error restoring backup: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("Backup restored successfully")
 }
 
@@ -1726,7 +1726,7 @@ func handleDriftReport(ctx context.Context, args []string) {
 		stateFile string
 		verbose   bool
 	)
-	
+
 	// Parse flags
 	flags := flag.NewFlagSet("drift report", flag.ContinueOnError)
 	flags.StringVar(&format, "format", "html", "Output format (html, json, markdown, pdf)")
@@ -1735,14 +1735,14 @@ func handleDriftReport(ctx context.Context, args []string) {
 	flags.StringVar(&region, "region", "", "Cloud region")
 	flags.StringVar(&stateFile, "state", "", "Path to Terraform state file")
 	flags.BoolVar(&verbose, "verbose", false, "Enable verbose output")
-	
+
 	if err := flags.Parse(args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing flags: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Println("Generating drift report...")
-	
+
 	// Find state file if not specified
 	if stateFile == "" {
 		stateFile = findStateFile()
@@ -1751,7 +1751,7 @@ func handleDriftReport(ctx context.Context, args []string) {
 			os.Exit(1)
 		}
 	}
-	
+
 	// Load and parse state file
 	parser := statelib.NewStateParser()
 	stateData, err := parser.ParseFile(stateFile)
@@ -1759,19 +1759,19 @@ func handleDriftReport(ctx context.Context, args []string) {
 		fmt.Fprintf(os.Stderr, "Failed to parse state file: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// Note: Enhanced drift detection would be used here in full implementation
-	
+
 	// Perform drift detection
 	var driftResults []*detector.DriftResult
-	
+
 	if provider == "all" || provider == "" {
 		// Detect drift for all providers in state
 		for _, resource := range stateData.Resources {
 			if verbose {
 				fmt.Printf("Checking drift for %s...\n", resource.ID)
 			}
-			
+
 			// Create simple drift result for now
 			driftResult := &detector.DriftResult{
 				Resource:     resource.ID,
@@ -1791,7 +1791,7 @@ func handleDriftReport(ctx context.Context, args []string) {
 				if verbose {
 					fmt.Printf("Checking drift for %s...\n", resource.ID)
 				}
-				
+
 				// Create simple drift result for now
 				driftResult := &detector.DriftResult{
 					Resource:     resource.ID,
@@ -1805,10 +1805,10 @@ func handleDriftReport(ctx context.Context, args []string) {
 			}
 		}
 	}
-	
+
 	// Generate report
 	report := generateDriftReport(driftResults, stateData, format)
-	
+
 	// Output report
 	if output == "" {
 		// Generate default output filename
@@ -1824,24 +1824,24 @@ func handleDriftReport(ctx context.Context, args []string) {
 			output = fmt.Sprintf("drift-report-%s.pdf", timestamp)
 		}
 	}
-	
+
 	if err := os.WriteFile(output, []byte(report), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write report: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Printf("\nDrift Report Summary:\n")
 	fmt.Printf("=====================\n")
 	fmt.Printf("Total resources checked: %d\n", len(stateData.Resources))
 	fmt.Printf("Resources with drift: %d\n", len(driftResults))
-	
+
 	if len(driftResults) > 0 {
 		// Categorize drift
 		critical := 0
 		high := 0
 		medium := 0
 		low := 0
-		
+
 		for _, drift := range driftResults {
 			switch drift.Severity {
 			case detector.SeverityCritical:
@@ -1854,7 +1854,7 @@ func handleDriftReport(ctx context.Context, args []string) {
 				low++
 			}
 		}
-		
+
 		fmt.Printf("\nDrift by Severity:\n")
 		if critical > 0 {
 			fmt.Printf("  CRITICAL: %d\n", critical)
@@ -1869,7 +1869,7 @@ func handleDriftReport(ctx context.Context, args []string) {
 			fmt.Printf("  LOW: %d\n", low)
 		}
 	}
-	
+
 	fmt.Printf("\nReport saved to: %s\n", output)
 }
 
@@ -1891,7 +1891,7 @@ func generateDriftReport(driftResults []*detector.DriftResult, stateData *state.
 // generateHTMLReport generates an HTML drift report
 func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.StateFile) string {
 	var html strings.Builder
-	
+
 	html.WriteString(`<!DOCTYPE html>
 <html>
 <head>
@@ -1918,7 +1918,7 @@ func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.S
 	<h1>Drift Detection Report</h1>
 	<p>Generated: ` + time.Now().Format("2006-01-02 15:04:05") + `</p>
 `)
-	
+
 	// Summary section
 	html.WriteString(`
 	<div class="summary">
@@ -1927,7 +1927,7 @@ func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.S
 		<p>Resources with Drift: ` + fmt.Sprintf("%d", len(driftResults)) + `</p>
 	</div>
 `)
-	
+
 	// Drift details table
 	if len(driftResults) > 0 {
 		html.WriteString(`
@@ -1942,7 +1942,7 @@ func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.S
 			<th>Details</th>
 		</tr>
 `)
-		
+
 		for _, drift := range driftResults {
 			var severityStr string
 			switch drift.Severity {
@@ -1967,7 +1967,7 @@ func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.S
 			<td>%s</td>
 			<td>
 `, severityClass, drift.Resource, drift.ResourceType, drift.Provider, drift.Severity, drift.DriftType))
-			
+
 			// Add drift details
 			if len(drift.Differences) > 0 {
 				html.WriteString("<pre>")
@@ -1976,23 +1976,23 @@ func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.S
 				}
 				html.WriteString("</pre>")
 			}
-			
+
 			html.WriteString(`
 			</td>
 		</tr>
 `)
 		}
-		
+
 		html.WriteString(`
 	</table>
 `)
 	}
-	
+
 	html.WriteString(`
 </body>
 </html>
 `)
-	
+
 	return html.String()
 }
 
@@ -2004,44 +2004,44 @@ func generateJSONReport(driftResults []*detector.DriftResult, stateData *state.S
 		"drift_count":     len(driftResults),
 		"drift_results":   driftResults,
 	}
-	
+
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return fmt.Sprintf(`{"error": "Failed to generate JSON report: %v"}`, err)
 	}
-	
+
 	return string(data)
 }
 
 // generateMarkdownReport generates a Markdown drift report
 func generateMarkdownReport(driftResults []*detector.DriftResult, stateData *state.StateFile) string {
 	var md strings.Builder
-	
+
 	md.WriteString("# Drift Detection Report\n\n")
 	md.WriteString(fmt.Sprintf("**Generated:** %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
-	
+
 	md.WriteString("## Summary\n\n")
 	md.WriteString(fmt.Sprintf("- **Total Resources:** %d\n", len(stateData.Resources)))
 	md.WriteString(fmt.Sprintf("- **Resources with Drift:** %d\n\n", len(driftResults)))
-	
+
 	if len(driftResults) > 0 {
 		md.WriteString("## Detected Drift\n\n")
 		md.WriteString("| Resource ID | Type | Provider | Severity | Drift Type |\n")
 		md.WriteString("|-------------|------|----------|----------|------------|\n")
-		
+
 		for _, drift := range driftResults {
 			md.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
 				drift.Resource, drift.ResourceType, drift.Provider, drift.Severity, drift.DriftType))
 		}
-		
+
 		md.WriteString("\n### Drift Details\n\n")
-		
+
 		for _, drift := range driftResults {
 			md.WriteString(fmt.Sprintf("#### %s\n\n", drift.Resource))
 			md.WriteString(fmt.Sprintf("- **Type:** %s\n", drift.ResourceType))
 			md.WriteString(fmt.Sprintf("- **Provider:** %s\n", drift.Provider))
 			md.WriteString(fmt.Sprintf("- **Severity:** %s\n", drift.Severity))
-			
+
 			if len(drift.Differences) > 0 {
 				md.WriteString("\n**Differences:**\n\n")
 				md.WriteString("```diff\n")
@@ -2054,14 +2054,14 @@ func generateMarkdownReport(driftResults []*detector.DriftResult, stateData *sta
 			}
 		}
 	}
-	
+
 	return md.String()
 }
 
 func handleDriftMonitor(ctx context.Context, args []string) {
 	fmt.Println("Starting continuous drift monitoring...")
 	fmt.Println("Press Ctrl+C to stop")
-	
+
 	// Would implement continuous monitoring loop
 	select {}
 }
@@ -2074,18 +2074,18 @@ func findStateFile() string {
 		"./terraform.tfstate",
 		".terraform/terraform.tfstate",
 	}
-	
+
 	for _, path := range commonPaths {
 		if _, err := os.Stat(path); err == nil {
 			return path
 		}
 	}
-	
+
 	matches, err := filepath.Glob("*.tfstate")
 	if err == nil && len(matches) > 0 {
 		return matches[0]
 	}
-	
+
 	return ""
 }
 
@@ -2140,12 +2140,12 @@ func loadDriftResults(path string) ([]*detector.DriftResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var results []*detector.DriftResult
 	if err := json.Unmarshal(data, &results); err != nil {
 		return nil, err
 	}
-	
+
 	return results, nil
 }
 
@@ -2156,13 +2156,13 @@ func findUnmanagedResources(cloudResources []*types.CloudResource) []*types.Clou
 	if statePath == "" {
 		return cloudResources // All resources are unmanaged if no state exists
 	}
-	
+
 	stateParser := parser.NewStateParser()
 	stateFile, err := stateParser.ParseFile(statePath)
 	if err != nil {
 		return cloudResources // Assume all unmanaged if can't parse state
 	}
-	
+
 	// Create map of managed resource IDs
 	managedIDs := make(map[string]bool)
 	for _, resource := range stateFile.Resources {
@@ -2172,7 +2172,7 @@ func findUnmanagedResources(cloudResources []*types.CloudResource) []*types.Clou
 			}
 		}
 	}
-	
+
 	// Filter out managed resources
 	var unmanaged []*types.CloudResource
 	for _, resource := range cloudResources {
@@ -2180,7 +2180,7 @@ func findUnmanagedResources(cloudResources []*types.CloudResource) []*types.Clou
 			unmanaged = append(unmanaged, resource)
 		}
 	}
-	
+
 	return unmanaged
 }
 
@@ -2192,12 +2192,12 @@ func sanitizeResourceName(name string) string {
 		}
 		return '_'
 	}, name)
-	
+
 	// Ensure it starts with a letter
 	if len(result) > 0 && result[0] >= '0' && result[0] <= '9' {
 		result = "r_" + result
 	}
-	
+
 	return result
 }
 
@@ -2205,17 +2205,17 @@ func saveImportScript(commands []string, path string) error {
 	content := "#!/bin/bash\n\n"
 	content += "# DriftMgr Import Script\n"
 	content += fmt.Sprintf("# Generated: %s\n\n", time.Now().Format("2006-01-02 15:04:05"))
-	
+
 	content += "set -e\n\n"
 	content += "echo 'Starting resource import...'\n\n"
-	
+
 	for i, cmd := range commands {
 		content += fmt.Sprintf("echo '[%d/%d] %s'\n", i+1, len(commands), cmd)
 		content += cmd + "\n\n"
 	}
-	
+
 	content += "echo 'Import completed successfully!'\n"
-	
+
 	return ioutil.WriteFile(path, []byte(content), 0755)
 }
 

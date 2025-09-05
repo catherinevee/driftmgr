@@ -184,8 +184,8 @@ func (s *AzureSimulator) simulateNSGRuleDrift(ctx context.Context, resource *sta
 
 	rule := map[string]interface{}{
 		"properties": map[string]interface{}{
-			"description":               "DriftSimulation - Test rule",
-			"protocol":                  "Tcp",
+			"description":              "DriftSimulation - Test rule",
+			"protocol":                 "Tcp",
 			"sourcePortRange":          "*",
 			"destinationPortRange":     "8443",
 			"sourceAddressPrefix":      "192.0.2.0/32", // TEST-NET-1
@@ -237,7 +237,7 @@ func (s *AzureSimulator) simulateResourceCreation(ctx context.Context, resource 
 	// Create a resource group with auto-delete tag
 	rgName := fmt.Sprintf("drift-simulation-%d", time.Now().Unix())
 	location := "eastus"
-	
+
 	apiURL := fmt.Sprintf("https://management.azure.com/subscriptions/%s/resourceGroups/%s?api-version=2021-04-01",
 		s.subscriptionID, rgName)
 
@@ -386,7 +386,7 @@ func (s *AzureSimulator) checkUnmanagedResources(ctx context.Context, state *sta
 
 	// List all resource groups
 	apiURL := fmt.Sprintf("https://management.azure.com/subscriptions/%s/resourceGroups?api-version=2021-04-01", s.subscriptionID)
-	
+
 	response, err := s.makeAPICall(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return drifts
@@ -513,7 +513,7 @@ func (s *AzureSimulator) getAccessToken() (string, error) {
 func (s *AzureSimulator) makeAPICall(ctx context.Context, method, url string, body interface{}) ([]byte, error) {
 	var bodyData []byte
 	var err error
-	
+
 	if body != nil {
 		bodyData, err = json.Marshal(body)
 		if err != nil {

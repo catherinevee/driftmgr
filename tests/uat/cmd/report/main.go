@@ -60,7 +60,7 @@ func main() {
 	}
 
 	fmt.Printf("UAT report generated: %s\n", *outputPath)
-	
+
 	// Print summary
 	passed, failed := countResults(events)
 	fmt.Printf("Results: %d passed, %d failed\n", passed, failed)
@@ -71,7 +71,7 @@ func main() {
 
 func countResults(events []TestEvent) (passed, failed int) {
 	testResults := make(map[string]string)
-	
+
 	for _, event := range events {
 		if event.Test != "" {
 			switch event.Action {
@@ -82,7 +82,7 @@ func countResults(events []TestEvent) (passed, failed int) {
 			}
 		}
 	}
-	
+
 	for _, result := range testResults {
 		if result == "pass" {
 			passed++
@@ -90,13 +90,13 @@ func countResults(events []TestEvent) (passed, failed int) {
 			failed++
 		}
 	}
-	
+
 	return passed, failed
 }
 
 func generateHTMLReport(events []TestEvent, persona string) string {
 	var sb strings.Builder
-	
+
 	sb.WriteString(`<!DOCTYPE html>
 <html>
 <head>
@@ -217,7 +217,7 @@ func generateHTMLReport(events []TestEvent, persona string) string {
 		status := "pending"
 		var output strings.Builder
 		var elapsed float64
-		
+
 		for _, event := range testEvents {
 			if event.Action == "pass" || event.Action == "fail" {
 				status = event.Action
@@ -227,7 +227,7 @@ func generateHTMLReport(events []TestEvent, persona string) string {
 				output.WriteString(event.Output)
 			}
 		}
-		
+
 		sb.WriteString(`<div class="test ` + status + `">`)
 		sb.WriteString(`<h3>` + testName + ` <span style="float: right; font-size: 14px;">`)
 		if status == "pass" {
@@ -239,7 +239,7 @@ func generateHTMLReport(events []TestEvent, persona string) string {
 			sb.WriteString(fmt.Sprintf(` (%.2fs)`, elapsed))
 		}
 		sb.WriteString(`</span></h3>`)
-		
+
 		if output.Len() > 0 {
 			sb.WriteString(`<div class="output">` + strings.TrimSpace(output.String()) + `</div>`)
 		}

@@ -23,7 +23,7 @@ func main() {
 	}
 
 	analyzer := quality.NewAnalyzer(*projectPath)
-	
+
 	// Run analysis
 	results, err := analyzer.AnalyzeProject()
 	if err != nil {
@@ -35,17 +35,17 @@ func main() {
 		"timestamp": time.Now().Format(time.RFC3339),
 		"project":   *projectPath,
 		"summary": map[string]interface{}{
-			"quality_score":      calculateQualityScore(results),
-			"total_files":        results.TotalFiles,
-			"total_lines":        results.TotalLines,
-			"avg_complexity":     results.AvgComplexity,
-			"max_complexity":     results.MaxComplexity,
-			"complex_files":      len(results.ComplexFunctions),
-			"test_coverage":      85.0, // Mock for now
-			"doc_coverage":       75.0, // Mock for now
+			"quality_score":  calculateQualityScore(results),
+			"total_files":    results.TotalFiles,
+			"total_lines":    results.TotalLines,
+			"avg_complexity": results.AvgComplexity,
+			"max_complexity": results.MaxComplexity,
+			"complex_files":  len(results.ComplexFunctions),
+			"test_coverage":  85.0, // Mock for now
+			"doc_coverage":   75.0, // Mock for now
 		},
 		"metrics": results,
-		"issues": results.Issues,
+		"issues":  results.Issues,
 	}
 
 	// Write output

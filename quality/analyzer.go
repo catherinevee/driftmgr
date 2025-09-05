@@ -18,27 +18,27 @@ type Analyzer struct {
 
 // Thresholds defines quality thresholds
 type Thresholds struct {
-	CyclomaticComplexity  int
-	CognitiveComplexity   int
-	MaxFileLines          int
-	MaxFunctionLines      int
-	MaxFunctionArguments  int
-	MaxNestingDepth       int
-	MinTestCoverage       float64
-	MaxDuplication        float64
+	CyclomaticComplexity int
+	CognitiveComplexity  int
+	MaxFileLines         int
+	MaxFunctionLines     int
+	MaxFunctionArguments int
+	MaxNestingDepth      int
+	MinTestCoverage      float64
+	MaxDuplication       float64
 }
 
 // DefaultThresholds returns recommended thresholds
 func DefaultThresholds() Thresholds {
 	return Thresholds{
-		CyclomaticComplexity:  10,
-		CognitiveComplexity:   15,
-		MaxFileLines:          500,
-		MaxFunctionLines:      50,
-		MaxFunctionArguments:  5,
-		MaxNestingDepth:       4,
-		MinTestCoverage:       80.0,
-		MaxDuplication:        5.0,
+		CyclomaticComplexity: 10,
+		CognitiveComplexity:  15,
+		MaxFileLines:         500,
+		MaxFunctionLines:     50,
+		MaxFunctionArguments: 5,
+		MaxNestingDepth:      4,
+		MinTestCoverage:      80.0,
+		MaxDuplication:       5.0,
 	}
 }
 
@@ -52,13 +52,13 @@ func NewAnalyzer(projectRoot string) *Analyzer {
 
 // AnalysisResults contains project-wide analysis results
 type AnalysisResults struct {
-	TotalFiles        int
-	TotalLines        int
-	TotalFunctions    int
-	AvgComplexity     float64
-	MaxComplexity     int
-	ComplexFunctions  []ComplexFunction
-	Issues            []Issue
+	TotalFiles       int
+	TotalLines       int
+	TotalFunctions   int
+	AvgComplexity    float64
+	MaxComplexity    int
+	ComplexFunctions []ComplexFunction
+	Issues           []Issue
 }
 
 // ComplexFunction represents a function with high complexity
@@ -71,11 +71,11 @@ type ComplexFunction struct {
 
 // Issue represents a quality issue
 type Issue struct {
-	File        string
-	Line        int
-	Type        string
-	Message     string
-	Severity    string
+	File     string
+	Line     int
+	Type     string
+	Message  string
+	Severity string
 }
 
 // FileMetrics contains metrics for a single file
@@ -105,13 +105,13 @@ type FunctionMetrics struct {
 
 // Violation represents a quality violation
 type Violation struct {
-	Type        string
-	Severity    string
-	File        string
-	Line        int
-	Column      int
-	Message     string
-	Suggestion  string
+	Type       string
+	Severity   string
+	File       string
+	Line       int
+	Column     int
+	Message    string
+	Suggestion string
 }
 
 // AnalyzeFile analyzes a single Go file
@@ -220,11 +220,11 @@ func (v *astVisitor) checkFunctionViolations(fm *FunctionMetrics, fn *ast.FuncDe
 	// Check function length
 	if fm.Lines > v.thresholds.MaxFunctionLines {
 		v.metrics.Violations = append(v.metrics.Violations, Violation{
-			Type:     "function_too_long",
-			Severity: "warning",
-			File:     v.metrics.Path,
-			Line:     pos.Line,
-			Message:  fmt.Sprintf("Function %s has %d lines, max is %d", fm.Name, fm.Lines, v.thresholds.MaxFunctionLines),
+			Type:       "function_too_long",
+			Severity:   "warning",
+			File:       v.metrics.Path,
+			Line:       pos.Line,
+			Message:    fmt.Sprintf("Function %s has %d lines, max is %d", fm.Name, fm.Lines, v.thresholds.MaxFunctionLines),
 			Suggestion: "Consider breaking this function into smaller functions",
 		})
 	}
@@ -232,11 +232,11 @@ func (v *astVisitor) checkFunctionViolations(fm *FunctionMetrics, fn *ast.FuncDe
 	// Check arguments
 	if fm.Arguments > v.thresholds.MaxFunctionArguments {
 		v.metrics.Violations = append(v.metrics.Violations, Violation{
-			Type:     "too_many_arguments",
-			Severity: "warning",
-			File:     v.metrics.Path,
-			Line:     pos.Line,
-			Message:  fmt.Sprintf("Function %s has %d arguments, max is %d", fm.Name, fm.Arguments, v.thresholds.MaxFunctionArguments),
+			Type:       "too_many_arguments",
+			Severity:   "warning",
+			File:       v.metrics.Path,
+			Line:       pos.Line,
+			Message:    fmt.Sprintf("Function %s has %d arguments, max is %d", fm.Name, fm.Arguments, v.thresholds.MaxFunctionArguments),
 			Suggestion: "Consider using a struct for parameters",
 		})
 	}
@@ -244,11 +244,11 @@ func (v *astVisitor) checkFunctionViolations(fm *FunctionMetrics, fn *ast.FuncDe
 	// Check complexity
 	if fm.CyclomaticComplexity > v.thresholds.CyclomaticComplexity {
 		v.metrics.Violations = append(v.metrics.Violations, Violation{
-			Type:     "high_complexity",
-			Severity: "error",
-			File:     v.metrics.Path,
-			Line:     pos.Line,
-			Message:  fmt.Sprintf("Function %s has cyclomatic complexity %d, max is %d", fm.Name, fm.CyclomaticComplexity, v.thresholds.CyclomaticComplexity),
+			Type:       "high_complexity",
+			Severity:   "error",
+			File:       v.metrics.Path,
+			Line:       pos.Line,
+			Message:    fmt.Sprintf("Function %s has cyclomatic complexity %d, max is %d", fm.Name, fm.CyclomaticComplexity, v.thresholds.CyclomaticComplexity),
 			Suggestion: "Simplify the logic or extract helper functions",
 		})
 	}
@@ -258,29 +258,29 @@ func (v *astVisitor) checkFunctionViolations(fm *FunctionMetrics, fn *ast.FuncDe
 func (a *Analyzer) AnalyzeProject() (*AnalysisResults, error) {
 	results := &AnalysisResults{
 		ComplexFunctions: []ComplexFunction{},
-		Issues:          []Issue{},
+		Issues:           []Issue{},
 	}
-	
+
 	err := filepath.Walk(a.projectRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Skip vendor and test files
 		if strings.Contains(path, "vendor") || strings.Contains(path, ".git") {
 			return nil
 		}
-		
+
 		if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
 			fileMetrics, err := a.AnalyzeFile(path)
 			if err != nil {
 				return err
 			}
-			
+
 			results.TotalFiles++
 			results.TotalLines += fileMetrics.Lines
 			results.TotalFunctions += len(fileMetrics.Functions)
-			
+
 			// Track complex functions
 			for _, fn := range fileMetrics.Functions {
 				if fn.CyclomaticComplexity > a.thresholds.CyclomaticComplexity {
@@ -291,12 +291,12 @@ func (a *Analyzer) AnalyzeProject() (*AnalysisResults, error) {
 						Line:       fn.LineNumber,
 					})
 				}
-				
+
 				if fn.CyclomaticComplexity > results.MaxComplexity {
 					results.MaxComplexity = fn.CyclomaticComplexity
 				}
 			}
-			
+
 			// Track issues
 			for _, violation := range fileMetrics.Violations {
 				results.Issues = append(results.Issues, Issue{
@@ -308,14 +308,14 @@ func (a *Analyzer) AnalyzeProject() (*AnalysisResults, error) {
 				})
 			}
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Calculate average complexity
 	if results.TotalFunctions > 0 {
 		totalComplexity := 0
@@ -324,7 +324,7 @@ func (a *Analyzer) AnalyzeProject() (*AnalysisResults, error) {
 		}
 		results.AvgComplexity = float64(totalComplexity) / float64(results.TotalFunctions)
 	}
-	
+
 	return results, nil
 }
 
@@ -332,11 +332,11 @@ func (a *Analyzer) checkFileViolations(metrics *FileMetrics) {
 	// Check file length
 	if metrics.Lines > a.thresholds.MaxFileLines {
 		metrics.Violations = append(metrics.Violations, Violation{
-			Type:     "file_too_long",
-			Severity: "warning",
-			File:     metrics.Path,
-			Line:     1,
-			Message:  fmt.Sprintf("File has %d lines, max is %d", metrics.Lines, a.thresholds.MaxFileLines),
+			Type:       "file_too_long",
+			Severity:   "warning",
+			File:       metrics.Path,
+			Line:       1,
+			Message:    fmt.Sprintf("File has %d lines, max is %d", metrics.Lines, a.thresholds.MaxFileLines),
 			Suggestion: "Consider splitting into multiple files",
 		})
 	}
@@ -364,7 +364,7 @@ func countArguments(fn *ast.FuncDecl) int {
 	if fn.Type.Params == nil {
 		return 0
 	}
-	
+
 	count := 0
 	for _, field := range fn.Type.Params.List {
 		if field.Names == nil {
@@ -378,7 +378,7 @@ func countArguments(fn *ast.FuncDecl) int {
 
 func calculateCyclomaticComplexity(fn *ast.FuncDecl) int {
 	complexity := 1 // Base complexity
-	
+
 	ast.Inspect(fn, func(n ast.Node) bool {
 		switch n.(type) {
 		case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt:
@@ -390,7 +390,7 @@ func calculateCyclomaticComplexity(fn *ast.FuncDecl) int {
 		}
 		return true
 	})
-	
+
 	return complexity
 }
 
@@ -411,21 +411,21 @@ func (v *cognitiveVisitor) Visit(node ast.Node) ast.Visitor {
 		v.complexity += 1 + v.nesting
 		v.nesting++
 		defer func() { v.nesting-- }()
-		
+
 	case *ast.ForStmt, *ast.RangeStmt:
 		v.complexity += 1 + v.nesting
 		v.nesting++
 		defer func() { v.nesting-- }()
-		
+
 	case *ast.SwitchStmt, *ast.TypeSwitchStmt:
 		v.complexity++
-		
+
 	case *ast.BinaryExpr:
 		if n.Op == token.LAND || n.Op == token.LOR {
 			v.complexity++
 		}
 	}
-	
+
 	return v
 }
 

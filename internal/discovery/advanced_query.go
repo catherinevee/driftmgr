@@ -21,12 +21,12 @@ type AdvancedQuery struct {
 
 // QueryResult represents the result of a query
 type QueryResult struct {
-	Query      string
-	Resources  []models.Resource
-	Count      int
+	Query         string
+	Resources     []models.Resource
+	Count         int
 	ExecutionTime time.Duration
-	Timestamp  time.Time
-	Cached     bool
+	Timestamp     time.Time
+	Cached        bool
 }
 
 // QueryFilter defines filter criteria
@@ -38,13 +38,13 @@ type QueryFilter struct {
 
 // QueryOptions defines query options
 type QueryOptions struct {
-	Filters    []QueryFilter
-	SortBy     string
-	SortOrder  string // "asc" or "desc"
-	Limit      int
-	Offset     int
-	GroupBy    string
-	Aggregate  string // "count", "sum", "avg", "min", "max"
+	Filters   []QueryFilter
+	SortBy    string
+	SortOrder string // "asc" or "desc"
+	Limit     int
+	Offset    int
+	GroupBy   string
+	Aggregate string // "count", "sum", "avg", "min", "max"
 }
 
 // NewAdvancedQuery creates a new advanced query engine
@@ -87,10 +87,10 @@ func (aq *AdvancedQuery) AddResource(resource models.Resource) {
 // Query performs a query with the given options
 func (aq *AdvancedQuery) Query(options QueryOptions) *QueryResult {
 	startTime := time.Now()
-	
+
 	// Generate cache key
 	cacheKey := aq.generateCacheKey(options)
-	
+
 	// Check cache
 	aq.mu.RLock()
 	if cached, exists := aq.queryCache[cacheKey]; exists {
@@ -104,7 +104,7 @@ func (aq *AdvancedQuery) Query(options QueryOptions) *QueryResult {
 
 	// Execute query
 	results := aq.executeQuery(options)
-	
+
 	// Cache result
 	queryResult := &QueryResult{
 		Query:         cacheKey,
@@ -114,31 +114,31 @@ func (aq *AdvancedQuery) Query(options QueryOptions) *QueryResult {
 		Timestamp:     time.Now(),
 		Cached:        false,
 	}
-	
+
 	aq.mu.Lock()
 	aq.queryCache[cacheKey] = queryResult
 	aq.mu.Unlock()
-	
+
 	return queryResult
 }
 
 // QueryByJMESPath performs a JMESPath-like query
 func (aq *AdvancedQuery) QueryByJMESPath(expression string) *QueryResult {
 	startTime := time.Now()
-	
+
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
-	
+
 	results := make([]models.Resource, 0)
-	
+
 	// Simple JMESPath-like implementation
 	// Examples: "resources[?provider=='aws']", "resources[?region=='us-east-1' && type=='ec2_instance']"
-	
+
 	if strings.HasPrefix(expression, "resources[?") && strings.HasSuffix(expression, "]") {
 		condition := expression[11 : len(expression)-1]
 		results = aq.evaluateCondition(condition)
 	}
-	
+
 	return &QueryResult{
 		Query:         expression,
 		Resources:     results,
@@ -152,15 +152,15 @@ func (aq *AdvancedQuery) QueryByJMESPath(expression string) *QueryResult {
 // QueryBySQL performs a SQL-like query
 func (aq *AdvancedQuery) QueryBySQL(sql string) *QueryResult {
 	startTime := time.Now()
-	
+
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
-	
+
 	results := make([]models.Resource, 0)
-	
+
 	// Simple SQL-like parser
 	// Example: "SELECT * FROM resources WHERE provider = 'aws' AND region = 'us-east-1'"
-	
+
 	sql = strings.ToLower(sql)
 	if strings.Contains(sql, "where") {
 		parts := strings.Split(sql, "where")
@@ -171,7 +171,7 @@ func (aq *AdvancedQuery) QueryBySQL(sql string) *QueryResult {
 	} else if strings.Contains(sql, "select * from resources") {
 		results = aq.resources
 	}
-	
+
 	return &QueryResult{
 		Query:         sql,
 		Resources:     results,
@@ -186,9 +186,9 @@ func (aq *AdvancedQuery) QueryBySQL(sql string) *QueryResult {
 func (aq *AdvancedQuery) FindByTags(tags map[string]string) []models.Resource {
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
-	
+
 	results := make([]models.Resource, 0)
-	
+
 	for _, resource := range aq.resources {
 		matches := true
 		if resourceTags, ok := resource.Tags.(map[string]string); ok {
@@ -205,7 +205,7 @@ func (aq *AdvancedQuery) FindByTags(tags map[string]string) []models.Resource {
 			results = append(results, resource)
 		}
 	}
-	
+
 	return results
 }
 
@@ -213,21 +213,21 @@ func (aq *AdvancedQuery) FindByTags(tags map[string]string) []models.Resource {
 func (aq *AdvancedQuery) FindByRegex(field, pattern string) []models.Resource {
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
-	
+
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return []models.Resource{}
 	}
-	
+
 	results := make([]models.Resource, 0)
-	
+
 	for _, resource := range aq.resources {
 		value := aq.getFieldValue(resource, field)
 		if regex.MatchString(value) {
 			results = append(results, resource)
 		}
 	}
-	
+
 	return results
 }
 
@@ -235,14 +235,14 @@ func (aq *AdvancedQuery) FindByRegex(field, pattern string) []models.Resource {
 func (aq *AdvancedQuery) GroupBy(field string) map[string][]models.Resource {
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
-	
+
 	groups := make(map[string][]models.Resource)
-	
+
 	for _, resource := range aq.resources {
 		value := aq.getFieldValue(resource, field)
 		groups[value] = append(groups[value], resource)
 	}
-	
+
 	return groups
 }
 
@@ -250,7 +250,7 @@ func (aq *AdvancedQuery) GroupBy(field string) map[string][]models.Resource {
 func (aq *AdvancedQuery) Aggregate(field, operation string) interface{} {
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
-	
+
 	switch operation {
 	case "count":
 		return len(aq.resources)
@@ -277,13 +277,13 @@ func (aq *AdvancedQuery) Aggregate(field, operation string) interface{} {
 func (aq *AdvancedQuery) GetStatistics() map[string]interface{} {
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
-	
+
 	stats := map[string]interface{}{
 		"total_resources": len(aq.resources),
 		"indexed_fields":  len(aq.indexes),
 		"cached_queries":  len(aq.queryCache),
 	}
-	
+
 	// Calculate cache hit rate
 	hits := 0
 	total := 0
@@ -293,11 +293,11 @@ func (aq *AdvancedQuery) GetStatistics() map[string]interface{} {
 			hits++
 		}
 	}
-	
+
 	if total > 0 {
 		stats["cache_hit_rate"] = float64(hits) / float64(total)
 	}
-	
+
 	return stats
 }
 
@@ -319,34 +319,34 @@ func (aq *AdvancedQuery) updateIndex(field, value string, index int) {
 
 func (aq *AdvancedQuery) generateCacheKey(options QueryOptions) string {
 	parts := make([]string, 0)
-	
+
 	for _, filter := range options.Filters {
 		parts = append(parts, fmt.Sprintf("%s%s%v", filter.Field, filter.Operator, filter.Value))
 	}
-	
+
 	if options.SortBy != "" {
 		parts = append(parts, fmt.Sprintf("sort:%s:%s", options.SortBy, options.SortOrder))
 	}
-	
+
 	if options.Limit > 0 {
 		parts = append(parts, fmt.Sprintf("limit:%d", options.Limit))
 	}
-	
+
 	if options.Offset > 0 {
 		parts = append(parts, fmt.Sprintf("offset:%d", options.Offset))
 	}
-	
+
 	return strings.Join(parts, "|")
 }
 
 func (aq *AdvancedQuery) executeQuery(options QueryOptions) []models.Resource {
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
-	
+
 	// Start with all resources
 	results := make([]models.Resource, len(aq.resources))
 	copy(results, aq.resources)
-	
+
 	// Apply filters
 	for _, filter := range options.Filters {
 		filtered := make([]models.Resource, 0)
@@ -357,23 +357,23 @@ func (aq *AdvancedQuery) executeQuery(options QueryOptions) []models.Resource {
 		}
 		results = filtered
 	}
-	
+
 	// Apply limit and offset
 	if options.Offset > 0 && options.Offset < len(results) {
 		results = results[options.Offset:]
 	}
-	
+
 	if options.Limit > 0 && options.Limit < len(results) {
 		results = results[:options.Limit]
 	}
-	
+
 	return results
 }
 
 func (aq *AdvancedQuery) matchesFilter(resource models.Resource, filter QueryFilter) bool {
 	value := aq.getFieldValue(resource, filter.Field)
 	filterValue := fmt.Sprintf("%v", filter.Value)
-	
+
 	switch filter.Operator {
 	case "=", "==":
 		return value == filterValue
@@ -422,10 +422,10 @@ func (aq *AdvancedQuery) getFieldValue(resource models.Resource, field string) s
 
 func (aq *AdvancedQuery) evaluateCondition(condition string) []models.Resource {
 	results := make([]models.Resource, 0)
-	
+
 	// Parse simple conditions like "provider=='aws' && region=='us-east-1'"
 	parts := strings.Split(condition, "&&")
-	
+
 	for _, resource := range aq.resources {
 		matches := true
 		for _, part := range parts {
@@ -439,7 +439,7 @@ func (aq *AdvancedQuery) evaluateCondition(condition string) []models.Resource {
 			results = append(results, resource)
 		}
 	}
-	
+
 	return results
 }
 
@@ -458,10 +458,10 @@ func (aq *AdvancedQuery) evaluateSimpleCondition(resource models.Resource, condi
 
 func (aq *AdvancedQuery) evaluateWhereClause(whereClause string) []models.Resource {
 	results := make([]models.Resource, 0)
-	
+
 	// Parse simple WHERE clauses
 	conditions := strings.Split(whereClause, "and")
-	
+
 	for _, resource := range aq.resources {
 		matches := true
 		for _, condition := range conditions {
@@ -475,7 +475,7 @@ func (aq *AdvancedQuery) evaluateWhereClause(whereClause string) []models.Resour
 			results = append(results, resource)
 		}
 	}
-	
+
 	return results
 }
 

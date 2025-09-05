@@ -15,45 +15,45 @@ import (
 
 // RunAllOptions configures the run-all execution
 type RunAllOptions struct {
-	Command            string            `json:"command"`            // Terraform command to run (plan, apply, destroy, etc.)
-	Args               []string          `json:"args"`               // Additional arguments
-	Parallelism        int               `json:"parallelism"`        // Max parallel executions
-	IgnoreErrors       bool              `json:"ignore_errors"`      // Continue on error
+	Command            string            `json:"command"`             // Terraform command to run (plan, apply, destroy, etc.)
+	Args               []string          `json:"args"`                // Additional arguments
+	Parallelism        int               `json:"parallelism"`         // Max parallel executions
+	IgnoreErrors       bool              `json:"ignore_errors"`       // Continue on error
 	IgnoreDependencies bool              `json:"ignore_dependencies"` // Ignore dependency order
-	IncludeSkipped     bool              `json:"include_skipped"`    // Include skipped modules
-	TargetModules      []string          `json:"target_modules"`     // Specific modules to target
-	ExcludeModules     []string          `json:"exclude_modules"`    // Modules to exclude
-	Environment        map[string]string `json:"environment"`        // Environment variables
-	Timeout            time.Duration     `json:"timeout"`            // Timeout per module
-	DryRun             bool              `json:"dry_run"`            // Don't actually execute
-	AutoApprove        bool              `json:"auto_approve"`       // Auto-approve for apply/destroy
+	IncludeSkipped     bool              `json:"include_skipped"`     // Include skipped modules
+	TargetModules      []string          `json:"target_modules"`      // Specific modules to target
+	ExcludeModules     []string          `json:"exclude_modules"`     // Modules to exclude
+	Environment        map[string]string `json:"environment"`         // Environment variables
+	Timeout            time.Duration     `json:"timeout"`             // Timeout per module
+	DryRun             bool              `json:"dry_run"`             // Don't actually execute
+	AutoApprove        bool              `json:"auto_approve"`        // Auto-approve for apply/destroy
 }
 
 // RunAllResult contains the results of a run-all execution
 type RunAllResult struct {
-	StartTime      time.Time                     `json:"start_time"`
-	EndTime        time.Time                     `json:"end_time"`
-	Duration       time.Duration                 `json:"duration"`
-	ModuleResults  map[string]*ModuleExecResult  `json:"module_results"`
-	SuccessCount   int                           `json:"success_count"`
-	FailureCount   int                           `json:"failure_count"`
-	SkippedCount   int                           `json:"skipped_count"`
-	ExecutionOrder *resolver.ExecutionOrder      `json:"execution_order"`
-	Errors         []error                       `json:"errors,omitempty"`
+	StartTime      time.Time                    `json:"start_time"`
+	EndTime        time.Time                    `json:"end_time"`
+	Duration       time.Duration                `json:"duration"`
+	ModuleResults  map[string]*ModuleExecResult `json:"module_results"`
+	SuccessCount   int                          `json:"success_count"`
+	FailureCount   int                          `json:"failure_count"`
+	SkippedCount   int                          `json:"skipped_count"`
+	ExecutionOrder *resolver.ExecutionOrder     `json:"execution_order"`
+	Errors         []error                      `json:"errors,omitempty"`
 }
 
 // ModuleExecResult contains the result of executing a single module
 type ModuleExecResult struct {
-	Module       string                 `json:"module"`
-	Status       resolver.ModuleStatus  `json:"status"`
-	StartTime    time.Time              `json:"start_time"`
-	EndTime      time.Time              `json:"end_time"`
-	Duration     time.Duration          `json:"duration"`
-	Command      string                 `json:"command"`
-	Output       string                 `json:"output"`
-	Error        error                  `json:"error,omitempty"`
-	ExitCode     int                    `json:"exit_code"`
-	Changes      *TerraformChanges      `json:"changes,omitempty"`
+	Module    string                `json:"module"`
+	Status    resolver.ModuleStatus `json:"status"`
+	StartTime time.Time             `json:"start_time"`
+	EndTime   time.Time             `json:"end_time"`
+	Duration  time.Duration         `json:"duration"`
+	Command   string                `json:"command"`
+	Output    string                `json:"output"`
+	Error     error                 `json:"error,omitempty"`
+	ExitCode  int                   `json:"exit_code"`
+	Changes   *TerraformChanges     `json:"changes,omitempty"`
 }
 
 // TerraformChanges represents changes detected by terraform
@@ -65,14 +65,14 @@ type TerraformChanges struct {
 
 // TerragruntExecutor executes terragrunt commands across modules
 type TerragruntExecutor struct {
-	resolver   *resolver.DependencyResolver
-	options    *RunAllOptions
-	results    *RunAllResult
-	mu         sync.Mutex
-	wg         sync.WaitGroup
-	semaphore  chan struct{}
-	ctx        context.Context
-	cancel     context.CancelFunc
+	resolver  *resolver.DependencyResolver
+	options   *RunAllOptions
+	results   *RunAllResult
+	mu        sync.Mutex
+	wg        sync.WaitGroup
+	semaphore chan struct{}
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // NewTerragruntExecutor creates a new terragrunt executor
@@ -80,7 +80,7 @@ func NewTerragruntExecutor(options *RunAllOptions) *TerragruntExecutor {
 	if options.Parallelism <= 0 {
 		options.Parallelism = 10 // Default parallelism
 	}
-	
+
 	if options.Timeout <= 0 {
 		options.Timeout = 30 * time.Minute // Default timeout per module
 	}
@@ -153,13 +153,13 @@ func (e *TerragruntExecutor) RunAll(rootDir string) (*RunAllResult, error) {
 // filterModules filters modules based on options
 func (e *TerragruntExecutor) filterModules(graph *resolver.DependencyGraph) []string {
 	var modules []string
-	
+
 	for path, module := range graph.Modules {
 		// Skip if module should be skipped
 		if module.Config.Skip && !e.options.IncludeSkipped {
 			continue
 		}
-		
+
 		// Check if module is in target list
 		if len(e.options.TargetModules) > 0 {
 			found := false
@@ -173,7 +173,7 @@ func (e *TerragruntExecutor) filterModules(graph *resolver.DependencyGraph) []st
 				continue
 			}
 		}
-		
+
 		// Check if module is in exclude list
 		excluded := false
 		for _, exclude := range e.options.ExcludeModules {
@@ -185,33 +185,33 @@ func (e *TerragruntExecutor) filterModules(graph *resolver.DependencyGraph) []st
 		if excluded {
 			continue
 		}
-		
+
 		modules = append(modules, path)
 	}
-	
+
 	return modules
 }
 
 // executeGroup executes a group of modules in parallel
 func (e *TerragruntExecutor) executeGroup(group []string, graph *resolver.DependencyGraph) error {
 	var groupErrors []error
-	
+
 	for _, modulePath := range group {
 		module := graph.Modules[modulePath]
 		if module == nil {
 			continue
 		}
-		
+
 		// Acquire semaphore
 		e.semaphore <- struct{}{}
 		e.wg.Add(1)
-		
+
 		go func(m *resolver.Module) {
 			defer func() {
 				<-e.semaphore
 				e.wg.Done()
 			}()
-			
+
 			// Check if context is cancelled
 			select {
 			case <-e.ctx.Done():
@@ -225,11 +225,11 @@ func (e *TerragruntExecutor) executeGroup(group []string, graph *resolver.Depend
 				return
 			default:
 			}
-			
+
 			// Execute module
 			result := e.executeModule(m)
 			e.recordModuleResult(m.Path, result)
-			
+
 			if result.Error != nil && !e.options.IgnoreErrors {
 				e.mu.Lock()
 				groupErrors = append(groupErrors, result.Error)
@@ -238,14 +238,14 @@ func (e *TerragruntExecutor) executeGroup(group []string, graph *resolver.Depend
 			}
 		}(module)
 	}
-	
+
 	// Wait for this group to complete before returning
 	e.wg.Wait()
-	
+
 	if len(groupErrors) > 0 {
 		return groupErrors[0]
 	}
-	
+
 	return nil
 }
 
@@ -268,7 +268,7 @@ func (e *TerragruntExecutor) executeModule(module *resolver.Module) *ModuleExecR
 	// Build command
 	args := []string{e.options.Command}
 	args = append(args, e.options.Args...)
-	
+
 	// Add auto-approve if needed
 	if e.options.AutoApprove && (e.options.Command == "apply" || e.options.Command == "destroy") {
 		args = append(args, "-auto-approve")
@@ -276,7 +276,7 @@ func (e *TerragruntExecutor) executeModule(module *resolver.Module) *ModuleExecR
 
 	cmd := exec.CommandContext(e.ctx, "terragrunt", args...)
 	cmd.Dir = module.Path
-	
+
 	// Set environment
 	cmd.Env = os.Environ()
 	for k, v := range e.options.Environment {
@@ -286,15 +286,15 @@ func (e *TerragruntExecutor) executeModule(module *resolver.Module) *ModuleExecR
 	// Execute with timeout
 	ctx, cancel := context.WithTimeout(e.ctx, e.options.Timeout)
 	defer cancel()
-	
+
 	cmd = exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
 	cmd.Dir = module.Path
 	cmd.Env = cmd.Env
-	
+
 	// Capture output
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		result.Status = resolver.ModuleStatusFailed
 		result.Error = fmt.Errorf("failed to execute terragrunt in %s: %w", module.Path, err)
@@ -308,10 +308,10 @@ func (e *TerragruntExecutor) executeModule(module *resolver.Module) *ModuleExecR
 			result.Changes = parseChanges(result.Output)
 		}
 	}
-	
+
 	result.EndTime = time.Now()
 	result.Duration = result.EndTime.Sub(result.StartTime)
-	
+
 	return result
 }
 
@@ -319,9 +319,9 @@ func (e *TerragruntExecutor) executeModule(module *resolver.Module) *ModuleExecR
 func (e *TerragruntExecutor) recordModuleResult(path string, result *ModuleExecResult) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	e.results.ModuleResults[path] = result
-	
+
 	switch result.Status {
 	case resolver.ModuleStatusCompleted:
 		e.results.SuccessCount++
@@ -339,15 +339,15 @@ func (e *TerragruntExecutor) recordModuleResult(path string, result *ModuleExecR
 func parseChanges(output string) *TerraformChanges {
 	// This is a simplified parser - in production you'd want more robust parsing
 	changes := &TerraformChanges{}
-	
+
 	// Look for plan summary lines like:
 	// Plan: 1 to add, 2 to change, 3 to destroy.
 	// or
 	// Apply complete! Resources: 1 added, 2 changed, 3 destroyed.
-	
+
 	// This would need proper implementation based on terraform output format
 	// For now, return empty changes
-	
+
 	return changes
 }
 
@@ -355,10 +355,10 @@ func parseChanges(output string) *TerraformChanges {
 func (e *TerragruntExecutor) GetProgress() map[string]interface{} {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	total := len(e.results.ModuleResults)
 	completed := e.results.SuccessCount + e.results.FailureCount + e.results.SkippedCount
-	
+
 	return map[string]interface{}{
 		"total":     total,
 		"completed": completed,
@@ -399,7 +399,7 @@ func (e *TerragruntExecutor) GeneratePlanSummary(rootDir string) (*PlanSummary, 
 	for _, module := range modules {
 		deps, _ := e.resolver.GetModuleDependencies(module, false)
 		dependents, _ := e.resolver.GetModuleDependents(module, false)
-		
+
 		summary.Modules = append(summary.Modules, ModulePlan{
 			Path:         module,
 			Dependencies: deps,

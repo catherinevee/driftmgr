@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/graph"
 	"github.com/catherinevee/driftmgr/internal/drift/detector"
+	"github.com/catherinevee/driftmgr/internal/graph"
 	"github.com/catherinevee/driftmgr/internal/state"
 	"github.com/google/uuid"
 )
@@ -22,29 +22,29 @@ type RemediationPlanner struct {
 
 // PlannerConfig contains configuration for the planner
 type PlannerConfig struct {
-	AutoApprove           bool          `json:"auto_approve"`
-	MaxParallelActions    int           `json:"max_parallel_actions"`
-	RequireApprovalFor    []ActionType  `json:"require_approval_for"`
-	SafeMode              bool          `json:"safe_mode"`
-	DryRun                bool          `json:"dry_run"`
-	BackupBeforeAction    bool          `json:"backup_before_action"`
-	MaxRetries            int           `json:"max_retries"`
-	ActionTimeout         time.Duration `json:"action_timeout"`
+	AutoApprove        bool          `json:"auto_approve"`
+	MaxParallelActions int           `json:"max_parallel_actions"`
+	RequireApprovalFor []ActionType  `json:"require_approval_for"`
+	SafeMode           bool          `json:"safe_mode"`
+	DryRun             bool          `json:"dry_run"`
+	BackupBeforeAction bool          `json:"backup_before_action"`
+	MaxRetries         int           `json:"max_retries"`
+	ActionTimeout      time.Duration `json:"action_timeout"`
 }
 
 // RemediationPlan represents a plan to remediate drift
 type RemediationPlan struct {
-	ID                string               `json:"id"`
-	Name              string               `json:"name"`
-	Description       string               `json:"description"`
-	CreatedAt         time.Time            `json:"created_at"`
-	Actions           []RemediationAction  `json:"actions"`
-	EstimatedDuration time.Duration        `json:"estimated_duration"`
-	RiskLevel         RiskLevel            `json:"risk_level"`
-	RequiresApproval  bool                 `json:"requires_approval"`
-	Dependencies      map[string][]string  `json:"dependencies"`
-	ExecutionOrder    []string             `json:"execution_order"`
-	RollbackPlan      *RollbackPlan        `json:"rollback_plan,omitempty"`
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	CreatedAt         time.Time              `json:"created_at"`
+	Actions           []RemediationAction    `json:"actions"`
+	EstimatedDuration time.Duration          `json:"estimated_duration"`
+	RiskLevel         RiskLevel              `json:"risk_level"`
+	RequiresApproval  bool                   `json:"requires_approval"`
+	Dependencies      map[string][]string    `json:"dependencies"`
+	ExecutionOrder    []string               `json:"execution_order"`
+	RollbackPlan      *RollbackPlan          `json:"rollback_plan,omitempty"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -71,15 +71,15 @@ type RemediationAction struct {
 type ActionType string
 
 const (
-	ActionTypeImport   ActionType = "import"
-	ActionTypeUpdate   ActionType = "update"
-	ActionTypeDelete   ActionType = "delete"
-	ActionTypeCreate   ActionType = "create"
-	ActionTypeRefresh  ActionType = "refresh"
-	ActionTypeMove     ActionType = "move"
-	ActionTypeReplace  ActionType = "replace"
-	ActionTypeTaint    ActionType = "taint"
-	ActionTypeUntaint  ActionType = "untaint"
+	ActionTypeImport  ActionType = "import"
+	ActionTypeUpdate  ActionType = "update"
+	ActionTypeDelete  ActionType = "delete"
+	ActionTypeCreate  ActionType = "create"
+	ActionTypeRefresh ActionType = "refresh"
+	ActionTypeMove    ActionType = "move"
+	ActionTypeReplace ActionType = "replace"
+	ActionTypeTaint   ActionType = "taint"
+	ActionTypeUntaint ActionType = "untaint"
 )
 
 // RiskLevel indicates the risk level of an action
@@ -110,10 +110,10 @@ type PostCheck struct {
 
 // RollbackPlan defines how to rollback a remediation plan
 type RollbackPlan struct {
-	ID          string            `json:"id"`
-	Description string            `json:"description"`
-	Actions     []RollbackAction  `json:"actions"`
-	Automatic   bool              `json:"automatic"`
+	ID          string           `json:"id"`
+	Description string           `json:"description"`
+	Actions     []RollbackAction `json:"actions"`
+	Automatic   bool             `json:"automatic"`
 }
 
 // RollbackAction defines a single rollback action
@@ -147,9 +147,9 @@ func NewRemediationPlanner(depGraph *graph.DependencyGraph) *RemediationPlanner 
 }
 
 // CreatePlan creates a remediation plan from drift results
-func (rp *RemediationPlanner) CreatePlan(ctx context.Context, driftReport *detector.DriftReport, 
+func (rp *RemediationPlanner) CreatePlan(ctx context.Context, driftReport *detector.DriftReport,
 	state *state.TerraformState) (*RemediationPlan, error) {
-	
+
 	plan := &RemediationPlan{
 		ID:           uuid.New().String(),
 		Name:         fmt.Sprintf("Remediation Plan %s", time.Now().Format("2006-01-02 15:04:05")),
@@ -203,9 +203,9 @@ func (rp *RemediationPlanner) CreatePlan(ctx context.Context, driftReport *detec
 }
 
 // generateActions generates remediation actions for a drift result
-func (rp *RemediationPlanner) generateActions(drift detector.DriftResult, 
+func (rp *RemediationPlanner) generateActions(drift detector.DriftResult,
 	state *state.TerraformState) ([]RemediationAction, error) {
-	
+
 	actions := make([]RemediationAction, 0)
 
 	switch drift.DriftType {
@@ -412,7 +412,7 @@ func (rp *RemediationPlanner) createManageUnmanagedAction(drift detector.DriftRe
 	action := rp.createImportAction(drift)
 	action.Description = fmt.Sprintf("Import unmanaged resource %s", drift.Resource)
 	action.RiskLevel = RiskLevelMedium
-	
+
 	// Add additional checks for unmanaged resources
 	action.PreChecks = append(action.PreChecks, PreCheck{
 		Name:        "no_conflicts",
@@ -420,7 +420,7 @@ func (rp *RemediationPlanner) createManageUnmanagedAction(drift detector.DriftRe
 		Check:       fmt.Sprintf("no_resource_conflicts(%s)", drift.Resource),
 		Required:    true,
 	})
-	
+
 	return action
 }
 

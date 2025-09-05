@@ -220,15 +220,15 @@ func (s *GCPSimulator) simulateFirewallRuleDrift(ctx context.Context, resource *
 
 	// Create a harmless firewall rule
 	ruleName := fmt.Sprintf("drift-simulation-%d", time.Now().Unix())
-	
+
 	apiURL := fmt.Sprintf("https://compute.googleapis.com/compute/v1/projects/%s/global/firewalls", s.projectID)
 
 	rule := map[string]interface{}{
-		"name":        ruleName,
-		"description": "DriftSimulation - Test firewall rule",
-		"network":     fmt.Sprintf("projects/%s/global/networks/default", s.projectID),
-		"priority":    65534,
-		"direction":   "INGRESS",
+		"name":         ruleName,
+		"description":  "DriftSimulation - Test firewall rule",
+		"network":      fmt.Sprintf("projects/%s/global/networks/default", s.projectID),
+		"priority":     65534,
+		"direction":    "INGRESS",
 		"sourceRanges": []string{"192.0.2.0/32"}, // TEST-NET-1
 		"denied": []map[string]interface{}{
 			{
@@ -274,7 +274,7 @@ func (s *GCPSimulator) simulateResourceCreation(ctx context.Context, resource *s
 
 	// Create a small storage bucket (free tier)
 	bucketName := fmt.Sprintf("drift-simulation-%d", time.Now().Unix())
-	
+
 	apiURL := fmt.Sprintf("https://storage.googleapis.com/storage/v1/b?project=%s", s.projectID)
 
 	bucket := map[string]interface{}{
@@ -484,7 +484,7 @@ func (s *GCPSimulator) checkUnmanagedResources(ctx context.Context, state *state
 
 	// Check for drift simulation buckets
 	apiURL := fmt.Sprintf("https://storage.googleapis.com/storage/v1/b?project=%s", s.projectID)
-	
+
 	response, err := s.makeAPICallWithResponse(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return drifts
@@ -533,7 +533,7 @@ func (s *GCPSimulator) checkUnmanagedResources(ctx context.Context, state *state
 
 	// Check for drift simulation firewall rules
 	firewallURL := fmt.Sprintf("https://compute.googleapis.com/compute/v1/projects/%s/global/firewalls", s.projectID)
-	
+
 	response, err = s.makeAPICallWithResponse(ctx, "GET", firewallURL, nil)
 	if err == nil {
 		var firewallResult map[string]interface{}
@@ -676,7 +676,7 @@ func (s *GCPSimulator) makeAPICallWithResponse(ctx context.Context, method, url 
 		"simulated": true,
 		"message":   "GCP drift simulation response",
 	}
-	
+
 	return json.Marshal(mockResponse)
 }
 
@@ -715,12 +715,12 @@ func (s *GCPSimulator) rollbackLabelRemoval(ctx context.Context, data *RollbackD
 		// Remove drift label
 		if labels, ok := getInstance["labels"].(map[string]interface{}); ok {
 			delete(labels, labelKey)
-			
+
 			body := map[string]interface{}{
 				"labels":           labels,
 				"labelFingerprint": getInstance["labelFingerprint"],
 			}
-			
+
 			return s.makeAPICall(ctx, "POST", apiURL, body)
 		}
 

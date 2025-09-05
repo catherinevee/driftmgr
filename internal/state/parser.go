@@ -30,7 +30,7 @@ func (p *StateParser) ParseFile(path string) (*StateFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read state file: %w", err)
 	}
-	
+
 	stateFile, err := p.Parse(data)
 	if err != nil {
 		return nil, err
@@ -45,7 +45,7 @@ func (p *StateParser) Parse(data []byte) (*StateFile, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("failed to parse state: %w", err)
 	}
-	
+
 	return &StateFile{
 		TerraformState: &state,
 	}, nil
@@ -72,15 +72,15 @@ type Module struct {
 
 // Resource represents a resource in the state
 type Resource struct {
-	ID          string      `json:"id,omitempty"`
-	Module      string      `json:"module,omitempty"`
-	Mode        string      `json:"mode"`
-	Type        string      `json:"type"`
-	Name        string      `json:"name"`
-	Provider    string      `json:"provider"`
-	Instances   []Instance  `json:"instances"`
-	DependsOn   []string    `json:"depends_on,omitempty"`
-	EachMode    string      `json:"each,omitempty"`
+	ID        string     `json:"id,omitempty"`
+	Module    string     `json:"module,omitempty"`
+	Mode      string     `json:"mode"`
+	Type      string     `json:"type"`
+	Name      string     `json:"name"`
+	Provider  string     `json:"provider"`
+	Instances []Instance `json:"instances"`
+	DependsOn []string   `json:"depends_on,omitempty"`
+	EachMode  string     `json:"each,omitempty"`
 }
 
 // Instance represents an instance of a resource
@@ -106,10 +106,10 @@ type OutputValue struct {
 
 // CheckResult represents a check result in the state
 type CheckResult struct {
-	ObjectKind   string `json:"object_kind"`
-	ConfigAddr   string `json:"config_addr"`
-	Status       string `json:"status"`
-	Objects      []CheckObject `json:"objects,omitempty"`
+	ObjectKind string        `json:"object_kind"`
+	ConfigAddr string        `json:"config_addr"`
+	Status     string        `json:"status"`
+	Objects    []CheckObject `json:"objects,omitempty"`
 }
 
 // CheckObject represents an object in a check result
@@ -136,7 +136,7 @@ func NewParser() *Parser {
 // Parse parses raw state data into a TerraformState structure
 func (p *Parser) Parse(data []byte) (*TerraformState, error) {
 	var state TerraformState
-	
+
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, fmt.Errorf("failed to parse state JSON: %w", err)
 	}
@@ -189,7 +189,7 @@ func (p *Parser) ParseLegacy(data []byte) (*TerraformState, error) {
 	// Convert modules to resources
 	for _, module := range legacyState.Modules {
 		modulePath := strings.Join(module.Path, ".")
-		
+
 		// Add outputs
 		for k, v := range module.Outputs {
 			outputKey := k
@@ -233,7 +233,7 @@ func (p *Parser) normalizeState(state *TerraformState) error {
 	// Normalize provider names
 	for i := range state.Resources {
 		state.Resources[i].Provider = p.normalizeProviderName(state.Resources[i].Provider)
-		
+
 		// Ensure instances have proper structure
 		for j := range state.Resources[i].Instances {
 			if state.Resources[i].Instances[j].Attributes == nil {
@@ -279,7 +279,7 @@ func (p *Parser) GetResourceByAddress(state *TerraformState, address string) (*R
 
 	resourceType := parts[0]
 	resourceName := strings.Split(parts[1], "[")[0]
-	
+
 	// Extract index if present
 	var index int
 	if strings.Contains(parts[1], "[") {
@@ -302,7 +302,7 @@ func (p *Parser) GetResourceByAddress(state *TerraformState, address string) (*R
 // ExtractProviders extracts unique providers from the state
 func (p *Parser) ExtractProviders(state *TerraformState) []string {
 	providers := make(map[string]bool)
-	
+
 	for _, resource := range state.Resources {
 		provider := p.normalizeProviderName(resource.Provider)
 		providers[provider] = true
@@ -328,13 +328,13 @@ func (p *Parser) GetResourceCount(state *TerraformState) int {
 // GetResourcesByType returns all resources of a specific type
 func (p *Parser) GetResourcesByType(state *TerraformState, resourceType string) []Resource {
 	var resources []Resource
-	
+
 	for _, resource := range state.Resources {
 		if resource.Type == resourceType {
 			resources = append(resources, resource)
 		}
 	}
-	
+
 	return resources
 }
 
@@ -342,13 +342,13 @@ func (p *Parser) GetResourcesByType(state *TerraformState, resourceType string) 
 func (p *Parser) GetResourcesByProvider(state *TerraformState, provider string) []Resource {
 	normalizedProvider := p.normalizeProviderName(provider)
 	var resources []Resource
-	
+
 	for _, resource := range state.Resources {
 		if p.normalizeProviderName(resource.Provider) == normalizedProvider {
 			resources = append(resources, resource)
 		}
 	}
-	
+
 	return resources
 }
 
@@ -374,7 +374,7 @@ func (p *Parser) ValidateState(state *TerraformState) error {
 			if len(resource.Instances) == 1 {
 				address = fmt.Sprintf("%s.%s", resource.Type, resource.Name)
 			}
-			
+
 			if addresses[address] {
 				return fmt.Errorf("duplicate resource address: %s", address)
 			}

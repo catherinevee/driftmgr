@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package integration
@@ -90,7 +91,7 @@ func testS3Operations(t *testing.T, cfg aws.Config) {
 	// List buckets
 	result, err := client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	require.NoError(t, err)
-	
+
 	found := false
 	for _, bucket := range result.Buckets {
 		if *bucket.Name == testBucket {
@@ -246,7 +247,7 @@ func testDriftDetection(t *testing.T) {
 
 	// Create provider with LocalStack endpoint
 	provider := awsprovider.NewAWSProvider(testRegion)
-	
+
 	// Override with LocalStack configuration
 	os.Setenv("AWS_ENDPOINT_URL", localstackEndpoint)
 	os.Setenv("AWS_ACCESS_KEY_ID", "test")
@@ -289,10 +290,10 @@ func testDriftDetection(t *testing.T) {
 	detector := drift.NewDriftDetector(provider)
 	drifts, err := detector.DetectDrift(ctx, desiredState)
 	require.NoError(t, err)
-	
+
 	// Should detect tag drift
 	assert.NotEmpty(t, drifts)
-	
+
 	hasDrift := false
 	for _, d := range drifts {
 		if d.ResourceType == "aws_vpc" {
@@ -306,7 +307,7 @@ func testDriftDetection(t *testing.T) {
 
 func testStateFileOperations(t *testing.T, cfg aws.Config) {
 	ctx := context.Background()
-	
+
 	// Create state manager
 	stateManager := state.NewS3StateManager(cfg, testBucket)
 
@@ -385,7 +386,7 @@ func isLocalStackRunning() bool {
 			}, nil
 		})),
 	)
-	
+
 	if err != nil {
 		return false
 	}

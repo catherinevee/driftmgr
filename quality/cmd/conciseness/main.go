@@ -58,11 +58,11 @@ func main() {
 		"total_issues": len(allIssues),
 		"issues":       allIssues,
 		"summary": map[string]int{
-			"verbose_conditionals":  countByType(allIssues, "verbose_conditional"),
-			"unnecessary_else":      countByType(allIssues, "unnecessary_else"),
-			"redundant_variables":   countByType(allIssues, "redundant_variable"),
-			"verbose_loops":         countByType(allIssues, "verbose_loop"),
-			"verbose_nil_checks":    countByType(allIssues, "verbose_nil_check"),
+			"verbose_conditionals": countByType(allIssues, "verbose_conditional"),
+			"unnecessary_else":     countByType(allIssues, "unnecessary_else"),
+			"redundant_variables":  countByType(allIssues, "redundant_variable"),
+			"verbose_loops":        countByType(allIssues, "verbose_loop"),
+			"verbose_nil_checks":   countByType(allIssues, "verbose_nil_check"),
 		},
 		"potential_savings": estimateSavings(allIssues),
 	}
@@ -79,7 +79,7 @@ func main() {
 
 	fmt.Printf("Conciseness analysis complete. Found %d issues.\n", len(allIssues))
 	fmt.Printf("Report saved to %s\n", *outputPath)
-	
+
 	if len(allIssues) > 0 {
 		fmt.Println("\nTop issues:")
 		for i, issue := range allIssues {

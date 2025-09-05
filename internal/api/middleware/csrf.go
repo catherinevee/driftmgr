@@ -257,6 +257,7 @@ func (m *CSRFMiddleware) DoubleSubmitCookie() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
 // compareSecure performs a constant-time comparison of two strings
 func compareSecure(a, b string) bool {
 	return hmac.Equal([]byte(a), []byte(b))

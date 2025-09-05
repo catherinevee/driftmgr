@@ -12,34 +12,34 @@ type MetricsTracker struct {
 	activeDetections    int64
 	completedDetections int64
 	failedDetections    int64
-	
+
 	// Cache metrics
 	cacheHits      int64
 	cacheMisses    int64
 	cacheEvictions int64
-	
+
 	// WebSocket metrics
 	messagesSent     int64
 	messagesReceived int64
 	messagesQueued   int64
-	
+
 	// API metrics
-	apiRequests      int64
-	apiErrors        int64
-	apiLatencySum    int64
-	apiLatencyCount  int64
-	
+	apiRequests     int64
+	apiErrors       int64
+	apiLatencySum   int64
+	apiLatencyCount int64
+
 	// Discovery metrics
 	discoveryRuns     int64
 	discoveryErrors   int64
 	resourcesFound    int64
 	lastDiscoveryTime atomic.Value // stores *time.Time
-	
+
 	// Remediation metrics
 	remediationRuns     int64
 	remediationSuccess  int64
 	remediationFailures int64
-	
+
 	mu sync.RWMutex
 }
 
@@ -165,13 +165,13 @@ func (mt *MetricsTracker) RecordAPIRequest(latencyMs int64, isError bool) {
 func (mt *MetricsTracker) GetAPIMetrics() (requests, errors, avgLatencyMs int64) {
 	requests = atomic.LoadInt64(&mt.apiRequests)
 	errors = atomic.LoadInt64(&mt.apiErrors)
-	
+
 	sum := atomic.LoadInt64(&mt.apiLatencySum)
 	count := atomic.LoadInt64(&mt.apiLatencyCount)
 	if count > 0 {
 		avgLatencyMs = sum / count
 	}
-	
+
 	return requests, errors, avgLatencyMs
 }
 
@@ -182,7 +182,7 @@ func (mt *MetricsTracker) RecordDiscoveryRun(resourcesFound int, isError bool) {
 		atomic.AddInt64(&mt.discoveryErrors, 1)
 	}
 	atomic.AddInt64(&mt.resourcesFound, int64(resourcesFound))
-	
+
 	now := time.Now()
 	mt.lastDiscoveryTime.Store(&now)
 }
@@ -192,11 +192,11 @@ func (mt *MetricsTracker) GetDiscoveryMetrics() (runs, errors, resources int64, 
 	runs = atomic.LoadInt64(&mt.discoveryRuns)
 	errors = atomic.LoadInt64(&mt.discoveryErrors)
 	resources = atomic.LoadInt64(&mt.resourcesFound)
-	
+
 	if val := mt.lastDiscoveryTime.Load(); val != nil {
 		lastRun = val.(*time.Time)
 	}
-	
+
 	return runs, errors, resources, lastRun
 }
 
@@ -247,7 +247,7 @@ func (mt *MetricsTracker) GetAllMetrics() map[string]interface{} {
 	apiReqs, apiErrs, apiLatency := mt.GetAPIMetrics()
 	discRuns, discErrs, resources, lastDisc := mt.GetDiscoveryMetrics()
 	remRuns, remSuccess, remFails := mt.GetRemediationMetrics()
-	
+
 	return map[string]interface{}{
 		"detections": map[string]int64{
 			"active":    mt.GetActiveDetections(),
@@ -265,15 +265,15 @@ func (mt *MetricsTracker) GetAllMetrics() map[string]interface{} {
 			"queued":   mt.GetMessagesQueued(),
 		},
 		"api": map[string]int64{
-			"requests":         apiReqs,
-			"errors":           apiErrs,
-			"avg_latency_ms":   apiLatency,
+			"requests":       apiReqs,
+			"errors":         apiErrs,
+			"avg_latency_ms": apiLatency,
 		},
 		"discovery": map[string]interface{}{
-			"runs":               discRuns,
-			"errors":             discErrs,
-			"resources_found":    resources,
-			"last_run":           lastDisc,
+			"runs":            discRuns,
+			"errors":          discErrs,
+			"resources_found": resources,
+			"last_run":        lastDisc,
 		},
 		"remediation": map[string]int64{
 			"runs":     remRuns,

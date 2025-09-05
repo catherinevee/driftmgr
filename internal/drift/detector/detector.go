@@ -24,29 +24,29 @@ type DriftDetector struct {
 
 // DetectorConfig contains configuration for drift detection
 type DetectorConfig struct {
-	MaxWorkers         int           `json:"max_workers"`
-	Timeout            time.Duration `json:"timeout"`
-	IgnoreAttributes   []string      `json:"ignore_attributes"`
-	CheckUnmanaged     bool          `json:"check_unmanaged"`
-	DeepComparison     bool          `json:"deep_comparison"`
-	ParallelDiscovery  bool          `json:"parallel_discovery"`
-	RetryAttempts      int           `json:"retry_attempts"`
-	RetryDelay         time.Duration `json:"retry_delay"`
+	MaxWorkers        int           `json:"max_workers"`
+	Timeout           time.Duration `json:"timeout"`
+	IgnoreAttributes  []string      `json:"ignore_attributes"`
+	CheckUnmanaged    bool          `json:"check_unmanaged"`
+	DeepComparison    bool          `json:"deep_comparison"`
+	ParallelDiscovery bool          `json:"parallel_discovery"`
+	RetryAttempts     int           `json:"retry_attempts"`
+	RetryDelay        time.Duration `json:"retry_delay"`
 }
 
 // DriftResult represents the result of drift detection
 type DriftResult struct {
-	Resource       string                 `json:"resource"`
-	ResourceType   string                 `json:"resource_type"`
-	Provider       string                 `json:"provider"`
-	DriftType      DriftType              `json:"drift_type"`
+	Resource       string                  `json:"resource"`
+	ResourceType   string                  `json:"resource_type"`
+	Provider       string                  `json:"provider"`
+	DriftType      DriftType               `json:"drift_type"`
 	Differences    []comparator.Difference `json:"differences"`
-	ActualState    map[string]interface{} `json:"actual_state"`
-	DesiredState   map[string]interface{} `json:"desired_state"`
-	Severity       DriftSeverity          `json:"severity"`
-	Impact         []string               `json:"impact"`
-	Recommendation string                 `json:"recommendation"`
-	Timestamp      time.Time              `json:"timestamp"`
+	ActualState    map[string]interface{}  `json:"actual_state"`
+	DesiredState   map[string]interface{}  `json:"desired_state"`
+	Severity       DriftSeverity           `json:"severity"`
+	Impact         []string                `json:"impact"`
+	Recommendation string                  `json:"recommendation"`
+	Timestamp      time.Time               `json:"timestamp"`
 }
 
 // DriftType categorizes the type of drift
@@ -73,14 +73,14 @@ const (
 
 // DriftReport contains the complete drift detection report
 type DriftReport struct {
-	Timestamp         time.Time           `json:"timestamp"`
-	TotalResources    int                 `json:"total_resources"`
-	DriftedResources  int                 `json:"drifted_resources"`
-	MissingResources  int                 `json:"missing_resources"`
-	UnmanagedResources int                `json:"unmanaged_resources"`
-	DriftResults      []DriftResult       `json:"drift_results"`
-	Summary           *DriftSummary       `json:"summary"`
-	Recommendations   []string            `json:"recommendations"`
+	Timestamp          time.Time     `json:"timestamp"`
+	TotalResources     int           `json:"total_resources"`
+	DriftedResources   int           `json:"drifted_resources"`
+	MissingResources   int           `json:"missing_resources"`
+	UnmanagedResources int           `json:"unmanaged_resources"`
+	DriftResults       []DriftResult `json:"drift_results"`
+	Summary            *DriftSummary `json:"summary"`
+	Recommendations    []string      `json:"recommendations"`
 }
 
 // DriftSummary provides a summary of drift detection
@@ -88,22 +88,22 @@ type DriftSummary struct {
 	ByProvider map[string]*ProviderDriftSummary `json:"by_provider"`
 	ByType     map[string]*TypeDriftSummary     `json:"by_type"`
 	BySeverity map[DriftSeverity]int            `json:"by_severity"`
-	DriftScore float64                           `json:"drift_score"` // 0-100, lower is better
+	DriftScore float64                          `json:"drift_score"` // 0-100, lower is better
 }
 
 // ProviderDriftSummary summarizes drift by provider
 type ProviderDriftSummary struct {
-	Provider         string `json:"provider"`
-	TotalResources   int    `json:"total_resources"`
-	DriftedResources int    `json:"drifted_resources"`
+	Provider         string  `json:"provider"`
+	TotalResources   int     `json:"total_resources"`
+	DriftedResources int     `json:"drifted_resources"`
 	DriftPercentage  float64 `json:"drift_percentage"`
 }
 
 // TypeDriftSummary summarizes drift by resource type
 type TypeDriftSummary struct {
-	ResourceType     string `json:"resource_type"`
-	TotalResources   int    `json:"total_resources"`
-	DriftedResources int    `json:"drifted_resources"`
+	ResourceType     string   `json:"resource_type"`
+	TotalResources   int      `json:"total_resources"`
+	DriftedResources int      `json:"drifted_resources"`
 	CommonIssues     []string `json:"common_issues"`
 }
 
@@ -144,7 +144,7 @@ func (dd *DriftDetector) DetectDrift(ctx context.Context, state *state.Terraform
 
 	resultChan := make(chan DriftResult, 100)
 	errorChan := make(chan error, 1)
-	
+
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, dd.config.MaxWorkers)
 
@@ -153,16 +153,16 @@ func (dd *DriftDetector) DetectDrift(ctx context.Context, state *state.Terraform
 		for i, instance := range resource.Instances {
 			wg.Add(1)
 			semaphore <- struct{}{}
-			
+
 			// Capture loop variables for goroutine
 			resCopy := resource
 			instCopy := instance
 			idxCopy := i
-			
+
 			go func() {
 				defer wg.Done()
 				defer func() { <-semaphore }()
-				
+
 				result, err := dd.checkResourceDrift(ctx, resCopy, instCopy, idxCopy)
 				if err != nil {
 					select {
@@ -171,7 +171,7 @@ func (dd *DriftDetector) DetectDrift(ctx context.Context, state *state.Terraform
 					}
 					return
 				}
-				
+
 				if result != nil {
 					resultChan <- *result
 				}
@@ -210,9 +210,9 @@ func (dd *DriftDetector) DetectDrift(ctx context.Context, state *state.Terraform
 }
 
 // checkResourceDrift checks a single resource for drift
-func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource state.Resource, 
+func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource state.Resource,
 	instance state.Instance, index int) (*DriftResult, error) {
-	
+
 	// Get provider
 	providerName := dd.extractProviderName(resource.Provider)
 	provider, exists := dd.providers[providerName]
@@ -224,26 +224,26 @@ func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource state.
 	resourceID, err := dd.extractResourceID(instance.Attributes)
 	if err != nil {
 		return &DriftResult{
-			Resource:     dd.formatResourceAddress(resource, index),
-			ResourceType: resource.Type,
-			Provider:     providerName,
-			DriftType:    ResourceOrphaned,
-			Severity:     SeverityMedium,
+			Resource:       dd.formatResourceAddress(resource, index),
+			ResourceType:   resource.Type,
+			Provider:       providerName,
+			DriftType:      ResourceOrphaned,
+			Severity:       SeverityMedium,
 			Recommendation: "Resource has no ID and may be orphaned",
-			Timestamp:    time.Now(),
+			Timestamp:      time.Now(),
 		}, nil
 	}
 
 	// Get actual state from cloud with retry
 	var actualResource *models.Resource
 	var lastErr error
-	
+
 	for attempt := 0; attempt < dd.config.RetryAttempts; attempt++ {
 		actualResource, lastErr = provider.GetResource(ctx, resourceID)
 		if lastErr == nil {
 			break
 		}
-		
+
 		if attempt < dd.config.RetryAttempts-1 {
 			time.Sleep(dd.config.RetryDelay)
 		}
@@ -259,9 +259,9 @@ func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource state.
 				DriftType:    ResourceMissing,
 				DesiredState: instance.Attributes,
 				Severity:     SeverityCritical,
-				Recommendation: fmt.Sprintf("Resource needs to be created or imported. Run: terraform apply -target=%s", 
+				Recommendation: fmt.Sprintf("Resource needs to be created or imported. Run: terraform apply -target=%s",
 					dd.formatResourceAddress(resource, index)),
-				Timestamp:    time.Now(),
+				Timestamp: time.Now(),
 			}, nil
 		}
 		return nil, fmt.Errorf("failed to get resource: %w", lastErr)
@@ -269,7 +269,7 @@ func (dd *DriftDetector) checkResourceDrift(ctx context.Context, resource state.
 
 	// Compare states
 	differences := dd.comparator.Compare(instance.Attributes, actualResource.Attributes)
-	
+
 	if len(differences) == 0 {
 		// No drift
 		return nil, nil
@@ -329,9 +329,9 @@ func (dd *DriftDetector) findUnmanagedResources(ctx context.Context, state *stat
 					DriftType:    ResourceUnmanaged,
 					ActualState:  cloudResource.Attributes,
 					Severity:     SeverityMedium,
-					Recommendation: fmt.Sprintf("Consider importing with: terraform import %s.resource_name %s", 
+					Recommendation: fmt.Sprintf("Consider importing with: terraform import %s.resource_name %s",
 						cloudResource.Type, cloudResource.ID),
-					Timestamp:    time.Now(),
+					Timestamp: time.Now(),
 				})
 			}
 		}
@@ -536,22 +536,22 @@ func (dd *DriftDetector) generateRecommendations(report *DriftReport) []string {
 	recommendations := make([]string, 0)
 
 	if report.MissingResources > 0 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			fmt.Sprintf("%d resources are missing and need to be created", report.MissingResources))
 	}
 
 	if report.UnmanagedResources > 0 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			fmt.Sprintf("%d unmanaged resources found. Consider importing or removing them", report.UnmanagedResources))
 	}
 
 	if report.Summary.BySeverity[SeverityCritical] > 0 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"CRITICAL: Address critical drift issues immediately to prevent service disruption")
 	}
 
 	if report.Summary.DriftScore > 50 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			"High drift score indicates significant divergence from desired state. Schedule remediation")
 	}
 
@@ -560,8 +560,8 @@ func (dd *DriftDetector) generateRecommendations(report *DriftReport) []string {
 		if summary.DriftedResources > 0 {
 			percentage := (float64(summary.DriftedResources) / float64(summary.TotalResources)) * 100
 			if percentage > 30 {
-				recommendations = append(recommendations, 
-					fmt.Sprintf("%s provider has %.0f%% drift. Review %s configurations", 
+				recommendations = append(recommendations,
+					fmt.Sprintf("%s provider has %.0f%% drift. Review %s configurations",
 						provider, percentage, provider))
 			}
 		}

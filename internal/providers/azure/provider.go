@@ -46,16 +46,16 @@ func NewAzureProviderComplete(subscriptionID, resourceGroup string) *AzureProvid
 		},
 		baseURL: "https://management.azure.com",
 		apiVersion: map[string]string{
-			"Microsoft.Compute/virtualMachines":     "2023-03-01",
-			"Microsoft.Network/virtualNetworks":     "2023-04-01",
-			"Microsoft.Network/networkInterfaces":   "2023-04-01",
-			"Microsoft.Network/networkSecurityGroups": "2023-04-01",
-			"Microsoft.Storage/storageAccounts":     "2023-01-01",
-			"Microsoft.Sql/servers":                 "2022-05-01-preview",
-			"Microsoft.Sql/servers/databases":       "2022-05-01-preview",
-			"Microsoft.KeyVault/vaults":             "2023-02-01",
-			"Microsoft.Web/sites":                   "2023-01-01",
-			"Microsoft.ContainerRegistry/registries": "2023-01-01-preview",
+			"Microsoft.Compute/virtualMachines":          "2023-03-01",
+			"Microsoft.Network/virtualNetworks":          "2023-04-01",
+			"Microsoft.Network/networkInterfaces":        "2023-04-01",
+			"Microsoft.Network/networkSecurityGroups":    "2023-04-01",
+			"Microsoft.Storage/storageAccounts":          "2023-01-01",
+			"Microsoft.Sql/servers":                      "2022-05-01-preview",
+			"Microsoft.Sql/servers/databases":            "2022-05-01-preview",
+			"Microsoft.KeyVault/vaults":                  "2023-02-01",
+			"Microsoft.Web/sites":                        "2023-01-01",
+			"Microsoft.ContainerRegistry/registries":     "2023-01-01-preview",
 			"Microsoft.ContainerService/managedClusters": "2023-05-01",
 		},
 	}
@@ -123,7 +123,7 @@ func (p *AzureProviderComplete) authenticateWithServicePrincipal(ctx context.Con
 func (p *AzureProviderComplete) authenticateWithManagedIdentity(ctx context.Context) error {
 	// Azure Instance Metadata Service endpoint
 	tokenURL := "http://169.254.169.254/metadata/identity/oauth2/token"
-	
+
 	params := url.Values{}
 	params.Set("api-version", "2018-02-01")
 	params.Set("resource", "https://management.azure.com/")
@@ -203,10 +203,10 @@ func (p *AzureProviderComplete) DiscoverResources(ctx context.Context, region st
 	// Azure doesn't use regions in the same way as AWS, but we can use resource groups
 	// For now, return empty list or implement actual discovery logic
 	resources := []models.Resource{}
-	
+
 	// TODO: Implement actual resource discovery
 	// This would involve listing various resource types from Azure
-	
+
 	return resources, nil
 }
 
@@ -235,7 +235,7 @@ func (p *AzureProviderComplete) GetResource(ctx context.Context, resourceID stri
 	} else if strings.Contains(resourceID, "/managedClusters/") {
 		return p.GetResourceByType(ctx, "azurerm_kubernetes_cluster", resourceID)
 	}
-	
+
 	// Extract the last part of the ID as resource name and try different types
 	parts := strings.Split(resourceID, "/")
 	if len(parts) > 0 {
@@ -245,7 +245,7 @@ func (p *AzureProviderComplete) GetResource(ctx context.Context, resourceID stri
 			return res, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("unable to determine resource type for ID: %s", resourceID)
 }
 
@@ -316,7 +316,7 @@ func (p *AzureProviderComplete) GetResourceByType(ctx context.Context, resourceT
 func (p *AzureProviderComplete) getVirtualMachine(ctx context.Context, vmName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s",
 		p.subscriptionID, p.resourceGroup, vmName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Compute/virtualMachines"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -331,16 +331,16 @@ func (p *AzureProviderComplete) getVirtualMachine(ctx context.Context, vmName st
 	}
 
 	properties := vm["properties"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   vmName,
 		Type: "azurerm_virtual_machine",
 		Attributes: map[string]interface{}{
-			"name":              vm["name"],
-			"location":          vm["location"],
-			"vm_size":           properties["hardwareProfile"].(map[string]interface{})["vmSize"],
-			"tags":              vm["tags"],
-			"zones":             vm["zones"],
+			"name":               vm["name"],
+			"location":           vm["location"],
+			"vm_size":            properties["hardwareProfile"].(map[string]interface{})["vmSize"],
+			"tags":               vm["tags"],
+			"zones":              vm["zones"],
 			"provisioning_state": properties["provisioningState"],
 		},
 	}, nil
@@ -350,7 +350,7 @@ func (p *AzureProviderComplete) getVirtualMachine(ctx context.Context, vmName st
 func (p *AzureProviderComplete) getVirtualNetwork(ctx context.Context, vnetName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s",
 		p.subscriptionID, p.resourceGroup, vnetName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Network/virtualNetworks"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -366,7 +366,7 @@ func (p *AzureProviderComplete) getVirtualNetwork(ctx context.Context, vnetName 
 
 	properties := vnet["properties"].(map[string]interface{})
 	addressSpace := properties["addressSpace"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   vnetName,
 		Type: "azurerm_virtual_network",
@@ -392,7 +392,7 @@ func (p *AzureProviderComplete) getSubnet(ctx context.Context, subnetID string) 
 
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets/%s",
 		p.subscriptionID, p.resourceGroup, vnetName, subnetName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Network/virtualNetworks"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -407,15 +407,15 @@ func (p *AzureProviderComplete) getSubnet(ctx context.Context, subnetID string) 
 	}
 
 	properties := subnet["properties"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   subnetID,
 		Type: "azurerm_subnet",
 		Attributes: map[string]interface{}{
-			"name":               subnet["name"],
-			"address_prefixes":   []string{properties["addressPrefix"].(string)},
+			"name":                 subnet["name"],
+			"address_prefixes":     []string{properties["addressPrefix"].(string)},
 			"virtual_network_name": vnetName,
-			"provisioning_state": properties["provisioningState"],
+			"provisioning_state":   properties["provisioningState"],
 		},
 	}, nil
 }
@@ -424,7 +424,7 @@ func (p *AzureProviderComplete) getSubnet(ctx context.Context, subnetID string) 
 func (p *AzureProviderComplete) getNetworkSecurityGroup(ctx context.Context, nsgName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s",
 		p.subscriptionID, p.resourceGroup, nsgName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Network/networkSecurityGroups"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -439,7 +439,7 @@ func (p *AzureProviderComplete) getNetworkSecurityGroup(ctx context.Context, nsg
 	}
 
 	properties := nsg["properties"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   nsgName,
 		Type: "azurerm_network_security_group",
@@ -457,7 +457,7 @@ func (p *AzureProviderComplete) getNetworkSecurityGroup(ctx context.Context, nsg
 func (p *AzureProviderComplete) getStorageAccount(ctx context.Context, storageAccountName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
 		p.subscriptionID, p.resourceGroup, storageAccountName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Storage/storageAccounts"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -473,7 +473,7 @@ func (p *AzureProviderComplete) getStorageAccount(ctx context.Context, storageAc
 
 	properties := storage["properties"].(map[string]interface{})
 	sku := storage["sku"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   storageAccountName,
 		Type: "azurerm_storage_account",
@@ -494,7 +494,7 @@ func (p *AzureProviderComplete) getStorageAccount(ctx context.Context, storageAc
 func (p *AzureProviderComplete) getSQLServer(ctx context.Context, serverName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Sql/servers/%s",
 		p.subscriptionID, p.resourceGroup, serverName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Sql/servers"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -509,18 +509,18 @@ func (p *AzureProviderComplete) getSQLServer(ctx context.Context, serverName str
 	}
 
 	properties := server["properties"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   serverName,
 		Type: "azurerm_sql_server",
 		Attributes: map[string]interface{}{
-			"name":                       server["name"],
-			"location":                   server["location"],
-			"version":                    properties["version"],
-			"administrator_login":        properties["administratorLogin"],
+			"name":                        server["name"],
+			"location":                    server["location"],
+			"version":                     properties["version"],
+			"administrator_login":         properties["administratorLogin"],
 			"fully_qualified_domain_name": properties["fullyQualifiedDomainName"],
-			"tags":                       server["tags"],
-			"state":                      properties["state"],
+			"tags":                        server["tags"],
+			"state":                       properties["state"],
 		},
 	}, nil
 }
@@ -537,7 +537,7 @@ func (p *AzureProviderComplete) getSQLDatabase(ctx context.Context, dbID string)
 
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Sql/servers/%s/databases/%s",
 		p.subscriptionID, p.resourceGroup, serverName, dbName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Sql/servers/databases"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -553,21 +553,21 @@ func (p *AzureProviderComplete) getSQLDatabase(ctx context.Context, dbID string)
 
 	properties := db["properties"].(map[string]interface{})
 	sku := db["sku"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   dbID,
 		Type: "azurerm_sql_database",
 		Attributes: map[string]interface{}{
-			"name":                   db["name"],
-			"server_name":            serverName,
-			"location":               db["location"],
-			"edition":                sku["tier"],
-			"collation":              properties["collation"],
-			"max_size_bytes":         properties["maxSizeBytes"],
-			"tags":                   db["tags"],
-			"status":                 properties["status"],
-			"catalog_collation":      properties["catalogCollation"],
-			"zone_redundant":         properties["zoneRedundant"],
+			"name":              db["name"],
+			"server_name":       serverName,
+			"location":          db["location"],
+			"edition":           sku["tier"],
+			"collation":         properties["collation"],
+			"max_size_bytes":    properties["maxSizeBytes"],
+			"tags":              db["tags"],
+			"status":            properties["status"],
+			"catalog_collation": properties["catalogCollation"],
+			"zone_redundant":    properties["zoneRedundant"],
 		},
 	}, nil
 }
@@ -576,7 +576,7 @@ func (p *AzureProviderComplete) getSQLDatabase(ctx context.Context, dbID string)
 func (p *AzureProviderComplete) getKeyVault(ctx context.Context, vaultName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.KeyVault/vaults/%s",
 		p.subscriptionID, p.resourceGroup, vaultName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.KeyVault/vaults"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -591,22 +591,22 @@ func (p *AzureProviderComplete) getKeyVault(ctx context.Context, vaultName strin
 	}
 
 	properties := vault["properties"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   vaultName,
 		Type: "azurerm_key_vault",
 		Attributes: map[string]interface{}{
-			"name":                      vault["name"],
-			"location":                  vault["location"],
-			"tenant_id":                 properties["tenantId"],
-			"sku_name":                  properties["sku"].(map[string]interface{})["name"],
-			"vault_uri":                 properties["vaultUri"],
-			"enabled_for_deployment":    properties["enabledForDeployment"],
-			"enabled_for_disk_encryption": properties["enabledForDiskEncryption"],
+			"name":                            vault["name"],
+			"location":                        vault["location"],
+			"tenant_id":                       properties["tenantId"],
+			"sku_name":                        properties["sku"].(map[string]interface{})["name"],
+			"vault_uri":                       properties["vaultUri"],
+			"enabled_for_deployment":          properties["enabledForDeployment"],
+			"enabled_for_disk_encryption":     properties["enabledForDiskEncryption"],
 			"enabled_for_template_deployment": properties["enabledForTemplateDeployment"],
-			"enable_soft_delete":        properties["enableSoftDelete"],
-			"soft_delete_retention_days": properties["softDeleteRetentionInDays"],
-			"tags":                      vault["tags"],
+			"enable_soft_delete":              properties["enableSoftDelete"],
+			"soft_delete_retention_days":      properties["softDeleteRetentionInDays"],
+			"tags":                            vault["tags"],
 		},
 	}, nil
 }
@@ -615,7 +615,7 @@ func (p *AzureProviderComplete) getKeyVault(ctx context.Context, vaultName strin
 func (p *AzureProviderComplete) getAppService(ctx context.Context, appName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Web/sites/%s",
 		p.subscriptionID, p.resourceGroup, appName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Web/sites"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -630,21 +630,21 @@ func (p *AzureProviderComplete) getAppService(ctx context.Context, appName strin
 	}
 
 	properties := app["properties"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   appName,
 		Type: "azurerm_app_service",
 		Attributes: map[string]interface{}{
-			"name":                 app["name"],
-			"location":             app["location"],
-			"app_service_plan_id":  properties["serverFarmId"],
-			"enabled":              properties["enabled"],
-			"https_only":           properties["httpsOnly"],
-			"client_cert_enabled":  properties["clientCertEnabled"],
-			"default_host_name":    properties["defaultHostName"],
+			"name":                  app["name"],
+			"location":              app["location"],
+			"app_service_plan_id":   properties["serverFarmId"],
+			"enabled":               properties["enabled"],
+			"https_only":            properties["httpsOnly"],
+			"client_cert_enabled":   properties["clientCertEnabled"],
+			"default_host_name":     properties["defaultHostName"],
 			"outbound_ip_addresses": properties["outboundIpAddresses"],
-			"state":                properties["state"],
-			"tags":                 app["tags"],
+			"state":                 properties["state"],
+			"tags":                  app["tags"],
 		},
 	}, nil
 }
@@ -653,7 +653,7 @@ func (p *AzureProviderComplete) getAppService(ctx context.Context, appName strin
 func (p *AzureProviderComplete) getContainerRegistry(ctx context.Context, registryName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ContainerRegistry/registries/%s",
 		p.subscriptionID, p.resourceGroup, registryName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.ContainerRegistry/registries"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -669,20 +669,20 @@ func (p *AzureProviderComplete) getContainerRegistry(ctx context.Context, regist
 
 	properties := registry["properties"].(map[string]interface{})
 	sku := registry["sku"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   registryName,
 		Type: "azurerm_container_registry",
 		Attributes: map[string]interface{}{
-			"name":                   registry["name"],
-			"location":               registry["location"],
-			"sku":                    sku["name"],
-			"admin_enabled":          properties["adminUserEnabled"],
-			"login_server":           properties["loginServer"],
+			"name":                          registry["name"],
+			"location":                      registry["location"],
+			"sku":                           sku["name"],
+			"admin_enabled":                 properties["adminUserEnabled"],
+			"login_server":                  properties["loginServer"],
 			"public_network_access_enabled": properties["publicNetworkAccess"] == "Enabled",
-			"zone_redundancy_enabled": properties["zoneRedundancy"] == "Enabled",
-			"tags":                   registry["tags"],
-			"provisioning_state":     properties["provisioningState"],
+			"zone_redundancy_enabled":       properties["zoneRedundancy"] == "Enabled",
+			"tags":                          registry["tags"],
+			"provisioning_state":            properties["provisioningState"],
 		},
 	}, nil
 }
@@ -691,7 +691,7 @@ func (p *AzureProviderComplete) getContainerRegistry(ctx context.Context, regist
 func (p *AzureProviderComplete) getKubernetesCluster(ctx context.Context, clusterName string) (*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ContainerService/managedClusters/%s",
 		p.subscriptionID, p.resourceGroup, clusterName)
-	
+
 	apiVersion := p.apiVersion["Microsoft.ContainerService/managedClusters"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -706,20 +706,20 @@ func (p *AzureProviderComplete) getKubernetesCluster(ctx context.Context, cluste
 	}
 
 	properties := cluster["properties"].(map[string]interface{})
-	
+
 	return &models.Resource{
 		ID:   clusterName,
 		Type: "azurerm_kubernetes_cluster",
 		Attributes: map[string]interface{}{
-			"name":                 cluster["name"],
-			"location":             cluster["location"],
-			"kubernetes_version":   properties["kubernetesVersion"],
-			"dns_prefix":           properties["dnsPrefix"],
-			"fqdn":                 properties["fqdn"],
-			"node_resource_group":  properties["nodeResourceGroup"],
-			"enable_rbac":          properties["enableRBAC"],
-			"tags":                 cluster["tags"],
-			"provisioning_state":   properties["provisioningState"],
+			"name":                cluster["name"],
+			"location":            cluster["location"],
+			"kubernetes_version":  properties["kubernetesVersion"],
+			"dns_prefix":          properties["dnsPrefix"],
+			"fqdn":                properties["fqdn"],
+			"node_resource_group": properties["nodeResourceGroup"],
+			"enable_rbac":         properties["enableRBAC"],
+			"tags":                cluster["tags"],
+			"provisioning_state":  properties["provisioningState"],
 		},
 	}, nil
 }
@@ -754,7 +754,7 @@ func (p *AzureProviderComplete) ListResources(ctx context.Context, resourceType 
 func (p *AzureProviderComplete) listVirtualMachines(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Compute/virtualMachines"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -792,7 +792,7 @@ func (p *AzureProviderComplete) listVirtualMachines(ctx context.Context) ([]*mod
 func (p *AzureProviderComplete) listVirtualNetworks(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Network/virtualNetworks"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -831,7 +831,7 @@ func (p *AzureProviderComplete) listVirtualNetworks(ctx context.Context) ([]*mod
 func (p *AzureProviderComplete) listNetworkSecurityGroups(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Network/networkSecurityGroups"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -866,7 +866,7 @@ func (p *AzureProviderComplete) listNetworkSecurityGroups(ctx context.Context) (
 func (p *AzureProviderComplete) listStorageAccounts(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Storage/storageAccounts"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -904,7 +904,7 @@ func (p *AzureProviderComplete) listStorageAccounts(ctx context.Context) ([]*mod
 func (p *AzureProviderComplete) listSQLServers(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Sql/servers",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Sql/servers"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -942,7 +942,7 @@ func (p *AzureProviderComplete) listSQLServers(ctx context.Context) ([]*models.R
 func (p *AzureProviderComplete) listKeyVaults(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.KeyVault/vaults",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.KeyVault/vaults"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -977,7 +977,7 @@ func (p *AzureProviderComplete) listKeyVaults(ctx context.Context) ([]*models.Re
 func (p *AzureProviderComplete) listAppServices(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Web/sites",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.Web/sites"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -1014,7 +1014,7 @@ func (p *AzureProviderComplete) listAppServices(ctx context.Context) ([]*models.
 func (p *AzureProviderComplete) listContainerRegistries(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ContainerRegistry/registries",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.ContainerRegistry/registries"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 
@@ -1051,7 +1051,7 @@ func (p *AzureProviderComplete) listContainerRegistries(ctx context.Context) ([]
 func (p *AzureProviderComplete) listKubernetesClusters(ctx context.Context) ([]*models.Resource, error) {
 	path := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ContainerService/managedClusters",
 		p.subscriptionID, p.resourceGroup)
-	
+
 	apiVersion := p.apiVersion["Microsoft.ContainerService/managedClusters"]
 	fullPath := fmt.Sprintf("%s?api-version=%s", path, apiVersion)
 

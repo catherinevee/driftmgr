@@ -34,29 +34,29 @@ type CloudSDK interface {
 
 // Credentials represents cloud provider credentials
 type Credentials struct {
-	Provider        string
-	AccessKey       string
-	SecretKey       string
-	Token           string
-	Region          string
-	ProjectID       string
-	SubscriptionID  string
-	TenantID        string
-	ClientID        string
-	ClientSecret    string
-	ServiceAccount  string
-	KeyFile         string
-	Extra           map[string]string
+	Provider       string
+	AccessKey      string
+	SecretKey      string
+	Token          string
+	Region         string
+	ProjectID      string
+	SubscriptionID string
+	TenantID       string
+	ClientID       string
+	ClientSecret   string
+	ServiceAccount string
+	KeyFile        string
+	Extra          map[string]string
 }
 
 // RateLimiter implements rate limiting for API calls
 type RateLimiter struct {
-	mu           sync.Mutex
-	tokens       int
-	maxTokens    int
-	refillRate   int
-	lastRefill   time.Time
-	waitQueue    []chan struct{}
+	mu         sync.Mutex
+	tokens     int
+	maxTokens  int
+	refillRate int
+	lastRefill time.Time
+	waitQueue  []chan struct{}
 }
 
 // RetryPolicy defines retry behavior
@@ -70,13 +70,13 @@ type RetryPolicy struct {
 
 // SDKMetrics tracks SDK usage metrics
 type SDKMetrics struct {
-	APICallsTotal      map[string]int64
-	APICallsPerSecond  map[string]float64
-	ErrorCount         map[string]int64
-	RetryCount         map[string]int64
-	RateLimitHits      map[string]int64
-	AverageLatency     map[string]time.Duration
-	LastAPICall        map[string]time.Time
+	APICallsTotal     map[string]int64
+	APICallsPerSecond map[string]float64
+	ErrorCount        map[string]int64
+	RetryCount        map[string]int64
+	RateLimitHits     map[string]int64
+	AverageLatency    map[string]time.Duration
+	LastAPICall       map[string]time.Time
 }
 
 // NewSDKIntegration creates a new SDK integration manager
@@ -103,9 +103,9 @@ func NewSDKIntegration() *SDKIntegration {
 func (si *SDKIntegration) RegisterProvider(provider string, sdk CloudSDK) {
 	si.mu.Lock()
 	defer si.mu.Unlock()
-	
+
 	si.providers[provider] = sdk
-	
+
 	// Set default rate limiter
 	si.rateLimiters[provider] = &RateLimiter{
 		maxTokens:  100,
@@ -114,7 +114,7 @@ func (si *SDKIntegration) RegisterProvider(provider string, sdk CloudSDK) {
 		lastRefill: time.Now(),
 		waitQueue:  make([]chan struct{}, 0),
 	}
-	
+
 	// Set default retry policy
 	si.retryPolicies[provider] = &RetryPolicy{
 		MaxRetries:    3,
@@ -134,18 +134,18 @@ func (si *SDKIntegration) RegisterProvider(provider string, sdk CloudSDK) {
 func (si *SDKIntegration) SetCredentials(provider string, creds Credentials) error {
 	si.mu.Lock()
 	defer si.mu.Unlock()
-	
+
 	if _, exists := si.providers[provider]; !exists {
 		return fmt.Errorf("provider %s not registered", provider)
 	}
-	
+
 	si.credentials[provider] = creds
-	
+
 	// Initialize the SDK with credentials
 	if err := si.providers[provider].Initialize(creds); err != nil {
 		return fmt.Errorf("failed to initialize %s SDK: %w", provider, err)
 	}
-	
+
 	return nil
 }
 
@@ -153,7 +153,7 @@ func (si *SDKIntegration) SetCredentials(provider string, creds Credentials) err
 func (si *SDKIntegration) SetRateLimiter(provider string, maxTokens, refillRate int) {
 	si.mu.Lock()
 	defer si.mu.Unlock()
-	
+
 	si.rateLimiters[provider] = &RateLimiter{
 		maxTokens:  maxTokens,
 		tokens:     maxTokens,
@@ -177,43 +177,43 @@ func (si *SDKIntegration) CallAPI(ctx context.Context, provider string, operatio
 	rateLimiter, hasLimiter := si.rateLimiters[provider]
 	retryPolicy, hasPolicy := si.retryPolicies[provider]
 	si.mu.RUnlock()
-	
+
 	if !hasLimiter || !hasPolicy {
 		return nil, fmt.Errorf("provider %s not configured", provider)
 	}
-	
+
 	// Apply rate limiting
 	if err := si.applyRateLimit(provider, rateLimiter); err != nil {
 		return nil, err
 	}
-	
+
 	// Execute with retry logic
 	var result interface{}
 	var lastErr error
 	delay := retryPolicy.InitialDelay
-	
+
 	for attempt := 0; attempt <= retryPolicy.MaxRetries; attempt++ {
 		startTime := time.Now()
-		
+
 		result, lastErr = operation()
-		
+
 		// Update metrics
 		si.updateMetrics(provider, time.Since(startTime), lastErr)
-		
+
 		if lastErr == nil {
 			return result, nil
 		}
-		
+
 		// Check if error is retryable
 		if !si.isRetryableError(lastErr, retryPolicy) {
 			break
 		}
-		
+
 		if attempt < retryPolicy.MaxRetries {
 			si.mu.Lock()
 			si.metrics.RetryCount[provider]++
 			si.mu.Unlock()
-			
+
 			// Apply backoff
 			select {
 			case <-ctx.Done():
@@ -226,7 +226,7 @@ func (si *SDKIntegration) CallAPI(ctx context.Context, provider string, operatio
 			}
 		}
 	}
-	
+
 	return nil, fmt.Errorf("API call failed after %d retries: %w", retryPolicy.MaxRetries, lastErr)
 }
 
@@ -235,19 +235,19 @@ func (si *SDKIntegration) ListResources(ctx context.Context, provider, resourceT
 	si.mu.RLock()
 	sdk, exists := si.providers[provider]
 	si.mu.RUnlock()
-	
+
 	if !exists {
 		return nil, fmt.Errorf("provider %s not registered", provider)
 	}
-	
+
 	result, err := si.CallAPI(ctx, provider, func() (interface{}, error) {
 		return sdk.ListResources(ctx, resourceType, params)
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return result.([]models.Resource), nil
 }
 
@@ -256,19 +256,19 @@ func (si *SDKIntegration) GetResource(ctx context.Context, provider, resourceID 
 	si.mu.RLock()
 	sdk, exists := si.providers[provider]
 	si.mu.RUnlock()
-	
+
 	if !exists {
 		return nil, fmt.Errorf("provider %s not registered", provider)
 	}
-	
+
 	result, err := si.CallAPI(ctx, provider, func() (interface{}, error) {
 		return sdk.GetResource(ctx, resourceID)
 	})
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return result.(*models.Resource), nil
 }
 
@@ -277,15 +277,15 @@ func (si *SDKIntegration) TagResource(ctx context.Context, provider, resourceID 
 	si.mu.RLock()
 	sdk, exists := si.providers[provider]
 	si.mu.RUnlock()
-	
+
 	if !exists {
 		return fmt.Errorf("provider %s not registered", provider)
 	}
-	
+
 	_, err := si.CallAPI(ctx, provider, func() (interface{}, error) {
 		return nil, sdk.TagResource(ctx, resourceID, tags)
 	})
-	
+
 	return err
 }
 
@@ -293,7 +293,7 @@ func (si *SDKIntegration) TagResource(ctx context.Context, provider, resourceID 
 func (si *SDKIntegration) GetMetrics() *SDKMetrics {
 	si.mu.RLock()
 	defer si.mu.RUnlock()
-	
+
 	// Create a copy to avoid race conditions
 	metricsCopy := &SDKMetrics{
 		APICallsTotal:     make(map[string]int64),
@@ -304,7 +304,7 @@ func (si *SDKIntegration) GetMetrics() *SDKMetrics {
 		AverageLatency:    make(map[string]time.Duration),
 		LastAPICall:       make(map[string]time.Time),
 	}
-	
+
 	for k, v := range si.metrics.APICallsTotal {
 		metricsCopy.APICallsTotal[k] = v
 	}
@@ -326,7 +326,7 @@ func (si *SDKIntegration) GetMetrics() *SDKMetrics {
 	for k, v := range si.metrics.LastAPICall {
 		metricsCopy.LastAPICall[k] = v
 	}
-	
+
 	return metricsCopy
 }
 
@@ -334,32 +334,32 @@ func (si *SDKIntegration) GetMetrics() *SDKMetrics {
 func (si *SDKIntegration) GetProviderStatus(provider string) map[string]interface{} {
 	si.mu.RLock()
 	defer si.mu.RUnlock()
-	
+
 	sdk, exists := si.providers[provider]
 	if !exists {
 		return map[string]interface{}{
 			"status": "not_registered",
 		}
 	}
-	
+
 	status := map[string]interface{}{
-		"status":           "active",
-		"api_calls_total":  si.metrics.APICallsTotal[provider],
-		"error_count":      si.metrics.ErrorCount[provider],
-		"retry_count":      si.metrics.RetryCount[provider],
-		"rate_limit_hits":  si.metrics.RateLimitHits[provider],
-		"average_latency":  si.metrics.AverageLatency[provider].String(),
-		"last_api_call":    si.metrics.LastAPICall[provider].Format(time.RFC3339),
-		"has_credentials":  si.credentials[provider].Provider != "",
+		"status":          "active",
+		"api_calls_total": si.metrics.APICallsTotal[provider],
+		"error_count":     si.metrics.ErrorCount[provider],
+		"retry_count":     si.metrics.RetryCount[provider],
+		"rate_limit_hits": si.metrics.RateLimitHits[provider],
+		"average_latency": si.metrics.AverageLatency[provider].String(),
+		"last_api_call":   si.metrics.LastAPICall[provider].Format(time.RFC3339),
+		"has_credentials": si.credentials[provider].Provider != "",
 	}
-	
+
 	if sdk != nil {
 		status["sdk_api_calls"] = sdk.GetAPICallCount()
 		if lastErr := sdk.GetLastError(); lastErr != nil {
 			status["last_error"] = lastErr.Error()
 		}
 	}
-	
+
 	return status
 }
 
@@ -375,12 +375,12 @@ func (si *SDKIntegration) ClearCache() {
 func (si *SDKIntegration) applyRateLimit(provider string, limiter *RateLimiter) error {
 	limiter.mu.Lock()
 	defer limiter.mu.Unlock()
-	
+
 	// Refill tokens
 	now := time.Now()
 	elapsed := now.Sub(limiter.lastRefill).Seconds()
 	tokensToAdd := int(elapsed * float64(limiter.refillRate))
-	
+
 	if tokensToAdd > 0 {
 		limiter.tokens += tokensToAdd
 		if limiter.tokens > limiter.maxTokens {
@@ -388,27 +388,27 @@ func (si *SDKIntegration) applyRateLimit(provider string, limiter *RateLimiter) 
 		}
 		limiter.lastRefill = now
 	}
-	
+
 	// Check if we have tokens available
 	if limiter.tokens > 0 {
 		limiter.tokens--
 		return nil
 	}
-	
+
 	// No tokens available, increment rate limit hit counter
 	si.mu.Lock()
 	si.metrics.RateLimitHits[provider]++
 	si.mu.Unlock()
-	
+
 	// Wait for token
 	waitCh := make(chan struct{})
 	limiter.waitQueue = append(limiter.waitQueue, waitCh)
-	
+
 	go func() {
 		time.Sleep(time.Second / time.Duration(limiter.refillRate))
 		close(waitCh)
 	}()
-	
+
 	<-waitCh
 	return nil
 }
@@ -426,10 +426,10 @@ func (si *SDKIntegration) isRetryableError(err error, policy *RetryPolicy) bool 
 func (si *SDKIntegration) updateMetrics(provider string, latency time.Duration, err error) {
 	si.mu.Lock()
 	defer si.mu.Unlock()
-	
+
 	si.metrics.APICallsTotal[provider]++
 	si.metrics.LastAPICall[provider] = time.Now()
-	
+
 	// Update average latency (simple moving average)
 	if currentAvg, exists := si.metrics.AverageLatency[provider]; exists {
 		callCount := si.metrics.APICallsTotal[provider]
@@ -438,7 +438,7 @@ func (si *SDKIntegration) updateMetrics(provider string, latency time.Duration, 
 	} else {
 		si.metrics.AverageLatency[provider] = latency
 	}
-	
+
 	// Calculate calls per second
 	if lastCall, exists := si.metrics.LastAPICall[provider]; exists {
 		timeDiff := time.Now().Sub(lastCall).Seconds()
@@ -446,7 +446,7 @@ func (si *SDKIntegration) updateMetrics(provider string, latency time.Duration, 
 			si.metrics.APICallsPerSecond[provider] = 1.0 / timeDiff
 		}
 	}
-	
+
 	if err != nil {
 		si.metrics.ErrorCount[provider]++
 	}
@@ -460,7 +460,7 @@ func contains(s, substr string) bool {
 func (si *SDKIntegration) Cleanup() {
 	si.mu.Lock()
 	defer si.mu.Unlock()
-	
+
 	// Clear all caches and connections
 	si.clientCache = make(map[string]interface{})
 	si.providers = make(map[string]CloudSDK)

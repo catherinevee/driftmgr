@@ -38,11 +38,11 @@ type TerragruntConfig struct {
 }
 
 type RemoteStateConfig struct {
-	Backend string                 `json:"backend"`
-	Generate *GenerateConfig       `json:"generate,omitempty"`
-	Config  map[string]interface{} `json:"config"`
-	DisableInit bool              `json:"disable_init"`
-	DisableDependencyOptimization bool `json:"disable_dependency_optimization"`
+	Backend                       string                 `json:"backend"`
+	Generate                      *GenerateConfig        `json:"generate,omitempty"`
+	Config                        map[string]interface{} `json:"config"`
+	DisableInit                   bool                   `json:"disable_init"`
+	DisableDependencyOptimization bool                   `json:"disable_dependency_optimization"`
 }
 
 type GenerateConfig struct {
@@ -51,11 +51,11 @@ type GenerateConfig struct {
 }
 
 type DependencyConfig struct {
-	Name       string                 `json:"name"`
-	ConfigPath string                 `json:"config_path"`
-	Enabled    bool                   `json:"enabled"`
+	Name        string                 `json:"name"`
+	ConfigPath  string                 `json:"config_path"`
+	Enabled     bool                   `json:"enabled"`
 	MockOutputs map[string]interface{} `json:"mock_outputs,omitempty"`
-	SkipOutputs bool                  `json:"skip_outputs"`
+	SkipOutputs bool                   `json:"skip_outputs"`
 }
 
 func NewTerragruntParser(rootDir string) *TerragruntParser {
@@ -109,13 +109,13 @@ func (tp *TerragruntParser) ParseAll() error {
 		wg.Add(1)
 		go func(f string) {
 			defer wg.Done()
-			
+
 			config, err := tp.parseFile(f)
 			if err != nil {
 				errCh <- fmt.Errorf("failed to parse %s: %w", f, err)
 				return
 			}
-			
+
 			configCh <- struct {
 				path   string
 				config *TerragruntConfig
@@ -200,12 +200,12 @@ func (tp *TerragruntParser) parseSimplifiedHCL(content string, config *Terragrun
 				Name:    match[1],
 				Enabled: true,
 			}
-			
+
 			// Extract config_path
 			if pathMatch := regexp.MustCompile(`config_path\s*=\s*"([^"]+)"`).FindStringSubmatch(match[2]); len(pathMatch) > 1 {
 				dep.ConfigPath = pathMatch[1]
 			}
-			
+
 			config.Dependencies = append(config.Dependencies, dep)
 		}
 	}
@@ -261,7 +261,7 @@ func (tp *TerragruntParser) parseRemoteState(content string) *RemoteStateConfig 
 
 func (tp *TerragruntParser) parseConfigBlock(content string) map[string]interface{} {
 	config := make(map[string]interface{})
-	
+
 	// Parse key-value pairs
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
@@ -284,27 +284,27 @@ func (tp *TerragruntParser) parseConfigBlock(content string) map[string]interfac
 			}
 		}
 	}
-	
+
 	return config
 }
 
 func (tp *TerragruntParser) parseGenerateBlock(content string) *GenerateConfig {
 	gen := &GenerateConfig{}
-	
+
 	if match := regexp.MustCompile(`path\s*=\s*"([^"]+)"`).FindStringSubmatch(content); len(match) > 1 {
 		gen.Path = match[1]
 	}
-	
+
 	if match := regexp.MustCompile(`if_exists\s*=\s*"([^"]+)"`).FindStringSubmatch(content); len(match) > 1 {
 		gen.IfExists = match[1]
 	}
-	
+
 	return gen
 }
 
 func (tp *TerragruntParser) parseInputs(content string) map[string]interface{} {
 	inputs := make(map[string]interface{})
-	
+
 	// Simple key-value parsing
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
@@ -317,10 +317,10 @@ func (tp *TerragruntParser) parseInputs(content string) map[string]interface{} {
 		if match := regexp.MustCompile(`(\w+)\s*=\s*(.+)`).FindStringSubmatch(line); len(match) > 2 {
 			key := match[1]
 			value := strings.TrimSpace(match[2])
-			
+
 			// Remove trailing comma if present
 			value = strings.TrimSuffix(value, ",")
-			
+
 			// Parse value type
 			if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
 				inputs[key] = strings.Trim(value, "\"")
@@ -334,18 +334,18 @@ func (tp *TerragruntParser) parseInputs(content string) map[string]interface{} {
 			}
 		}
 	}
-	
+
 	return inputs
 }
 
 func (tp *TerragruntParser) parseArrayValue(value string) []string {
 	// Remove brackets
 	value = strings.Trim(value, "[]")
-	
+
 	// Split by comma and clean up
 	items := strings.Split(value, ",")
 	result := make([]string, 0, len(items))
-	
+
 	for _, item := range items {
 		item = strings.TrimSpace(item)
 		item = strings.Trim(item, "\"")
@@ -353,7 +353,7 @@ func (tp *TerragruntParser) parseArrayValue(value string) []string {
 			result = append(result, item)
 		}
 	}
-	
+
 	return result
 }
 
@@ -365,10 +365,10 @@ func (tp *TerragruntParser) parseHCLBody(body *hclparse.Body, config *Terragrunt
 
 func (tp *TerragruntParser) buildDependencyGraph() {
 	tp.dependencies = make(map[string][]string)
-	
+
 	for path, config := range tp.configs {
 		deps := make([]string, 0)
-		
+
 		// Add explicit dependencies
 		for _, dep := range config.Dependencies {
 			if dep.ConfigPath != "" {
@@ -378,7 +378,7 @@ func (tp *TerragruntParser) buildDependencyGraph() {
 				deps = append(deps, depPath)
 			}
 		}
-		
+
 		// Add include dependencies
 		for _, includePath := range config.IncludePaths {
 			// Resolve include path
@@ -386,7 +386,7 @@ func (tp *TerragruntParser) buildDependencyGraph() {
 			incPath = filepath.Clean(incPath)
 			deps = append(deps, incPath)
 		}
-		
+
 		tp.dependencies[path] = deps
 	}
 }
@@ -394,89 +394,89 @@ func (tp *TerragruntParser) buildDependencyGraph() {
 func (tp *TerragruntParser) GetConfig(path string) (*TerragruntConfig, error) {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
-	
+
 	config, exists := tp.configs[path]
 	if !exists {
 		return nil, fmt.Errorf("config not found for path: %s", path)
 	}
-	
+
 	return config, nil
 }
 
 func (tp *TerragruntParser) GetAllConfigs() map[string]*TerragruntConfig {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
-	
+
 	configs := make(map[string]*TerragruntConfig)
 	for k, v := range tp.configs {
 		configs[k] = v
 	}
-	
+
 	return configs
 }
 
 func (tp *TerragruntParser) GetDependencies(path string) []string {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
-	
+
 	deps, exists := tp.dependencies[path]
 	if !exists {
 		return []string{}
 	}
-	
+
 	return deps
 }
 
 func (tp *TerragruntParser) GetDependencyOrder() ([]string, error) {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
-	
+
 	// Topological sort for execution order
 	visited := make(map[string]bool)
 	stack := make([]string, 0)
-	
+
 	var visit func(string) error
 	visit = func(path string) error {
 		if visited[path] {
 			return nil
 		}
-		
+
 		visited[path] = true
-		
+
 		// Visit dependencies first
 		for _, dep := range tp.dependencies[path] {
 			if err := visit(dep); err != nil {
 				return err
 			}
 		}
-		
+
 		stack = append(stack, path)
 		return nil
 	}
-	
+
 	// Visit all configs
 	for path := range tp.configs {
 		if err := visit(path); err != nil {
 			return nil, err
 		}
 	}
-	
+
 	return stack, nil
 }
 
 func (tp *TerragruntParser) ValidateDependencies() []error {
 	tp.mu.RLock()
 	defer tp.mu.RUnlock()
-	
+
 	errors := make([]error, 0)
-	
+
 	// Check for circular dependencies
 	for path := range tp.configs {
 		if tp.hasCircularDependency(path, make(map[string]bool)) {
 			errors = append(errors, fmt.Errorf("circular dependency detected for %s", path))
 		}
 	}
-	
+
 	// Check for missing dependencies
 	for path, deps := range tp.dependencies {
 		for _, dep := range deps {
@@ -485,7 +485,7 @@ func (tp *TerragruntParser) ValidateDependencies() []error {
 			}
 		}
 	}
-	
+
 	return errors
 }
 
@@ -493,15 +493,15 @@ func (tp *TerragruntParser) hasCircularDependency(path string, visiting map[stri
 	if visiting[path] {
 		return true
 	}
-	
+
 	visiting[path] = true
 	defer delete(visiting, path)
-	
+
 	for _, dep := range tp.dependencies[path] {
 		if tp.hasCircularDependency(dep, visiting) {
 			return true
 		}
 	}
-	
+
 	return false
 }

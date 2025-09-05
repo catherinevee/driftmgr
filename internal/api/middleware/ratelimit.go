@@ -22,29 +22,29 @@ type RateLimitMiddleware struct {
 // RateLimitConfig defines rate limiting configuration
 type RateLimitConfig struct {
 	// Global limits
-	GlobalRPS     int // Requests per second globally
-	GlobalBurst   int // Burst size globally
-	
+	GlobalRPS   int // Requests per second globally
+	GlobalBurst int // Burst size globally
+
 	// Per-user limits
-	UserRPS       int // Requests per second per user
-	UserBurst     int // Burst size per user
-	
+	UserRPS   int // Requests per second per user
+	UserBurst int // Burst size per user
+
 	// Per-IP limits
-	IPRPS         int // Requests per second per IP
-	IPBurst       int // Burst size per IP
-	
+	IPRPS   int // Requests per second per IP
+	IPBurst int // Burst size per IP
+
 	// API key limits (higher for service accounts)
-	APIKeyRPS     int // Requests per second for API keys
-	APIKeyBurst   int // Burst size for API keys
-	
+	APIKeyRPS   int // Requests per second for API keys
+	APIKeyBurst int // Burst size for API keys
+
 	// Endpoint-specific limits
 	EndpointLimits map[string]EndpointLimit
-	
+
 	// Cleanup interval
 	CleanupInterval time.Duration
-	
+
 	// TTL for inactive limiters
-	InactiveTTL     time.Duration
+	InactiveTTL time.Duration
 }
 
 // EndpointLimit defines limits for specific endpoints
@@ -64,24 +64,24 @@ func DefaultRateLimitConfig() RateLimitConfig {
 	return RateLimitConfig{
 		GlobalRPS:   1000,
 		GlobalBurst: 2000,
-		
-		UserRPS:     100,
-		UserBurst:   200,
-		
-		IPRPS:       50,
-		IPBurst:     100,
-		
+
+		UserRPS:   100,
+		UserBurst: 200,
+
+		IPRPS:   50,
+		IPBurst: 100,
+
 		APIKeyRPS:   500,
 		APIKeyBurst: 1000,
-		
+
 		EndpointLimits: map[string]EndpointLimit{
-			"/api/discovery":     {RPS: 10, Burst: 20},
-			"/api/remediation":   {RPS: 5, Burst: 10},
-			"/api/drift/detect":  {RPS: 10, Burst: 20},
-			"/api/state/import":  {RPS: 5, Burst: 10},
-			"/api/auth/login":    {RPS: 5, Burst: 10},
+			"/api/discovery":    {RPS: 10, Burst: 20},
+			"/api/remediation":  {RPS: 5, Burst: 10},
+			"/api/drift/detect": {RPS: 10, Burst: 20},
+			"/api/state/import": {RPS: 5, Burst: 10},
+			"/api/auth/login":   {RPS: 5, Burst: 10},
 		},
-		
+
 		CleanupInterval: 5 * time.Minute,
 		InactiveTTL:     30 * time.Minute,
 	}
@@ -115,10 +115,10 @@ func (m *RateLimitMiddleware) RateLimit() gin.HandlerFunc {
 
 		// Get identifier for rate limiting
 		identifier := m.getIdentifier(c)
-		
+
 		// Get or create limiter for this identifier
 		limiter := m.getLimiter(identifier, c)
-		
+
 		// Check endpoint-specific limits if configured
 		if endpointLimit, exists := m.config.EndpointLimits[c.Request.URL.Path]; exists {
 			endpointLimiter := m.getEndpointLimiter(identifier+":"+c.Request.URL.Path, endpointLimit)
@@ -171,7 +171,7 @@ func (m *RateLimitMiddleware) getLimiter(identifier string, c *gin.Context) *rat
 
 	// Create new limiter based on identifier type
 	var limiter *rate.Limiter
-	
+
 	if isAPIKey(identifier) {
 		// Higher limits for API keys
 		limiter = rate.NewLimiter(rate.Limit(m.config.APIKeyRPS), m.config.APIKeyBurst)
@@ -214,10 +214,10 @@ func (m *RateLimitMiddleware) getEndpointLimiter(identifier string, limit Endpoi
 func (m *RateLimitMiddleware) rateLimitExceeded(c *gin.Context, limitType string) {
 	c.Header("Retry-After", "60")
 	c.JSON(http.StatusTooManyRequests, gin.H{
-		"error":      "Rate limit exceeded",
-		"limit_type": limitType,
+		"error":       "Rate limit exceeded",
+		"limit_type":  limitType,
 		"retry_after": 60,
-		"message":    "Too many requests. Please slow down and try again later.",
+		"message":     "Too many requests. Please slow down and try again later.",
 	})
 	c.Abort()
 }
@@ -227,7 +227,7 @@ func (m *RateLimitMiddleware) addRateLimitHeaders(c *gin.Context, limiter *rate.
 	// Get current state
 	tokens := int(limiter.Tokens())
 	limit := int(limiter.Limit())
-	
+
 	// Add headers
 	c.Header("X-RateLimit-Limit", strconv.Itoa(limit))
 	c.Header("X-RateLimit-Remaining", strconv.Itoa(tokens))
@@ -289,16 +289,16 @@ func (a *AdaptiveRateLimit) RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get current system load
 		load := a.loadMonitor()
-		
+
 		// Adjust rate limits based on load
 		if load > 0.8 {
 			// High load - reduce limits
 			adjustedConfig := a.base.config
 			factor := 1.0 - (load-0.8)*a.adjustFactor*2.5 // More aggressive reduction
-			
+
 			adjustedConfig.UserRPS = int(float64(adjustedConfig.UserRPS) * factor)
 			adjustedConfig.IPRPS = int(float64(adjustedConfig.IPRPS) * factor)
-			
+
 			// Create temporary middleware with adjusted limits
 			tempMiddleware := NewRateLimitMiddleware(adjustedConfig)
 			tempMiddleware.RateLimit()(c)
@@ -356,7 +356,7 @@ func RateLimitWithWhitelist(rateLimiter *RateLimitMiddleware, whitelist *IPWhite
 			c.Next()
 			return
 		}
-		
+
 		// Apply rate limiting
 		rateLimiter.RateLimit()(c)
 	}

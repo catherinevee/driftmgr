@@ -9,56 +9,56 @@ import (
 
 // ProgressTracker tracks discovery progress across providers, regions, and services
 type ProgressTracker struct {
-	mu               sync.RWMutex
-	providers        []string
-	regions          []string
-	services         []string
-	totalResources   int64
+	mu                 sync.RWMutex
+	providers          []string
+	regions            []string
+	services           []string
+	totalResources     int64
 	processedResources int64
-	startTime        time.Time
-	providerProgress map[string]*ProviderProgress
-	regionProgress   map[string]*RegionProgress
-	serviceProgress  map[string]*ServiceProgress
-	errors           []error
-	completed        bool
+	startTime          time.Time
+	providerProgress   map[string]*ProviderProgress
+	regionProgress     map[string]*RegionProgress
+	serviceProgress    map[string]*ServiceProgress
+	errors             []error
+	completed          bool
 }
 
 // ProviderProgress tracks progress for a specific provider
 type ProviderProgress struct {
-	Name            string
-	TotalRegions    int
-	CompletedRegions int
-	TotalResources  int64
+	Name                string
+	TotalRegions        int
+	CompletedRegions    int
+	TotalResources      int64
 	DiscoveredResources int64
-	StartTime       time.Time
-	EndTime         *time.Time
-	Errors          []error
+	StartTime           time.Time
+	EndTime             *time.Time
+	Errors              []error
 }
 
 // RegionProgress tracks progress for a specific region
 type RegionProgress struct {
-	Provider        string
-	Region          string
-	TotalServices   int
-	CompletedServices int
-	TotalResources  int64
+	Provider            string
+	Region              string
+	TotalServices       int
+	CompletedServices   int
+	TotalResources      int64
 	DiscoveredResources int64
-	StartTime       time.Time
-	EndTime         *time.Time
-	Errors          []error
+	StartTime           time.Time
+	EndTime             *time.Time
+	Errors              []error
 }
 
 // ServiceProgress tracks progress for a specific service
 type ServiceProgress struct {
-	Provider        string
-	Region          string
-	Service         string
-	TotalResources  int64
+	Provider            string
+	Region              string
+	Service             string
+	TotalResources      int64
 	DiscoveredResources int64
-	StartTime       time.Time
-	EndTime         *time.Time
-	Errors          []error
-	LastActivity    time.Time
+	StartTime           time.Time
+	EndTime             *time.Time
+	Errors              []error
+	LastActivity        time.Time
 }
 
 // NewProgressTracker creates a new progress tracker
@@ -197,14 +197,14 @@ func (pt *ProgressTracker) GetProgress() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"elapsed_time":        elapsed.String(),
-		"total_resources":     pt.totalResources,
-		"processed_resources": pt.processedResources,
+		"elapsed_time":         elapsed.String(),
+		"total_resources":      pt.totalResources,
+		"processed_resources":  pt.processedResources,
 		"resources_per_second": resourcesPerSecond,
-		"overall_progress":    overallProgress,
-		"errors_count":        len(pt.errors),
-		"providers_active":    activeProviders,
-		"completed":           pt.completed,
+		"overall_progress":     overallProgress,
+		"errors_count":         len(pt.errors),
+		"providers_active":     activeProviders,
+		"completed":            pt.completed,
 	}
 }
 

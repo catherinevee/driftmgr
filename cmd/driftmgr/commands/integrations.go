@@ -8,7 +8,7 @@ import (
 func HandleIntegrations(args []string) {
 	fmt.Println("\n🔌 DriftMgr Integration Status")
 	fmt.Println("================================")
-	
+
 	integrations := []struct {
 		category string
 		items    []string
@@ -55,7 +55,7 @@ func HandleIntegrations(args []string) {
 			"✅ Active",
 		},
 	}
-	
+
 	totalIntegrations := 0
 	for _, cat := range integrations {
 		fmt.Printf("\n%s (%d integrations)\n", cat.category, len(cat.items))
@@ -64,7 +64,7 @@ func HandleIntegrations(args []string) {
 			totalIntegrations++
 		}
 	}
-	
+
 	fmt.Printf("\n📈 Total Active Integrations: %d\n", totalIntegrations)
 	fmt.Println("\n💡 Use 'driftmgr configure <integration>' to set up any integration")
 }

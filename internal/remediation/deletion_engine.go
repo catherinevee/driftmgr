@@ -206,7 +206,7 @@ func (de *DeletionEngine) retryFailedResources(ctx context.Context, provider Clo
 
 // retrySingleResource retries deletion of a single resource
 func (de *DeletionEngine) retrySingleResource(ctx context.Context, provider CloudProvider, accountID string, options DeletionOptions, err DeletionError) error {
-	maxRetries := 3 // DefaultMaxRetries
+	maxRetries := 3                                    // DefaultMaxRetries
 	backoffMs := int((2 * time.Second).Milliseconds()) // DefaultRetryDelay
 
 	log.Printf("Retrying deletion of resource %s (type: %s)", err.ResourceID, err.ResourceType)

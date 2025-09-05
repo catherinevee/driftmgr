@@ -65,12 +65,12 @@ func (f *HTMLFormatter) Format(report *ComplianceReport) ([]byte, error) {
 			}
 		},
 	}).Parse(htmlTemplate))
-	
+
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, report); err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }
 

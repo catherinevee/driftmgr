@@ -39,22 +39,22 @@ func (c *ConcisenessAnalyzer) AnalyzeFile(filepath string) ([]ConcisenessIssue, 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filepath, src, parser.ParseComments)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	c.issues = []ConcisenessIssue{}
-	
+
 	// Run various checks
 	c.checkVerboseConditionals(fset, node, filepath)
 	c.checkUnnecessaryElse(fset, node, filepath)
 	c.checkRedundantVariables(fset, node, filepath)
 	c.checkVerboseLoops(fset, node, filepath)
 	c.checkErrorHandling(fset, node, filepath)
-	
+
 	return c.issues, nil
 }
 
@@ -68,42 +68,42 @@ func (c *ConcisenessAnalyzer) checkVerboseConditionals(fset *token.FileSet, node
 					if ident, ok := binExpr.Y.(*ast.Ident); ok && ident.Name == "true" {
 						pos := fset.Position(ifStmt.Pos())
 						c.issues = append(c.issues, ConcisenessIssue{
-							Type:     "verbose_conditional",
-							File:     filepath,
-							Line:     pos.Line,
-							Message:  "Comparing with true is unnecessary",
-							Original: "if x == true",
-							Improved: "if x",
+							Type:       "verbose_conditional",
+							File:       filepath,
+							Line:       pos.Line,
+							Message:    "Comparing with true is unnecessary",
+							Original:   "if x == true",
+							Improved:   "if x",
 							Suggestion: "Remove explicit comparison with true",
 						})
 					}
-					
+
 					if ident, ok := binExpr.Y.(*ast.Ident); ok && ident.Name == "false" {
 						pos := fset.Position(ifStmt.Pos())
 						c.issues = append(c.issues, ConcisenessIssue{
-							Type:     "verbose_conditional",
-							File:     filepath,
-							Line:     pos.Line,
-							Message:  "Comparing with false is verbose",
-							Original: "if x == false",
-							Improved: "if !x",
+							Type:       "verbose_conditional",
+							File:       filepath,
+							Line:       pos.Line,
+							Message:    "Comparing with false is verbose",
+							Original:   "if x == false",
+							Improved:   "if !x",
 							Suggestion: "Use negation instead of comparing with false",
 						})
 					}
 				}
-				
+
 				// Check for x != nil
 				if binExpr.Op == token.NEQ {
 					if ident, ok := binExpr.Y.(*ast.Ident); ok && ident.Name == "nil" {
 						pos := fset.Position(ifStmt.Pos())
 						leftStr := formatNode(fset, binExpr.X)
 						c.issues = append(c.issues, ConcisenessIssue{
-							Type:     "verbose_nil_check",
-							File:     filepath,
-							Line:     pos.Line,
-							Message:  "Use 'is not' for nil comparisons",
-							Original: fmt.Sprintf("if %s != nil", leftStr),
-							Improved: fmt.Sprintf("if %s != nil", leftStr), // Go uses != for nil
+							Type:       "verbose_nil_check",
+							File:       filepath,
+							Line:       pos.Line,
+							Message:    "Use 'is not' for nil comparisons",
+							Original:   fmt.Sprintf("if %s != nil", leftStr),
+							Improved:   fmt.Sprintf("if %s != nil", leftStr), // Go uses != for nil
 							Suggestion: "This is correct for Go",
 						})
 					}
@@ -122,22 +122,22 @@ func (c *ConcisenessAnalyzer) checkUnnecessaryElse(fset *token.FileSet, node *as
 				// Check if the if-block ends with return/continue/break
 				if len(ifStmt.Body.List) > 0 {
 					lastStmt := ifStmt.Body.List[len(ifStmt.Body.List)-1]
-					
+
 					isTerminal := false
 					switch lastStmt.(type) {
 					case *ast.ReturnStmt, *ast.BranchStmt:
 						isTerminal = true
 					}
-					
+
 					if isTerminal {
 						pos := fset.Position(ifStmt.Else.Pos())
 						c.issues = append(c.issues, ConcisenessIssue{
-							Type:     "unnecessary_else",
-							File:     filepath,
-							Line:     pos.Line,
-							Message:  "Else is unnecessary after return/break/continue",
-							Original: "if condition {\n    return x\n} else {\n    // code\n}",
-							Improved: "if condition {\n    return x\n}\n// code",
+							Type:       "unnecessary_else",
+							File:       filepath,
+							Line:       pos.Line,
+							Message:    "Else is unnecessary after return/break/continue",
+							Original:   "if condition {\n    return x\n} else {\n    // code\n}",
+							Improved:   "if condition {\n    return x\n}\n// code",
 							Suggestion: "Remove else and unindent the code",
 						})
 					}
@@ -158,7 +158,7 @@ func (c *ConcisenessAnalyzer) checkRedundantVariables(fset *token.FileSet, node 
 				if len(stmts) >= 2 {
 					secondLast := stmts[len(stmts)-2]
 					last := stmts[len(stmts)-1]
-					
+
 					// Pattern: x := expr; return x
 					if assign, ok := secondLast.(*ast.AssignStmt); ok {
 						if ret, ok := last.(*ast.ReturnStmt); ok {
@@ -168,12 +168,12 @@ func (c *ConcisenessAnalyzer) checkRedundantVariables(fset *token.FileSet, node 
 										if lhsIdent.Name == retIdent.Name {
 											pos := fset.Position(assign.Pos())
 											c.issues = append(c.issues, ConcisenessIssue{
-												Type:     "redundant_variable",
-												File:     filepath,
-												Line:     pos.Line,
-												Message:  "Redundant variable assignment before return",
-												Original: fmt.Sprintf("%s := ...\nreturn %s", lhsIdent.Name, lhsIdent.Name),
-												Improved: "return ...",
+												Type:       "redundant_variable",
+												File:       filepath,
+												Line:       pos.Line,
+												Message:    "Redundant variable assignment before return",
+												Original:   fmt.Sprintf("%s := ...\nreturn %s", lhsIdent.Name, lhsIdent.Name),
+												Improved:   "return ...",
 												Suggestion: "Return the expression directly",
 											})
 										}
@@ -201,12 +201,12 @@ func (c *ConcisenessAnalyzer) checkVerboseLoops(fset *token.FileSet, node *ast.F
 							if sel.Sel.Name == "append" {
 								pos := fset.Position(forStmt.Pos())
 								c.issues = append(c.issues, ConcisenessIssue{
-									Type:     "verbose_loop",
-									File:     filepath,
-									Line:     pos.Line,
-									Message:  "Loop with append can be a slice operation",
-									Original: "for _, x := range items {\n    result = append(result, x)\n}",
-									Improved: "result = append(result, items...)",
+									Type:       "verbose_loop",
+									File:       filepath,
+									Line:       pos.Line,
+									Message:    "Loop with append can be a slice operation",
+									Original:   "for _, x := range items {\n    result = append(result, x)\n}",
+									Improved:   "result = append(result, items...)",
 									Suggestion: "Use variadic append for simple copies",
 								})
 							}
@@ -258,23 +258,23 @@ func RefactorFile(filepath string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filepath, src, parser.ParseComments)
 	if err != nil {
 		return err
 	}
-	
+
 	// Apply transformations
 	refactorer := &conciseRefactorer{}
 	ast.Walk(refactorer, node)
-	
+
 	// Format and write back
 	var buf strings.Builder
 	if err := format.Node(&buf, fset, node); err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(filepath, []byte(buf.String()), 0644)
 }
 

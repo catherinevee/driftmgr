@@ -15,7 +15,7 @@ import (
 // SimulateDriftCommand handles the simulate-drift command
 func SimulateDriftCommand(args []string) error {
 	fs := flag.NewFlagSet("simulate-drift", flag.ExitOnError)
-	
+
 	// Command flags
 	stateFile := fs.String("state", "", "Path to Terraform state file (required)")
 	provider := fs.String("provider", "", "Cloud provider (aws, azure, gcp)")
@@ -26,7 +26,7 @@ func SimulateDriftCommand(args []string) error {
 	rollback := fs.Bool("rollback", false, "Rollback previous drift simulation")
 	detect := fs.Bool("detect", true, "Run drift detection after simulation")
 	verbose := fs.Bool("verbose", false, "Verbose output")
-	
+
 	// Help text
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: driftmgr simulate-drift --state <file> [options]
@@ -71,21 +71,21 @@ Safety Features:
   - Test IP ranges (192.0.2.0/32) for network rules
 `)
 	}
-	
+
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	
+
 	// Handle rollback mode
 	if *rollback {
 		return handleRollback()
 	}
-	
+
 	// Validate required flags
 	if *stateFile == "" {
 		return fmt.Errorf("--state flag is required")
 	}
-	
+
 	// Auto-detect provider from state if not specified
 	if *provider == "" {
 		detectedProvider := detectProviderFromState(*stateFile)
@@ -95,7 +95,7 @@ Safety Features:
 		*provider = detectedProvider
 		fmt.Printf("Auto-detected provider: %s\n", *provider)
 	}
-	
+
 	// Convert drift type string to enum
 	var driftTypeEnum simulation.DriftType
 	switch strings.ToLower(*driftType) {
@@ -112,7 +112,7 @@ Safety Features:
 	default:
 		return fmt.Errorf("invalid drift type: %s", *driftType)
 	}
-	
+
 	// Print simulation plan
 	fmt.Println("\n=== Drift Simulation Plan ===")
 	fmt.Printf("State File: %s\n", *stateFile)
@@ -123,11 +123,11 @@ Safety Features:
 	}
 	fmt.Printf("Auto Rollback: %v\n", *autoRollback)
 	fmt.Printf("Detect After: %v\n", *detect)
-	
+
 	if *dryRun {
 		fmt.Println("\n[DRY RUN MODE - No actual changes will be made]")
 	}
-	
+
 	// Confirm with user
 	if !*dryRun {
 		fmt.Print("\nProceed with drift simulation? (y/N): ")
@@ -138,7 +138,7 @@ Safety Features:
 			return nil
 		}
 	}
-	
+
 	// Create simulator
 	config := simulation.SimulatorConfig{
 		StateFile:      *stateFile,
@@ -148,25 +148,25 @@ Safety Features:
 		AutoRollback:   *autoRollback,
 		DryRun:         *dryRun,
 	}
-	
+
 	simulator, err := simulation.NewDriftSimulator(config)
 	if err != nil {
 		return fmt.Errorf("failed to create drift simulator: %w", err)
 	}
-	
+
 	ctx := context.Background()
-	
+
 	// Simulate drift
 	fmt.Println("\n🔄 Simulating drift...")
 	result, err := simulator.SimulateDrift(ctx)
 	if err != nil {
 		return fmt.Errorf("drift simulation failed: %w", err)
 	}
-	
+
 	if !result.Success {
 		return fmt.Errorf("drift simulation failed: %s", result.ErrorMessage)
 	}
-	
+
 	// Display results
 	fmt.Println("\n✅ Drift Simulation Successful!")
 	fmt.Printf("Provider: %s\n", result.Provider)
@@ -174,18 +174,18 @@ Safety Features:
 	fmt.Printf("Resource ID: %s\n", result.ResourceID)
 	fmt.Printf("Drift Type: %s\n", result.DriftType)
 	fmt.Printf("Cost Estimate: %s\n", result.CostEstimate)
-	
+
 	fmt.Println("\nChanges Applied:")
 	for key, value := range result.Changes {
 		fmt.Printf("  • %s: %v\n", key, value)
 	}
-	
+
 	// Save rollback data
 	if result.RollbackData != nil {
 		saveRollbackData(result.RollbackData)
 		fmt.Println("\n💾 Rollback data saved (use --rollback to undo)")
 	}
-	
+
 	// Run drift detection
 	if *detect && !*dryRun {
 		fmt.Println("\n🔍 Running drift detection...")
@@ -198,7 +198,7 @@ Safety Features:
 				fmt.Printf("%d. %s (%s)\n", i+1, drift.ResourceID, drift.ResourceType)
 				fmt.Printf("   Type: %s\n", drift.DriftType)
 				fmt.Printf("   Impact: %s\n", drift.Impact)
-				
+
 				if *verbose {
 					if len(drift.Before) > 0 {
 						fmt.Println("   Before:")
@@ -214,19 +214,19 @@ Safety Features:
 					}
 				}
 			}
-			
+
 			// Store detected drifts in result
 			result.DetectedDrift = drifts
 		} else {
 			fmt.Println("\n✅ No drift detected (this might be an error)")
 		}
 	}
-	
+
 	// Auto-rollback if enabled
 	if *autoRollback && !*dryRun && result.RollbackData != nil {
 		fmt.Println("\n🔄 Auto-rollback in 5 seconds (press Ctrl+C to keep drift)...")
 		time.Sleep(5 * time.Second)
-		
+
 		fmt.Println("Rolling back drift...")
 		if err := simulator.Rollback(ctx); err != nil {
 			fmt.Printf("⚠️  Rollback failed: %v\n", err)
@@ -236,13 +236,13 @@ Safety Features:
 			clearRollbackData()
 		}
 	}
-	
+
 	// Generate report
 	if *verbose {
 		report := simulator.GenerateReport(result, result.DetectedDrift)
 		fmt.Println("\n" + report)
 	}
-	
+
 	return nil
 }
 
@@ -253,9 +253,9 @@ func detectProviderFromState(stateFile string) string {
 	if err != nil {
 		return ""
 	}
-	
+
 	content := string(data)
-	
+
 	// Check for provider-specific resource types
 	if strings.Contains(content, "aws_") {
 		return "aws"
@@ -266,7 +266,7 @@ func detectProviderFromState(stateFile string) string {
 	if strings.Contains(content, "google_") {
 		return "gcp"
 	}
-	
+
 	return ""
 }
 
@@ -277,14 +277,14 @@ func handleRollback() error {
 	if data == nil {
 		return fmt.Errorf("no rollback data found. Did you run a simulation first?")
 	}
-	
+
 	fmt.Println("\n=== Rollback Information ===")
 	fmt.Printf("Provider: %s\n", data.Provider)
 	fmt.Printf("Resource Type: %s\n", data.ResourceType)
 	fmt.Printf("Resource ID: %s\n", data.ResourceID)
 	fmt.Printf("Action: %s\n", data.Action)
 	fmt.Printf("Timestamp: %s\n", data.Timestamp.Format("2006-01-02 15:04:05"))
-	
+
 	fmt.Print("\nProceed with rollback? (y/N): ")
 	var response string
 	fmt.Scanln(&response)
@@ -292,28 +292,28 @@ func handleRollback() error {
 		fmt.Println("Rollback cancelled")
 		return nil
 	}
-	
+
 	// Create appropriate simulator based on provider
 	var simulator *simulation.DriftSimulator
 	config := simulation.SimulatorConfig{
 		Provider: data.Provider,
 	}
-	
+
 	simulator, err := simulation.NewDriftSimulator(config)
 	if err != nil {
 		return fmt.Errorf("failed to create simulator for rollback: %w", err)
 	}
-	
+
 	ctx := context.Background()
-	
+
 	fmt.Println("\n🔄 Executing rollback...")
 	if err := simulator.Rollback(ctx); err != nil {
 		return fmt.Errorf("rollback failed: %w", err)
 	}
-	
+
 	fmt.Println("✅ Rollback completed successfully!")
 	clearRollbackData()
-	
+
 	return nil
 }
 
@@ -324,13 +324,13 @@ func saveRollbackData(data *simulation.RollbackData) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return
 	}
-	
+
 	file := fmt.Sprintf("%s/rollback.json", dir)
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return
 	}
-	
+
 	os.WriteFile(file, jsonData, 0644)
 }
 
@@ -341,12 +341,12 @@ func loadRollbackData() *simulation.RollbackData {
 	if err != nil {
 		return nil
 	}
-	
+
 	var rollback simulation.RollbackData
 	if err := json.Unmarshal(data, &rollback); err != nil {
 		return nil
 	}
-	
+
 	return &rollback
 }
 

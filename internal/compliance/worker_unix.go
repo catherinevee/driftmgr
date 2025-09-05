@@ -34,13 +34,13 @@ func (w *UnixWorker) IsLocked(path string) bool {
 		return true // Can't open, assume locked
 	}
 	defer file.Close()
-	
+
 	// Try to acquire an exclusive lock
 	err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 	if err != nil {
 		return true // Can't lock, file is in use
 	}
-	
+
 	// Release the lock
 	syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
 	return false

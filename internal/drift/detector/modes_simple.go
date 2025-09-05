@@ -10,10 +10,10 @@ type DetectionMode string
 const (
 	// QuickMode performs basic existence checks (< 30 seconds)
 	QuickMode DetectionMode = "quick"
-	
+
 	// DeepMode performs comprehensive analysis of all attributes
 	DeepMode DetectionMode = "deep"
-	
+
 	// SmartMode adapts based on resource criticality
 	SmartMode DetectionMode = "smart"
 )
@@ -31,30 +31,30 @@ const (
 // ResourceCriticality maps resource types to their criticality levels
 var ResourceCriticality = map[string]CriticalityLevel{
 	// Critical resources - always deep scan
-	"aws_db_instance":               CriticalLevel,
-	"aws_security_group":            CriticalLevel,
-	"aws_iam_role":                  CriticalLevel,
-	"aws_iam_policy":                CriticalLevel,
-	"azure_sql_database":            CriticalLevel,
-	"google_sql_database_instance":  CriticalLevel,
-	
+	"aws_db_instance":              CriticalLevel,
+	"aws_security_group":           CriticalLevel,
+	"aws_iam_role":                 CriticalLevel,
+	"aws_iam_policy":               CriticalLevel,
+	"azure_sql_database":           CriticalLevel,
+	"google_sql_database_instance": CriticalLevel,
+
 	// High priority resources
-	"aws_lb":                        HighLevel,
-	"aws_alb":                       HighLevel,
-	"aws_network_acl":               HighLevel,
-	"aws_kms_key":                   HighLevel,
-	"azure_lb":                      HighLevel,
-	"google_compute_firewall":       HighLevel,
-	
+	"aws_lb":                  HighLevel,
+	"aws_alb":                 HighLevel,
+	"aws_network_acl":         HighLevel,
+	"aws_kms_key":             HighLevel,
+	"azure_lb":                HighLevel,
+	"google_compute_firewall": HighLevel,
+
 	// Medium priority resources
-	"aws_instance":                  MediumLevel,
-	"aws_s3_bucket":                 MediumLevel,
-	"azure_virtual_machine":         MediumLevel,
-	"google_compute_instance":       MediumLevel,
-	
+	"aws_instance":            MediumLevel,
+	"aws_s3_bucket":           MediumLevel,
+	"azure_virtual_machine":   MediumLevel,
+	"google_compute_instance": MediumLevel,
+
 	// Low priority resources - quick scan in smart mode
-	"aws_s3_bucket_object":          LowLevel,
-	"aws_route53_record":            LowLevel,
+	"aws_s3_bucket_object": LowLevel,
+	"aws_route53_record":   LowLevel,
 }
 
 // DetectionStats tracks statistics about the detection process

@@ -43,7 +43,7 @@ func (eb *EventBridge) Start() error {
 		events.DiscoveryCompleted,
 		events.DiscoveryFailed,
 	}
-	
+
 	discoverySub := eb.eventBus.SubscribeToTypes(discoveryEvents, func(event events.Event) {
 		eb.handleDiscoveryEvent(event)
 	})
@@ -55,7 +55,7 @@ func (eb *EventBridge) Start() error {
 		events.DriftDetectionCompleted,
 		events.DriftDetectionFailed,
 	}
-	
+
 	driftSub := eb.eventBus.SubscribeToTypes(driftEvents, func(event events.Event) {
 		eb.handleDriftEvent(event)
 	})
@@ -67,7 +67,7 @@ func (eb *EventBridge) Start() error {
 		events.RemediationCompleted,
 		events.RemediationFailed,
 	}
-	
+
 	remediationSub := eb.eventBus.SubscribeToTypes(remediationEvents, func(event events.Event) {
 		eb.handleRemediationEvent(event)
 	})
@@ -80,7 +80,7 @@ func (eb *EventBridge) Start() error {
 		events.JobCompleted,
 		events.JobFailed,
 	}
-	
+
 	jobSub := eb.eventBus.SubscribeToTypes(jobEvents, func(event events.Event) {
 		eb.handleJobEvent(event)
 	})
@@ -92,7 +92,7 @@ func (eb *EventBridge) Start() error {
 		events.ResourceUpdated,
 		events.ResourceDeleted,
 	}
-	
+
 	resourceSub := eb.eventBus.SubscribeToTypes(resourceEvents, func(event events.Event) {
 		eb.handleResourceEvent(event)
 	})
@@ -104,7 +104,7 @@ func (eb *EventBridge) Start() error {
 		events.StateAnalyzed,
 		events.StateDeleted,
 	}
-	
+
 	stateSub := eb.eventBus.SubscribeToTypes(stateEvents, func(event events.Event) {
 		eb.handleStateEvent(event)
 	})
@@ -151,7 +151,7 @@ func (eb *EventBridge) handleDiscoveryEvent(event events.Event) {
 	if jobID, ok := event.Data["job_id"].(string); ok {
 		if job, exists := eb.wsServer.jobManager.GetJob(jobID); exists {
 			updates := map[string]interface{}{}
-			
+
 			switch event.Type {
 			case events.DiscoveryStarted:
 				updates["status"] = "running"
@@ -168,7 +168,7 @@ func (eb *EventBridge) handleDiscoveryEvent(event events.Event) {
 				updates["status"] = "failed"
 				updates["error"] = event.Data["error"]
 			}
-			
+
 			eb.wsServer.jobManager.UpdateJob(jobID, updates)
 			wsMessage["job"] = job
 		}
@@ -184,7 +184,7 @@ func (eb *EventBridge) handleDriftEvent(event events.Event) {
 		"type":      "drift_update",
 		"timestamp": event.Timestamp,
 		"data": map[string]interface{}{
-			"event":      string(event.Type),
+			"event":       string(event.Type),
 			"drift_count": event.Data["drift_count"],
 			"resources":   event.Data["resources"],
 			"severity":    event.Data["severity"],
@@ -233,7 +233,7 @@ func (eb *EventBridge) handleRemediationEvent(event events.Event) {
 	// Track remediation progress
 	if planID, ok := event.Data["plan_id"].(string); ok {
 		remediationKey := fmt.Sprintf("remediation_%s", planID)
-		
+
 		switch event.Type {
 		case events.RemediationStarted:
 			eb.wsServer.dataStore.Set(remediationKey, map[string]interface{}{
@@ -261,7 +261,7 @@ func (eb *EventBridge) handleRemediationEvent(event events.Event) {
 				}
 			}
 		}
-		
+
 		wsMessage["remediation_status"] = eb.wsServer.dataStore.data[remediationKey]
 	}
 
@@ -271,17 +271,17 @@ func (eb *EventBridge) handleRemediationEvent(event events.Event) {
 // handleJobEvent processes job events
 func (eb *EventBridge) handleJobEvent(event events.Event) {
 	jobID, _ := event.Data["job_id"].(string)
-	
+
 	wsMessage := map[string]interface{}{
 		"type":      "job_update",
 		"timestamp": event.Timestamp,
 		"data": map[string]interface{}{
-			"event":   string(event.Type),
-			"job_id":  jobID,
+			"event":    string(event.Type),
+			"job_id":   jobID,
 			"job_type": event.Data["job_type"],
-			"status":  event.Data["status"],
+			"status":   event.Data["status"],
 			"progress": event.Data["progress"],
-			"message": event.Data["message"],
+			"message":  event.Data["message"],
 		},
 	}
 
@@ -326,13 +326,13 @@ func (eb *EventBridge) handleResourceEvent(event events.Event) {
 		"type":      "resource_update",
 		"timestamp": event.Timestamp,
 		"data": map[string]interface{}{
-			"event":        string(event.Type),
-			"resource_id":  event.Data["resource_id"],
+			"event":         string(event.Type),
+			"resource_id":   event.Data["resource_id"],
 			"resource_type": event.Data["resource_type"],
-			"provider":     event.Data["provider"],
-			"region":       event.Data["region"],
-			"action":       event.Data["action"],
-			"changes":      event.Data["changes"],
+			"provider":      event.Data["provider"],
+			"region":        event.Data["region"],
+			"action":        event.Data["action"],
+			"changes":       event.Data["changes"],
 		},
 	}
 
@@ -356,7 +356,7 @@ func (eb *EventBridge) handleResourceEvent(event events.Event) {
 		"user":          event.Data["user"],
 		"source":        event.Source,
 	}
-	
+
 	auditLog := []interface{}{}
 	if existing, ok := eb.wsServer.dataStore.Get("audit_log"); ok {
 		if log, ok := existing.([]interface{}); ok {
@@ -364,7 +364,7 @@ func (eb *EventBridge) handleResourceEvent(event events.Event) {
 		}
 	}
 	auditLog = append(auditLog, auditEntry)
-	
+
 	// Keep only last 1000 entries
 	if len(auditLog) > 1000 {
 		auditLog = auditLog[len(auditLog)-1000:]
@@ -392,13 +392,13 @@ func (eb *EventBridge) handleStateEvent(event events.Event) {
 	// Update state inventory
 	if event.Type == events.StateImported {
 		stateInfo := map[string]interface{}{
-			"id":            event.Data["state_id"],
-			"path":          event.Data["state_path"],
-			"provider":      event.Data["provider"],
+			"id":             event.Data["state_id"],
+			"path":           event.Data["state_path"],
+			"provider":       event.Data["provider"],
 			"resource_count": event.Data["resource_count"],
-			"imported_at":   time.Now(),
+			"imported_at":    time.Now(),
 		}
-		
+
 		states := []interface{}{}
 		if existing, ok := eb.wsServer.dataStore.Get("states"); ok {
 			if s, ok := existing.([]interface{}); ok {
@@ -420,7 +420,7 @@ func (eb *EventBridge) BroadcastCustomMessage(messageType string, data interface
 		"timestamp": time.Now(),
 		"data":      data,
 	}
-	
+
 	if jsonData, err := json.Marshal(message); err == nil {
 		eb.wsServer.broadcast <- jsonData
 	}

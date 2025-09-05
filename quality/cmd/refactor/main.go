@@ -18,11 +18,11 @@ type ConcisenessReport struct {
 
 func main() {
 	var (
-		inputPath    = flag.String("input", "", "Path to conciseness report JSON")
-		dryRun       = flag.Bool("dry-run", false, "Show changes without applying")
-		safeOnly     = flag.Bool("safe-only", false, "Apply only safe refactorings")
-		autoApprove  = flag.Bool("auto-approve", false, "Automatically approve all changes")
-		outputPath   = flag.String("output", "", "Path to output diff file (for dry-run)")
+		inputPath   = flag.String("input", "", "Path to conciseness report JSON")
+		dryRun      = flag.Bool("dry-run", false, "Show changes without applying")
+		safeOnly    = flag.Bool("safe-only", false, "Apply only safe refactorings")
+		autoApprove = flag.Bool("auto-approve", false, "Automatically approve all changes")
+		outputPath  = flag.String("output", "", "Path to output diff file (for dry-run)")
 	)
 	flag.Parse()
 
@@ -38,17 +38,17 @@ func main() {
 		// If no input, analyze current directory
 		analyzer := quality.NewConcisenessAnalyzer()
 		projectPath := "."
-		
+
 		var allIssues []quality.ConcisenessIssue
 		err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			
+
 			if strings.Contains(path, "vendor") || strings.Contains(path, ".git") {
 				return nil
 			}
-			
+
 			if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
 				issues, err := analyzer.AnalyzeFile(path)
 				if err != nil {
@@ -59,11 +59,11 @@ func main() {
 			}
 			return nil
 		})
-		
+
 		if err != nil {
 			log.Fatalf("Failed to analyze project: %v", err)
 		}
-		
+
 		processIssues(allIssues, *dryRun, *safeOnly, *outputPath)
 		return
 	}
@@ -142,25 +142,25 @@ func processIssues(issues []quality.ConcisenessIssue, dryRun, safeOnly bool, out
 func applySafeRefactorings(projectPath string, dryRun bool, outputPath string) {
 	analyzer := quality.NewConcisenessAnalyzer()
 	refactored := 0
-	
+
 	err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Skip vendor, .git, and test files
-		if strings.Contains(path, "vendor") || 
-		   strings.Contains(path, ".git") || 
-		   strings.HasSuffix(path, "_test.go") {
+		if strings.Contains(path, "vendor") ||
+			strings.Contains(path, ".git") ||
+			strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		
+
 		if strings.HasSuffix(path, ".go") {
 			issues, err := analyzer.AnalyzeFile(path)
 			if err != nil {
 				return nil // Skip files with errors
 			}
-			
+
 			// Only apply safe refactorings
 			safeIssues := filterSafeIssues(issues)
 			if len(safeIssues) > 0 && !dryRun {
@@ -175,12 +175,12 @@ func applySafeRefactorings(projectPath string, dryRun bool, outputPath string) {
 		}
 		return nil
 	})
-	
+
 	if err != nil {
 		log.Fatalf("Failed to walk project: %v", err)
 	}
-	
-	fmt.Printf("\nAutomatic refactoring complete: %d safe issues %s\n", 
+
+	fmt.Printf("\nAutomatic refactoring complete: %d safe issues %s\n",
 		refactored, map[bool]string{true: "would be fixed", false: "fixed"}[dryRun])
 }
 
@@ -206,8 +206,8 @@ func filterSafeIssues(issues []quality.ConcisenessIssue) []quality.ConcisenessIs
 func isSafeIssueType(issueType string) bool {
 	// These are considered safe to auto-refactor
 	safeTypes := map[string]bool{
-		"verbose_conditional": true,  // if x == true -> if x
-		"redundant_variable":  true,  // x := val; return x -> return val
+		"verbose_conditional": true, // if x == true -> if x
+		"redundant_variable":  true, // x := val; return x -> return val
 	}
 	return safeTypes[issueType]
 }

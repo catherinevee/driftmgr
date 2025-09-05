@@ -7,14 +7,14 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/aws/aws-sdk-go-v2/service/rds"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	
+	"github.com/aws/aws-sdk-go-v2/service/rds"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+
 	"github.com/catherinevee/driftmgr/pkg/models"
 )
 
@@ -30,12 +30,12 @@ func (e *NotFoundError) Error() string {
 
 // AWSProvider implements CloudProvider for AWS
 type AWSProvider struct {
-	region    string
-	awsConfig aws.Config
-	ec2Client *ec2.Client
-	s3Client  *s3.Client
-	rdsClient *rds.Client
-	iamClient *iam.Client
+	region       string
+	awsConfig    aws.Config
+	ec2Client    *ec2.Client
+	s3Client     *s3.Client
+	rdsClient    *rds.Client
+	iamClient    *iam.Client
 	lambdaClient *lambda.Client
 	dynamoClient *dynamodb.Client
 }
@@ -53,7 +53,7 @@ func (p *AWSProvider) Initialize(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to load AWS config: %w", err)
 	}
-	
+
 	p.awsConfig = cfg
 	p.ec2Client = ec2.NewFromConfig(cfg)
 	p.s3Client = s3.NewFromConfig(cfg)
@@ -61,7 +61,7 @@ func (p *AWSProvider) Initialize(ctx context.Context) error {
 	p.iamClient = iam.NewFromConfig(cfg)
 	p.lambdaClient = lambda.NewFromConfig(cfg)
 	p.dynamoClient = dynamodb.NewFromConfig(cfg)
-	
+
 	return nil
 }
 
@@ -70,7 +70,7 @@ func (p *AWSProvider) GetResource(ctx context.Context, resourceID string) (*mode
 	// Try to determine resource type from ID format
 	// AWS resource IDs often have patterns we can use
 	var resourceType string
-	
+
 	switch {
 	case strings.HasPrefix(resourceID, "i-"):
 		resourceType = "aws_instance"
@@ -98,7 +98,7 @@ func (p *AWSProvider) GetResource(ctx context.Context, resourceID string) (*mode
 		}
 		return nil, fmt.Errorf("unable to determine resource type for ID: %s", resourceID)
 	}
-	
+
 	return p.GetResourceByType(ctx, resourceType, resourceID)
 }
 
@@ -110,7 +110,7 @@ func (p *AWSProvider) GetResourceByType(ctx context.Context, resourceType string
 			return nil, err
 		}
 	}
-	
+
 	switch {
 	case strings.HasPrefix(resourceType, "aws_instance"):
 		return p.getEC2Instance(ctx, resourceID)
@@ -143,23 +143,23 @@ func (p *AWSProvider) ListResources(ctx context.Context) ([]*models.Resource, er
 			return nil, err
 		}
 	}
-	
+
 	resources := []*models.Resource{}
-	
+
 	// List EC2 instances
 	instances, err := p.listEC2Instances(ctx)
 	if err == nil {
 		resources = append(resources, instances...)
 	}
-	
+
 	// List S3 buckets
 	buckets, err := p.listS3Buckets(ctx)
 	if err == nil {
 		resources = append(resources, buckets...)
 	}
-	
+
 	// Add other resource types as needed
-	
+
 	return resources, nil
 }
 
@@ -183,19 +183,19 @@ func (p *AWSProvider) DiscoverResources(ctx context.Context, region string) ([]m
 			return nil, err
 		}
 	}
-	
+
 	// Use ListResources to get resources
 	resources, err := p.ListResources(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert []*models.Resource to []models.Resource
 	result := make([]models.Resource, len(resources))
 	for i, r := range resources {
 		result[i] = *r
 	}
-	
+
 	return result, nil
 }
 
@@ -236,45 +236,45 @@ func (p *AWSProvider) getEC2Instance(ctx context.Context, instanceID string) (*m
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: []string{instanceID},
 	}
-	
+
 	result, err := p.ec2Client.DescribeInstances(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if len(result.Reservations) == 0 || len(result.Reservations[0].Instances) == 0 {
 		return nil, &NotFoundError{ResourceType: "aws_instance", ResourceID: instanceID}
 	}
-	
+
 	instance := result.Reservations[0].Instances[0]
-	
+
 	// Convert to models.Resource
 	resource := &models.Resource{
-		ID:   *instance.InstanceId,
-		Type: "aws_instance",
-		Name: p.getTagValue(instance.Tags, "Name"),
+		ID:     *instance.InstanceId,
+		Type:   "aws_instance",
+		Name:   p.getTagValue(instance.Tags, "Name"),
 		Region: p.region,
-		Tags: p.convertTags(instance.Tags),
+		Tags:   p.convertTags(instance.Tags),
 		Attributes: map[string]interface{}{
 			"id":                *instance.InstanceId,
 			"instance_type":     string(instance.InstanceType),
-			"ami":              *instance.ImageId,
+			"ami":               *instance.ImageId,
 			"availability_zone": *instance.Placement.AvailabilityZone,
-			"subnet_id":        *instance.SubnetId,
-			"vpc_id":           *instance.VpcId,
-			"state":            string(instance.State.Name),
-			"private_ip":       *instance.PrivateIpAddress,
+			"subnet_id":         *instance.SubnetId,
+			"vpc_id":            *instance.VpcId,
+			"state":             string(instance.State.Name),
+			"private_ip":        *instance.PrivateIpAddress,
 		},
 	}
-	
+
 	if instance.PublicIpAddress != nil {
 		resource.Attributes["public_ip"] = *instance.PublicIpAddress
 	}
-	
+
 	if instance.KeyName != nil {
 		resource.Attributes["key_name"] = *instance.KeyName
 	}
-	
+
 	if len(instance.SecurityGroups) > 0 {
 		sgIds := make([]string, len(instance.SecurityGroups))
 		for i, sg := range instance.SecurityGroups {
@@ -282,44 +282,44 @@ func (p *AWSProvider) getEC2Instance(ctx context.Context, instanceID string) (*m
 		}
 		resource.Attributes["security_groups"] = sgIds
 	}
-	
+
 	return resource, nil
 }
 
 func (p *AWSProvider) listEC2Instances(ctx context.Context) ([]*models.Resource, error) {
 	resources := []*models.Resource{}
-	
+
 	paginator := ec2.NewDescribeInstancesPaginator(p.ec2Client, &ec2.DescribeInstancesInput{})
-	
+
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		for _, reservation := range page.Reservations {
 			for _, instance := range reservation.Instances {
 				if instance.State.Name == "terminated" {
 					continue
 				}
-				
+
 				resource := &models.Resource{
-					ID:   *instance.InstanceId,
-					Type: "aws_instance",
-					Name: p.getTagValue(instance.Tags, "Name"),
+					ID:     *instance.InstanceId,
+					Type:   "aws_instance",
+					Name:   p.getTagValue(instance.Tags, "Name"),
 					Region: p.region,
-					Tags: p.convertTags(instance.Tags),
+					Tags:   p.convertTags(instance.Tags),
 					Attributes: map[string]interface{}{
-						"id":           *instance.InstanceId,
+						"id":            *instance.InstanceId,
 						"instance_type": string(instance.InstanceType),
-						"state":        string(instance.State.Name),
+						"state":         string(instance.State.Name),
 					},
 				}
 				resources = append(resources, resource)
 			}
 		}
 	}
-	
+
 	return resources, nil
 }
 
@@ -329,21 +329,21 @@ func (p *AWSProvider) getS3Bucket(ctx context.Context, bucketName string) (*mode
 	_, err := p.s3Client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucketName),
 	})
-	
+
 	if err != nil {
 		return nil, &NotFoundError{ResourceType: "aws_s3_bucket", ResourceID: bucketName}
 	}
-	
+
 	// Get bucket location
 	location, err := p.s3Client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{
 		Bucket: aws.String(bucketName),
 	})
-	
+
 	region := "us-east-1"
 	if err == nil && location.LocationConstraint != "" {
 		region = string(location.LocationConstraint)
 	}
-	
+
 	// Get bucket tags
 	tags := make(map[string]string)
 	tagging, err := p.s3Client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{
@@ -354,7 +354,7 @@ func (p *AWSProvider) getS3Bucket(ctx context.Context, bucketName string) (*mode
 			tags[*tag.Key] = *tag.Value
 		}
 	}
-	
+
 	resource := &models.Resource{
 		ID:     bucketName,
 		Type:   "aws_s3_bucket",
@@ -367,7 +367,7 @@ func (p *AWSProvider) getS3Bucket(ctx context.Context, bucketName string) (*mode
 			"region": region,
 		},
 	}
-	
+
 	// Get versioning status
 	versioning, err := p.s3Client.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{
 		Bucket: aws.String(bucketName),
@@ -375,7 +375,7 @@ func (p *AWSProvider) getS3Bucket(ctx context.Context, bucketName string) (*mode
 	if err == nil && versioning.Status != "" {
 		resource.Attributes["versioning"] = string(versioning.Status)
 	}
-	
+
 	// Get encryption
 	encryption, err := p.s3Client.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{
 		Bucket: aws.String(bucketName),
@@ -383,32 +383,32 @@ func (p *AWSProvider) getS3Bucket(ctx context.Context, bucketName string) (*mode
 	if err == nil && encryption.ServerSideEncryptionConfiguration != nil {
 		resource.Attributes["encryption"] = true
 	}
-	
+
 	return resource, nil
 }
 
 func (p *AWSProvider) listS3Buckets(ctx context.Context) ([]*models.Resource, error) {
 	resources := []*models.Resource{}
-	
+
 	result, err := p.s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, bucket := range result.Buckets {
 		resource := &models.Resource{
 			ID:   *bucket.Name,
 			Type: "aws_s3_bucket",
 			Name: *bucket.Name,
 			Attributes: map[string]interface{}{
-				"id":           *bucket.Name,
-				"bucket":       *bucket.Name,
+				"id":            *bucket.Name,
+				"bucket":        *bucket.Name,
 				"creation_date": bucket.CreationDate.Format("2006-01-02T15:04:05Z"),
 			},
 		}
 		resources = append(resources, resource)
 	}
-	
+
 	return resources, nil
 }
 
@@ -417,41 +417,41 @@ func (p *AWSProvider) getRDSInstance(ctx context.Context, dbInstanceID string) (
 	input := &rds.DescribeDBInstancesInput{
 		DBInstanceIdentifier: aws.String(dbInstanceID),
 	}
-	
+
 	result, err := p.rdsClient.DescribeDBInstances(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if len(result.DBInstances) == 0 {
 		return nil, &NotFoundError{ResourceType: "aws_db_instance", ResourceID: dbInstanceID}
 	}
-	
+
 	dbInstance := result.DBInstances[0]
-	
+
 	resource := &models.Resource{
-		ID:   *dbInstance.DBInstanceIdentifier,
-		Type: "aws_db_instance",
-		Name: *dbInstance.DBInstanceIdentifier,
+		ID:     *dbInstance.DBInstanceIdentifier,
+		Type:   "aws_db_instance",
+		Name:   *dbInstance.DBInstanceIdentifier,
 		Region: p.region,
 		Attributes: map[string]interface{}{
-			"id":                    *dbInstance.DBInstanceIdentifier,
-			"db_instance_class":     *dbInstance.DBInstanceClass,
-			"engine":                *dbInstance.Engine,
-			"engine_version":        *dbInstance.EngineVersion,
-			"allocated_storage":     *dbInstance.AllocatedStorage,
-			"availability_zone":     *dbInstance.AvailabilityZone,
-			"status":                *dbInstance.DBInstanceStatus,
-			"multi_az":              *dbInstance.MultiAZ,
-			"publicly_accessible":   *dbInstance.PubliclyAccessible,
+			"id":                  *dbInstance.DBInstanceIdentifier,
+			"db_instance_class":   *dbInstance.DBInstanceClass,
+			"engine":              *dbInstance.Engine,
+			"engine_version":      *dbInstance.EngineVersion,
+			"allocated_storage":   *dbInstance.AllocatedStorage,
+			"availability_zone":   *dbInstance.AvailabilityZone,
+			"status":              *dbInstance.DBInstanceStatus,
+			"multi_az":            *dbInstance.MultiAZ,
+			"publicly_accessible": *dbInstance.PubliclyAccessible,
 		},
 	}
-	
+
 	if dbInstance.Endpoint != nil {
 		resource.Attributes["endpoint"] = *dbInstance.Endpoint.Address
 		resource.Attributes["port"] = *dbInstance.Endpoint.Port
 	}
-	
+
 	return resource, nil
 }
 
@@ -460,14 +460,14 @@ func (p *AWSProvider) getIAMRole(ctx context.Context, roleName string) (*models.
 	input := &iam.GetRoleInput{
 		RoleName: aws.String(roleName),
 	}
-	
+
 	result, err := p.iamClient.GetRole(ctx, input)
 	if err != nil {
 		return nil, &NotFoundError{ResourceType: "aws_iam_role", ResourceID: roleName}
 	}
-	
+
 	role := result.Role
-	
+
 	// Get tags
 	tags := make(map[string]string)
 	tagging, err := p.iamClient.ListRoleTags(ctx, &iam.ListRoleTagsInput{
@@ -478,27 +478,27 @@ func (p *AWSProvider) getIAMRole(ctx context.Context, roleName string) (*models.
 			tags[*tag.Key] = *tag.Value
 		}
 	}
-	
+
 	resource := &models.Resource{
 		ID:   *role.RoleName,
 		Type: "aws_iam_role",
 		Name: *role.RoleName,
 		Tags: tags,
 		Attributes: map[string]interface{}{
-			"id":                      *role.RoleName,
-			"name":                    *role.RoleName,
-			"arn":                     *role.Arn,
-			"path":                    *role.Path,
-			"assume_role_policy":      *role.AssumeRolePolicyDocument,
-			"create_date":             role.CreateDate.Format("2006-01-02T15:04:05Z"),
-			"max_session_duration":    *role.MaxSessionDuration,
+			"id":                   *role.RoleName,
+			"name":                 *role.RoleName,
+			"arn":                  *role.Arn,
+			"path":                 *role.Path,
+			"assume_role_policy":   *role.AssumeRolePolicyDocument,
+			"create_date":          role.CreateDate.Format("2006-01-02T15:04:05Z"),
+			"max_session_duration": *role.MaxSessionDuration,
 		},
 	}
-	
+
 	if role.Description != nil {
 		resource.Attributes["description"] = *role.Description
 	}
-	
+
 	return resource, nil
 }
 
@@ -507,20 +507,20 @@ func (p *AWSProvider) getLambdaFunction(ctx context.Context, functionName string
 	input := &lambda.GetFunctionInput{
 		FunctionName: aws.String(functionName),
 	}
-	
+
 	result, err := p.lambdaClient.GetFunction(ctx, input)
 	if err != nil {
 		return nil, &NotFoundError{ResourceType: "aws_lambda_function", ResourceID: functionName}
 	}
-	
+
 	config := result.Configuration
-	
+
 	// Get tags
 	tags := make(map[string]string)
 	if result.Tags != nil {
 		tags = result.Tags
 	}
-	
+
 	resource := &models.Resource{
 		ID:     *config.FunctionName,
 		Type:   "aws_lambda_function",
@@ -530,24 +530,24 @@ func (p *AWSProvider) getLambdaFunction(ctx context.Context, functionName string
 		Attributes: map[string]interface{}{
 			"id":            *config.FunctionName,
 			"function_name": *config.FunctionName,
-			"arn":          *config.FunctionArn,
-			"runtime":      string(config.Runtime),
-			"handler":      *config.Handler,
-			"role":         *config.Role,
-			"timeout":      *config.Timeout,
-			"memory_size":  *config.MemorySize,
+			"arn":           *config.FunctionArn,
+			"runtime":       string(config.Runtime),
+			"handler":       *config.Handler,
+			"role":          *config.Role,
+			"timeout":       *config.Timeout,
+			"memory_size":   *config.MemorySize,
 			"last_modified": *config.LastModified,
 		},
 	}
-	
+
 	if config.Description != nil {
 		resource.Attributes["description"] = *config.Description
 	}
-	
+
 	if config.Environment != nil && len(config.Environment.Variables) > 0 {
 		resource.Attributes["environment_variables"] = config.Environment.Variables
 	}
-	
+
 	return resource, nil
 }
 
@@ -556,14 +556,14 @@ func (p *AWSProvider) getDynamoDBTable(ctx context.Context, tableName string) (*
 	input := &dynamodb.DescribeTableInput{
 		TableName: aws.String(tableName),
 	}
-	
+
 	result, err := p.dynamoClient.DescribeTable(ctx, input)
 	if err != nil {
 		return nil, &NotFoundError{ResourceType: "aws_dynamodb_table", ResourceID: tableName}
 	}
-	
+
 	table := result.Table
-	
+
 	// Get tags
 	tags := make(map[string]string)
 	tagging, err := p.dynamoClient.ListTagsOfResource(ctx, &dynamodb.ListTagsOfResourceInput{
@@ -574,7 +574,7 @@ func (p *AWSProvider) getDynamoDBTable(ctx context.Context, tableName string) (*
 			tags[*tag.Key] = *tag.Value
 		}
 	}
-	
+
 	resource := &models.Resource{
 		ID:     *table.TableName,
 		Type:   "aws_dynamodb_table",
@@ -582,21 +582,21 @@ func (p *AWSProvider) getDynamoDBTable(ctx context.Context, tableName string) (*
 		Region: p.region,
 		Tags:   tags,
 		Attributes: map[string]interface{}{
-			"id":          *table.TableName,
-			"name":        *table.TableName,
-			"arn":         *table.TableArn,
-			"status":      string(table.TableStatus),
-			"item_count":  *table.ItemCount,
-			"table_size":  *table.TableSizeBytes,
+			"id":            *table.TableName,
+			"name":          *table.TableName,
+			"arn":           *table.TableArn,
+			"status":        string(table.TableStatus),
+			"item_count":    *table.ItemCount,
+			"table_size":    *table.TableSizeBytes,
 			"creation_time": table.CreationDateTime.Format("2006-01-02T15:04:05Z"),
 		},
 	}
-	
+
 	// Add billing mode
 	if table.BillingModeSummary != nil {
 		resource.Attributes["billing_mode"] = string(table.BillingModeSummary.BillingMode)
 	}
-	
+
 	return resource, nil
 }
 
@@ -605,24 +605,24 @@ func (p *AWSProvider) getSecurityGroup(ctx context.Context, groupID string) (*mo
 	input := &ec2.DescribeSecurityGroupsInput{
 		GroupIds: []string{groupID},
 	}
-	
+
 	result, err := p.ec2Client.DescribeSecurityGroups(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if len(result.SecurityGroups) == 0 {
 		return nil, &NotFoundError{ResourceType: "aws_security_group", ResourceID: groupID}
 	}
-	
+
 	sg := result.SecurityGroups[0]
-	
+
 	resource := &models.Resource{
-		ID:   *sg.GroupId,
-		Type: "aws_security_group",
-		Name: *sg.GroupName,
+		ID:     *sg.GroupId,
+		Type:   "aws_security_group",
+		Name:   *sg.GroupName,
 		Region: p.region,
-		Tags: p.convertTags(sg.Tags),
+		Tags:   p.convertTags(sg.Tags),
 		Attributes: map[string]interface{}{
 			"id":          *sg.GroupId,
 			"name":        *sg.GroupName,
@@ -630,7 +630,7 @@ func (p *AWSProvider) getSecurityGroup(ctx context.Context, groupID string) (*mo
 			"vpc_id":      *sg.VpcId,
 		},
 	}
-	
+
 	// Add ingress rules
 	if len(sg.IpPermissions) > 0 {
 		ingress := make([]map[string]interface{}, len(sg.IpPermissions))
@@ -639,7 +639,7 @@ func (p *AWSProvider) getSecurityGroup(ctx context.Context, groupID string) (*mo
 		}
 		resource.Attributes["ingress"] = ingress
 	}
-	
+
 	// Add egress rules
 	if len(sg.IpPermissionsEgress) > 0 {
 		egress := make([]map[string]interface{}, len(sg.IpPermissionsEgress))
@@ -648,7 +648,7 @@ func (p *AWSProvider) getSecurityGroup(ctx context.Context, groupID string) (*mo
 		}
 		resource.Attributes["egress"] = egress
 	}
-	
+
 	return resource, nil
 }
 
@@ -657,24 +657,24 @@ func (p *AWSProvider) getVPC(ctx context.Context, vpcID string) (*models.Resourc
 	input := &ec2.DescribeVpcsInput{
 		VpcIds: []string{vpcID},
 	}
-	
+
 	result, err := p.ec2Client.DescribeVpcs(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if len(result.Vpcs) == 0 {
 		return nil, &NotFoundError{ResourceType: "aws_vpc", ResourceID: vpcID}
 	}
-	
+
 	vpc := result.Vpcs[0]
-	
+
 	resource := &models.Resource{
-		ID:   *vpc.VpcId,
-		Type: "aws_vpc",
-		Name: p.getTagValue(vpc.Tags, "Name"),
+		ID:     *vpc.VpcId,
+		Type:   "aws_vpc",
+		Name:   p.getTagValue(vpc.Tags, "Name"),
 		Region: p.region,
-		Tags: p.convertTags(vpc.Tags),
+		Tags:   p.convertTags(vpc.Tags),
 		Attributes: map[string]interface{}{
 			"id":         *vpc.VpcId,
 			"cidr_block": *vpc.CidrBlock,
@@ -682,11 +682,11 @@ func (p *AWSProvider) getVPC(ctx context.Context, vpcID string) (*models.Resourc
 			"is_default": *vpc.IsDefault,
 		},
 	}
-	
+
 	if vpc.DhcpOptionsId != nil {
 		resource.Attributes["dhcp_options_id"] = *vpc.DhcpOptionsId
 	}
-	
+
 	return resource, nil
 }
 
@@ -695,35 +695,35 @@ func (p *AWSProvider) getSubnet(ctx context.Context, subnetID string) (*models.R
 	input := &ec2.DescribeSubnetsInput{
 		SubnetIds: []string{subnetID},
 	}
-	
+
 	result, err := p.ec2Client.DescribeSubnets(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if len(result.Subnets) == 0 {
 		return nil, &NotFoundError{ResourceType: "aws_subnet", ResourceID: subnetID}
 	}
-	
+
 	subnet := result.Subnets[0]
-	
+
 	resource := &models.Resource{
-		ID:   *subnet.SubnetId,
-		Type: "aws_subnet",
-		Name: p.getTagValue(subnet.Tags, "Name"),
+		ID:     *subnet.SubnetId,
+		Type:   "aws_subnet",
+		Name:   p.getTagValue(subnet.Tags, "Name"),
 		Region: p.region,
-		Tags: p.convertTags(subnet.Tags),
+		Tags:   p.convertTags(subnet.Tags),
 		Attributes: map[string]interface{}{
-			"id":                       *subnet.SubnetId,
-			"vpc_id":                   *subnet.VpcId,
-			"cidr_block":               *subnet.CidrBlock,
-			"availability_zone":        *subnet.AvailabilityZone,
+			"id":                         *subnet.SubnetId,
+			"vpc_id":                     *subnet.VpcId,
+			"cidr_block":                 *subnet.CidrBlock,
+			"availability_zone":          *subnet.AvailabilityZone,
 			"available_ip_address_count": *subnet.AvailableIpAddressCount,
-			"map_public_ip_on_launch":   *subnet.MapPublicIpOnLaunch,
-			"state":                    string(subnet.State),
+			"map_public_ip_on_launch":    *subnet.MapPublicIpOnLaunch,
+			"state":                      string(subnet.State),
 		},
 	}
-	
+
 	return resource, nil
 }
 
@@ -747,7 +747,7 @@ func (p *AWSProvider) convertTags(tags []ec2types.Tag) map[string]string {
 
 func (p *AWSProvider) convertSecurityGroupRule(rule ec2types.IpPermission) map[string]interface{} {
 	result := map[string]interface{}{}
-	
+
 	if rule.FromPort != nil {
 		result["from_port"] = *rule.FromPort
 	}
@@ -757,7 +757,7 @@ func (p *AWSProvider) convertSecurityGroupRule(rule ec2types.IpPermission) map[s
 	if rule.IpProtocol != nil {
 		result["protocol"] = *rule.IpProtocol
 	}
-	
+
 	// Add CIDR blocks
 	if len(rule.IpRanges) > 0 {
 		cidrs := make([]string, len(rule.IpRanges))
@@ -766,7 +766,7 @@ func (p *AWSProvider) convertSecurityGroupRule(rule ec2types.IpPermission) map[s
 		}
 		result["cidr_blocks"] = cidrs
 	}
-	
+
 	// Add security groups
 	if len(rule.UserIdGroupPairs) > 0 {
 		sgs := make([]string, len(rule.UserIdGroupPairs))
@@ -775,6 +775,6 @@ func (p *AWSProvider) convertSecurityGroupRule(rule ec2types.IpPermission) map[s
 		}
 		result["security_groups"] = sgs
 	}
-	
+
 	return result
 }

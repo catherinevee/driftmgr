@@ -341,7 +341,7 @@ func handleRemediationRollback(args []string) {
 // handleRemediationList handles listing remediation plans
 func handleRemediationList(args []string) {
 	workDir := ".driftmgr/remediation"
-	
+
 	fmt.Println("📋 Remediation Plans")
 
 	// Create remediation engine
@@ -429,7 +429,7 @@ func handleRemediationShow(args []string) {
 	// Display detailed plan information
 	fmt.Printf("📄 Remediation Plan: %s\n", color.CyanString(plan.ID))
 	fmt.Println(strings.Repeat("─", 60))
-	
+
 	fmt.Printf("Name:         %s\n", plan.Name)
 	fmt.Printf("Description:  %s\n", plan.Description)
 	fmt.Printf("Created:      %s\n", plan.CreatedAt.Format("2006-01-02 15:04:05"))
@@ -483,11 +483,11 @@ func handleDiscoverState(args []string) {
 	}
 
 	fmt.Println("🔍 Auto-discovering Terraform state files...")
-	
+
 	// Create state discovery
 	// Use state manager instead of undefined NewStateDiscovery
 	stateManager := state.NewStateManager(state.NewLocalBackend(".driftmgr/state"))
-	
+
 	// List available states
 	ctx := context.Background()
 	stateFiles, err := stateManager.ListStates(ctx)
@@ -551,7 +551,7 @@ func convertDriftRecordToResult(record *DriftRecord) *models.DriftResult {
 		DetectedAt:   time.Now(), // No DetectedAt field in DriftRecord
 		Changes:      []models.DriftChange{},
 	}
-	
+
 	// No Changes field in DriftRecord - leaving empty
 	if false { // Disabled since record.Changes doesn't exist
 		var field string
@@ -560,7 +560,7 @@ func convertDriftRecordToResult(record *DriftRecord) *models.DriftResult {
 			Field:      field,
 			ChangeType: "update",
 		}
-		
+
 		// Try to extract old and new values from the change
 		if changeMap, ok := value.(map[string]interface{}); ok {
 			if oldVal, exists := changeMap["old"]; exists {
@@ -576,10 +576,10 @@ func convertDriftRecordToResult(record *DriftRecord) *models.DriftResult {
 			// If it's not a map, treat the whole value as the new value
 			change.NewValue = value
 		}
-		
+
 		result.Changes = append(result.Changes, change)
 	}
-	
+
 	return result
 }
 
@@ -588,12 +588,12 @@ func truncatePath(path string, maxLen int) string {
 	if len(path) <= maxLen {
 		return path
 	}
-	
+
 	// Try to keep the filename visible
 	parts := strings.Split(path, "/")
 	if len(parts) > 2 {
 		return "..." + path[len(path)-maxLen+3:]
 	}
-	
+
 	return path[:maxLen-3] + "..."
 }

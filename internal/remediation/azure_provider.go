@@ -1142,11 +1142,11 @@ func (ap *AzureProvider) discoverApplicationInsights(ctx context.Context, accoun
 	resources := []models.Resource{}
 	for _, component := range components {
 		resource := models.Resource{
-			ID:       getStringFromInterface(component["id"]),
-			Name:     getStringFromInterface(component["name"]),
-			Type:     "Microsoft.Insights/components",
+			ID:     getStringFromInterface(component["id"]),
+			Name:   getStringFromInterface(component["name"]),
+			Type:   "Microsoft.Insights/components",
 			Region: getStringFromInterface(component["location"]), // Using Region field for location
-			Tags:     extractTagsFromInterface(component["tags"]),
+			Tags:   extractTagsFromInterface(component["tags"]),
 			Properties: map[string]interface{}{
 				"applicationType":       getStringFromInterface(component["applicationType"]),
 				"applicationId":         getStringFromInterface(component["applicationId"]),
@@ -1411,7 +1411,7 @@ func (ap *AzureProvider) deleteResourceGroup(ctx context.Context, resource model
 	if err != nil {
 		return fmt.Errorf("failed to create resource groups client: %w", err)
 	}
-	
+
 	// Extract resource group name from resource ID
 	// Azure resource group ID format: /subscriptions/{subId}/resourceGroups/{rgName}
 	parts := strings.Split(resource.ID, "/")
@@ -1419,24 +1419,24 @@ func (ap *AzureProvider) deleteResourceGroup(ctx context.Context, resource model
 		return fmt.Errorf("invalid resource group ID format: %s", resource.ID)
 	}
 	resourceGroupName := parts[4]
-	
+
 	// Check if resource group exists
 	exists, err := client.CheckExistence(ctx, resourceGroupName, nil)
 	if err != nil {
 		return fmt.Errorf("failed to check resource group existence: %w", err)
 	}
-	
+
 	if !exists.Success {
 		// Resource group doesn't exist, nothing to delete
 		return nil
 	}
-	
+
 	// List all resources in the resource group first
 	resourcesClient, err := armresources.NewClient(ap.subscriptionID, ap.cred, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create resources client: %w", err)
 	}
-	
+
 	// Get all resources in the resource group
 	pager := resourcesClient.NewListByResourceGroupPager(resourceGroupName, nil)
 	resourceCount := 0
@@ -1447,25 +1447,25 @@ func (ap *AzureProvider) deleteResourceGroup(ctx context.Context, resource model
 		}
 		resourceCount += len(page.Value)
 	}
-	
+
 	// Warn if resource group contains resources
 	if resourceCount > 0 {
 		fmt.Printf("Warning: Resource group '%s' contains %d resources that will be deleted\n", resourceGroupName, resourceCount)
 	}
-	
+
 	// Begin deletion of resource group (this will delete all contained resources)
 	poller, err := client.BeginDelete(ctx, resourceGroupName, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin resource group deletion: %w", err)
 	}
-	
+
 	// Wait for deletion to complete
 	fmt.Printf("Deleting resource group '%s'...\n", resourceGroupName)
 	_, err = poller.PollUntilDone(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete resource group: %w", err)
 	}
-	
+
 	fmt.Printf("Successfully deleted resource group '%s'\n", resourceGroupName)
 	return nil
 }
@@ -1760,7 +1760,7 @@ func extractTagsFromInterface(v interface{}) map[string]string {
 	if v == nil {
 		return tags
 	}
-	
+
 	switch t := v.(type) {
 	case map[string]interface{}:
 		for k, v := range t {

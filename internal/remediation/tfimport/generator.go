@@ -1,4 +1,4 @@
-package import
+package tfimport
 
 import (
 	"fmt"

@@ -11,15 +11,15 @@ import (
 
 	"github.com/catherinevee/driftmgr/internal/discovery"
 	"github.com/catherinevee/driftmgr/internal/providers"
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/state"
 )
 
 // ValidationResult represents the result of a validation
 type ValidationResult struct {
-	Valid   bool     `json:"valid"`
-	Errors  []string `json:"errors,omitempty"`
+	Valid    bool     `json:"valid"`
+	Errors   []string `json:"errors,omitempty"`
 	Warnings []string `json:"warnings,omitempty"`
-	Stats   Stats    `json:"stats"`
+	Stats    Stats    `json:"stats"`
 }
 
 // Stats contains validation statistics
@@ -103,8 +103,8 @@ func validateStateFile(path string, result *ValidationResult, verbose bool) {
 	}
 
 	// Parse state file
-	stateParser := parser.NewParser()
-	state, err := stateParser.ParseFile(path)
+	stateParser := state.NewParser()
+	tfState, err := stateParser.ParseFile(path)
 	if err != nil {
 		result.Valid = false
 		result.Errors = append(result.Errors, fmt.Sprintf("Failed to parse state file: %v", err))
@@ -112,15 +112,15 @@ func validateStateFile(path string, result *ValidationResult, verbose bool) {
 	}
 
 	// Validate state structure
-	if state.Version < 3 {
-		result.Warnings = append(result.Warnings, fmt.Sprintf("Old state format version %d", state.Version))
+	if tfState.Version < 3 {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("Old state format version %d", tfState.Version))
 	}
 
 	// Count resources
-	result.Stats.TotalResources = len(state.Resources)
-	
+	result.Stats.TotalResources = len(tfState.Resources)
+
 	// Validate each resource
-	for _, resource := range state.Resources {
+	for _, resource := range tfState.Resources {
 		if err := validateResource(resource); err != nil {
 			result.Stats.InvalidResources++
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Resource %s: %v", resource.Name, err))

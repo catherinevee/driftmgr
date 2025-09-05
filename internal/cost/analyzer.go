@@ -41,26 +41,26 @@ type ResourceCost struct {
 
 // OptimizationRecommendation represents a cost optimization recommendation
 type OptimizationRecommendation struct {
-	ResourceAddress   string  `json:"resource_address"`
-	RecommendationType string `json:"recommendation_type"`
-	Description       string  `json:"description"`
-	EstimatedSavings  float64 `json:"estimated_savings"`
-	Impact            string  `json:"impact"`
-	Confidence        float64 `json:"confidence"`
+	ResourceAddress    string  `json:"resource_address"`
+	RecommendationType string  `json:"recommendation_type"`
+	Description        string  `json:"description"`
+	EstimatedSavings   float64 `json:"estimated_savings"`
+	Impact             string  `json:"impact"`
+	Confidence         float64 `json:"confidence"`
 }
 
 // StateCostReport represents the cost analysis for an entire state
 type StateCostReport struct {
-	Timestamp       time.Time                   `json:"timestamp"`
-	TotalHourlyCost float64                     `json:"total_hourly_cost"`
-	TotalMonthlyCost float64                    `json:"total_monthly_cost"`
-	TotalAnnualCost float64                     `json:"total_annual_cost"`
-	Currency        string                      `json:"currency"`
-	ResourceCosts   []ResourceCost              `json:"resource_costs"`
-	ProviderSummary map[string]*ProviderCostSummary `json:"provider_summary"`
-	TypeSummary     map[string]*TypeCostSummary     `json:"type_summary"`
-	TopExpensive    []ResourceCost              `json:"top_expensive"`
-	Recommendations []CostRecommendation        `json:"recommendations"`
+	Timestamp        time.Time                       `json:"timestamp"`
+	TotalHourlyCost  float64                         `json:"total_hourly_cost"`
+	TotalMonthlyCost float64                         `json:"total_monthly_cost"`
+	TotalAnnualCost  float64                         `json:"total_annual_cost"`
+	Currency         string                          `json:"currency"`
+	ResourceCosts    []ResourceCost                  `json:"resource_costs"`
+	ProviderSummary  map[string]*ProviderCostSummary `json:"provider_summary"`
+	TypeSummary      map[string]*TypeCostSummary     `json:"type_summary"`
+	TopExpensive     []ResourceCost                  `json:"top_expensive"`
+	Recommendations  []CostRecommendation            `json:"recommendations"`
 }
 
 // ProviderCostSummary summarizes costs by provider
@@ -95,11 +95,11 @@ type CostRecommendation struct {
 
 // CostConfig contains configuration for cost analysis
 type CostConfig struct {
-	Currency           string            `json:"currency"`
-	HoursPerMonth      float64           `json:"hours_per_month"`
-	DefaultRegion      map[string]string `json:"default_region"`
-	IncludeFreeTier    bool              `json:"include_free_tier"`
-	MarkupPercentage   float64           `json:"markup_percentage"`
+	Currency         string            `json:"currency"`
+	HoursPerMonth    float64           `json:"hours_per_month"`
+	DefaultRegion    map[string]string `json:"default_region"`
+	IncludeFreeTier  bool              `json:"include_free_tier"`
+	MarkupPercentage float64           `json:"markup_percentage"`
 }
 
 // CostCache caches pricing data
@@ -127,18 +127,18 @@ func NewCostAnalyzer() *CostAnalyzer {
 			Currency:      "USD",
 			HoursPerMonth: 730, // Average hours in a month
 			DefaultRegion: map[string]string{
-				"aws":     "us-east-1",
-				"azure":   "eastus",
-				"google":  "us-central1",
+				"aws":    "us-east-1",
+				"azure":  "eastus",
+				"google": "us-central1",
 			},
-			IncludeFreeTier: false,
-			MarkupPercentage:  0,
+			IncludeFreeTier:  false,
+			MarkupPercentage: 0,
 		},
 	}
-	
+
 	// Register providers
 	analyzer.registerProviders()
-	
+
 	return analyzer
 }
 
@@ -153,7 +153,7 @@ func (ca *CostAnalyzer) AnalyzeState(ctx context.Context, state *state.Terraform
 		TopExpensive:    make([]ResourceCost, 0),
 		Recommendations: make([]CostRecommendation, 0),
 	}
-	
+
 	// Analyze each resource
 	for _, resource := range state.Resources {
 		for i, instance := range resource.Instances {
@@ -162,65 +162,65 @@ func (ca *CostAnalyzer) AnalyzeState(ctx context.Context, state *state.Terraform
 				// Log error but continue
 				continue
 			}
-			
+
 			if cost != nil && cost.MonthlyCost > 0 {
 				report.ResourceCosts = append(report.ResourceCosts, *cost)
 				report.TotalHourlyCost += cost.HourlyCost
 				report.TotalMonthlyCost += cost.MonthlyCost
 				report.TotalAnnualCost += cost.AnnualCost
-				
+
 				// Update provider summary
 				ca.updateProviderSummary(report, cost)
-				
+
 				// Update type summary
 				ca.updateTypeSummary(report, cost)
 			}
 		}
 	}
-	
+
 	// Calculate percentages
 	ca.calculatePercentages(report)
-	
+
 	// Find top expensive resources
 	report.TopExpensive = ca.findTopExpensive(report.ResourceCosts, 10)
-	
+
 	// Generate recommendations
 	report.Recommendations = ca.generateRecommendations(state, report)
-	
+
 	return report, nil
 }
 
 // AnalyzeResource analyzes the cost of a single resource
-func (ca *CostAnalyzer) AnalyzeResource(ctx context.Context, resource *state.Resource, 
+func (ca *CostAnalyzer) AnalyzeResource(ctx context.Context, resource *state.Resource,
 	instance *state.Instance, index int) (*ResourceCost, error) {
-	
+
 	// Extract provider name
 	providerName := ca.extractProviderName(resource.Provider)
-	
+
 	// Get appropriate cost provider
 	provider, exists := ca.providers[providerName]
 	if !exists {
 		return nil, fmt.Errorf("no cost provider for %s", providerName)
 	}
-	
+
 	// Check if provider supports this resource type
 	if !provider.SupportsResource(resource.Type) {
 		return nil, fmt.Errorf("resource type %s not supported by cost provider", resource.Type)
 	}
-	
+
 	// Get resource cost
 	cost, err := provider.GetResourceCost(ctx, resource.Type, instance.Attributes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource cost: %w", err)
 	}
-	
+
 	// Set resource address
 	if len(resource.Instances) == 1 {
 		cost.ResourceAddress = fmt.Sprintf("%s.%s", resource.Type, resource.Name)
 	} else {
 		cost.ResourceAddress = fmt.Sprintf("%s.%s[%d]", resource.Type, resource.Name, index)
 	}
-	
+
 	// Apply markup if configured
 	if ca.config.MarkupPercentage > 0 {
 		markup := 1 + (ca.config.MarkupPercentage / 100)
@@ -228,7 +228,7 @@ func (ca *CostAnalyzer) AnalyzeResource(ctx context.Context, resource *state.Res
 		cost.MonthlyCost *= markup
 		cost.AnnualCost *= markup
 	}
-	
+
 	// Extract tags if available
 	if tags, ok := instance.Attributes["tags"].(map[string]interface{}); ok {
 		cost.Tags = make(map[string]string)
@@ -238,9 +238,9 @@ func (ca *CostAnalyzer) AnalyzeResource(ctx context.Context, resource *state.Res
 			}
 		}
 	}
-	
+
 	cost.LastUpdated = time.Now()
-	
+
 	return cost, nil
 }
 
@@ -251,7 +251,7 @@ func (ca *CostAnalyzer) updateProviderSummary(report *StateCostReport, cost *Res
 			Provider: cost.Provider,
 		}
 	}
-	
+
 	summary := report.ProviderSummary[cost.Provider]
 	summary.ResourceCount++
 	summary.HourlyCost += cost.HourlyCost
@@ -266,7 +266,7 @@ func (ca *CostAnalyzer) updateTypeSummary(report *StateCostReport, cost *Resourc
 			ResourceType: cost.ResourceType,
 		}
 	}
-	
+
 	summary := report.TypeSummary[cost.ResourceType]
 	summary.ResourceCount++
 	summary.HourlyCost += cost.HourlyCost
@@ -279,11 +279,11 @@ func (ca *CostAnalyzer) calculatePercentages(report *StateCostReport) {
 	if report.TotalMonthlyCost == 0 {
 		return
 	}
-	
+
 	for _, summary := range report.ProviderSummary {
 		summary.Percentage = (summary.MonthlyCost / report.TotalMonthlyCost) * 100
 	}
-	
+
 	for _, summary := range report.TypeSummary {
 		summary.Percentage = (summary.MonthlyCost / report.TotalMonthlyCost) * 100
 	}
@@ -294,7 +294,7 @@ func (ca *CostAnalyzer) findTopExpensive(costs []ResourceCost, limit int) []Reso
 	// Simple bubble sort for top N (could use heap for better performance)
 	sorted := make([]ResourceCost, len(costs))
 	copy(sorted, costs)
-	
+
 	for i := 0; i < len(sorted)-1; i++ {
 		for j := 0; j < len(sorted)-i-1; j++ {
 			if sorted[j].MonthlyCost < sorted[j+1].MonthlyCost {
@@ -302,7 +302,7 @@ func (ca *CostAnalyzer) findTopExpensive(costs []ResourceCost, limit int) []Reso
 			}
 		}
 	}
-	
+
 	if len(sorted) > limit {
 		return sorted[:limit]
 	}
@@ -310,11 +310,11 @@ func (ca *CostAnalyzer) findTopExpensive(costs []ResourceCost, limit int) []Reso
 }
 
 // generateRecommendations generates cost optimization recommendations
-func (ca *CostAnalyzer) generateRecommendations(state *state.TerraformState, 
+func (ca *CostAnalyzer) generateRecommendations(state *state.TerraformState,
 	report *StateCostReport) []CostRecommendation {
-	
+
 	recommendations := make([]CostRecommendation, 0)
-	
+
 	for _, cost := range report.ResourceCosts {
 		// Check for oversized instances
 		if strings.Contains(cost.ResourceType, "instance") {
@@ -329,7 +329,7 @@ func (ca *CostAnalyzer) generateRecommendations(state *state.TerraformState,
 				})
 			}
 		}
-		
+
 		// Check for unattached volumes
 		if strings.Contains(cost.ResourceType, "volume") || strings.Contains(cost.ResourceType, "disk") {
 			// This would need actual attachment checking
@@ -342,7 +342,7 @@ func (ca *CostAnalyzer) generateRecommendations(state *state.TerraformState,
 				Risk:             "low",
 			})
 		}
-		
+
 		// Check for old snapshots
 		if strings.Contains(cost.ResourceType, "snapshot") {
 			recommendations = append(recommendations, CostRecommendation{
@@ -355,7 +355,7 @@ func (ca *CostAnalyzer) generateRecommendations(state *state.TerraformState,
 			})
 		}
 	}
-	
+
 	// Check for savings plans opportunities
 	if report.TotalMonthlyCost > 1000 {
 		recommendations = append(recommendations, CostRecommendation{
@@ -367,7 +367,7 @@ func (ca *CostAnalyzer) generateRecommendations(state *state.TerraformState,
 			Risk:             "low",
 		})
 	}
-	
+
 	return recommendations
 }
 
@@ -397,25 +397,25 @@ func (ca *CostAnalyzer) GetCostTrend(ctx context.Context, historicalReports []*S
 	if len(historicalReports) < 2 {
 		return nil
 	}
-	
+
 	trend := &CostTrend{
 		Period:      fmt.Sprintf("%d reports", len(historicalReports)),
 		StartCost:   historicalReports[0].TotalMonthlyCost,
 		EndCost:     historicalReports[len(historicalReports)-1].TotalMonthlyCost,
 		TrendPoints: make([]TrendPoint, len(historicalReports)),
 	}
-	
+
 	for i, report := range historicalReports {
 		trend.TrendPoints[i] = TrendPoint{
 			Timestamp:   report.Timestamp,
 			MonthlyCost: report.TotalMonthlyCost,
 		}
 	}
-	
+
 	// Calculate trend direction
 	trend.Change = trend.EndCost - trend.StartCost
 	trend.ChangePercent = (trend.Change / trend.StartCost) * 100
-	
+
 	if trend.ChangePercent > 5 {
 		trend.Direction = "increasing"
 	} else if trend.ChangePercent < -5 {
@@ -423,7 +423,7 @@ func (ca *CostAnalyzer) GetCostTrend(ctx context.Context, historicalReports []*S
 	} else {
 		trend.Direction = "stable"
 	}
-	
+
 	return trend
 }
 
@@ -433,12 +433,12 @@ func (ca *CostAnalyzer) CalculateResourceCost(ctx context.Context, resource *sta
 	if len(resource.Instances) == 0 {
 		return nil, fmt.Errorf("no instances found for resource %s", resource.Name)
 	}
-	
+
 	cost, err := ca.AnalyzeResource(ctx, resource, &resource.Instances[0], 0)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return cost, nil
 }
 

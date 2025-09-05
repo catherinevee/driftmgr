@@ -5,15 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/drift/detector"
 	"github.com/catherinevee/driftmgr/internal/drift/comparator"
+	"github.com/catherinevee/driftmgr/internal/drift/detector"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCodeAsTruthStrategy(t *testing.T) {
 	ctx := context.Background()
-	
+
 	config := &StrategyConfig{
 		TerraformPath: "terraform",
 		Timeout:       5 * time.Minute,
@@ -21,19 +21,19 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 		AutoApprove:   false,
 		MaxParallel:   1,
 	}
-	
+
 	strategy := NewCodeAsTruthStrategy(config)
-	
+
 	t.Run("GetType", func(t *testing.T) {
 		assert.Equal(t, CodeAsTruthStrategy, strategy.GetType())
 	})
-	
+
 	t.Run("GetDescription", func(t *testing.T) {
 		desc := strategy.GetDescription()
 		assert.Contains(t, desc, "Terraform")
 		assert.Contains(t, desc, "fix drift")
 	})
-	
+
 	t.Run("Validate", func(t *testing.T) {
 		// Test with no drift
 		noDrift := &detector.DriftResult{
@@ -41,14 +41,14 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 		}
 		err := strategy.Validate(noDrift)
 		assert.Error(t, err, "Should error when no drift detected")
-		
+
 		// Test with drift
 		withDrift := &detector.DriftResult{
 			HasDrift: true,
 			Differences: []comparator.Difference{
 				{
-					Path: "aws_instance.test",
-					Type: comparator.DiffTypeModified,
+					Path:       "aws_instance.test",
+					Type:       comparator.DiffTypeModified,
 					Importance: comparator.ImportanceMedium,
 				},
 			},
@@ -59,7 +59,7 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 			assert.Contains(t, err.Error(), "terraform")
 		}
 	})
-	
+
 	t.Run("Plan", func(t *testing.T) {
 		drift := &detector.DriftResult{
 			HasDrift: true,
@@ -79,32 +79,32 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 				},
 			},
 		}
-		
+
 		plan, err := strategy.Plan(ctx, drift)
 		if err != nil {
 			// If terraform is not available, skip this test
 			t.Skip("Terraform not available in test environment")
 			return
 		}
-		
+
 		require.NoError(t, err)
 		require.NotNil(t, plan)
-		
+
 		// Verify plan structure
 		assert.NotEmpty(t, plan.ID)
 		assert.Equal(t, CodeAsTruthStrategy, plan.Strategy)
 		assert.NotZero(t, plan.CreatedAt)
 		assert.NotNil(t, plan.DriftSummary)
-		
+
 		// Check drift summary
 		assert.Equal(t, 2, plan.DriftSummary.TotalResources)
 		assert.Equal(t, 1, plan.DriftSummary.DriftedResources)
 		assert.Equal(t, 1, plan.DriftSummary.MissingResources)
 		assert.Equal(t, 1, plan.DriftSummary.CriticalDrifts)
-		
+
 		// Check actions
 		assert.NotEmpty(t, plan.Actions)
-		
+
 		// Should have at least a plan action
 		hasPlanAction := false
 		for _, action := range plan.Actions {
@@ -114,15 +114,15 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 			}
 		}
 		assert.True(t, hasPlanAction, "Should have a plan/apply action")
-		
+
 		// Check risk level
 		assert.Equal(t, RiskHigh, plan.RiskLevel, "Should be high risk due to critical drift")
-		
+
 		// Check metadata
 		assert.Contains(t, plan.Metadata, "terraform_version")
 		assert.Contains(t, plan.Metadata, "dry_run")
 	})
-	
+
 	t.Run("Execute_DryRun", func(t *testing.T) {
 		drift := &detector.DriftResult{
 			HasDrift: true,
@@ -134,37 +134,37 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 				},
 			},
 		}
-		
+
 		plan, err := strategy.Plan(ctx, drift)
 		if err != nil {
 			t.Skip("Terraform not available in test environment")
 			return
 		}
-		
+
 		require.NoError(t, err)
 		require.NotNil(t, plan)
-		
+
 		// Execute in dry run mode
 		result, err := strategy.Execute(ctx, plan)
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		
+
 		// Verify execution result
 		assert.Equal(t, plan.ID, result.PlanID)
 		assert.NotZero(t, result.StartedAt)
 		assert.NotZero(t, result.CompletedAt)
 		assert.NotZero(t, result.Duration)
-		
+
 		// Check actions executed
 		assert.Len(t, result.ActionsExecuted, len(plan.Actions))
-		
+
 		// In dry run, all actions should succeed
 		for _, action := range result.ActionsExecuted {
 			assert.True(t, action.Success, "Dry run actions should succeed")
 			assert.Contains(t, action.Output, "[DRY RUN]")
 		}
 	})
-	
+
 	t.Run("RequiresApproval", func(t *testing.T) {
 		// Test auto-approve config
 		autoApproveConfig := &StrategyConfig{
@@ -173,7 +173,7 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 			DryRun:        true,
 		}
 		autoStrategy := NewCodeAsTruthStrategy(autoApproveConfig)
-		
+
 		drift := &detector.DriftResult{
 			HasDrift: true,
 			Differences: []comparator.Difference{
@@ -184,15 +184,15 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 				},
 			},
 		}
-		
+
 		plan, err := autoStrategy.Plan(ctx, drift)
 		if err != nil {
 			t.Skip("Terraform not available in test environment")
 			return
 		}
-		
+
 		assert.False(t, plan.RequiresApproval, "Should not require approval with auto-approve")
-		
+
 		// Test manual approval for critical changes
 		manualConfig := &StrategyConfig{
 			TerraformPath:      "terraform",
@@ -201,20 +201,20 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 			RequireApprovalFor: []RiskLevel{RiskHigh, RiskCritical},
 		}
 		manualStrategy := NewCodeAsTruthStrategy(manualConfig)
-		
+
 		plan, err = manualStrategy.Plan(ctx, drift)
 		if err != nil {
 			t.Skip("Terraform not available in test environment")
 			return
 		}
-		
+
 		assert.True(t, plan.RequiresApproval, "Should require approval for critical changes")
 	})
 }
 
 func TestDriftSummaryCreation(t *testing.T) {
 	strategy := NewCodeAsTruthStrategy(nil)
-	
+
 	drift := &detector.DriftResult{
 		HasDrift: true,
 		Differences: []comparator.Difference{
@@ -240,9 +240,9 @@ func TestDriftSummaryCreation(t *testing.T) {
 			},
 		},
 	}
-	
+
 	summary := strategy.createDriftSummary(drift)
-	
+
 	assert.NotNil(t, summary)
 	assert.Equal(t, 4, summary.TotalResources)
 	assert.Equal(t, 2, summary.DriftedResources)
@@ -256,12 +256,12 @@ func TestDriftSummaryCreation(t *testing.T) {
 
 func TestEstimateExecutionTime(t *testing.T) {
 	strategy := NewCodeAsTruthStrategy(nil)
-	
+
 	tests := []struct {
-		name         string
-		actionCount  int
-		minExpected  time.Duration
-		maxExpected  time.Duration
+		name        string
+		actionCount int
+		minExpected time.Duration
+		maxExpected time.Duration
 	}{
 		{
 			name:        "Small operation",
@@ -282,7 +282,7 @@ func TestEstimateExecutionTime(t *testing.T) {
 			maxExpected: 5 * time.Minute,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			duration := strategy.estimateExecutionTime(tt.actionCount)
@@ -298,14 +298,14 @@ func TestBuildPlanCommand(t *testing.T) {
 		AutoApprove:   true,
 	}
 	strategy := NewCodeAsTruthStrategy(config)
-	
+
 	targets := []string{
 		"aws_instance.web",
 		"aws_s3_bucket.data",
 	}
-	
+
 	command := strategy.buildPlanCommand(targets)
-	
+
 	assert.Contains(t, command, "terraform")
 	assert.Contains(t, command, "plan")
 	assert.Contains(t, command, "-out=drift-remediation.tfplan")

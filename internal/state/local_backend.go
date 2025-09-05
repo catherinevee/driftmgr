@@ -56,7 +56,7 @@ func (lb *LocalBackend) Delete(ctx context.Context, key string) error {
 // List returns keys with a given prefix
 func (lb *LocalBackend) List(ctx context.Context, prefix string) ([]string, error) {
 	var keys []string
-	
+
 	err := filepath.Walk(lb.basePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -69,7 +69,7 @@ func (lb *LocalBackend) List(ctx context.Context, prefix string) ([]string, erro
 		}
 		return nil
 	})
-	
+
 	return keys, err
 }
 
@@ -77,7 +77,7 @@ func (lb *LocalBackend) List(ctx context.Context, prefix string) ([]string, erro
 func (lb *LocalBackend) Lock(ctx context.Context, key string) error {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
-	
+
 	if lb.locks[key] {
 		return fmt.Errorf("key already locked: %s", key)
 	}
@@ -89,7 +89,7 @@ func (lb *LocalBackend) Lock(ctx context.Context, key string) error {
 func (lb *LocalBackend) Unlock(ctx context.Context, key string) error {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
-	
+
 	delete(lb.locks, key)
 	return nil
 }

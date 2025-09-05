@@ -25,14 +25,14 @@ type BackupManager struct {
 }
 
 type BackupMetadata struct {
-	ID          string    `json:"id"`
-	Timestamp   time.Time `json:"timestamp"`
-	Size        int64     `json:"size"`
-	Compressed  bool      `json:"compressed"`
-	Encrypted   bool      `json:"encrypted"`
-	StateVersion int      `json:"state_version"`
-	Description string    `json:"description"`
-	Tags        map[string]string `json:"tags"`
+	ID           string            `json:"id"`
+	Timestamp    time.Time         `json:"timestamp"`
+	Size         int64             `json:"size"`
+	Compressed   bool              `json:"compressed"`
+	Encrypted    bool              `json:"encrypted"`
+	StateVersion int               `json:"state_version"`
+	Description  string            `json:"description"`
+	Tags         map[string]string `json:"tags"`
 }
 
 type BackupOptions struct {
@@ -69,7 +69,7 @@ func (bm *BackupManager) CreateBackup(backupID string, state interface{}) error 
 	// Create backup file path
 	timestamp := time.Now().Unix()
 	backupFile := filepath.Join(bm.backupDir, fmt.Sprintf("%s_%d.json", backupID, timestamp))
-	
+
 	if bm.compression {
 		backupFile += ".gz"
 	}
@@ -245,13 +245,13 @@ func (bm *BackupManager) cleanupOldBackups() error {
 		if file.IsDir() {
 			continue
 		}
-		
+
 		// Extract backup ID from filename
 		parts := strings.Split(file.Name(), "_")
 		if len(parts) < 2 {
 			continue
 		}
-		
+
 		backupID := parts[0]
 		backupGroups[backupID] = append(backupGroups[backupID], file)
 	}
@@ -284,7 +284,7 @@ func (bm *BackupManager) LoadMetadata() error {
 	defer bm.mu.Unlock()
 
 	metadataFile := filepath.Join(bm.backupDir, "metadata.json")
-	
+
 	data, err := os.ReadFile(metadataFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -305,7 +305,7 @@ func (bm *BackupManager) SaveMetadata() error {
 	defer bm.mu.RUnlock()
 
 	metadataFile := filepath.Join(bm.backupDir, "metadata.json")
-	
+
 	data, err := json.MarshalIndent(bm.metadata, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)

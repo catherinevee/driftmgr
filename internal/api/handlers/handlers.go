@@ -24,7 +24,7 @@ func (h *DriftHandler) HandleDetect(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// StateHandler handles state management requests  
+// StateHandler handles state management requests
 type StateHandler struct{}
 
 // NewStateHandler creates a new state handler

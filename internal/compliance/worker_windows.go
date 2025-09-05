@@ -29,7 +29,7 @@ func (w *WindowsWorker) TryDelete(path string) error {
 	if err == nil {
 		return nil
 	}
-	
+
 	// If it's a permission error, try to change attributes
 	if os.IsPermission(err) {
 		// Remove read-only attribute
@@ -38,7 +38,7 @@ func (w *WindowsWorker) TryDelete(path string) error {
 			return os.Remove(path)
 		}
 	}
-	
+
 	return err
 }
 
@@ -49,7 +49,7 @@ func (w *WindowsWorker) ForceUnlock(path string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Try to open the file with delete permission
 	handle, err := syscall.CreateFile(
 		pathPtr,
@@ -60,12 +60,12 @@ func (w *WindowsWorker) ForceUnlock(path string) error {
 		0x04000000, // FILE_FLAG_DELETE_ON_CLOSE
 		0,
 	)
-	
+
 	if err != nil {
 		// Try alternative method using MoveFileEx
 		return w.scheduleForDeletion(path)
 	}
-	
+
 	// Close handle which should delete the file
 	syscall.CloseHandle(handle)
 	return nil
@@ -74,23 +74,23 @@ func (w *WindowsWorker) ForceUnlock(path string) error {
 // scheduleForDeletion schedules file deletion on next reboot
 func (w *WindowsWorker) scheduleForDeletion(path string) error {
 	moveFileEx := w.kernel32.NewProc("MoveFileExW")
-	
+
 	pathPtr, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return err
 	}
-	
+
 	// MOVEFILE_DELAY_UNTIL_REBOOT = 0x4
 	ret, _, err := moveFileEx.Call(
 		uintptr(unsafe.Pointer(pathPtr)),
 		0,
 		0x4,
 	)
-	
+
 	if ret == 0 {
 		return fmt.Errorf("failed to schedule deletion: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -111,7 +111,7 @@ func (w *WindowsWorker) IsLocked(path string) bool {
 		// Other errors might also indicate the file is in use
 		return true
 	}
-	
+
 	// File opened successfully, it's not locked
 	file.Close()
 	return false

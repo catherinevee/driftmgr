@@ -34,7 +34,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to read report: %v", err)
 		}
-		
+
 		var genericReport map[string]interface{}
 		if err := json.Unmarshal(data, &genericReport); err != nil {
 			log.Fatalf("Failed to parse report: %v", err)
@@ -76,7 +76,7 @@ func generateMarkdown(report *quality.Report) string {
 
 	sb.WriteString("## Code Quality Report\n\n")
 	sb.WriteString(fmt.Sprintf("**Generated:** %s\n\n", report.Timestamp.Format("2006-01-02 15:04:05")))
-	
+
 	sb.WriteString("### Summary\n\n")
 	sb.WriteString(fmt.Sprintf("- **Quality Score:** %.1f/100\n", report.Summary.QualityScore))
 	sb.WriteString(fmt.Sprintf("- **UAT Pass Rate:** %.1f%%\n", report.Summary.UATPassRate))
@@ -119,9 +119,9 @@ func generateMarkdown(report *quality.Report) string {
 
 func generateMarkdownFromGeneric(data map[string]interface{}) string {
 	var sb strings.Builder
-	
+
 	sb.WriteString("## Code Quality Report\n\n")
-	
+
 	if summary, ok := data["summary"].(map[string]interface{}); ok {
 		sb.WriteString("### Summary\n\n")
 		if score, ok := summary["quality_score"].(float64); ok {
@@ -138,7 +138,7 @@ func generateMarkdownFromGeneric(data map[string]interface{}) string {
 		}
 		sb.WriteString("\n")
 	}
-	
+
 	return sb.String()
 }
 
@@ -148,7 +148,7 @@ func generateText(report *quality.Report) string {
 	sb.WriteString("CODE QUALITY REPORT\n")
 	sb.WriteString("==================\n\n")
 	sb.WriteString(fmt.Sprintf("Generated: %s\n\n", report.Timestamp.Format("2006-01-02 15:04:05")))
-	
+
 	sb.WriteString("SUMMARY\n")
 	sb.WriteString("-------\n")
 	sb.WriteString(fmt.Sprintf("Quality Score: %.1f/100\n", report.Summary.QualityScore))

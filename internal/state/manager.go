@@ -35,14 +35,14 @@ type StateManager struct {
 
 // StateMetadata contains metadata about a state
 type StateMetadata struct {
-	Key          string    `json:"key"`
-	Version      int       `json:"version"`
-	Serial       int       `json:"serial"`
-	Lineage      string    `json:"lineage"`
-	LastModified time.Time `json:"last_modified"`
-	Size         int64     `json:"size"`
-	Checksum     string    `json:"checksum"`
-	ResourceCount int      `json:"resource_count"`
+	Key           string    `json:"key"`
+	Version       int       `json:"version"`
+	Serial        int       `json:"serial"`
+	Lineage       string    `json:"lineage"`
+	LastModified  time.Time `json:"last_modified"`
+	Size          int64     `json:"size"`
+	Checksum      string    `json:"checksum"`
+	ResourceCount int       `json:"resource_count"`
 }
 
 // StateVersion represents a version of a state file
@@ -172,10 +172,10 @@ func (sm *StateManager) GetStateMetadata(ctx context.Context, key string) (*Stat
 
 	// Parse just the metadata fields
 	var meta struct {
-		Version          int    `json:"version"`
-		Serial           int    `json:"serial"`
-		Lineage          string `json:"lineage"`
-		TerraformVersion string `json:"terraform_version"`
+		Version          int               `json:"version"`
+		Serial           int               `json:"serial"`
+		Lineage          string            `json:"lineage"`
+		TerraformVersion string            `json:"terraform_version"`
 		Resources        []json.RawMessage `json:"resources"`
 	}
 
@@ -292,7 +292,7 @@ func (sm *StateManager) RemoveResource(ctx context.Context, key string, resource
 	// Find and remove resource
 	found := false
 	newResources := make([]Resource, 0, len(state.Resources)-1)
-	
+
 	for _, resource := range state.Resources {
 		address := fmt.Sprintf("%s.%s", resource.Type, resource.Name)
 		if address == resourceAddress {
@@ -326,7 +326,7 @@ func (sm *StateManager) MoveResource(ctx context.Context, key string, fromAddres
 	// Find source resource
 	var sourceResource *Resource
 	newResources := make([]Resource, 0, len(state.Resources))
-	
+
 	for _, resource := range state.Resources {
 		address := fmt.Sprintf("%s.%s", resource.Type, resource.Name)
 		if address == fromAddress {
@@ -476,4 +476,3 @@ func generateLineage() string {
 	h.Write([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
-

@@ -12,8 +12,8 @@ import (
 
 	awsprovider "github.com/catherinevee/driftmgr/internal/cloud/aws"
 	"github.com/catherinevee/driftmgr/internal/core/discovery"
-	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/catherinevee/driftmgr/internal/terraform/state"
+	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

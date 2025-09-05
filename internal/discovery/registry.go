@@ -75,13 +75,13 @@ func (b *LocalBackend) PutState(ctx context.Context, key string, data []byte) er
 	if key != "" {
 		path = filepath.Join(filepath.Dir(b.path), key)
 	}
-	
+
 	// Write to temp file first
 	tempPath := path + ".tmp"
 	if err := os.WriteFile(tempPath, data, 0644); err != nil {
 		return err
 	}
-	
+
 	// Atomic rename
 	return os.Rename(tempPath, path)
 }
@@ -102,7 +102,7 @@ func (b *LocalBackend) ListStates(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var states []string
 	for _, entry := range entries {
 		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".tfstate" {
@@ -119,12 +119,12 @@ func (b *LocalBackend) LockState(ctx context.Context, key string) (string, error
 		"ID":      lockID,
 		"Created": time.Now().Format(time.RFC3339),
 	}
-	
+
 	data, err := json.Marshal(lockData)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Try to create lock file exclusively
 	f, err := os.OpenFile(b.lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
@@ -134,12 +134,12 @@ func (b *LocalBackend) LockState(ctx context.Context, key string) (string, error
 		return "", err
 	}
 	defer f.Close()
-	
+
 	if _, err := f.Write(data); err != nil {
 		os.Remove(b.lockFile)
 		return "", err
 	}
-	
+
 	return lockID, nil
 }
 
@@ -150,27 +150,27 @@ func (b *LocalBackend) UnlockState(ctx context.Context, key string, lockID strin
 	if err != nil {
 		return err
 	}
-	
+
 	var lockData map[string]interface{}
 	if err := json.Unmarshal(data, &lockData); err != nil {
 		return err
 	}
-	
+
 	if lockData["ID"] != lockID {
 		return fmt.Errorf("lock ID mismatch")
 	}
-	
+
 	return os.Remove(b.lockFile)
 }
 
 // S3Backend implements AWS S3 backend
 type S3Backend struct {
-	bucket         string
-	key            string
-	region         string
-	dynamoDBTable  string
-	client         *s3.Client
-	dynamoClient   *dynamodb.Client
+	bucket        string
+	key           string
+	region        string
+	dynamoDBTable string
+	client        *s3.Client
+	dynamoClient  *dynamodb.Client
 }
 
 // NewS3Backend creates a new S3 backend
@@ -189,13 +189,13 @@ func (b *S3Backend) Connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to load AWS config: %w", err)
 	}
-	
+
 	b.client = s3.NewFromConfig(cfg)
-	
+
 	if b.dynamoDBTable != "" {
 		b.dynamoClient = dynamodb.NewFromConfig(cfg)
 	}
-	
+
 	return nil
 }
 
@@ -204,7 +204,7 @@ func (b *S3Backend) GetState(ctx context.Context, key string) ([]byte, error) {
 	if key == "" {
 		key = b.key
 	}
-	
+
 	resp, err := b.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(b.bucket),
 		Key:    aws.String(key),
@@ -213,7 +213,7 @@ func (b *S3Backend) GetState(ctx context.Context, key string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to get state from S3: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	return io.ReadAll(resp.Body)
 }
 
@@ -222,17 +222,17 @@ func (b *S3Backend) PutState(ctx context.Context, key string, data []byte) error
 	if key == "" {
 		key = b.key
 	}
-	
+
 	_, err := b.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(b.bucket),
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(data),
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to put state to S3: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -241,16 +241,16 @@ func (b *S3Backend) DeleteState(ctx context.Context, key string) error {
 	if key == "" {
 		key = b.key
 	}
-	
+
 	_, err := b.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(b.bucket),
 		Key:    aws.String(key),
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to delete state from S3: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -263,14 +263,14 @@ func (b *S3Backend) ListStates(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list states from S3: %w", err)
 	}
-	
+
 	var states []string
 	for _, obj := range resp.Contents {
 		if filepath.Ext(*obj.Key) == ".tfstate" {
 			states = append(states, *obj.Key)
 		}
 	}
-	
+
 	return states, nil
 }
 
@@ -279,15 +279,15 @@ func (b *S3Backend) LockState(ctx context.Context, key string) (string, error) {
 	if b.dynamoClient == nil {
 		return "", fmt.Errorf("DynamoDB table not configured for state locking")
 	}
-	
+
 	lockID := fmt.Sprintf("s3://%s/%s", b.bucket, key)
 	lockInfo := map[string]interface{}{
 		"ID":      lockID,
 		"Created": time.Now().Unix(),
 	}
-	
+
 	infoBytes, _ := json.Marshal(lockInfo)
-	
+
 	_, err := b.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(b.dynamoDBTable),
 		Item: map[string]types.AttributeValue{
@@ -296,11 +296,11 @@ func (b *S3Backend) LockState(ctx context.Context, key string) (string, error) {
 		},
 		ConditionExpression: aws.String("attribute_not_exists(LockID)"),
 	})
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to acquire state lock: %w", err)
 	}
-	
+
 	return lockID, nil
 }
 
@@ -309,18 +309,18 @@ func (b *S3Backend) UnlockState(ctx context.Context, key string, lockID string) 
 	if b.dynamoClient == nil {
 		return nil
 	}
-	
+
 	_, err := b.dynamoClient.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(b.dynamoDBTable),
 		Key: map[string]types.AttributeValue{
 			"LockID": &types.AttributeValueMemberS{Value: lockID},
 		},
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to release state lock: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -341,23 +341,23 @@ func (f *BackendFactory) CreateBackend(backendType BackendType, config map[strin
 			path = "terraform.tfstate"
 		}
 		return NewLocalBackend(path), nil
-		
+
 	case BackendS3:
 		bucket, _ := config["bucket"].(string)
 		key, _ := config["key"].(string)
 		region, _ := config["region"].(string)
 		dynamoTable, _ := config["dynamodb_table"].(string)
-		
+
 		if bucket == "" || key == "" {
 			return nil, fmt.Errorf("S3 backend requires bucket and key")
 		}
-		
+
 		if region == "" {
 			region = "us-east-1"
 		}
-		
+
 		return NewS3Backend(bucket, key, region, dynamoTable), nil
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %s", backendType)
 	}

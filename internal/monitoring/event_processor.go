@@ -10,13 +10,13 @@ import (
 
 // EventProcessor processes cloud events
 type EventProcessor struct {
-	eventChan  chan CloudEvent
-	handlers   map[string]EventHandler
-	buffer     *EventBuffer
-	metrics    *EventMetrics
-	mu         sync.RWMutex
-	stopChan   chan struct{}
-	wg         sync.WaitGroup
+	eventChan chan CloudEvent
+	handlers  map[string]EventHandler
+	buffer    *EventBuffer
+	metrics   *EventMetrics
+	mu        sync.RWMutex
+	stopChan  chan struct{}
+	wg        sync.WaitGroup
 }
 
 // EventHandler processes specific event types
@@ -24,9 +24,9 @@ type EventHandler func(event CloudEvent) error
 
 // EventBuffer stores events for batch processing
 type EventBuffer struct {
-	events   []CloudEvent
-	maxSize  int
-	mu       sync.Mutex
+	events  []CloudEvent
+	maxSize int
+	mu      sync.Mutex
 }
 
 // EventMetrics tracks event processing metrics
@@ -84,10 +84,10 @@ func (p *EventProcessor) RegisterHandler(eventType string, handler EventHandler)
 // processEvents processes events from the channel
 func (p *EventProcessor) processEvents(ctx context.Context) {
 	defer p.wg.Done()
-	
+
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -110,14 +110,14 @@ func (p *EventProcessor) handleEvent(event CloudEvent) {
 	p.mu.RLock()
 	handler, exists := p.handlers[event.Type]
 	p.mu.RUnlock()
-	
+
 	if !exists {
 		// Try generic handler
 		p.mu.RLock()
 		handler, exists = p.handlers["*"]
 		p.mu.RUnlock()
 	}
-	
+
 	if exists {
 		if err := handler(event); err != nil {
 			fmt.Printf("Error handling event %s: %v\n", event.ID, err)
@@ -138,13 +138,13 @@ func (p *EventProcessor) processBatch() {
 	if len(events) == 0 {
 		return
 	}
-	
+
 	// Group events by type for batch processing
 	eventsByType := make(map[string][]CloudEvent)
 	for _, event := range events {
 		eventsByType[event.Type] = append(eventsByType[event.Type], event)
 	}
-	
+
 	// Process each group
 	for eventType, group := range eventsByType {
 		fmt.Printf("Processing batch of %d %s events\n", len(group), eventType)
@@ -162,11 +162,11 @@ func (p *EventProcessor) flushBuffer() {
 func (p *EventProcessor) updateMetrics(event CloudEvent, dropped bool) {
 	p.metrics.mu.Lock()
 	defer p.metrics.mu.Unlock()
-	
+
 	p.metrics.TotalEvents++
 	p.metrics.EventsByType[event.Type]++
 	p.metrics.LastEventTime = event.Time
-	
+
 	if dropped {
 		p.metrics.FailedEvents++
 	}
@@ -176,7 +176,7 @@ func (p *EventProcessor) updateMetrics(event CloudEvent, dropped bool) {
 func (p *EventProcessor) GetMetrics() EventMetrics {
 	p.metrics.mu.RLock()
 	defer p.metrics.mu.RUnlock()
-	
+
 	// Return a copy
 	return EventMetrics{
 		TotalEvents:     p.metrics.TotalEvents,
@@ -193,7 +193,7 @@ func (p *EventProcessor) GetMetrics() EventMetrics {
 func (b *EventBuffer) Add(event CloudEvent) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	
+
 	if len(b.events) >= b.maxSize {
 		// Remove oldest event
 		b.events = b.events[1:]
@@ -205,7 +205,7 @@ func (b *EventBuffer) Add(event CloudEvent) {
 func (b *EventBuffer) Flush() []CloudEvent {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	
+
 	events := b.events
 	b.events = nil
 	return events
@@ -236,10 +236,10 @@ type Change struct {
 func (d *ChangeDetector) DetectChanges(provider string, currentResources []interface{}) []Change {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	var changes []Change
 	currentState := make(map[string]interface{})
-	
+
 	// Build current state map
 	for _, resource := range currentResources {
 		// Extract resource ID (this would be provider-specific)
@@ -249,13 +249,13 @@ func (d *ChangeDetector) DetectChanges(provider string, currentResources []inter
 			}
 		}
 	}
-	
+
 	// Get previous state
 	previousState, exists := d.previousStates[provider]
 	if !exists {
 		previousState = make(map[string]interface{})
 	}
-	
+
 	// Detect deletions
 	for id := range previousState {
 		if _, exists := currentState[id]; !exists {
@@ -266,7 +266,7 @@ func (d *ChangeDetector) DetectChanges(provider string, currentResources []inter
 			})
 		}
 	}
-	
+
 	// Detect creations and updates
 	for id, resource := range currentState {
 		previous, existed := previousState[id]
@@ -289,10 +289,10 @@ func (d *ChangeDetector) DetectChanges(provider string, currentResources []inter
 			})
 		}
 	}
-	
+
 	// Update previous state
 	d.previousStates[provider] = currentState
-	
+
 	return changes
 }
 

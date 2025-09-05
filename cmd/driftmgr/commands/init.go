@@ -12,9 +12,9 @@ import (
 
 // InitConfig represents the initial configuration for DriftMgr
 type InitConfig struct {
-	Provider    string            `yaml:"provider"`
-	Regions     []string          `yaml:"regions"`
-	Credentials map[string]string `yaml:"credentials,omitempty"`
+	Provider    string                 `yaml:"provider"`
+	Regions     []string               `yaml:"regions"`
+	Credentials map[string]string      `yaml:"credentials,omitempty"`
 	Settings    map[string]interface{} `yaml:"settings"`
 }
 
@@ -24,7 +24,7 @@ func HandleInit(args []string) {
 	regions := []string{}
 	configPath := ".driftmgr/config.yaml"
 	interactive := true
-	
+
 	// Parse arguments
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -50,7 +50,7 @@ func HandleInit(args []string) {
 			return
 		}
 	}
-	
+
 	// Interactive mode
 	if interactive && provider == "" {
 		fmt.Println("Welcome to DriftMgr initialization!")
@@ -62,10 +62,10 @@ func HandleInit(args []string) {
 		fmt.Println("4. DigitalOcean")
 		fmt.Println("5. Multi-cloud")
 		fmt.Print("\nChoice (1-5): ")
-		
+
 		var choice int
 		fmt.Scanln(&choice)
-		
+
 		switch choice {
 		case 1:
 			provider = "aws"
@@ -82,7 +82,7 @@ func HandleInit(args []string) {
 			os.Exit(1)
 		}
 	}
-	
+
 	// Set default regions if not provided
 	if len(regions) == 0 {
 		switch provider {
@@ -98,55 +98,55 @@ func HandleInit(args []string) {
 			regions = []string{"global"}
 		}
 	}
-	
+
 	// Create configuration
 	config := InitConfig{
 		Provider: provider,
 		Regions:  regions,
 		Settings: map[string]interface{}{
-			"auto_discovery": true,
+			"auto_discovery":   true,
 			"parallel_workers": 10,
-			"cache_ttl": "1h",
+			"cache_ttl":        "1h",
 			"drift_detection": map[string]interface{}{
-				"enabled": true,
+				"enabled":  true,
 				"interval": "15m",
 			},
 			"remediation": map[string]interface{}{
-				"enabled": false,
-				"dry_run": true,
+				"enabled":           false,
+				"dry_run":           true,
 				"approval_required": true,
 			},
 			"database": map[string]interface{}{
 				"enabled": true,
-				"path": "~/.driftmgr/driftmgr.db",
+				"path":    "~/.driftmgr/driftmgr.db",
 			},
 			"logging": map[string]interface{}{
 				"level": "info",
-				"file": "~/.driftmgr/driftmgr.log",
+				"file":  "~/.driftmgr/driftmgr.log",
 			},
 		},
 	}
-	
+
 	// Create directory if it doesn't exist
 	configDir := filepath.Dir(configPath)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		fmt.Printf("Error creating config directory: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// Marshal configuration to YAML
 	data, err := yaml.Marshal(&config)
 	if err != nil {
 		fmt.Printf("Error marshaling config: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// Write configuration file
 	if err := ioutil.WriteFile(configPath, data, 0644); err != nil {
 		fmt.Printf("Error writing config file: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Printf("✓ Configuration initialized at %s\n", configPath)
 	fmt.Println()
 	fmt.Println("Next steps:")

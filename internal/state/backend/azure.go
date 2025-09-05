@@ -35,14 +35,14 @@ type AzureBackend struct {
 	subscriptionID     string
 	useMSI             bool
 	workspace          string
-	
-	containerClient    *container.Client
-	leaseClient        *lease.BlobLeaseClient
-	currentLeaseID     *string
-	
-	mu                 sync.RWMutex
-	metadata           *BackendMetadata
-	credential         azcore.TokenCredential
+
+	containerClient *container.Client
+	leaseClient     *lease.BlobLeaseClient
+	currentLeaseID  *string
+
+	mu         sync.RWMutex
+	metadata   *BackendMetadata
+	credential azcore.TokenCredential
 }
 
 // NewAzureBackend creates a new Azure Storage backend instance
@@ -59,15 +59,15 @@ func NewAzureBackend(cfg *BackendConfig) (*AzureBackend, error) {
 	subscriptionID, _ := cfg.Config["subscription_id"].(string)
 	useMSI, _ := cfg.Config["use_msi"].(bool)
 	workspace, _ := cfg.Config["workspace"].(string)
-	
+
 	if storageAccount == "" || containerName == "" || key == "" {
 		return nil, fmt.Errorf("storage_account_name, container_name, and key are required for Azure backend")
 	}
-	
+
 	if workspace == "" {
 		workspace = "default"
 	}
-	
+
 	backend := &AzureBackend{
 		storageAccountName: storageAccount,
 		containerName:      containerName,
@@ -94,12 +94,12 @@ func NewAzureBackend(cfg *BackendConfig) (*AzureBackend, error) {
 			StateKey:  key,
 		},
 	}
-	
+
 	// Initialize Azure clients
 	if err := backend.initializeClients(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to initialize Azure clients: %w", err)
 	}
-	
+
 	return backend, nil
 }
 
@@ -107,9 +107,9 @@ func NewAzureBackend(cfg *BackendConfig) (*AzureBackend, error) {
 func (a *AzureBackend) initializeClients(ctx context.Context) error {
 	var err error
 	var client *azblob.Client
-	
+
 	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", a.storageAccountName)
-	
+
 	// Determine authentication method
 	if a.accessKey != "" {
 		// Use storage account key
@@ -167,10 +167,10 @@ func (a *AzureBackend) initializeClients(ctx context.Context) error {
 			return fmt.Errorf("failed to create blob client with default credential: %w", err)
 		}
 	}
-	
+
 	// Get container client
 	a.containerClient = client.ServiceClient().NewContainerClient(a.containerName)
-	
+
 	// Ensure container exists
 	_, err = a.containerClient.GetProperties(ctx, nil)
 	if err != nil {
@@ -180,7 +180,7 @@ func (a *AzureBackend) initializeClients(ctx context.Context) error {
 			return fmt.Errorf("container %s does not exist and cannot be created: %w", a.containerName, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -188,7 +188,7 @@ func (a *AzureBackend) initializeClients(ctx context.Context) error {
 func (a *AzureBackend) Pull(ctx context.Context) (*StateData, error) {
 	blobName := a.getStateBlobName()
 	blobClient := a.containerClient.NewBlobClient(blobName)
-	
+
 	// Download blob
 	downloadResponse, err := blobClient.DownloadStream(ctx, nil)
 	if err != nil {
@@ -203,28 +203,28 @@ func (a *AzureBackend) Pull(ctx context.Context) (*StateData, error) {
 		}
 		return nil, fmt.Errorf("failed to download state from Azure: %w", err)
 	}
-	
+
 	// Read state data
 	reader := downloadResponse.Body
 	defer reader.Close()
-	
+
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read state data: %w", err)
 	}
-	
+
 	// Parse state metadata
 	var stateMetadata map[string]interface{}
 	if err := json.Unmarshal(data, &stateMetadata); err != nil {
 		return nil, fmt.Errorf("failed to parse state metadata: %w", err)
 	}
-	
+
 	state := &StateData{
 		Data:         data,
 		LastModified: *downloadResponse.LastModified,
 		Size:         *downloadResponse.ContentLength,
 	}
-	
+
 	// Extract version and serial from metadata
 	if version, ok := stateMetadata["version"].(float64); ok {
 		state.Version = int(version)
@@ -238,12 +238,12 @@ func (a *AzureBackend) Pull(ctx context.Context) (*StateData, error) {
 	if tfVersion, ok := stateMetadata["terraform_version"].(string); ok {
 		state.TerraformVersion = tfVersion
 	}
-	
+
 	// Calculate checksum
 	h := md5.New()
 	h.Write(data)
 	state.Checksum = base64.StdEncoding.EncodeToString(h.Sum(nil))
-	
+
 	return state, nil
 }
 
@@ -251,7 +251,7 @@ func (a *AzureBackend) Pull(ctx context.Context) (*StateData, error) {
 func (a *AzureBackend) Push(ctx context.Context, state *StateData) error {
 	blobName := a.getStateBlobName()
 	blobClient := a.containerClient.NewBlockBlobClient(blobName)
-	
+
 	// Prepare the state data
 	var data []byte
 	if state.Data != nil {
@@ -263,12 +263,12 @@ func (a *AzureBackend) Push(ctx context.Context, state *StateData) error {
 			return fmt.Errorf("failed to marshal state: %w", err)
 		}
 	}
-	
+
 	// Calculate MD5 for content verification
 	h := md5.New()
 	h.Write(data)
 	contentMD5 := h.Sum(nil)
-	
+
 	// Prepare upload options
 	uploadOptions := &azblob.UploadBufferOptions{
 		Metadata: map[string]*string{
@@ -281,13 +281,13 @@ func (a *AzureBackend) Push(ctx context.Context, state *StateData) error {
 			BlobContentMD5:  contentMD5,
 		},
 	}
-	
+
 	// Upload to Azure
 	_, err := blobClient.UploadBuffer(ctx, data, uploadOptions)
 	if err != nil {
 		return fmt.Errorf("failed to push state to Azure: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -295,10 +295,10 @@ func (a *AzureBackend) Push(ctx context.Context, state *StateData) error {
 func (a *AzureBackend) Lock(ctx context.Context, info *LockInfo) (string, error) {
 	blobName := a.getStateBlobName()
 	blobClient := a.containerClient.NewBlobClient(blobName)
-	
+
 	// Create lease client
 	a.leaseClient, _ = lease.NewBlobLeaseClient(blobClient, nil)
-	
+
 	// Try to acquire lease (60 seconds, can be renewed)
 	leaseResponse, err := a.leaseClient.AcquireLease(ctx, 60, &lease.BlobAcquireOptions{})
 	if err != nil {
@@ -325,11 +325,11 @@ func (a *AzureBackend) Lock(ctx context.Context, info *LockInfo) (string, error)
 			return "", fmt.Errorf("failed to acquire lease: %w", err)
 		}
 	}
-	
+
 	a.mu.Lock()
 	a.currentLeaseID = leaseResponse.LeaseID
 	a.mu.Unlock()
-	
+
 	// Store lock info in blob metadata
 	metadata := map[string]*string{
 		"lock-id":        to.Ptr(info.ID),
@@ -337,16 +337,16 @@ func (a *AzureBackend) Lock(ctx context.Context, info *LockInfo) (string, error)
 		"lock-who":       to.Ptr(info.Who),
 		"lock-created":   to.Ptr(info.Created.Format(time.RFC3339)),
 	}
-	
+
 	blobClient.SetMetadata(ctx, metadata, &blob.SetMetadataOptions{
 		LeaseAccessConditions: &blob.LeaseAccessConditions{
 			LeaseID: a.currentLeaseID,
 		},
 	})
-	
+
 	// Start lease renewal goroutine
 	go a.renewLease(ctx)
-	
+
 	return *a.currentLeaseID, nil
 }
 
@@ -354,7 +354,7 @@ func (a *AzureBackend) Lock(ctx context.Context, info *LockInfo) (string, error)
 func (a *AzureBackend) renewLease(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -367,7 +367,7 @@ func (a *AzureBackend) renewLease(ctx context.Context) {
 			}
 			leaseID := *a.currentLeaseID
 			a.mu.RUnlock()
-			
+
 			_, err := a.leaseClient.RenewLease(ctx, &lease.BlobRenewOptions{})
 			if err != nil {
 				fmt.Printf("Warning: failed to renew lease %s: %v\n", leaseID, err)
@@ -381,27 +381,27 @@ func (a *AzureBackend) renewLease(ctx context.Context) {
 func (a *AzureBackend) Unlock(ctx context.Context, lockID string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	
+
 	if a.leaseClient == nil || a.currentLeaseID == nil {
 		return nil // No lock held
 	}
-	
+
 	// Release the lease
 	_, err := a.leaseClient.ReleaseLease(ctx, &lease.BlobReleaseOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to release lease: %w", err)
 	}
-	
+
 	a.currentLeaseID = nil
 	a.leaseClient = nil
-	
+
 	return nil
 }
 
 // GetVersions returns available state versions using blob snapshots
 func (a *AzureBackend) GetVersions(ctx context.Context) ([]*StateVersion, error) {
 	blobName := a.getStateBlobName()
-	
+
 	// List blob snapshots
 	pager := a.containerClient.NewListBlobsFlatPager(&container.ListBlobsFlatOptions{
 		Include: container.ListBlobsInclude{
@@ -410,34 +410,34 @@ func (a *AzureBackend) GetVersions(ctx context.Context) ([]*StateVersion, error)
 		},
 		Prefix: &blobName,
 	})
-	
+
 	var versions []*StateVersion
 	versionIndex := 0
-	
+
 	for pager.More() {
 		resp, err := pager.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list blob snapshots: %w", err)
 		}
-		
+
 		for _, blobItem := range resp.Segment.BlobItems {
 			if *blobItem.Name != blobName {
 				continue
 			}
-			
+
 			sv := &StateVersion{
-				ID:        fmt.Sprintf("v%d", versionIndex),
-				Created:   *blobItem.Properties.LastModified,
-				Size:      *blobItem.Properties.ContentLength,
-				IsLatest:  blobItem.Snapshot == nil,
+				ID:       fmt.Sprintf("v%d", versionIndex),
+				Created:  *blobItem.Properties.LastModified,
+				Size:     *blobItem.Properties.ContentLength,
+				IsLatest: blobItem.Snapshot == nil,
 			}
-			
+
 			if blobItem.Snapshot != nil {
 				sv.VersionID = *blobItem.Snapshot
 			} else {
 				sv.VersionID = "current"
 			}
-			
+
 			// Extract serial from metadata if available
 			if blobItem.Metadata != nil {
 				if serial, ok := blobItem.Metadata["serial"]; ok && serial != nil {
@@ -446,17 +446,17 @@ func (a *AzureBackend) GetVersions(ctx context.Context) ([]*StateVersion, error)
 					sv.Serial = s
 				}
 			}
-			
+
 			// Calculate checksum from ETag
 			if blobItem.Properties.ETag != nil {
 				sv.Checksum = strings.Trim(string(*blobItem.Properties.ETag), "\"")
 			}
-			
+
 			versions = append(versions, sv)
 			versionIndex++
 		}
 	}
-	
+
 	return versions, nil
 }
 
@@ -464,7 +464,7 @@ func (a *AzureBackend) GetVersions(ctx context.Context) ([]*StateVersion, error)
 func (a *AzureBackend) GetVersion(ctx context.Context, versionID string) (*StateData, error) {
 	blobName := a.getStateBlobName()
 	blobClient := a.containerClient.NewBlobClient(blobName)
-	
+
 	// Prepare download options for specific snapshot
 	var downloadOptions *azblob.DownloadStreamOptions
 	if versionID != "current" && versionID != "" {
@@ -474,27 +474,27 @@ func (a *AzureBackend) GetVersion(ctx context.Context, versionID string) (*State
 			},
 		}
 	}
-	
+
 	// Download specific version
 	downloadResponse, err := blobClient.DownloadStream(ctx, downloadOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download state version %s: %w", versionID, err)
 	}
-	
+
 	reader := downloadResponse.Body
 	defer reader.Close()
-	
+
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read state data: %w", err)
 	}
-	
+
 	state := &StateData{
 		Data:         data,
 		LastModified: *downloadResponse.LastModified,
 		Size:         *downloadResponse.ContentLength,
 	}
-	
+
 	// Parse state metadata
 	var stateMetadata map[string]interface{}
 	if err := json.Unmarshal(data, &stateMetadata); err == nil {
@@ -508,7 +508,7 @@ func (a *AzureBackend) GetVersion(ctx context.Context, versionID string) (*State
 			state.Lineage = lineage
 		}
 	}
-	
+
 	return state, nil
 }
 
@@ -516,20 +516,20 @@ func (a *AzureBackend) GetVersion(ctx context.Context, versionID string) (*State
 func (a *AzureBackend) ListWorkspaces(ctx context.Context) ([]string, error) {
 	// List all state files with env: prefix
 	prefix := path.Dir(a.key) + "/env:/"
-	
+
 	pager := a.containerClient.NewListBlobsFlatPager(&container.ListBlobsFlatOptions{
 		Prefix: &prefix,
 	})
-	
+
 	workspaceMap := make(map[string]bool)
 	workspaceMap["default"] = true
-	
+
 	for pager.More() {
 		resp, err := pager.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list workspaces: %w", err)
 		}
-		
+
 		for _, blobItem := range resp.Segment.BlobItems {
 			parts := strings.Split(*blobItem.Name, "env:/")
 			if len(parts) > 1 {
@@ -540,12 +540,12 @@ func (a *AzureBackend) ListWorkspaces(ctx context.Context) ([]string, error) {
 			}
 		}
 	}
-	
+
 	workspaces := make([]string, 0, len(workspaceMap))
 	for ws := range workspaceMap {
 		workspaces = append(workspaces, ws)
 	}
-	
+
 	return workspaces, nil
 }
 
@@ -553,13 +553,13 @@ func (a *AzureBackend) ListWorkspaces(ctx context.Context) ([]string, error) {
 func (a *AzureBackend) SelectWorkspace(ctx context.Context, name string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	
+
 	// Check if workspace exists
 	workspaces, err := a.ListWorkspaces(ctx)
 	if err != nil {
 		return err
 	}
-	
+
 	found := false
 	for _, ws := range workspaces {
 		if ws == name {
@@ -567,14 +567,14 @@ func (a *AzureBackend) SelectWorkspace(ctx context.Context, name string) error {
 			break
 		}
 	}
-	
+
 	if !found && name != "default" {
 		return fmt.Errorf("workspace %s does not exist", name)
 	}
-	
+
 	a.workspace = name
 	a.metadata.Workspace = name
-	
+
 	return nil
 }
 
@@ -583,32 +583,32 @@ func (a *AzureBackend) CreateWorkspace(ctx context.Context, name string) error {
 	if name == "default" {
 		return fmt.Errorf("cannot create default workspace")
 	}
-	
+
 	// Check if workspace already exists
 	workspaces, err := a.ListWorkspaces(ctx)
 	if err != nil {
 		return err
 	}
-	
+
 	for _, ws := range workspaces {
 		if ws == name {
 			return fmt.Errorf("workspace %s already exists", name)
 		}
 	}
-	
+
 	// Create empty state for new workspace
 	emptyState := &StateData{
 		Version: 4,
 		Serial:  0,
 		Data:    []byte("{}"),
 	}
-	
+
 	// Save state with workspace key
 	oldWorkspace := a.workspace
 	a.workspace = name
 	err = a.Push(ctx, emptyState)
 	a.workspace = oldWorkspace
-	
+
 	return err
 }
 
@@ -617,20 +617,20 @@ func (a *AzureBackend) DeleteWorkspace(ctx context.Context, name string) error {
 	if name == "default" {
 		return fmt.Errorf("cannot delete default workspace")
 	}
-	
+
 	if a.workspace == name {
 		return fmt.Errorf("cannot delete current workspace")
 	}
-	
+
 	blobName := a.getWorkspaceStateBlobName(name)
 	blobClient := a.containerClient.NewBlobClient(blobName)
-	
+
 	// Delete the workspace state blob
 	_, err := blobClient.Delete(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete workspace %s: %w", name, err)
 	}
-	
+
 	return nil
 }
 
@@ -638,7 +638,7 @@ func (a *AzureBackend) DeleteWorkspace(ctx context.Context, name string) error {
 func (a *AzureBackend) GetLockInfo(ctx context.Context) (*LockInfo, error) {
 	blobName := a.getStateBlobName()
 	blobClient := a.containerClient.NewBlobClient(blobName)
-	
+
 	// Get blob properties to check lease status
 	props, err := blobClient.GetProperties(ctx, nil)
 	if err != nil {
@@ -647,12 +647,12 @@ func (a *AzureBackend) GetLockInfo(ctx context.Context) (*LockInfo, error) {
 		}
 		return nil, fmt.Errorf("failed to get blob properties: %w", err)
 	}
-	
+
 	// Check if blob is leased
 	if props.LeaseState == nil || *props.LeaseState != lease.StateTypeLeased {
 		return nil, nil // No active lease
 	}
-	
+
 	// Extract lock info from metadata
 	lockInfo := &LockInfo{}
 	if props.Metadata != nil {
@@ -671,7 +671,7 @@ func (a *AzureBackend) GetLockInfo(ctx context.Context) (*LockInfo, error) {
 			}
 		}
 	}
-	
+
 	return lockInfo, nil
 }
 
@@ -682,7 +682,7 @@ func (a *AzureBackend) Validate(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("cannot access container %s: %w", a.containerName, err)
 	}
-	
+
 	return nil
 }
 

@@ -17,29 +17,29 @@ import (
 
 // BackendConfig represents a discovered Terraform backend configuration
 type BackendConfig struct {
-	Type         string                 `json:"type"`
-	Config       map[string]interface{} `json:"config"`
-	FilePath     string                 `json:"file_path"`
-	WorkingDir   string                 `json:"working_dir"`
-	IsRemote     bool                   `json:"is_remote"`
-	StateFile    string                 `json:"state_file,omitempty"`
-	LockTable    string                 `json:"lock_table,omitempty"`
-	Workspace    string                 `json:"workspace,omitempty"`
-	Discovered   string                 `json:"discovered"`
+	Type       string                 `json:"type"`
+	Config     map[string]interface{} `json:"config"`
+	FilePath   string                 `json:"file_path"`
+	WorkingDir string                 `json:"working_dir"`
+	IsRemote   bool                   `json:"is_remote"`
+	StateFile  string                 `json:"state_file,omitempty"`
+	LockTable  string                 `json:"lock_table,omitempty"`
+	Workspace  string                 `json:"workspace,omitempty"`
+	Discovered string                 `json:"discovered"`
 }
 
 // S3BackendConfig represents S3 backend specific configuration
 type S3BackendConfig struct {
-	Bucket         string `json:"bucket"`
-	Key            string `json:"key"`
-	Region         string `json:"region"`
-	DynamoDBTable  string `json:"dynamodb_table,omitempty"`
-	Encrypt        bool   `json:"encrypt"`
-	Profile        string `json:"profile,omitempty"`
-	RoleARN        string `json:"role_arn,omitempty"`
-	AccessKey      string `json:"access_key,omitempty"`
-	SecretKey      string `json:"secret_key,omitempty"`
-	SessionToken   string `json:"session_token,omitempty"`
+	Bucket        string `json:"bucket"`
+	Key           string `json:"key"`
+	Region        string `json:"region"`
+	DynamoDBTable string `json:"dynamodb_table,omitempty"`
+	Encrypt       bool   `json:"encrypt"`
+	Profile       string `json:"profile,omitempty"`
+	RoleARN       string `json:"role_arn,omitempty"`
+	AccessKey     string `json:"access_key,omitempty"`
+	SecretKey     string `json:"secret_key,omitempty"`
+	SessionToken  string `json:"session_token,omitempty"`
 }
 
 // AzureBackendConfig represents Azure Storage backend configuration
@@ -107,7 +107,7 @@ func (d *DiscoveryService) DiscoverBackends(ctx context.Context) ([]*BackendConf
 		wg.Add(1)
 		go func(root string) {
 			defer wg.Done()
-			
+
 			err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 				if err != nil {
 					return nil // Skip inaccessible paths
@@ -151,7 +151,7 @@ func (d *DiscoveryService) DiscoverBackends(ctx context.Context) ([]*BackendConf
 
 				return nil
 			})
-			
+
 			if err != nil && err != ctx.Err() {
 				fmt.Printf("Warning: Error walking directory %s: %v\n", root, err)
 			}
@@ -159,7 +159,7 @@ func (d *DiscoveryService) DiscoverBackends(ctx context.Context) ([]*BackendConf
 	}
 
 	wg.Wait()
-	
+
 	// Also discover from environment variables
 	envConfigs := d.discoverFromEnvironment()
 	configs = append(configs, envConfigs...)
@@ -208,10 +208,10 @@ func (d *DiscoveryService) parseBackendFromFile(filePath string) (*BackendConfig
 func (d *DiscoveryService) parseBackendWithRegex(content, filePath string) (*BackendConfig, error) {
 	// Regex patterns for different backend types
 	patterns := map[string]*regexp.Regexp{
-		"s3": regexp.MustCompile(`backend\s+"s3"\s*{([^}]+)}`),
+		"s3":      regexp.MustCompile(`backend\s+"s3"\s*{([^}]+)}`),
 		"azurerm": regexp.MustCompile(`backend\s+"azurerm"\s*{([^}]+)}`),
-		"gcs": regexp.MustCompile(`backend\s+"gcs"\s*{([^}]+)}`),
-		"remote": regexp.MustCompile(`backend\s+"remote"\s*{([^}]+)}`),
+		"gcs":     regexp.MustCompile(`backend\s+"gcs"\s*{([^}]+)}`),
+		"remote":  regexp.MustCompile(`backend\s+"remote"\s*{([^}]+)}`),
 	}
 
 	for backendType, pattern := range patterns {
@@ -333,30 +333,30 @@ func (d *DiscoveryService) extractBackendFromState(stateContent string) *Backend
 	// Use regex to find backend configuration in state file
 	backendPattern := regexp.MustCompile(`"backend":\s*{([^}]+)}`)
 	matches := backendPattern.FindStringSubmatch(stateContent)
-	
+
 	if len(matches) > 1 {
 		// Parse the backend configuration
 		typePattern := regexp.MustCompile(`"type":\s*"([^"]+)"`)
 		typeMatches := typePattern.FindStringSubmatch(matches[1])
-		
+
 		if len(typeMatches) > 1 {
 			config := &BackendConfig{
 				Type:     typeMatches[1],
 				Config:   make(map[string]interface{}),
 				IsRemote: true,
 			}
-			
+
 			// Extract config values
 			configPattern := regexp.MustCompile(`"config":\s*{([^}]+)}`)
 			configMatches := configPattern.FindStringSubmatch(matches[1])
 			if len(configMatches) > 1 {
 				config.Config = d.parseBackendProperties(configMatches[1])
 			}
-			
+
 			return config
 		}
 	}
-	
+
 	return nil
 }
 
@@ -376,12 +376,12 @@ func (d *DiscoveryService) discoverFromEnvironment() []*BackendConfig {
 			IsRemote:   true,
 			Discovered: "environment",
 		}
-		
+
 		if table := os.Getenv("TF_BACKEND_S3_DYNAMODB_TABLE"); table != "" {
 			config.Config["dynamodb_table"] = table
 			config.LockTable = table
 		}
-		
+
 		configs = append(configs, config)
 	}
 
@@ -422,8 +422,8 @@ func (d *DiscoveryService) discoverFromEnvironment() []*BackendConfig {
 func (d *DiscoveryService) isTerraformFile(path string) bool {
 	ext := filepath.Ext(path)
 	name := filepath.Base(path)
-	return ext == ".tf" || ext == ".hcl" || 
-		name == "terraform.tfvars" || 
+	return ext == ".tf" || ext == ".hcl" ||
+		name == "terraform.tfvars" ||
 		strings.HasSuffix(name, ".tfvars") ||
 		name == "terragrunt.hcl"
 }
@@ -436,7 +436,7 @@ func (d *DiscoveryService) shouldExclude(path string) bool {
 	}
 	// Common excludes
 	excludePatterns := []string{
-		".git", "node_modules", ".terraform/providers", 
+		".git", "node_modules", ".terraform/providers",
 		".terraform/modules", "vendor", ".venv",
 	}
 	for _, pattern := range excludePatterns {
@@ -449,17 +449,17 @@ func (d *DiscoveryService) shouldExclude(path string) bool {
 
 func (d *DiscoveryService) parseBackendProperties(content string) map[string]interface{} {
 	props := make(map[string]interface{})
-	
+
 	// Simple regex to extract key-value pairs
 	pattern := regexp.MustCompile(`"?(\w+)"?\s*[=:]\s*"([^"]+)"`)
 	matches := pattern.FindAllStringSubmatch(content, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 2 {
 			props[match[1]] = match[2]
 		}
 	}
-	
+
 	return props
 }
 
@@ -476,12 +476,12 @@ func (d *DiscoveryService) extractProperty(content, property string) string {
 func (d *DiscoveryService) GetDiscoveredBackends() []*BackendConfig {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	
+
 	configs := make([]*BackendConfig, 0, len(d.discoveredCache))
 	for _, config := range d.discoveredCache {
 		configs = append(configs, config)
 	}
-	
+
 	return configs
 }
 

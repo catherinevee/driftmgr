@@ -16,19 +16,19 @@ import (
 
 // EnhancedDiscoverer provides advanced cloud discovery capabilities
 type EnhancedDiscoverer struct {
-	config          *config.Config
-	plugins         map[string]*DiscoveryPlugin
-	hierarchy       *ResourceHierarchy
-	filters         *DiscoveryFilter
-	progressTracker *ProgressTracker
-	visualizer      *DiscoveryVisualizer
+	config              *config.Config
+	plugins             map[string]*DiscoveryPlugin
+	hierarchy           *ResourceHierarchy
+	filters             *DiscoveryFilter
+	progressTracker     *ProgressTracker
+	visualizer          *DiscoveryVisualizer
 	advancedQuery       *AdvancedQuery
 	realTimeMonitor     *RealTimeMonitor
 	sdkIntegration      *SDKIntegration
 	discoveredResources []models.Resource
 	metrics             map[string]interface{}
 	lastDiscoveryTime   time.Time
-	cache              *ResourceCache
+	cache               *ResourceCache
 	mu                  sync.RWMutex
 }
 
@@ -118,12 +118,12 @@ func NewEnhancedDiscoverer(cfg *config.Config) *EnhancedDiscoverer {
 	services := []string{"EC2", "S3", "RDS", "Lambda", "DynamoDB"}
 
 	return &EnhancedDiscoverer{
-		config:          cfg,
-		cache:           &ResourceCache{data: make(map[string]interface{})},
-		plugins:         make(map[string]*DiscoveryPlugin),
-		hierarchy:       &ResourceHierarchy{},
-		filters:         &DiscoveryFilter{},
-		progressTracker: NewProgressTracker([]string{"aws", "azure", "gcp"}, defaultRegions, services),
+		config:              cfg,
+		cache:               &ResourceCache{data: make(map[string]interface{})},
+		plugins:             make(map[string]*DiscoveryPlugin),
+		hierarchy:           &ResourceHierarchy{},
+		filters:             &DiscoveryFilter{},
+		progressTracker:     NewProgressTracker([]string{"aws", "azure", "gcp"}, defaultRegions, services),
 		sdkIntegration:      NewSDKIntegration(),
 		discoveredResources: []models.Resource{},
 		metrics:             make(map[string]interface{}),

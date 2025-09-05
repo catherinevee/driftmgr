@@ -65,21 +65,21 @@ type RecoveryStrategy struct {
 // Error implements the error interface
 func (e *DriftError) Error() string {
 	var parts []string
-	
+
 	if e.Code != "" {
 		parts = append(parts, fmt.Sprintf("[%s]", e.Code))
 	}
-	
+
 	parts = append(parts, e.Message)
-	
+
 	if e.Resource != "" {
 		parts = append(parts, fmt.Sprintf("(resource: %s)", e.Resource))
 	}
-	
+
 	if e.Wrapped != nil {
 		parts = append(parts, fmt.Sprintf("caused by: %v", e.Wrapped))
 	}
-	
+
 	return strings.Join(parts, " ")
 }
 
@@ -132,15 +132,15 @@ type ErrorBuilder struct {
 // NewError creates a new error builder
 func NewError(errType ErrorType, message string) *ErrorBuilder {
 	_, file, line, _ := runtime.Caller(1)
-	
+
 	return &ErrorBuilder{
 		err: &DriftError{
-			Type:      errType,
-			Severity:  SeverityMedium,
-			Message:   message,
-			Timestamp: time.Now(),
+			Type:       errType,
+			Severity:   SeverityMedium,
+			Message:    message,
+			Timestamp:  time.Now(),
 			StackTrace: fmt.Sprintf("%s:%d", file, line),
-			Details:   make(map[string]interface{}),
+			Details:    make(map[string]interface{}),
 		},
 	}
 }
@@ -212,16 +212,16 @@ func (b *ErrorBuilder) WithContext(ctx context.Context) *ErrorBuilder {
 	if traceID := ctx.Value("trace_id"); traceID != nil {
 		b.err.TraceID = fmt.Sprintf("%v", traceID)
 	}
-	
+
 	// Extract other context values
 	if userID := ctx.Value("user_id"); userID != nil {
 		b.err.Details["user_id"] = userID
 	}
-	
+
 	if requestID := ctx.Value("request_id"); requestID != nil {
 		b.err.Details["request_id"] = requestID
 	}
-	
+
 	return b
 }
 
@@ -316,12 +316,12 @@ func (h *ErrorHandler) Handle(err error) error {
 			WithWrapped(err).
 			Build()
 	}
-	
+
 	// Try specific handler
 	if handler, exists := h.handlers[driftErr.Type]; exists {
 		return handler(driftErr)
 	}
-	
+
 	// Use fallback
 	return h.fallback(driftErr)
 }
@@ -340,7 +340,7 @@ func defaultFallbackHandler(err *DriftError) error {
 		// Log info
 		fmt.Printf("INFO: %s\n", err.Error())
 	}
-	
+
 	return err
 }
 

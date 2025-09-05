@@ -9,14 +9,14 @@ import (
 
 // ResourceCostImpact represents cost impact of a resource with drift
 type ResourceCostImpact struct {
-	ResourceID          string
-	ResourceType        string
-	ResourceName        string
-	CurrentMonthlyCost  float64
-	DriftMonthlyCost    float64
-	PotentialSavings    float64
-	Reason              string
-	Recommendations     []string
+	ResourceID         string
+	ResourceType       string
+	ResourceName       string
+	CurrentMonthlyCost float64
+	DriftMonthlyCost   float64
+	PotentialSavings   float64
+	Reason             string
+	Recommendations    []string
 }
 
 // Recommendation represents a cost optimization recommendation
@@ -115,7 +115,7 @@ func (ca *CostAnalyzer) AnalyzeResourceSimple(resource *state.Resource) *Resourc
 	if resource.Module != "" {
 		resourceID = fmt.Sprintf("module.%s.%s", resource.Module, resourceID)
 	}
-	
+
 	impact := &ResourceCostImpact{
 		ResourceID:   resourceID,
 		ResourceType: resource.Type,
@@ -145,9 +145,9 @@ func isIdleResource(impact *ResourceCostImpact) bool {
 		// In production, would check CloudWatch metrics for utilization
 		// For now, use heuristic based on resource name
 		lowerName := strings.ToLower(impact.ResourceName)
-		if strings.Contains(lowerName, "unused") || 
-		   strings.Contains(lowerName, "idle") ||
-		   strings.Contains(lowerName, "temp") {
+		if strings.Contains(lowerName, "unused") ||
+			strings.Contains(lowerName, "idle") ||
+			strings.Contains(lowerName, "temp") {
 			return true
 		}
 	}
@@ -158,14 +158,14 @@ func shouldRecommendReservedInstances(impacts []*ResourceCostImpact) bool {
 	// Check if there are long-running instances that would benefit from RIs
 	instanceCount := 0
 	totalInstanceCost := 0.0
-	
+
 	for _, impact := range impacts {
 		if strings.Contains(impact.ResourceType, "instance") {
 			instanceCount++
 			totalInstanceCost += impact.CurrentMonthlyCost
 		}
 	}
-	
+
 	// Recommend RIs if significant instance spend
 	return instanceCount > 5 && totalInstanceCost > 1000
 }
@@ -190,16 +190,16 @@ func shouldRecommendSpotInstances(impacts []*ResourceCostImpact) bool {
 func analyzeStorageOptimization(impacts []*ResourceCostImpact) Recommendation {
 	totalStorageCost := 0.0
 	storageResources := 0
-	
+
 	for _, impact := range impacts {
-		if strings.Contains(impact.ResourceType, "storage") || 
-		   strings.Contains(impact.ResourceType, "volume") ||
-		   strings.Contains(impact.ResourceType, "bucket") {
+		if strings.Contains(impact.ResourceType, "storage") ||
+			strings.Contains(impact.ResourceType, "volume") ||
+			strings.Contains(impact.ResourceType, "bucket") {
 			storageResources++
 			totalStorageCost += impact.CurrentMonthlyCost
 		}
 	}
-	
+
 	if storageResources > 0 && totalStorageCost > 100 {
 		return Recommendation{
 			ID:               "STORAGE_001",
@@ -210,23 +210,23 @@ func analyzeStorageOptimization(impacts []*ResourceCostImpact) Recommendation {
 			Risk:             "LOW",
 		}
 	}
-	
+
 	return Recommendation{}
 }
 
 func analyzeDatabaseOptimization(impacts []*ResourceCostImpact) Recommendation {
 	totalDBCost := 0.0
 	dbResources := 0
-	
+
 	for _, impact := range impacts {
-		if strings.Contains(impact.ResourceType, "db") || 
-		   strings.Contains(impact.ResourceType, "database") ||
-		   strings.Contains(impact.ResourceType, "rds") {
+		if strings.Contains(impact.ResourceType, "db") ||
+			strings.Contains(impact.ResourceType, "database") ||
+			strings.Contains(impact.ResourceType, "rds") {
 			dbResources++
 			totalDBCost += impact.CurrentMonthlyCost
 		}
 	}
-	
+
 	if dbResources > 0 && totalDBCost > 500 {
 		return Recommendation{
 			ID:               "DB_001",
@@ -237,7 +237,7 @@ func analyzeDatabaseOptimization(impacts []*ResourceCostImpact) Recommendation {
 			Risk:             "MEDIUM",
 		}
 	}
-	
+
 	return Recommendation{}
 }
 
@@ -253,7 +253,7 @@ func estimateResourceCost(resource *state.Resource) float64 {
 		"google_compute_instance": 55.0,
 		"google_storage_bucket":   8.0,
 	}
-	
+
 	baseCost := 10.0 // Default
 	for resourceType, cost := range baseCosts {
 		if strings.HasPrefix(resource.Type, resourceType) {
@@ -261,16 +261,16 @@ func estimateResourceCost(resource *state.Resource) float64 {
 			break
 		}
 	}
-	
+
 	// Adjust based on instance attributes if available
 	if len(resource.Instances) > 0 {
 		instance := resource.Instances[0]
-		
+
 		// Check instance type for compute resources
 		if instanceType, ok := instance.Attributes["instance_type"].(string); ok {
 			baseCost = getInstanceTypeCost(instanceType)
 		}
-		
+
 		// Check storage size
 		if size, ok := instance.Attributes["size"].(float64); ok {
 			if strings.Contains(resource.Type, "volume") || strings.Contains(resource.Type, "storage") {
@@ -278,127 +278,127 @@ func estimateResourceCost(resource *state.Resource) float64 {
 			}
 		}
 	}
-	
+
 	return baseCost
 }
 
 func estimateDriftCost(resource *state.Resource) float64 {
 	currentCost := estimateResourceCost(resource)
-	
+
 	// Simulate drift impact
 	driftMultiplier := 1.0
-	
+
 	if len(resource.Instances) > 0 {
 		instance := resource.Instances[0]
-		
+
 		// Check for common drift patterns
 		if _, ok := instance.Attributes["instance_type"].(string); ok {
 			driftMultiplier *= 1.2 // Assume 20% increase due to upsizing
 		}
-		
+
 		if _, ok := instance.Attributes["size"].(float64); ok {
 			driftMultiplier *= 1.1 // Assume 10% increase in storage
 		}
-		
+
 		if monitoring, ok := instance.Attributes["monitoring"].(bool); ok && monitoring {
 			driftMultiplier *= 1.05 // 5% increase for enhanced monitoring
 		}
-		
+
 		if encryption, ok := instance.Attributes["encryption"].(bool); ok && encryption {
 			driftMultiplier *= 1.02 // 2% increase for encryption
 		}
 	}
-	
+
 	return currentCost * driftMultiplier
 }
 
 func calculatePotentialSavings(resource *state.Resource) float64 {
 	currentCost := estimateResourceCost(resource)
-	
+
 	// Calculate potential optimized cost
 	optimizedCost := currentCost
-	
+
 	// Right-sizing optimization
 	if strings.Contains(resource.Type, "instance") {
 		optimizedCost *= 0.8 // Assume 20% reduction through right-sizing
 	}
-	
+
 	// Storage optimization
 	if strings.Contains(resource.Type, "storage") || strings.Contains(resource.Type, "volume") {
 		optimizedCost *= 0.85 // Assume 15% reduction through storage optimization
 	}
-	
+
 	// Database optimization
 	if strings.Contains(resource.Type, "db") || strings.Contains(resource.Type, "database") {
 		optimizedCost *= 0.7 // Assume 30% reduction through DB optimization
 	}
-	
+
 	if optimizedCost < currentCost {
 		return currentCost - optimizedCost
 	}
-	
+
 	return 0.0
 }
 
 func analyzeCostIncrease(resource *state.Resource) string {
 	reasons := []string{}
-	
+
 	// Check for common cost increase patterns
 	if strings.Contains(resource.Type, "instance") {
 		reasons = append(reasons, "Instance type may have been upsized")
 	}
-	
+
 	if strings.Contains(resource.Type, "storage") || strings.Contains(resource.Type, "volume") {
 		reasons = append(reasons, "Storage capacity increased")
 	}
-	
+
 	if len(resource.Instances) > 0 {
 		instance := resource.Instances[0]
-		
+
 		if _, ok := instance.Attributes["multi_az"].(bool); ok {
 			reasons = append(reasons, "Multi-AZ deployment enabled")
 		}
-		
+
 		if _, ok := instance.Attributes["encryption"].(bool); ok {
 			reasons = append(reasons, "Encryption enabled")
 		}
-		
+
 		if _, ok := instance.Attributes["backup_retention_period"].(float64); ok {
 			reasons = append(reasons, "Backup retention increased")
 		}
 	}
-	
+
 	if len(reasons) > 0 {
 		return strings.Join(reasons, "; ")
 	}
-	
+
 	return "Configuration drift detected"
 }
 
 func getInstanceTypeCost(instanceType string) float64 {
 	// Monthly costs for common instance types
 	costs := map[string]float64{
-		"t2.micro":    8.50,
-		"t2.small":    17.00,
-		"t2.medium":   34.00,
-		"t2.large":    68.00,
-		"t3.micro":    7.50,
-		"t3.small":    15.00,
-		"t3.medium":   30.00,
-		"t3.large":    60.00,
-		"m5.large":    70.00,
-		"m5.xlarge":   140.00,
-		"m5.2xlarge":  280.00,
-		"c5.large":    62.00,
-		"c5.xlarge":   124.00,
-		"r5.large":    92.00,
-		"r5.xlarge":   184.00,
+		"t2.micro":   8.50,
+		"t2.small":   17.00,
+		"t2.medium":  34.00,
+		"t2.large":   68.00,
+		"t3.micro":   7.50,
+		"t3.small":   15.00,
+		"t3.medium":  30.00,
+		"t3.large":   60.00,
+		"m5.large":   70.00,
+		"m5.xlarge":  140.00,
+		"m5.2xlarge": 280.00,
+		"c5.large":   62.00,
+		"c5.xlarge":  124.00,
+		"r5.large":   92.00,
+		"r5.xlarge":  184.00,
 	}
-	
+
 	if cost, ok := costs[instanceType]; ok {
 		return cost
 	}
-	
+
 	// Default based on size indicators
 	if strings.Contains(instanceType, "micro") {
 		return 10.0
@@ -411,6 +411,6 @@ func getInstanceTypeCost(instanceType string) float64 {
 	} else if strings.Contains(instanceType, "xlarge") {
 		return 160.0
 	}
-	
+
 	return 50.0 // Default monthly cost
 }

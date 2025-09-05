@@ -11,7 +11,7 @@ import (
 )
 
 type ConcisenessReport struct {
-	Issues []Issue `json:"issues"`
+	Issues  []Issue        `json:"issues"`
 	Summary map[string]int `json:"summary"`
 }
 
@@ -66,7 +66,7 @@ func generateSuggestions(report ConcisenessReport) string {
 	var sb strings.Builder
 
 	sb.WriteString("# Code Conciseness Suggestions\n\n")
-	
+
 	if len(report.Issues) == 0 {
 		sb.WriteString("✅ No conciseness issues found! Your code is already quite concise.\n")
 		return sb.String()

@@ -10,27 +10,26 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/pkg/models"
-	"github.com/catherinevee/driftmgr/internal/remediation"
 	"github.com/catherinevee/driftmgr/internal/discovery"
+	"github.com/catherinevee/driftmgr/internal/remediation"
+	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/fatih/color"
 )
 
-
 // BulkDeleteOptions represents options for bulk deletion
 type BulkDeleteOptions struct {
-	Provider       string
-	Region         string
-	ResourceType   string
-	Tags           map[string]string
-	ResourceIDs    []string
-	Force          bool
-	DryRun         bool
-	Parallel       bool
-	MaxConcurrent  int
-	IncludeDeps    bool
-	Wait           bool
-	Confirm        bool
+	Provider      string
+	Region        string
+	ResourceType  string
+	Tags          map[string]string
+	ResourceIDs   []string
+	Force         bool
+	DryRun        bool
+	Parallel      bool
+	MaxConcurrent int
+	IncludeDeps   bool
+	Wait          bool
+	Confirm       bool
 }
 
 // HandleBulkDelete handles bulk resource deletion
@@ -187,13 +186,13 @@ func executeBulkDelete(opts *BulkDeleteOptions) error {
 
 	// Step 5: Confirm deletion
 	if !opts.Confirm && !opts.DryRun {
-		fmt.Printf("\n%s Delete %d resources? (yes/no): ", 
+		fmt.Printf("\n%s Delete %d resources? (yes/no): ",
 			color.YellowString("WARNING:"), len(resources))
-		
+
 		reader := bufio.NewReader(os.Stdin)
 		response, _ := reader.ReadString('\n')
 		response = strings.ToLower(strings.TrimSpace(response))
-		
+
 		if response != "yes" && response != "y" {
 			fmt.Println("Deletion cancelled")
 			return nil
@@ -290,17 +289,17 @@ func matchesResourceType(actualType, filterType string) bool {
 	// Handle various type formats
 	actualLower := strings.ToLower(actualType)
 	filterLower := strings.ToLower(filterType)
-	
+
 	// Direct match
 	if actualLower == filterLower {
 		return true
 	}
-	
+
 	// AWS resource type matching
 	if strings.Contains(actualLower, filterLower) {
 		return true
 	}
-	
+
 	// Handle AWS::Service::Type format
 	awsParts := strings.Split(actualType, "::")
 	if len(awsParts) == 3 {
@@ -309,7 +308,7 @@ func matchesResourceType(actualType, filterType string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -337,30 +336,30 @@ func validateBulkDeletion(resources []models.Resource) error {
 		if isProductionResource(res) {
 			return fmt.Errorf("resource %s appears to be a production resource", res.Name)
 		}
-		
+
 		// Check for critical resources
 		if isCriticalResource(res) {
 			return fmt.Errorf("resource %s is marked as critical", res.Name)
 		}
 	}
-	
+
 	return nil
 }
 
 func isProductionResource(res models.Resource) bool {
 	// Check tags for production indicators
 	prodIndicators := []string{"production", "prod", "live"}
-	
+
 	// Type assert Tags to map[string]string
 	tags, ok := res.Tags.(map[string]string)
 	if !ok {
 		return false
 	}
-	
+
 	for key, value := range tags {
 		keyLower := strings.ToLower(key)
 		valueLower := strings.ToLower(value)
-		
+
 		if keyLower == "environment" || keyLower == "env" {
 			for _, indicator := range prodIndicators {
 				if valueLower == indicator {
@@ -369,7 +368,7 @@ func isProductionResource(res models.Resource) bool {
 			}
 		}
 	}
-	
+
 	// Check name for production indicators
 	nameLower := strings.ToLower(res.Name)
 	for _, indicator := range prodIndicators {
@@ -377,7 +376,7 @@ func isProductionResource(res models.Resource) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -391,14 +390,14 @@ func isCriticalResource(res models.Resource) bool {
 		"kms_key",
 		"route53_zone",
 	}
-	
+
 	typeLower := strings.ToLower(res.Type)
 	for _, critical := range criticalTypes {
 		if strings.Contains(typeLower, critical) {
 			return true
 		}
 	}
-	
+
 	// Check tags for critical indicators
 	if res.Tags != nil {
 		// Type assert Tags to map[string]string
@@ -411,7 +410,7 @@ func isCriticalResource(res models.Resource) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -424,20 +423,20 @@ type DeletionResult struct {
 
 func performBulkDeletion(ctx context.Context, resources []models.Resource, opts *BulkDeleteOptions) []DeletionResult {
 	results := make([]DeletionResult, len(resources))
-	
+
 	if opts.Parallel {
 		// Parallel deletion with concurrency limit
 		semaphore := make(chan struct{}, opts.MaxConcurrent)
 		var wg sync.WaitGroup
-		
+
 		for i, res := range resources {
 			wg.Add(1)
 			go func(idx int, resource models.Resource) {
 				defer wg.Done()
-				
-				semaphore <- struct{}{} // Acquire
+
+				semaphore <- struct{}{}        // Acquire
 				defer func() { <-semaphore }() // Release
-				
+
 				start := time.Now()
 				err := deleteResource(ctx, resource, opts)
 				results[idx] = DeletionResult{
@@ -448,7 +447,7 @@ func performBulkDeletion(ctx context.Context, resources []models.Resource, opts 
 				}
 			}(i, res)
 		}
-		
+
 		wg.Wait()
 	} else {
 		// Sequential deletion
@@ -461,13 +460,13 @@ func performBulkDeletion(ctx context.Context, resources []models.Resource, opts 
 				Error:    err,
 				Duration: time.Since(start),
 			}
-			
+
 			// Show progress
-			fmt.Printf("  [%d/%d] %s %s... ", 
-				i+1, len(resources), 
+			fmt.Printf("  [%d/%d] %s %s... ",
+				i+1, len(resources),
 				res.Name,
 				map[bool]string{true: "✓", false: "✗"}[err == nil])
-			
+
 			if err != nil {
 				color.Red("Failed: %v\n", err)
 			} else {
@@ -475,7 +474,7 @@ func performBulkDeletion(ctx context.Context, resources []models.Resource, opts 
 			}
 		}
 	}
-	
+
 	return results
 }
 
@@ -488,14 +487,14 @@ func deleteResource(ctx context.Context, resource models.Resource, opts *BulkDel
 			return err
 		}
 		return provider.DeleteResource(ctx, resource)
-		
+
 	case "azure":
 		provider, err := remediation.NewAzureProvider()
 		if err != nil {
 			return err
 		}
 		return provider.DeleteResource(ctx, resource)
-		
+
 	case "gcp":
 		// Create GCP deletion provider
 		provider, err := remediation.NewGCPProvider()
@@ -503,7 +502,7 @@ func deleteResource(ctx context.Context, resource models.Resource, opts *BulkDel
 			return fmt.Errorf("failed to create GCP provider: %w", err)
 		}
 		return provider.DeleteResource(ctx, resource)
-		
+
 	default:
 		return fmt.Errorf("unsupported provider: %s", resource.Provider)
 	}
@@ -515,7 +514,7 @@ func displayResources(resources []models.Resource) {
 	for _, res := range resources {
 		byType[res.Type] = append(byType[res.Type], res)
 	}
-	
+
 	// Display grouped
 	for resType, resList := range byType {
 		fmt.Printf("\n  %s (%d):\n", resType, len(resList))
@@ -537,7 +536,7 @@ func displayDeletionResults(results []DeletionResult) {
 	successful := 0
 	failed := 0
 	totalDuration := time.Duration(0)
-	
+
 	for _, result := range results {
 		if result.Success {
 			successful++
@@ -546,14 +545,14 @@ func displayDeletionResults(results []DeletionResult) {
 		}
 		totalDuration += result.Duration
 	}
-	
+
 	fmt.Println("\n=== Deletion Summary ===")
 	color.Green("Successful: %d\n", successful)
 	if failed > 0 {
 		color.Red("Failed: %d\n", failed)
 	}
 	fmt.Printf("Total time: %s\n", totalDuration)
-	
+
 	if failed > 0 {
 		fmt.Println("\nFailed deletions:")
 		for _, result := range results {
@@ -571,10 +570,10 @@ func ExportDeletionList(resources []models.Resource, filename string) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	
+
 	return encoder.Encode(resources)
 }
 
@@ -585,13 +584,13 @@ func ImportDeletionList(filename string) ([]models.Resource, error) {
 		return nil, err
 	}
 	defer file.Close()
-	
+
 	var resources []models.Resource
 	decoder := json.NewDecoder(file)
-	
+
 	if err := decoder.Decode(&resources); err != nil {
 		return nil, err
 	}
-	
+
 	return resources, nil
 }

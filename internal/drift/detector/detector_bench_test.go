@@ -14,10 +14,10 @@ func BenchmarkDriftDetection(b *testing.B) {
 	provider := &mockProvider{
 		resources: generateMockResources(100),
 	}
-	
+
 	// Create mock state
 	state := generateMockState(100)
-	
+
 	// Create detector
 	detector := New(provider, nil)
 	ctx := context.Background()
@@ -32,7 +32,7 @@ func BenchmarkDriftDetectionQuickMode(b *testing.B) {
 	provider := &mockProvider{
 		resources: generateMockResources(1000),
 	}
-	
+
 	state := generateMockState(1000)
 	detector := New(provider, nil)
 	ctx := context.Background()
@@ -47,7 +47,7 @@ func BenchmarkDriftDetectionDeepMode(b *testing.B) {
 	provider := &mockProvider{
 		resources: generateMockResources(100),
 	}
-	
+
 	state := generateMockState(100)
 	detector := New(provider, nil)
 	ctx := context.Background()
@@ -62,7 +62,7 @@ func BenchmarkDriftDetectionSmartMode(b *testing.B) {
 	provider := &mockProvider{
 		resources: generateMockResources(500),
 	}
-	
+
 	state := generateMockState(500)
 	detector := New(provider, nil)
 	ctx := context.Background()
@@ -77,7 +77,7 @@ func BenchmarkParallelDriftDetection(b *testing.B) {
 	provider := &mockProvider{
 		resources: generateMockResources(1000),
 	}
-	
+
 	state := generateMockState(1000)
 	detector := New(provider, nil)
 	ctx := context.Background()
@@ -96,21 +96,21 @@ func BenchmarkResourceComparison(b *testing.B) {
 		Name: "test",
 		Attributes: map[string]interface{}{
 			"instance_type": "t2.micro",
-			"ami":          "ami-12345",
+			"ami":           "ami-12345",
 			"tags": map[string]string{
 				"Name": "Test Instance",
 				"Env":  "test",
 			},
 		},
 	}
-	
+
 	actualResource := &models.Resource{
 		ID:   "test-resource",
 		Type: "aws_instance",
 		Name: "test",
 		Attributes: map[string]interface{}{
 			"instance_type": "t2.small", // Changed
-			"ami":          "ami-12345",
+			"ami":           "ami-12345",
 			"tags": map[string]string{
 				"Name": "Test Instance",
 				"Env":  "production", // Changed
@@ -126,13 +126,13 @@ func BenchmarkResourceComparison(b *testing.B) {
 
 func BenchmarkLargeStateProcessing(b *testing.B) {
 	sizes := []int{100, 500, 1000, 5000}
-	
+
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Resources_%d", size), func(b *testing.B) {
 			provider := &mockProvider{
 				resources: generateMockResources(size),
 			}
-			
+
 			state := generateMockState(size)
 			detector := New(provider, nil)
 			ctx := context.Background()
@@ -189,7 +189,7 @@ func generateMockResources(count int) []*models.Resource {
 			Name: fmt.Sprintf("instance-%d", i),
 			Attributes: map[string]interface{}{
 				"instance_type": "t2.micro",
-				"ami":          fmt.Sprintf("ami-%d", i),
+				"ami":           fmt.Sprintf("ami-%d", i),
 			},
 		}
 	}
@@ -207,13 +207,13 @@ func generateMockState(count int) *parser.TerraformState {
 					Attributes: map[string]interface{}{
 						"id":            fmt.Sprintf("resource-%d", i),
 						"instance_type": "t2.micro",
-						"ami":          fmt.Sprintf("ami-%d", i),
+						"ami":           fmt.Sprintf("ami-%d", i),
 					},
 				},
 			},
 		}
 	}
-	
+
 	return &parser.TerraformState{
 		Version:   4,
 		Resources: resources,

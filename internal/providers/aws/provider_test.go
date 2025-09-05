@@ -79,17 +79,17 @@ func TestNewAWSProvider(t *testing.T) {
 
 func TestAWSProvider_Initialize(t *testing.T) {
 	provider := NewAWSProvider("us-east-1")
-	
+
 	// Test initialization without credentials
 	ctx := context.Background()
 	err := provider.Initialize(ctx)
-	
+
 	// This will fail if AWS credentials are not configured
 	// In CI/CD, we'll use LocalStack or mocked clients
 	if err != nil {
 		t.Skipf("Skipping Initialize test - AWS credentials not configured: %v", err)
 	}
-	
+
 	assert.NotNil(t, provider.ec2Client)
 	assert.NotNil(t, provider.s3Client)
 	assert.NotNil(t, provider.iamClient)
@@ -108,7 +108,7 @@ func TestAWSProvider_DiscoverResources(t *testing.T) {
 
 	// Create mock client
 	mockEC2 := new(MockEC2Client)
-	
+
 	// Set up expected responses
 	instanceOutput := &ec2.DescribeInstancesOutput{
 		Reservations: []types.Reservation{
@@ -131,7 +131,7 @@ func TestAWSProvider_DiscoverResources(t *testing.T) {
 			},
 		},
 	}
-	
+
 	sgOutput := &ec2.DescribeSecurityGroupsOutput{
 		SecurityGroups: []types.SecurityGroup{
 			{
@@ -141,7 +141,7 @@ func TestAWSProvider_DiscoverResources(t *testing.T) {
 			},
 		},
 	}
-	
+
 	vpcOutput := &ec2.DescribeVpcsOutput{
 		Vpcs: []types.Vpc{
 			{
@@ -151,7 +151,7 @@ func TestAWSProvider_DiscoverResources(t *testing.T) {
 			},
 		},
 	}
-	
+
 	subnetOutput := &ec2.DescribeSubnetsOutput{
 		Subnets: []types.Subnet{
 			{
@@ -181,7 +181,7 @@ func TestAWSProvider_DiscoverResources(t *testing.T) {
 	// for now we'll just verify the mock was called
 	require.NoError(t, err)
 	assert.NotNil(t, resources)
-	
+
 	// Verify all mocks were called
 	mockEC2.AssertExpectations(t)
 }
@@ -192,12 +192,12 @@ func TestAWSProvider_GetResource(t *testing.T) {
 
 	// Test getting EC2 instance
 	resource, err := provider.GetResource(ctx, "aws_instance", "i-1234567890abcdef0")
-	
+
 	// This will fail without proper AWS setup
 	if err != nil {
 		t.Skipf("Skipping GetResource test - AWS not configured: %v", err)
 	}
-	
+
 	assert.NotNil(t, resource)
 }
 
@@ -207,7 +207,7 @@ func TestAWSProvider_ValidateCredentials(t *testing.T) {
 	defer cancel()
 
 	err := provider.ValidateCredentials(ctx)
-	
+
 	// Skip if no credentials configured
 	if err != nil {
 		t.Skipf("Skipping ValidateCredentials test - AWS credentials not configured: %v", err)
@@ -238,8 +238,8 @@ func TestAWSProvider_EstimateCost(t *testing.T) {
 			name:         "unknown resource",
 			resourceType: "aws_unknown",
 			config:       map[string]interface{}{},
-			wantMin:     0.0,
-			wantMax:     0.0,
+			wantMin:      0.0,
+			wantMax:      0.0,
 		},
 	}
 
@@ -257,7 +257,7 @@ func TestAWSProvider_EstimateCost(t *testing.T) {
 func BenchmarkAWSProvider_DiscoverResources(b *testing.B) {
 	provider := NewAWSProvider("us-east-1")
 	ctx := context.Background()
-	
+
 	// Skip if AWS is not configured
 	if err := provider.Initialize(ctx); err != nil {
 		b.Skipf("AWS not configured: %v", err)
@@ -275,7 +275,7 @@ func BenchmarkAWSProvider_DiscoverResources(b *testing.B) {
 func BenchmarkAWSProvider_ParallelDiscovery(b *testing.B) {
 	provider := NewAWSProvider("us-east-1")
 	ctx := context.Background()
-	
+
 	// Skip if AWS is not configured
 	if err := provider.Initialize(ctx); err != nil {
 		b.Skipf("AWS not configured: %v", err)

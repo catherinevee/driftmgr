@@ -37,39 +37,39 @@ type ExecutionHooks struct {
 }
 
 type ExecutionResult struct {
-	PlanID        string                   `json:"plan_id"`
-	StartTime     time.Time                `json:"start_time"`
-	EndTime       time.Time                `json:"end_time"`
-	Status        ExecutionStatus          `json:"status"`
-	ActionsTotal  int                      `json:"actions_total"`
-	ActionsSucceeded int                   `json:"actions_succeeded"`
-	ActionsFailed int                      `json:"actions_failed"`
-	ActionsSkipped int                     `json:"actions_skipped"`
-	ActionResults []ActionResult           `json:"action_results"`
-	Error         string                   `json:"error,omitempty"`
-	RollbackExecuted bool                 `json:"rollback_executed"`
+	PlanID           string          `json:"plan_id"`
+	StartTime        time.Time       `json:"start_time"`
+	EndTime          time.Time       `json:"end_time"`
+	Status           ExecutionStatus `json:"status"`
+	ActionsTotal     int             `json:"actions_total"`
+	ActionsSucceeded int             `json:"actions_succeeded"`
+	ActionsFailed    int             `json:"actions_failed"`
+	ActionsSkipped   int             `json:"actions_skipped"`
+	ActionResults    []ActionResult  `json:"action_results"`
+	Error            string          `json:"error,omitempty"`
+	RollbackExecuted bool            `json:"rollback_executed"`
 }
 
 type ActionResult struct {
-	ActionID      string          `json:"action_id"`
-	ResourceID    string          `json:"resource_id"`
-	Action        string          `json:"action"`
-	Status        ExecutionStatus `json:"status"`
-	StartTime     time.Time       `json:"start_time"`
-	EndTime       time.Time       `json:"end_time"`
-	Output        string          `json:"output,omitempty"`
-	Error         string          `json:"error,omitempty"`
-	Changes       []string        `json:"changes,omitempty"`
+	ActionID   string          `json:"action_id"`
+	ResourceID string          `json:"resource_id"`
+	Action     string          `json:"action"`
+	Status     ExecutionStatus `json:"status"`
+	StartTime  time.Time       `json:"start_time"`
+	EndTime    time.Time       `json:"end_time"`
+	Output     string          `json:"output,omitempty"`
+	Error      string          `json:"error,omitempty"`
+	Changes    []string        `json:"changes,omitempty"`
 }
 
 type ExecutionStatus string
 
 const (
-	StatusPending   ExecutionStatus = "pending"
-	StatusRunning   ExecutionStatus = "running"
-	StatusSuccess   ExecutionStatus = "success"
-	StatusFailed    ExecutionStatus = "failed"
-	StatusSkipped   ExecutionStatus = "skipped"
+	StatusPending    ExecutionStatus = "pending"
+	StatusRunning    ExecutionStatus = "running"
+	StatusSuccess    ExecutionStatus = "success"
+	StatusFailed     ExecutionStatus = "failed"
+	StatusSkipped    ExecutionStatus = "skipped"
 	StatusRolledBack ExecutionStatus = "rolled_back"
 )
 
@@ -110,7 +110,7 @@ func (re *RemediationExecutor) Execute(ctx context.Context, plan *RemediationPla
 	// Execute actions in order
 	actionResults := make([]ActionResult, 0, len(plan.Actions))
 	executedActions := make([]*RemediationAction, 0)
-	
+
 	for _, action := range plan.Actions {
 		// Check if action can be executed
 		if !re.canExecuteAction(&action, actionResults) {
@@ -141,7 +141,7 @@ func (re *RemediationExecutor) Execute(ctx context.Context, plan *RemediationPla
 				}
 				actionResults = append(actionResults, actionResult)
 				result.ActionsFailed++
-				
+
 				if re.rollbackOnFail {
 					re.executeRollback(ctx, plan, executedActions, backupID)
 					result.RollbackExecuted = true
@@ -156,13 +156,13 @@ func (re *RemediationExecutor) Execute(ctx context.Context, plan *RemediationPla
 		// Execute the action
 		actionResult := re.executeAction(ctx, &action)
 		actionResults = append(actionResults, actionResult)
-		
+
 		if actionResult.Status == StatusSuccess {
 			result.ActionsSucceeded++
 			executedActions = append(executedActions, &action)
 		} else if actionResult.Status == StatusFailed {
 			result.ActionsFailed++
-			
+
 			if re.rollbackOnFail {
 				re.executeRollback(ctx, plan, executedActions, backupID)
 				result.RollbackExecuted = true
@@ -184,7 +184,7 @@ func (re *RemediationExecutor) Execute(ctx context.Context, plan *RemediationPla
 
 	result.ActionResults = actionResults
 	result.EndTime = time.Now()
-	
+
 	if result.ActionsFailed > 0 {
 		result.Status = StatusFailed
 	} else {
@@ -241,7 +241,7 @@ func (re *RemediationExecutor) executeAction(ctx context.Context, action *Remedi
 	if err != nil {
 		result.Status = StatusFailed
 		result.Error = err.Error()
-		
+
 		if re.hooks.OnError != nil {
 			re.hooks.OnError(action, err)
 		}
@@ -271,7 +271,7 @@ func (re *RemediationExecutor) executeCreateAction(ctx context.Context, action *
 	cmd.Dir = re.workDir
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		return fmt.Errorf("terraform apply failed: %w", err)
 	}
@@ -286,7 +286,7 @@ func (re *RemediationExecutor) executeUpdateAction(ctx context.Context, action *
 	cmd.Dir = re.workDir
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		return fmt.Errorf("terraform apply failed: %w", err)
 	}
@@ -301,7 +301,7 @@ func (re *RemediationExecutor) executeDeleteAction(ctx context.Context, action *
 	cmd.Dir = re.workDir
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		return fmt.Errorf("terraform destroy failed: %w", err)
 	}
@@ -321,7 +321,7 @@ func (re *RemediationExecutor) executeImportAction(ctx context.Context, action *
 	cmd.Dir = re.workDir
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		return fmt.Errorf("terraform import failed: %w", err)
 	}
@@ -336,7 +336,7 @@ func (re *RemediationExecutor) executeRefreshAction(ctx context.Context, action 
 	cmd.Dir = re.workDir
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		return fmt.Errorf("terraform refresh failed: %w", err)
 	}
@@ -351,7 +351,7 @@ func (re *RemediationExecutor) executeTaintAction(ctx context.Context, action *R
 	cmd.Dir = re.workDir
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		return fmt.Errorf("terraform taint failed: %w", err)
 	}
@@ -366,7 +366,7 @@ func (re *RemediationExecutor) executeUntaintAction(ctx context.Context, action 
 	cmd.Dir = re.workDir
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		return fmt.Errorf("terraform untaint failed: %w", err)
 	}
@@ -386,7 +386,7 @@ func (re *RemediationExecutor) executeMoveAction(ctx context.Context, action *Re
 	cmd.Dir = re.workDir
 	output, err := cmd.CombinedOutput()
 	result.Output = string(output)
-	
+
 	if err != nil {
 		return fmt.Errorf("terraform state mv failed: %w", err)
 	}
@@ -459,25 +459,25 @@ func (re *RemediationExecutor) executeRollback(ctx context.Context, plan *Remedi
 func (re *RemediationExecutor) generateResourceConfig(action *RemediationAction) (string, error) {
 	// Generate Terraform configuration based on action parameters
 	config := strings.Builder{}
-	
+
 	resourceType, ok := action.Parameters["resource_type"].(string)
 	if !ok {
 		return "", errors.New("resource_type not specified")
 	}
 
 	resourceName := strings.ReplaceAll(action.Resource, ".", "_")
-	
+
 	config.WriteString(fmt.Sprintf("resource \"%s\" \"%s\" {\n", resourceType, resourceName))
-	
+
 	// Add resource attributes from parameters
 	if attrs, ok := action.Parameters["attributes"].(map[string]interface{}); ok {
 		for key, value := range attrs {
 			config.WriteString(fmt.Sprintf("  %s = %s\n", key, re.formatValue(value)))
 		}
 	}
-	
+
 	config.WriteString("}\n")
-	
+
 	return config.String(), nil
 }
 
@@ -522,7 +522,7 @@ func (re *RemediationExecutor) SetHooks(hooks ExecutionHooks) {
 func (re *RemediationExecutor) GetExecutionHistory() []ExecutionResult {
 	re.mu.RLock()
 	defer re.mu.RUnlock()
-	
+
 	history := make([]ExecutionResult, len(re.execHistory))
 	copy(history, re.execHistory)
 	return history

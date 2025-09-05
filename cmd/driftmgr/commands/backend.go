@@ -55,17 +55,17 @@ func init() {
 	discoverBackendsCmd.Flags().StringVarP(&backendPath, "path", "p", ".", "Path to search for backend configurations")
 	discoverBackendsCmd.Flags().BoolVarP(&backendRecursive, "recursive", "r", true, "Search recursively")
 	discoverBackendsCmd.Flags().StringVar(&backendProvider, "provider", "", "Filter by provider (s3, azurerm, gcs)")
-	
+
 	validateBackendCmd.Flags().DurationVar(&backendTimeout, "timeout", 30*time.Second, "Validation timeout")
 	validateBackendCmd.Flags().StringVar(&backendRegion, "region", "", "Override region for validation")
 }
 
 func runDiscoverBackends(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	
+
 	// Create backend scanner
 	scanner := discovery.NewBackendScanner()
-	
+
 	// Configure scanner options
 	opts := discovery.ScanOptions{
 		Path:      backendPath,
@@ -73,32 +73,32 @@ func runDiscoverBackends(cmd *cobra.Command, args []string) error {
 		MaxDepth:  10,
 		Workers:   4,
 	}
-	
+
 	if backendProvider != "" {
 		opts.FilterTypes = []string{backendProvider}
 	}
-	
+
 	fmt.Printf("Scanning for Terraform backends in %s...\n", backendPath)
-	
+
 	// Perform discovery
 	backends, err := scanner.Scan(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("failed to scan for backends: %w", err)
 	}
-	
+
 	if len(backends) == 0 {
 		fmt.Println("No backend configurations found")
 		return nil
 	}
-	
+
 	// Display discovered backends
 	fmt.Printf("\nDiscovered %d backend configuration(s):\n\n", len(backends))
-	
+
 	for _, backend := range backends {
 		fmt.Printf("Backend: %s\n", backend.ID)
 		fmt.Printf("  Type: %s\n", backend.Type)
 		fmt.Printf("  Path: %s\n", backend.ConfigPath)
-		
+
 		switch backend.Type {
 		case "s3":
 			if bucket, ok := backend.Config["bucket"].(string); ok {
@@ -110,7 +110,7 @@ func runDiscoverBackends(cmd *cobra.Command, args []string) error {
 			if region, ok := backend.Config["region"].(string); ok {
 				fmt.Printf("  Region: %s\n", region)
 			}
-			
+
 		case "azurerm":
 			if account, ok := backend.Config["storage_account_name"].(string); ok {
 				fmt.Printf("  Storage Account: %s\n", account)
@@ -121,7 +121,7 @@ func runDiscoverBackends(cmd *cobra.Command, args []string) error {
 			if key, ok := backend.Config["key"].(string); ok {
 				fmt.Printf("  Key: %s\n", key)
 			}
-			
+
 		case "gcs":
 			if bucket, ok := backend.Config["bucket"].(string); ok {
 				fmt.Printf("  Bucket: %s\n", bucket)
@@ -130,32 +130,32 @@ func runDiscoverBackends(cmd *cobra.Command, args []string) error {
 				fmt.Printf("  Prefix: %s\n", prefix)
 			}
 		}
-		
+
 		if backend.WorkspaceDir != "" {
 			fmt.Printf("  Workspace: %s\n", backend.WorkspaceDir)
 		}
-		
+
 		fmt.Println()
 	}
-	
+
 	// Register backends (simplified for now)
 	for _, backend := range backends {
 		// Backend registration will be implemented when registry is ready
 		_ = backend
 	}
-	
+
 	return nil
 }
 
 func runValidateBackend(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), backendTimeout)
 	defer cancel()
-	
+
 	backendID := args[0]
-	
+
 	// Get backend from registry (simplified for now)
 	var backend interface{} = nil
-	
+
 	if backend == nil {
 		// Try to discover it first
 		scanner := discovery.NewBackendScanner()
@@ -163,11 +163,11 @@ func runValidateBackend(cmd *cobra.Command, args []string) error {
 			Path:      ".",
 			Recursive: true,
 		})
-		
+
 		if err != nil {
 			return fmt.Errorf("failed to scan for backend: %w", err)
 		}
-		
+
 		for _, b := range backends {
 			if b.ID == backendID || strings.Contains(b.ConfigPath, backendID) {
 				// Backend provider will be created when registry is ready
@@ -175,25 +175,24 @@ func runValidateBackend(cmd *cobra.Command, args []string) error {
 				break
 			}
 		}
-		
+
 		if backend == nil {
 			return fmt.Errorf("backend %s not found", backendID)
 		}
 	}
-	
+
 	fmt.Printf("Validating backend %s...\n", backendID)
-	
+
 	// Backend testing simplified for now
 	fmt.Print("Testing connection... ")
 	fmt.Println("OK")
-	
+
 	// Backend validation simplified for now
 	fmt.Print("Checking state file... ")
 	fmt.Println("EXISTS")
 	fmt.Println("\nBackend validation completed successfully")
 	return nil
 }
-
 
 func runListBackends(cmd *cobra.Command, args []string) error {
 	// List backends (simplified for now)

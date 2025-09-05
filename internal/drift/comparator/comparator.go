@@ -9,10 +9,10 @@ import (
 
 // ResourceComparator compares resource states
 type ResourceComparator struct {
-	ignoreKeys    map[string]bool
-	customRules   map[string]CompareFunc
-	normalizers   map[string]NormalizeFunc
-	config        *ComparatorConfig
+	ignoreKeys  map[string]bool
+	customRules map[string]CompareFunc
+	normalizers map[string]NormalizeFunc
+	config      *ComparatorConfig
 }
 
 // ComparatorConfig contains comparator configuration
@@ -33,21 +33,21 @@ type NormalizeFunc func(value interface{}) interface{}
 
 // Difference represents a difference between expected and actual values
 type Difference struct {
-	Path          string      `json:"path"`
-	Type          DiffType    `json:"type"`
-	Expected      interface{} `json:"expected"`
-	Actual        interface{} `json:"actual"`
-	Message       string      `json:"message"`
-	Importance    Importance  `json:"importance"`
+	Path       string      `json:"path"`
+	Type       DiffType    `json:"type"`
+	Expected   interface{} `json:"expected"`
+	Actual     interface{} `json:"actual"`
+	Message    string      `json:"message"`
+	Importance Importance  `json:"importance"`
 }
 
 // DiffType categorizes the type of difference
 type DiffType string
 
 const (
-	DiffTypeAdded       DiffType = "added"
-	DiffTypeRemoved     DiffType = "removed"
-	DiffTypeModified    DiffType = "modified"
+	DiffTypeAdded        DiffType = "added"
+	DiffTypeRemoved      DiffType = "removed"
+	DiffTypeModified     DiffType = "modified"
 	DiffTypeTypeMismatch DiffType = "type_mismatch"
 )
 
@@ -78,10 +78,10 @@ func NewResourceComparator() *ResourceComparator {
 
 	// Add default ignore keys
 	comparator.addDefaultIgnoreKeys()
-	
+
 	// Add default normalizers
 	comparator.addDefaultNormalizers()
-	
+
 	// Add default custom rules
 	comparator.addDefaultCustomRules()
 
@@ -91,17 +91,17 @@ func NewResourceComparator() *ResourceComparator {
 // Compare compares expected and actual resource states
 func (rc *ResourceComparator) Compare(expected, actual map[string]interface{}) []Difference {
 	differences := make([]Difference, 0)
-	
+
 	// Normalize inputs
 	expected = rc.normalizeMap(expected)
 	actual = rc.normalizeMap(actual)
-	
+
 	// Perform comparison
 	rc.compareRecursive("", expected, actual, &differences)
-	
+
 	// Sort differences by importance and path
 	rc.sortDifferences(differences)
-	
+
 	return differences
 }
 
@@ -163,7 +163,7 @@ func (rc *ResourceComparator) compareRecursive(path string, expected, actual int
 	// Type checking
 	expectedType := reflect.TypeOf(expected)
 	actualType := reflect.TypeOf(actual)
-	
+
 	if expectedType != actualType {
 		*diffs = append(*diffs, Difference{
 			Path:       path,
@@ -287,12 +287,12 @@ func (rc *ResourceComparator) compareSlices(path string, expected, actual []inte
 func (rc *ResourceComparator) compareStrings(path string, expected, actual string, diffs *[]Difference) {
 	compareExpected := expected
 	compareActual := actual
-	
+
 	if !rc.config.CaseSensitive {
 		compareExpected = strings.ToLower(expected)
 		compareActual = strings.ToLower(actual)
 	}
-	
+
 	if compareExpected != compareActual {
 		*diffs = append(*diffs, Difference{
 			Path:       path,
@@ -327,27 +327,27 @@ func (rc *ResourceComparator) shouldIgnore(path string) bool {
 	if rc.ignoreKeys[path] {
 		return true
 	}
-	
+
 	// Check custom ignore fields
 	for _, field := range rc.config.CustomIgnoreFields {
 		if strings.Contains(path, field) {
 			return true
 		}
 	}
-	
+
 	// Check patterns
 	if rc.config.IgnoreComputed && strings.Contains(path, "computed_") {
 		return true
 	}
-	
+
 	if rc.config.IgnoreTags && (path == "tags" || strings.HasSuffix(path, ".tags")) {
 		return true
 	}
-	
+
 	if rc.config.IgnoreMetadata && strings.Contains(path, "metadata") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -356,14 +356,14 @@ func (rc *ResourceComparator) normalizeMap(m map[string]interface{}) map[string]
 	if m == nil {
 		return nil
 	}
-	
+
 	normalized := make(map[string]interface{})
 	for k, v := range m {
 		// Skip nil values
 		if v == nil {
 			continue
 		}
-		
+
 		// Recursively normalize nested maps
 		if nestedMap, ok := v.(map[string]interface{}); ok {
 			normalized[k] = rc.normalizeMap(nestedMap)
@@ -371,7 +371,7 @@ func (rc *ResourceComparator) normalizeMap(m map[string]interface{}) map[string]
 			normalized[k] = v
 		}
 	}
-	
+
 	return normalized
 }
 
@@ -390,7 +390,7 @@ func (rc *ResourceComparator) addDefaultIgnoreKeys() {
 		"resource_version",
 		"uid",
 	}
-	
+
 	for _, key := range defaultIgnore {
 		rc.ignoreKeys[key] = true
 	}
@@ -405,7 +405,7 @@ func (rc *ResourceComparator) addDefaultNormalizers() {
 		}
 		return v
 	}
-	
+
 	// Normalize empty strings to nil
 	rc.normalizers["description"] = func(v interface{}) interface{} {
 		if str, ok := v.(string); ok && str == "" {
@@ -421,27 +421,27 @@ func (rc *ResourceComparator) addDefaultCustomRules() {
 	rc.customRules["cidr_block"] = func(expected, actual interface{}) bool {
 		expStr, expOk := expected.(string)
 		actStr, actOk := actual.(string)
-		
+
 		if !expOk || !actOk {
 			return expected == actual
 		}
-		
+
 		// Normalize CIDR notation
 		expStr = rc.normalizeCIDR(expStr)
 		actStr = rc.normalizeCIDR(actStr)
-		
+
 		return expStr == actStr
 	}
-	
+
 	// Custom rule for JSON strings
 	rc.customRules["policy"] = func(expected, actual interface{}) bool {
 		expStr, expOk := expected.(string)
 		actStr, actOk := actual.(string)
-		
+
 		if !expOk || !actOk {
 			return expected == actual
 		}
-		
+
 		// Compare normalized JSON
 		return rc.compareJSON(expStr, actStr)
 	}
@@ -465,7 +465,7 @@ func (rc *ResourceComparator) compareJSON(json1, json2 string) bool {
 		s = strings.ReplaceAll(s, "\t", "")
 		return s
 	}
-	
+
 	return normalize(json1) == normalize(json2)
 }
 
@@ -478,7 +478,7 @@ func (rc *ResourceComparator) getFieldImportance(path string) Importance {
 		"ssl",
 		"https",
 	}
-	
+
 	highFields := []string{
 		"security_group",
 		"subnet",
@@ -491,7 +491,7 @@ func (rc *ResourceComparator) getFieldImportance(path string) Importance {
 		"backup",
 		"retention",
 	}
-	
+
 	mediumFields := []string{
 		"instance_type",
 		"size",
@@ -499,27 +499,27 @@ func (rc *ResourceComparator) getFieldImportance(path string) Importance {
 		"version",
 		"engine",
 	}
-	
+
 	pathLower := strings.ToLower(path)
-	
+
 	for _, field := range criticalFields {
 		if strings.Contains(pathLower, field) {
 			return ImportanceCritical
 		}
 	}
-	
+
 	for _, field := range highFields {
 		if strings.Contains(pathLower, field) {
 			return ImportanceHigh
 		}
 	}
-	
+
 	for _, field := range mediumFields {
 		if strings.Contains(pathLower, field) {
 			return ImportanceMedium
 		}
 	}
-	
+
 	return ImportanceLow
 }
 
@@ -540,12 +540,12 @@ func (rc *ResourceComparator) joinPath(base, key string) string {
 	if base == "" {
 		return key
 	}
-	
+
 	// Handle array indices
 	if strings.HasPrefix(key, "[") {
 		return base + key
 	}
-	
+
 	return base + "." + key
 }
 

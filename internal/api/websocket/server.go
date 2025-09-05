@@ -224,27 +224,27 @@ func convertToWSMessage(msg interface{}) WebSocketMessage {
 	if wsMsg, ok := msg.(WebSocketMessage); ok {
 		return wsMsg
 	}
-	
+
 	if mapMsg, ok := msg.(map[string]interface{}); ok {
 		msgType := "update"
 		if t, ok := mapMsg["type"].(string); ok {
 			msgType = t
 			delete(mapMsg, "type")
 		}
-		
+
 		timestamp := time.Now()
 		if ts, ok := mapMsg["timestamp"].(time.Time); ok {
 			timestamp = ts
 			delete(mapMsg, "timestamp")
 		}
-		
+
 		return WebSocketMessage{
 			Type:      msgType,
 			Timestamp: timestamp,
 			Data:      mapMsg,
 		}
 	}
-	
+
 	// Default fallback
 	return WebSocketMessage{
 		Type:      "update",

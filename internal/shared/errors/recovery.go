@@ -18,9 +18,9 @@ type RecoveryFunc func(ctx context.Context, err *DriftError) error
 
 // RecoveryMetrics tracks recovery attempts and success rates
 type RecoveryMetrics struct {
-	Attempts   int64
-	Successes  int64
-	Failures   int64
+	Attempts    int64
+	Successes   int64
+	Failures    int64
 	LastAttempt time.Time
 }
 
@@ -30,14 +30,14 @@ func NewRecoveryExecutor() *RecoveryExecutor {
 		strategies: make(map[string]RecoveryFunc),
 		metrics:    &RecoveryMetrics{},
 	}
-	
+
 	// Register default strategies
 	executor.RegisterStrategy("retry", executor.retryStrategy)
 	executor.RegisterStrategy("retry_with_backoff", executor.retryWithBackoffStrategy)
 	executor.RegisterStrategy("circuit_breaker", executor.circuitBreakerStrategy)
 	executor.RegisterStrategy("fallback", executor.fallbackStrategy)
 	executor.RegisterStrategy("compensate", executor.compensateStrategy)
-	
+
 	return executor
 }
 
@@ -50,24 +50,24 @@ func (r *RecoveryExecutor) RegisterStrategy(name string, fn RecoveryFunc) {
 func (r *RecoveryExecutor) Execute(ctx context.Context, err *DriftError) error {
 	r.metrics.Attempts++
 	r.metrics.LastAttempt = time.Now()
-	
+
 	// No recovery strategy defined
 	if err.Recovery.Strategy == "" {
 		return err
 	}
-	
+
 	// Find and execute strategy
 	strategy, exists := r.strategies[err.Recovery.Strategy]
 	if !exists {
 		return fmt.Errorf("unknown recovery strategy: %s", err.Recovery.Strategy)
 	}
-	
+
 	// Execute recovery
 	if recoveryErr := strategy(ctx, err); recoveryErr != nil {
 		r.metrics.Failures++
 		return recoveryErr
 	}
-	
+
 	r.metrics.Successes++
 	return nil
 }
@@ -77,7 +77,7 @@ func (r *RecoveryExecutor) retryStrategy(ctx context.Context, err *DriftError) e
 	if !err.Retryable {
 		return err
 	}
-	
+
 	// Wait for retry delay
 	if err.RetryAfter > 0 {
 		select {
@@ -86,7 +86,7 @@ func (r *RecoveryExecutor) retryStrategy(ctx context.Context, err *DriftError) e
 			return ctx.Err()
 		}
 	}
-	
+
 	// In real implementation, this would retry the original operation
 	// For now, we just return nil to indicate recovery succeeded
 	return nil
@@ -98,31 +98,31 @@ func (r *RecoveryExecutor) retryWithBackoffStrategy(ctx context.Context, err *Dr
 	if val, ok := err.Recovery.Params["max_retries"].(int); ok {
 		maxRetries = val
 	}
-	
+
 	baseDelay := 1 * time.Second
 	if val, ok := err.Recovery.Params["base_delay"].(string); ok {
 		if d, err := time.ParseDuration(val); err == nil {
 			baseDelay = d
 		}
 	}
-	
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Calculate backoff delay
 		delay := time.Duration(math.Pow(2, float64(attempt-1))) * baseDelay
-		
+
 		select {
 		case <-time.After(delay):
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-		
+
 		// In real implementation, retry the operation here
 		// For demonstration, we simulate success on last attempt
 		if attempt == maxRetries {
 			return nil
 		}
 	}
-	
+
 	return err
 }
 
@@ -133,12 +133,12 @@ func (r *RecoveryExecutor) circuitBreakerStrategy(ctx context.Context, err *Drif
 	if val, ok := err.Recovery.Params["threshold"].(int); ok {
 		threshold = val
 	}
-	
+
 	// If too many recent failures, circuit is open
 	if r.metrics.Failures > int64(threshold) {
 		return fmt.Errorf("circuit breaker open: too many failures")
 	}
-	
+
 	// Try operation
 	// In real implementation, this would attempt the operation
 	return nil
@@ -150,7 +150,7 @@ func (r *RecoveryExecutor) fallbackStrategy(ctx context.Context, err *DriftError
 	if !ok {
 		return fmt.Errorf("no fallback function provided")
 	}
-	
+
 	return fallbackFn()
 }
 
@@ -161,14 +161,14 @@ func (r *RecoveryExecutor) compensateStrategy(ctx context.Context, err *DriftErr
 		fmt.Printf("Executing compensation step: %s\n", step)
 		// In real implementation, execute actual compensation logic
 	}
-	
+
 	return nil
 }
 
 // RetryOperation wraps an operation with retry logic
 func RetryOperation(ctx context.Context, operation func() error, maxRetries int, delay time.Duration) error {
 	var lastErr error
-	
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			// Wait before retry
@@ -178,54 +178,54 @@ func RetryOperation(ctx context.Context, operation func() error, maxRetries int,
 				return ctx.Err()
 			}
 		}
-		
+
 		err := operation()
 		if err == nil {
 			return nil
 		}
-		
+
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if driftErr, ok := err.(*DriftError); ok && !driftErr.Retryable {
 			return err
 		}
 	}
-	
+
 	return fmt.Errorf("operation failed after %d retries: %w", maxRetries, lastErr)
 }
 
 // RetryWithExponentialBackoff retries with exponential backoff
 func RetryWithExponentialBackoff(ctx context.Context, operation func() error, config BackoffConfig) error {
 	var lastErr error
-	
+
 	for attempt := 0; attempt < config.MaxRetries; attempt++ {
 		if attempt > 0 {
 			delay := time.Duration(math.Pow(2, float64(attempt-1))) * config.BaseDelay
 			if delay > config.MaxDelay {
 				delay = config.MaxDelay
 			}
-			
+
 			select {
 			case <-time.After(delay):
 			case <-ctx.Done():
 				return ctx.Err()
 			}
 		}
-		
+
 		err := operation()
 		if err == nil {
 			return nil
 		}
-		
+
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if driftErr, ok := err.(*DriftError); ok && !driftErr.Retryable {
 			return err
 		}
 	}
-	
+
 	return fmt.Errorf("operation failed after %d retries: %w", config.MaxRetries, lastErr)
 }
 

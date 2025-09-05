@@ -9,8 +9,8 @@ import (
 
 // Validator validates Terraform state files
 type Validator struct {
-	rules       []ValidationRule
-	strictMode  bool
+	rules      []ValidationRule
+	strictMode bool
 }
 
 // ValidationRule defines a validation rule
@@ -39,11 +39,11 @@ type ValidationResult struct {
 
 // ValidationError represents a validation error
 type ValidationError struct {
-	Rule        string   `json:"rule"`
-	Message     string   `json:"message"`
-	Severity    Severity `json:"severity"`
-	Resource    string   `json:"resource,omitempty"`
-	Field       string   `json:"field,omitempty"`
+	Rule     string   `json:"rule"`
+	Message  string   `json:"message"`
+	Severity Severity `json:"severity"`
+	Resource string   `json:"resource,omitempty"`
+	Field    string   `json:"field,omitempty"`
 }
 
 // NewValidator creates a new state validator
@@ -153,7 +153,7 @@ func (v *Validator) addDefaultRules() {
 		Severity:    SeverityError,
 		Validate: func(state *TerraformState) error {
 			addresses := make(map[string]bool)
-			
+
 			for _, resource := range state.Resources {
 				// Validate resource structure
 				if err := v.validateResource(resource); err != nil {
@@ -166,14 +166,14 @@ func (v *Validator) addDefaultRules() {
 					if len(resource.Instances) > 1 {
 						address = fmt.Sprintf("%s[%d]", address, i)
 					}
-					
+
 					if addresses[address] {
 						return fmt.Errorf("duplicate resource address: %s", address)
 					}
 					addresses[address] = true
 				}
 			}
-			
+
 			return nil
 		},
 	})
@@ -356,7 +356,7 @@ func (v *Validator) ValidateResourceAddress(address string) error {
 	// Basic format: type.name or type.name[index]
 	pattern := `^[a-zA-Z][a-zA-Z0-9_-]*\.[a-zA-Z_][a-zA-Z0-9_-]*(\[\d+\])?$`
 	match, _ := regexp.MatchString(pattern, address)
-	
+
 	if !match {
 		return fmt.Errorf("invalid resource address format: %s", address)
 	}

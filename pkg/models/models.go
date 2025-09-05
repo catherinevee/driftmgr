@@ -38,12 +38,12 @@ func (r *Resource) GetTagsAsMap() map[string]string {
 	if r.Tags == nil {
 		return make(map[string]string)
 	}
-	
+
 	// If tags are already a map[string]string, return them
 	if tags, ok := r.Tags.(map[string]string); ok {
 		return tags
 	}
-	
+
 	// If tags are map[string]interface{}, convert them
 	if tags, ok := r.Tags.(map[string]interface{}); ok {
 		result := make(map[string]string)
@@ -56,7 +56,7 @@ func (r *Resource) GetTagsAsMap() map[string]string {
 		}
 		return result
 	}
-	
+
 	// If tags are []string, convert to map with empty values
 	if tags, ok := r.Tags.([]string); ok {
 		result := make(map[string]string)
@@ -65,7 +65,7 @@ func (r *Resource) GetTagsAsMap() map[string]string {
 		}
 		return result
 	}
-	
+
 	return make(map[string]string)
 }
 

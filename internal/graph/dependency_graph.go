@@ -110,7 +110,7 @@ func (dg *DependencyGraph) BuildFromState(state *state.TerraformState) error {
 func (dg *DependencyGraph) addResourceNodes(resource state.Resource) error {
 	for i, instance := range resource.Instances {
 		address := dg.formatAddress(resource, i)
-		
+
 		node := &ResourceNode{
 			Address:      address,
 			Type:         resource.Type,
@@ -125,7 +125,7 @@ func (dg *DependencyGraph) addResourceNodes(resource state.Resource) error {
 
 		// Add explicit dependencies
 		node.Dependencies = append(node.Dependencies, resource.DependsOn...)
-		
+
 		// Add instance dependencies
 		node.Dependencies = append(node.Dependencies, instance.Dependencies...)
 
@@ -138,21 +138,21 @@ func (dg *DependencyGraph) addResourceNodes(resource state.Resource) error {
 // buildResourceEdges builds edges based on dependencies
 func (dg *DependencyGraph) buildResourceEdges(resource state.Resource) error {
 	referenceRegex := regexp.MustCompile(`\$\{([^}]+)\}`)
-	
+
 	for i, instance := range resource.Instances {
 		address := dg.formatAddress(resource, i)
 		node := dg.nodes[address]
-		
+
 		// Extract implicit dependencies from attributes
 		implicitDeps := dg.extractImplicitDependencies(instance.Attributes, referenceRegex)
-		
+
 		// Add all dependencies as edges
 		allDeps := append(node.Dependencies, implicitDeps...)
-		
+
 		for _, dep := range allDeps {
 			// Normalize dependency address
 			depAddr := dg.normalizeDependency(dep)
-			
+
 			// Check if dependency exists
 			if targetNode, exists := dg.nodes[depAddr]; exists {
 				// Add edge
@@ -252,13 +252,13 @@ func (dg *DependencyGraph) normalizeDependency(dep string) string {
 			return fmt.Sprintf("%s.%s", parts[2], parts[3])
 		}
 	}
-	
+
 	// Handle index notation
 	if strings.Contains(dep, "[") {
 		// Already has index
 		return dep
 	}
-	
+
 	// Check if we need to add [0]
 	parts := strings.Split(dep, ".")
 	if len(parts) == 2 {
@@ -270,7 +270,7 @@ func (dg *DependencyGraph) normalizeDependency(dep string) string {
 			}
 		}
 	}
-	
+
 	return dep
 }
 
@@ -280,13 +280,13 @@ func (dg *DependencyGraph) hasEdge(from, to string) bool {
 	if !exists {
 		return false
 	}
-	
+
 	for _, edge := range edges {
 		if edge == to {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -305,10 +305,10 @@ func (dg *DependencyGraph) calculateLevels() {
 	level := 0
 	for len(queue) > 0 {
 		nextQueue := make([]string, 0)
-		
+
 		for _, addr := range queue {
 			node := dg.nodes[addr]
-			
+
 			// Process dependents
 			for _, dependent := range node.Dependents {
 				depNode := dg.nodes[dependent]
@@ -318,7 +318,7 @@ func (dg *DependencyGraph) calculateLevels() {
 				}
 			}
 		}
-		
+
 		queue = nextQueue
 		level++
 	}
@@ -412,7 +412,7 @@ func (dg *DependencyGraph) Nodes() map[string]*ResourceNode {
 	return dg.nodes
 }
 
-// Edges property for compatibility  
+// Edges property for compatibility
 func (dg *DependencyGraph) Edges() map[string][]string {
 	return dg.edges
 }
@@ -461,7 +461,7 @@ func (dg *DependencyGraph) CalculateBlastRadius(resourceID string) *BlastRadius 
 	if !exists {
 		return nil
 	}
-	
+
 	return &BlastRadius{
 		ResourceID:     resourceID,
 		DirectImpact:   node.Dependents,
@@ -484,7 +484,7 @@ func (dg *DependencyGraph) GetDependencies(resourceID string) []string {
 // GetEdges returns all edges
 func (dg *DependencyGraph) GetEdges() []Edge {
 	edges := make([]Edge, 0)
-	
+
 	for from, tos := range dg.edges {
 		for _, to := range tos {
 			edges = append(edges, Edge{
@@ -494,10 +494,9 @@ func (dg *DependencyGraph) GetEdges() []Edge {
 			})
 		}
 	}
-	
+
 	return edges
 }
-
 
 // GetDependents returns all resources that depend on this resource
 func (dg *DependencyGraph) GetDependents(address string) []string {
@@ -565,13 +564,13 @@ func (dg *DependencyGraph) GetBlastRadius(address string) []string {
 // GetOrphanedResources returns resources with no dependencies or dependents
 func (dg *DependencyGraph) GetOrphanedResources() []string {
 	orphans := make([]string, 0)
-	
+
 	for addr, node := range dg.nodes {
 		if len(dg.edges[addr]) == 0 && len(node.Dependents) == 0 {
 			orphans = append(orphans, addr)
 		}
 	}
-	
+
 	return orphans
 }
 
@@ -615,7 +614,7 @@ func (dg *DependencyGraph) GetCriticalPath() []string {
 	// Find the node with the longest path
 	maxLen := 0
 	var startNode string
-	
+
 	for node := range dg.nodes {
 		if !visited[node] {
 			len := dfs(node)
@@ -629,7 +628,7 @@ func (dg *DependencyGraph) GetCriticalPath() []string {
 	// Build the critical path
 	path := make([]string, 0)
 	current := startNode
-	
+
 	for current != "" {
 		path = append(path, current)
 		current = pathPrev[current]

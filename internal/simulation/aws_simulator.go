@@ -10,9 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/catherinevee/driftmgr/internal/state"
 )
 
@@ -134,7 +134,7 @@ func (s *AWSSimulator) simulateTagDrift(ctx context.Context, resource *state.Res
 		taggingOutput, err := s.s3Client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{
 			Bucket: aws.String(bucketName),
 		})
-		
+
 		var existingTags []s3types.Tag
 		if taggingOutput != nil {
 			existingTags = taggingOutput.TagSet
@@ -290,7 +290,7 @@ func (s *AWSSimulator) simulateResourceCreation(ctx context.Context, resource *s
 
 	// Create a small S3 bucket (free tier)
 	bucketName := fmt.Sprintf("drift-simulation-%d", time.Now().Unix())
-	
+
 	_, err := s.s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(bucketName),
 		CreateBucketConfiguration: &s3types.CreateBucketConfiguration{
@@ -468,7 +468,7 @@ func (s *AWSSimulator) checkInstanceDrift(ctx context.Context, resource *state.R
 	}
 
 	instance := output.Reservations[0].Instances[0]
-	
+
 	// Check for drift simulation tags
 	for _, tag := range instance.Tags {
 		if tag.Key != nil && *tag.Key == "DriftSimulation" {
@@ -527,7 +527,7 @@ func (s *AWSSimulator) checkBucketDrift(ctx context.Context, resource *state.Res
 	if err == nil && versioningOutput != nil {
 		stateVersioning := s.extractBucketVersioning(resource)
 		currentVersioning := string(versioningOutput.Status)
-		
+
 		if stateVersioning != currentVersioning {
 			return &DriftItem{
 				ResourceID:   bucketName,
@@ -563,7 +563,7 @@ func (s *AWSSimulator) checkSecurityGroupDrift(ctx context.Context, resource *st
 	}
 
 	sg := output.SecurityGroups[0]
-	
+
 	// Check for drift simulation rule
 	for _, rule := range sg.IpPermissions {
 		for _, ipRange := range rule.IpRanges {
@@ -814,7 +814,7 @@ func (s *AWSSimulator) convertSecurityGroupRules(permissions []types.IpPermissio
 
 func (s *AWSSimulator) rollbackTagRemoval(ctx context.Context, data *RollbackData) error {
 	tagKey := data.OriginalData["tag_key"].(string)
-	
+
 	switch data.ResourceType {
 	case "aws_instance", "aws_vpc", "aws_security_group", "aws_subnet":
 		_, err := s.ec2Client.DeleteTags(ctx, &ec2.DeleteTagsInput{

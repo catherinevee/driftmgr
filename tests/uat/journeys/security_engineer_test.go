@@ -16,11 +16,11 @@ func TestSecurityEngineerComplianceCheck(t *testing.T) {
 	// Step 1: Security group audit
 	t.Run("SecurityGroupAudit", func(t *testing.T) {
 		step := j.AddStep("Audit security groups", "Security engineer audits AWS security groups")
-		
+
 		output, err := j.ExecuteCommand(ctx, "driftmgr", "discover",
 			"--provider", "aws",
 			"--resource-type", "security_group")
-		
+
 		if err != nil {
 			step.Complete(false, "Security group discovery failed")
 		} else {
@@ -31,11 +31,11 @@ func TestSecurityEngineerComplianceCheck(t *testing.T) {
 	// Step 2: IAM role analysis
 	t.Run("IAMRoleAnalysis", func(t *testing.T) {
 		step := j.AddStep("Analyze IAM roles", "Security engineer analyzes IAM roles and policies")
-		
+
 		output, err := j.ExecuteCommand(ctx, "driftmgr", "discover",
 			"--provider", "aws",
 			"--resource-type", "iam_role")
-		
+
 		if err != nil {
 			step.Complete(false, "IAM role discovery failed")
 		} else {
@@ -46,15 +46,15 @@ func TestSecurityEngineerComplianceCheck(t *testing.T) {
 	// Step 3: Encryption validation
 	t.Run("EncryptionValidation", func(t *testing.T) {
 		step := j.AddStep("Validate encryption", "Security engineer validates encryption settings")
-		
+
 		stateFile := createTestStateFile(t)
 		defer cleanupTestFile(stateFile)
-		
+
 		// Check for unencrypted resources
 		output, err := j.ExecuteCommand(ctx, "driftmgr", "analyze",
 			"--state", stateFile,
 			"--check-encryption")
-		
+
 		if err != nil {
 			// Encryption checking might not be implemented
 			step.Complete(false, "Encryption validation not available")
@@ -66,7 +66,7 @@ func TestSecurityEngineerComplianceCheck(t *testing.T) {
 	// Step 4: Compliance reporting
 	t.Run("ComplianceReport", func(t *testing.T) {
 		step := j.AddStep("Generate compliance report", "Security engineer generates compliance report")
-		
+
 		// This would generate SOC2/HIPAA/PCI-DSS reports
 		// For now, we simulate this
 		step.Complete(true, "Compliance report generated (simulated)")
@@ -75,15 +75,15 @@ func TestSecurityEngineerComplianceCheck(t *testing.T) {
 	// Step 5: Policy validation
 	t.Run("PolicyValidation", func(t *testing.T) {
 		step := j.AddStep("Validate policies", "Security engineer validates security policies")
-		
+
 		// Check for policy violations
 		stateFile := createTestStateFile(t)
 		defer cleanupTestFile(stateFile)
-		
+
 		output, err := j.ExecuteCommand(ctx, "driftmgr", "analyze",
 			"--state", stateFile,
 			"--policy-check")
-		
+
 		if err != nil {
 			step.Complete(false, "Policy validation failed")
 		} else {
@@ -106,14 +106,14 @@ func TestSecurityEngineerIncidentInvestigation(t *testing.T) {
 	// Step 1: Detect unauthorized changes
 	t.Run("UnauthorizedChangeDetection", func(t *testing.T) {
 		step := j.AddStep("Detect unauthorized changes", "Security engineer detects unauthorized modifications")
-		
+
 		stateFile := createTestStateFile(t)
 		defer cleanupTestFile(stateFile)
-		
+
 		output, err := j.ExecuteCommand(ctx, "driftmgr", "drift", "detect",
 			"--state", stateFile,
 			"--mode", "deep")
-		
+
 		require.NoError(t, err)
 		assert.Contains(t, output, "drift")
 		step.Complete(true, "Unauthorized changes detected")
@@ -122,7 +122,7 @@ func TestSecurityEngineerIncidentInvestigation(t *testing.T) {
 	// Step 2: Audit trail review
 	t.Run("AuditTrailReview", func(t *testing.T) {
 		step := j.AddStep("Review audit trail", "Security engineer reviews audit logs")
-		
+
 		// This would integrate with CloudTrail/Azure Activity Log/etc
 		step.Complete(true, "Audit trail reviewed (simulated)")
 	})
@@ -130,7 +130,7 @@ func TestSecurityEngineerIncidentInvestigation(t *testing.T) {
 	// Step 3: Resource quarantine
 	t.Run("ResourceQuarantine", func(t *testing.T) {
 		step := j.AddStep("Quarantine resources", "Security engineer quarantines affected resources")
-		
+
 		// In real scenario, this would isolate compromised resources
 		step.Complete(true, "Resources quarantined (simulated)")
 	})
@@ -138,7 +138,7 @@ func TestSecurityEngineerIncidentInvestigation(t *testing.T) {
 	// Step 4: Generate security report
 	t.Run("SecurityReport", func(t *testing.T) {
 		step := j.AddStep("Generate security report", "Security engineer generates incident report")
-		
+
 		step.Complete(true, "Security incident report generated")
 	})
 
@@ -156,11 +156,11 @@ func TestSecurityEngineerAccessControl(t *testing.T) {
 	// Step 1: Review resource permissions
 	t.Run("PermissionReview", func(t *testing.T) {
 		step := j.AddStep("Review permissions", "Security engineer reviews resource permissions")
-		
+
 		output, err := j.ExecuteCommand(ctx, "driftmgr", "discover",
 			"--provider", "aws",
 			"--show-permissions")
-		
+
 		if err != nil {
 			step.Complete(false, "Permission review failed")
 		} else {
@@ -171,7 +171,7 @@ func TestSecurityEngineerAccessControl(t *testing.T) {
 	// Step 2: Identify overly permissive resources
 	t.Run("OverlyPermissiveCheck", func(t *testing.T) {
 		step := j.AddStep("Check for overly permissive resources", "Security engineer identifies risky permissions")
-		
+
 		// This would check for 0.0.0.0/0 in security groups, * in IAM policies, etc
 		step.Complete(true, "Risky permissions identified (simulated)")
 	})
@@ -179,23 +179,23 @@ func TestSecurityEngineerAccessControl(t *testing.T) {
 	// Step 3: Generate least privilege recommendations
 	t.Run("LeastPrivilegeRecommendations", func(t *testing.T) {
 		step := j.AddStep("Generate recommendations", "Security engineer creates least privilege recommendations")
-		
+
 		step.Complete(true, "Least privilege recommendations generated")
 	})
 
 	// Step 4: Apply security hardening
 	t.Run("SecurityHardening", func(t *testing.T) {
 		step := j.AddStep("Apply hardening", "Security engineer applies security hardening")
-		
+
 		stateFile := createTestStateFile(t)
 		defer cleanupTestFile(stateFile)
-		
+
 		// This would apply security best practices
 		output, err := j.ExecuteCommand(ctx, "driftmgr", "remediate",
 			"--state", stateFile,
 			"--strategy", "security-hardening",
 			"--dry-run")
-		
+
 		if err != nil {
 			// Security hardening strategy might not be implemented
 			step.Complete(false, "Security hardening not available")
@@ -218,7 +218,7 @@ func TestSecurityEngineerDisasterRecovery(t *testing.T) {
 	// Step 1: Backup encryption verification
 	t.Run("BackupEncryption", func(t *testing.T) {
 		step := j.AddStep("Verify backup encryption", "Security engineer verifies backups are encrypted")
-		
+
 		// Check that state backups are encrypted
 		step.Complete(true, "Backup encryption verified (simulated)")
 	})
@@ -226,14 +226,14 @@ func TestSecurityEngineerDisasterRecovery(t *testing.T) {
 	// Step 2: Access control for DR resources
 	t.Run("DRAccessControl", func(t *testing.T) {
 		step := j.AddStep("Verify DR access control", "Security engineer verifies DR resource access controls")
-		
+
 		step.Complete(true, "DR access controls verified")
 	})
 
 	// Step 3: Compliance validation for DR
 	t.Run("DRCompliance", func(t *testing.T) {
 		step := j.AddStep("Validate DR compliance", "Security engineer validates DR compliance requirements")
-		
+
 		step.Complete(true, "DR compliance validated")
 	})
 

@@ -33,12 +33,12 @@ type Metric struct {
 
 // Collector collects and aggregates metrics
 type Collector struct {
-	metrics    map[string]*metricData
-	exporters  []Exporter
-	mu         sync.RWMutex
-	bufferSize int
+	metrics       map[string]*metricData
+	exporters     []Exporter
+	mu            sync.RWMutex
+	bufferSize    int
 	flushInterval time.Duration
-	stopCh     chan struct{}
+	stopCh        chan struct{}
 }
 
 // metricData holds metric data and statistics
@@ -178,7 +178,7 @@ func (c *Collector) AddExporter(exporter Exporter) {
 // flush exports all metrics
 func (c *Collector) flush() {
 	c.mu.Lock()
-	
+
 	if len(c.metrics) == 0 {
 		c.mu.Unlock()
 		return
@@ -202,18 +202,18 @@ func (c *Collector) flush() {
 			m.Value = data.metric.Value
 		case MetricTypeHistogram, MetricTypeSummary:
 			m.Metadata = map[string]interface{}{
-				"count":       data.count,
-				"sum":         data.sum,
-				"min":         data.min,
-				"max":         data.max,
-				"p50":         data.histogram.Percentile(0.5),
-				"p90":         data.histogram.Percentile(0.9),
-				"p95":         data.histogram.Percentile(0.95),
-				"p99":         data.histogram.Percentile(0.99),
+				"count": data.count,
+				"sum":   data.sum,
+				"min":   data.min,
+				"max":   data.max,
+				"p50":   data.histogram.Percentile(0.5),
+				"p90":   data.histogram.Percentile(0.9),
+				"p95":   data.histogram.Percentile(0.95),
+				"p99":   data.histogram.Percentile(0.99),
 			}
 		}
 		data.mu.RUnlock()
-		
+
 		metrics = append(metrics, m)
 	}
 
@@ -293,10 +293,10 @@ func (c *Collector) collectSystemMetrics() {
 	// GC metrics
 	c.Gauge("system.gc.count", float64(m.NumGC), nil)
 	c.Gauge("system.gc.pause_total", float64(m.PauseTotalNs), map[string]string{"unit": "nanoseconds"})
-	
+
 	// Goroutine metrics
 	c.Gauge("system.goroutines", float64(runtime.NumGoroutine()), nil)
-	
+
 	// CPU metrics
 	c.Gauge("system.cpu.count", float64(runtime.NumCPU()), nil)
 }
@@ -319,7 +319,7 @@ func (h *Histogram) Record(value float64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.values = append(h.values, value)
-	
+
 	// Keep only last 1000 values
 	if len(h.values) > 1000 {
 		h.values = h.values[len(h.values)-1000:]
@@ -458,7 +458,7 @@ func (r *ResourceMetrics) RecordDiscovery(resourceType string, count int, durati
 		"provider": r.provider,
 		"type":     resourceType,
 	}
-	
+
 	r.collector.Counter("discovery.resources.count", float64(count), labels)
 	r.collector.Histogram("discovery.duration", duration.Seconds(), labels)
 }
@@ -469,7 +469,7 @@ func (r *ResourceMetrics) RecordDrift(resourceType string, driftCount int, durat
 		"provider": r.provider,
 		"type":     resourceType,
 	}
-	
+
 	r.collector.Counter("drift.detected.count", float64(driftCount), labels)
 	r.collector.Histogram("drift.detection.duration", duration.Seconds(), labels)
 }
@@ -481,7 +481,7 @@ func (r *ResourceMetrics) RecordRemediation(resourceType string, success bool, d
 		"type":     resourceType,
 		"success":  fmt.Sprintf("%t", success),
 	}
-	
+
 	r.collector.Counter("remediation.attempts", 1, labels)
 	r.collector.Histogram("remediation.duration", duration.Seconds(), labels)
 }
@@ -493,10 +493,10 @@ func (r *ResourceMetrics) RecordAPICall(operation string, success bool, duration
 		"operation": operation,
 		"success":   fmt.Sprintf("%t", success),
 	}
-	
+
 	r.collector.Counter("api.calls", 1, labels)
 	r.collector.Histogram("api.duration", duration.Seconds(), labels)
-	
+
 	if !success {
 		r.collector.Counter("api.errors", 1, labels)
 	}
@@ -513,17 +513,17 @@ type RateLimitMetrics struct {
 // RecordRequest records a rate limit request
 func (r *RateLimitMetrics) RecordRequest(allowed bool, throttled bool) {
 	atomic.AddInt64(&r.requests, 1)
-	
+
 	if allowed {
 		atomic.AddInt64(&r.allowed, 1)
 	} else {
 		atomic.AddInt64(&r.rejected, 1)
 	}
-	
+
 	if throttled {
 		atomic.AddInt64(&r.throttled, 1)
 	}
-	
+
 	// Export metrics
 	Counter("ratelimit.requests", 1, nil)
 	if allowed {

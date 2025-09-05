@@ -97,7 +97,7 @@ func validateAllProviders(ctx context.Context, outputFile string) error {
 		// Resource count validator not implemented - skipping for now
 		fmt.Printf("[SKIP] Validation skipped for %s - validator not implemented\n", provider)
 		continue
-		
+
 		// Original code disabled - validator not implemented
 	}
 
@@ -122,7 +122,7 @@ func validateSingleProvider(ctx context.Context, provider, region, outputFile st
 	// Validator not implemented - return early
 	fmt.Printf("[SKIP] Validation skipped for %s - validator not implemented\n", provider)
 	return nil
-	
+
 	// Original code disabled:
 	// validator := discovery.NewResourceCountValidator(provider)
 	// var regions []string

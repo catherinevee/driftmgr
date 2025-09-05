@@ -51,7 +51,7 @@ func main() {
 	}
 
 	fmt.Println("✅ All quality gates passed")
-	
+
 	// Check summary metrics if available
 	if summary, ok := report["summary"].(map[string]interface{}); ok {
 		if score, ok := summary["quality_score"].(float64); ok {

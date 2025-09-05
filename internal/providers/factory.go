@@ -67,23 +67,23 @@ func NewAzureProviderComplete(subscriptionID, resourceGroup, tenantID, clientID,
 	if region == "" {
 		region = "eastus"
 	}
-	
+
 	// Create provider with available constructor
 	provider := azure.NewAzureProviderComplete(subscriptionID, resourceGroup)
-	
+
 	// Set auth credentials through environment or other means
 	// The provider will pick up credentials from environment variables during Initialize
 	os.Setenv("AZURE_TENANT_ID", tenantID)
 	os.Setenv("AZURE_CLIENT_ID", clientID)
 	os.Setenv("AZURE_CLIENT_SECRET", clientSecret)
-	
+
 	// Initialize authentication
 	ctx := context.Background()
 	if err := provider.Connect(ctx); err != nil {
 		// Log error but don't fail - authentication will be retried on first use
 		fmt.Printf("Warning: Azure authentication failed during initialization: %v\n", err)
 	}
-	
+
 	return provider
 }
 
@@ -96,31 +96,31 @@ func NewGCPProviderComplete(projectID, region, credentialsPath string) *gcp.GCPP
 			projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
 		}
 	}
-	
+
 	// Auto-detect credentials path if not provided
 	if credentialsPath == "" {
 		credentialsPath = os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
 	}
-	
+
 	if region == "" {
 		region = "us-central1"
 	}
-	
+
 	// Set credentials path in environment for provider to pick up
 	if credentialsPath != "" {
 		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credentialsPath)
 	}
-	
+
 	// Create provider with available constructor
 	provider := gcp.NewGCPProviderComplete(projectID)
-	
+
 	// Initialize authentication
 	ctx := context.Background()
 	if err := provider.Connect(ctx); err != nil {
 		// Log error but don't fail - authentication will be retried on first use
 		fmt.Printf("Warning: GCP authentication failed during initialization: %v\n", err)
 	}
-	
+
 	return provider
 }
 
@@ -149,7 +149,7 @@ func (pf *ProviderFactory) CreateProvider(providerName string) (CloudProvider, e
 			return nil, fmt.Errorf("failed to initialize AWS provider: %w", err)
 		}
 		return provider, nil
-		
+
 	case "azure", "azurerm":
 		subscriptionID := ""
 		resourceGroup := ""
@@ -157,7 +157,7 @@ func (pf *ProviderFactory) CreateProvider(providerName string) (CloudProvider, e
 		clientID := ""
 		clientSecret := ""
 		region := ""
-		
+
 		if s, ok := pf.config["azure_subscription_id"].(string); ok {
 			subscriptionID = s
 		}
@@ -176,14 +176,14 @@ func (pf *ProviderFactory) CreateProvider(providerName string) (CloudProvider, e
 		if r, ok := pf.config["azure_region"].(string); ok {
 			region = r
 		}
-		
+
 		return NewAzureProviderComplete(subscriptionID, resourceGroup, tenantID, clientID, clientSecret, region), nil
-		
+
 	case "gcp", "google":
 		projectID := ""
 		region := ""
 		credentialsPath := ""
-		
+
 		if p, ok := pf.config["gcp_project"].(string); ok {
 			projectID = p
 		}
@@ -193,9 +193,9 @@ func (pf *ProviderFactory) CreateProvider(providerName string) (CloudProvider, e
 		if c, ok := pf.config["gcp_credentials"].(string); ok {
 			credentialsPath = c
 		}
-		
+
 		return NewGCPProviderComplete(projectID, region, credentialsPath), nil
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", providerName)
 	}
@@ -204,26 +204,26 @@ func (pf *ProviderFactory) CreateProvider(providerName string) (CloudProvider, e
 // DetectProviders detects available cloud providers based on environment and credentials
 func DetectProviders() []string {
 	var providers []string
-	
+
 	// Check for AWS credentials
 	if os.Getenv("AWS_ACCESS_KEY_ID") != "" || os.Getenv("AWS_PROFILE") != "" {
 		providers = append(providers, "aws")
 	} else if _, err := os.Stat(os.ExpandEnv("$HOME/.aws/credentials")); err == nil {
 		providers = append(providers, "aws")
 	}
-	
+
 	// Check for Azure credentials
 	if os.Getenv("AZURE_CLIENT_ID") != "" && os.Getenv("AZURE_CLIENT_SECRET") != "" {
 		providers = append(providers, "azure")
 	}
-	
+
 	// Check for GCP credentials
 	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
 		providers = append(providers, "gcp")
 	} else if os.Getenv("GCP_PROJECT") != "" || os.Getenv("GOOGLE_CLOUD_PROJECT") != "" {
 		providers = append(providers, "gcp")
 	}
-	
+
 	return providers
 }
 
@@ -238,7 +238,7 @@ func ValidateProviderCredentials(providerName string) error {
 			}
 		}
 		return nil
-		
+
 	case "azure", "azurerm":
 		// Check for Azure credentials
 		if os.Getenv("AZURE_CLIENT_ID") == "" || os.Getenv("AZURE_CLIENT_SECRET") == "" {
@@ -251,7 +251,7 @@ func ValidateProviderCredentials(providerName string) error {
 			return fmt.Errorf("Azure subscription ID not found. Set AZURE_SUBSCRIPTION_ID")
 		}
 		return nil
-		
+
 	case "gcp", "google":
 		// Check for GCP credentials
 		if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") == "" {
@@ -260,7 +260,7 @@ func ValidateProviderCredentials(providerName string) error {
 			}
 		}
 		return nil
-		
+
 	default:
 		return fmt.Errorf("unsupported provider: %s", providerName)
 	}

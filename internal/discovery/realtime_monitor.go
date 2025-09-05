@@ -26,27 +26,27 @@ type RealTimeMonitor struct {
 
 // MonitoringMetrics tracks real-time metrics
 type MonitoringMetrics struct {
-	ResourcesDiscovered   int64
-	ResourcesPerSecond    float64
-	ErrorCount            int64
-	WarningCount          int64
-	LastUpdateTime        time.Time
-	AverageDiscoveryTime  time.Duration
-	ActiveProviders       map[string]bool
-	ActiveRegions         map[string]bool
-	DiscoveryRate         map[string]float64 // provider -> rate
-	ErrorRate             float64
-	SuccessRate           float64
+	ResourcesDiscovered  int64
+	ResourcesPerSecond   float64
+	ErrorCount           int64
+	WarningCount         int64
+	LastUpdateTime       time.Time
+	AverageDiscoveryTime time.Duration
+	ActiveProviders      map[string]bool
+	ActiveRegions        map[string]bool
+	DiscoveryRate        map[string]float64 // provider -> rate
+	ErrorRate            float64
+	SuccessRate          float64
 }
 
 // Alert represents a monitoring alert
 type Alert struct {
-	ID          string
-	Type        AlertType
-	Severity    AlertSeverity
-	Message     string
-	Details     map[string]interface{}
-	Timestamp   time.Time
+	ID           string
+	Type         AlertType
+	Severity     AlertSeverity
+	Message      string
+	Details      map[string]interface{}
+	Timestamp    time.Time
 	Acknowledged bool
 }
 
@@ -54,10 +54,10 @@ type Alert struct {
 type AlertType string
 
 const (
-	AlertTypeError        AlertType = "error"
-	AlertTypeWarning      AlertType = "warning"
-	AlertTypeInfo         AlertType = "info"
-	AlertTypeRateLimit    AlertType = "rate_limit"
+	AlertTypeError         AlertType = "error"
+	AlertTypeWarning       AlertType = "warning"
+	AlertTypeInfo          AlertType = "info"
+	AlertTypeRateLimit     AlertType = "rate_limit"
 	AlertTypeQuotaExceeded AlertType = "quota_exceeded"
 	AlertTypeSlowDiscovery AlertType = "slow_discovery"
 )
@@ -74,11 +74,11 @@ const (
 
 // WebhookConfig defines webhook configuration
 type WebhookConfig struct {
-	URL         string
-	Events      []string
-	Headers     map[string]string
-	RetryCount  int
-	Timeout     time.Duration
+	URL        string
+	Events     []string
+	Headers    map[string]string
+	RetryCount int
+	Timeout    time.Duration
 }
 
 // Event represents a monitoring event
@@ -203,7 +203,7 @@ func (rtm *RealTimeMonitor) UnsubscribeFromStream(clientID string) {
 func (rtm *RealTimeMonitor) GetMetrics() *MonitoringMetrics {
 	rtm.mu.RLock()
 	defer rtm.mu.RUnlock()
-	
+
 	// Create a copy to avoid race conditions
 	metricsCopy := &MonitoringMetrics{
 		ResourcesDiscovered:  rtm.metrics.ResourcesDiscovered,
@@ -218,19 +218,19 @@ func (rtm *RealTimeMonitor) GetMetrics() *MonitoringMetrics {
 		ActiveRegions:        make(map[string]bool),
 		DiscoveryRate:        make(map[string]float64),
 	}
-	
+
 	for k, v := range rtm.metrics.ActiveProviders {
 		metricsCopy.ActiveProviders[k] = v
 	}
-	
+
 	for k, v := range rtm.metrics.ActiveRegions {
 		metricsCopy.ActiveRegions[k] = v
 	}
-	
+
 	for k, v := range rtm.metrics.DiscoveryRate {
 		metricsCopy.DiscoveryRate[k] = v
 	}
-	
+
 	return metricsCopy
 }
 
@@ -274,12 +274,12 @@ func (rtm *RealTimeMonitor) CreateAlert(alertType AlertType, severity AlertSever
 	defer rtm.mu.Unlock()
 
 	alert := Alert{
-		ID:          fmt.Sprintf("alert-%d", time.Now().UnixNano()),
-		Type:        alertType,
-		Severity:    severity,
-		Message:     message,
-		Details:     details,
-		Timestamp:   time.Now(),
+		ID:           fmt.Sprintf("alert-%d", time.Now().UnixNano()),
+		Type:         alertType,
+		Severity:     severity,
+		Message:      message,
+		Details:      details,
+		Timestamp:    time.Now(),
 		Acknowledged: false,
 	}
 
@@ -304,10 +304,10 @@ func (rtm *RealTimeMonitor) GetDashboardData() map[string]interface{} {
 	return map[string]interface{}{
 		"metrics": rtm.metrics,
 		"alerts": map[string]interface{}{
-			"total":         len(rtm.alerts),
+			"total":          len(rtm.alerts),
 			"unacknowledged": rtm.countUnacknowledgedAlerts(),
-			"critical":      rtm.countAlertsBySeverity(AlertSeverityCritical),
-			"high":          rtm.countAlertsBySeverity(AlertSeverityHigh),
+			"critical":       rtm.countAlertsBySeverity(AlertSeverityCritical),
+			"high":           rtm.countAlertsBySeverity(AlertSeverityHigh),
 		},
 		"active_providers": len(rtm.metrics.ActiveProviders),
 		"active_regions":   len(rtm.metrics.ActiveRegions),
@@ -395,27 +395,27 @@ func (rtm *RealTimeMonitor) collectMetrics(ctx context.Context) {
 			return
 		case <-ticker.C:
 			rtm.mu.Lock()
-			
+
 			// Calculate resources per second
 			currentTime := time.Now()
 			timeDiff := currentTime.Sub(lastTime).Seconds()
 			resourceDiff := rtm.metrics.ResourcesDiscovered - lastResourceCount
-			
+
 			if timeDiff > 0 {
 				rtm.metrics.ResourcesPerSecond = float64(resourceDiff) / timeDiff
 			}
-			
+
 			// Calculate success rate
 			total := rtm.metrics.ResourcesDiscovered + rtm.metrics.ErrorCount
 			if total > 0 {
 				rtm.metrics.SuccessRate = float64(rtm.metrics.ResourcesDiscovered) / float64(total)
 				rtm.metrics.ErrorRate = float64(rtm.metrics.ErrorCount) / float64(total)
 			}
-			
+
 			rtm.metrics.LastUpdateTime = currentTime
 			lastResourceCount = rtm.metrics.ResourcesDiscovered
 			lastTime = currentTime
-			
+
 			rtm.mu.Unlock()
 		}
 	}
@@ -443,7 +443,7 @@ func (rtm *RealTimeMonitor) checkAlertConditions() {
 
 	// Check for slow discovery
 	if rtm.metrics.ResourcesPerSecond < 1.0 && rtm.metrics.ResourcesPerSecond > 0 {
-		rtm.CreateAlert(AlertTypeSlowDiscovery, AlertSeverityLow, 
+		rtm.CreateAlert(AlertTypeSlowDiscovery, AlertSeverityLow,
 			fmt.Sprintf("Discovery rate is slow: %.2f resources/sec", rtm.metrics.ResourcesPerSecond),
 			map[string]interface{}{"rate": rtm.metrics.ResourcesPerSecond})
 	}

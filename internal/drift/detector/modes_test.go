@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/catherinevee/driftmgr/internal/drift/comparator"
+	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -51,24 +51,24 @@ func TestQuickModeDetection(t *testing.T) {
 	detector := NewModeDetector(QuickMode, nil)
 
 	stateResource := &models.Resource{
-		ID:   "test-resource-1",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource-1",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"instance_type": "t2.micro",
-			"ami": "ami-12345",
+			"ami":           "ami-12345",
 		},
 	}
 
 	cloudResource := &models.Resource{
-		ID:   "test-resource-1",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource-1",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"instance_type": "t2.small", // Different but should be ignored in quick mode
-			"ami": "ami-12345",
+			"ami":           "ami-12345",
 		},
 	}
 
@@ -86,30 +86,30 @@ func TestDeepModeDetection(t *testing.T) {
 	detector := NewModeDetector(DeepMode, nil)
 
 	stateResource := &models.Resource{
-		ID:   "test-resource-1",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource-1",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"instance_type": "t2.micro",
-			"ami": "ami-12345",
+			"ami":           "ami-12345",
 			"tags": map[string]interface{}{
-				"Name": "test",
+				"Name":        "test",
 				"Environment": "dev",
 			},
 		},
 	}
 
 	cloudResource := &models.Resource{
-		ID:   "test-resource-1",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource-1",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"instance_type": "t2.small", // Different
-			"ami": "ami-12345",
+			"ami":           "ami-12345",
 			"tags": map[string]interface{}{
-				"Name": "test",
+				"Name":        "test",
 				"Environment": "dev",
 			},
 		},
@@ -122,16 +122,16 @@ func TestDeepModeDetection(t *testing.T) {
 
 func TestSmartModeDetection(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Create criticality config
 	criticalityConfig := &ResourceCriticalityConfig{
 		ResourceTypes: map[string]ResourceCriticality{
 			"aws_instance": {
-				Level: CriticalityHigh,
+				Level:              CriticalityHigh,
 				CriticalAttributes: []string{"instance_type", "ami"},
 			},
 			"aws_s3_bucket": {
-				Level: CriticalityCritical,
+				Level:              CriticalityCritical,
 				CriticalAttributes: []string{"bucket", "acl", "versioning"},
 			},
 		},
@@ -141,24 +141,24 @@ func TestSmartModeDetection(t *testing.T) {
 
 	// Test high criticality resource
 	criticalResource := &models.Resource{
-		ID:   "critical-resource",
-		Type: "aws_s3_bucket",
-		Name: "critical-bucket",
+		ID:       "critical-resource",
+		Type:     "aws_s3_bucket",
+		Name:     "critical-bucket",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"bucket": "my-bucket",
-			"acl": "private",
+			"acl":    "private",
 		},
 	}
 
 	cloudResource := &models.Resource{
-		ID:   "critical-resource",
-		Type: "aws_s3_bucket",
-		Name: "critical-bucket",
+		ID:       "critical-resource",
+		Type:     "aws_s3_bucket",
+		Name:     "critical-bucket",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"bucket": "my-bucket",
-			"acl": "public-read", // Critical attribute changed
+			"acl":    "public-read", // Critical attribute changed
 		},
 	}
 
@@ -168,24 +168,24 @@ func TestSmartModeDetection(t *testing.T) {
 
 	// Test low criticality resource
 	lowCriticalityResource := &models.Resource{
-		ID:   "low-resource",
-		Type: "aws_route53_record",
-		Name: "dns-record",
+		ID:       "low-resource",
+		Type:     "aws_route53_record",
+		Name:     "dns-record",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"name": "example.com",
-			"ttl": 300,
+			"ttl":  300,
 		},
 	}
 
 	cloudResourceLow := &models.Resource{
-		ID:   "low-resource",
-		Type: "aws_route53_record",
-		Name: "dns-record",
+		ID:       "low-resource",
+		Type:     "aws_route53_record",
+		Name:     "dns-record",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"name": "example.com",
-			"ttl": 600, // Different but low criticality
+			"ttl":  600, // Different but low criticality
 		},
 	}
 
@@ -196,28 +196,28 @@ func TestSmartModeDetection(t *testing.T) {
 
 func TestGetRecommendedMode(t *testing.T) {
 	tests := []struct {
-		name             string
-		resourceCount    int
+		name              string
+		resourceCount     int
 		criticalResources int
-		expectedMode     DetectionMode
+		expectedMode      DetectionMode
 	}{
 		{
-			name:             "Small infrastructure",
-			resourceCount:    50,
+			name:              "Small infrastructure",
+			resourceCount:     50,
 			criticalResources: 5,
-			expectedMode:     DeepMode,
+			expectedMode:      DeepMode,
 		},
 		{
-			name:             "Large infrastructure with few critical",
-			resourceCount:    1000,
+			name:              "Large infrastructure with few critical",
+			resourceCount:     1000,
 			criticalResources: 10,
-			expectedMode:     SmartMode,
+			expectedMode:      SmartMode,
 		},
 		{
-			name:             "Large infrastructure",
-			resourceCount:    5000,
+			name:              "Large infrastructure",
+			resourceCount:     5000,
 			criticalResources: 100,
-			expectedMode:     QuickMode,
+			expectedMode:      QuickMode,
 		},
 	}
 
@@ -234,41 +234,41 @@ func TestDriftDetectionWithComparator(t *testing.T) {
 	detector := NewModeDetector(DeepMode, nil)
 
 	stateResource := &models.Resource{
-		ID:   "test-resource",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
-			"instance_type": "t2.micro",
-			"ami": "ami-12345",
+			"instance_type":   "t2.micro",
+			"ami":             "ami-12345",
 			"security_groups": []string{"sg-1", "sg-2"},
 			"tags": map[string]interface{}{
-				"Name": "test",
+				"Name":        "test",
 				"Environment": "production",
 			},
 		},
 	}
 
 	cloudResource := &models.Resource{
-		ID:   "test-resource",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
-			"instance_type": "t2.micro",
-			"ami": "ami-12345",
+			"instance_type":   "t2.micro",
+			"ami":             "ami-12345",
 			"security_groups": []string{"sg-2", "sg-1"}, // Order different
 			"tags": map[string]interface{}{
-				"Name": "test",
+				"Name":        "test",
 				"Environment": "production",
-				"Owner": "team", // Additional tag
+				"Owner":       "team", // Additional tag
 			},
 		},
 	}
 
 	// Deep mode should handle complex comparisons
 	hasDrift := detector.DetectDrift(ctx, stateResource, cloudResource)
-	
+
 	// The detector should recognize that security groups order doesn't matter
 	// but the additional tag is drift
 	assert.True(t, hasDrift, "Should detect additional attributes as drift")
@@ -277,18 +277,18 @@ func TestDriftDetectionWithComparator(t *testing.T) {
 func BenchmarkQuickModeDetection(b *testing.B) {
 	ctx := context.Background()
 	detector := NewModeDetector(QuickMode, nil)
-	
+
 	stateResource := &models.Resource{
-		ID:   "test-resource",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 	}
-	
+
 	cloudResource := &models.Resource{
-		ID:   "test-resource",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 	}
 
@@ -301,32 +301,32 @@ func BenchmarkQuickModeDetection(b *testing.B) {
 func BenchmarkDeepModeDetection(b *testing.B) {
 	ctx := context.Background()
 	detector := NewModeDetector(DeepMode, nil)
-	
+
 	stateResource := &models.Resource{
-		ID:   "test-resource",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"instance_type": "t2.micro",
-			"ami": "ami-12345",
+			"ami":           "ami-12345",
 			"tags": map[string]interface{}{
-				"Name": "test",
+				"Name":        "test",
 				"Environment": "dev",
 			},
 		},
 	}
-	
+
 	cloudResource := &models.Resource{
-		ID:   "test-resource",
-		Type: "aws_instance",
-		Name: "test-instance",
+		ID:       "test-resource",
+		Type:     "aws_instance",
+		Name:     "test-instance",
 		Provider: "aws",
 		Attributes: map[string]interface{}{
 			"instance_type": "t2.micro",
-			"ami": "ami-12345",
+			"ami":           "ami-12345",
 			"tags": map[string]interface{}{
-				"Name": "test",
+				"Name":        "test",
 				"Environment": "dev",
 			},
 		},

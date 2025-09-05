@@ -124,7 +124,7 @@ func (c *WebSocketClient) writePump() {
 			if err := c.conn.WriteJSON(message); err != nil {
 				return
 			}
-			
+
 			// Track message sent
 			if c.server.apiServer != nil {
 				c.server.apiServer.IncrementWSMessagesSent()
@@ -430,12 +430,12 @@ func (c *WebSocketClient) handleExecuteCommand(cmd WebSocketCommand, response *W
 		c.send <- *response
 		return
 	}
-	
+
 	jobID, _ := cmd.Params["jobID"].(string)
 	if jobID == "" {
 		jobID = uuid.New().String()
 	}
-	
+
 	// Send initial terminal status
 	statusMsg := WebSocketMessage{
 		Type:      "terminal_status",
@@ -447,7 +447,7 @@ func (c *WebSocketClient) handleExecuteCommand(cmd WebSocketCommand, response *W
 		},
 	}
 	c.send <- statusMsg
-	
+
 	// Stream terminal output (simulated for now)
 	go c.streamTerminalOutput(jobID, commandStr)
 }
@@ -456,7 +456,7 @@ func (c *WebSocketClient) handleExecuteCommand(cmd WebSocketCommand, response *W
 func (c *WebSocketClient) streamTerminalOutput(jobID string, command string) {
 	// In a real implementation, this would execute the command and stream its output
 	// For now, we'll simulate output based on the command
-	
+
 	outputs := []struct {
 		text       string
 		outputType string
@@ -473,10 +473,10 @@ func (c *WebSocketClient) streamTerminalOutput(jobID string, command string) {
 		{"Analyzing resource configurations...", "info", 500 * time.Millisecond},
 		{"Discovery completed successfully", "success", 100 * time.Millisecond},
 	}
-	
+
 	for _, output := range outputs {
 		time.Sleep(output.delay)
-		
+
 		msg := WebSocketMessage{
 			Type:      "terminal_output",
 			ID:        jobID,
@@ -486,14 +486,14 @@ func (c *WebSocketClient) streamTerminalOutput(jobID string, command string) {
 				"output_type": output.outputType,
 			},
 		}
-		
+
 		select {
 		case c.send <- msg:
 		default:
 			return // Client disconnected
 		}
 	}
-	
+
 	// Send completion status
 	time.Sleep(200 * time.Millisecond)
 	statusMsg := WebSocketMessage{

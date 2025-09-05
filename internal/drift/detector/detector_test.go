@@ -127,7 +127,7 @@ func TestDriftDetector_DetectDrift(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name: "missing resource",
+			name:            "missing resource",
 			actualResources: []providers.CloudResource{},
 			desiredState: map[string]interface{}{
 				"resources": []map[string]interface{}{
@@ -408,7 +408,7 @@ func TestDriftDetector_CompareProperties(t *testing.T) {
 func BenchmarkDriftDetector_DetectDrift(b *testing.B) {
 	mockProvider := new(MockProvider)
 	mockProvider.On("GetProviderName").Return("mock")
-	
+
 	resources := make([]providers.CloudResource, 100)
 	for i := 0; i < 100; i++ {
 		resources[i] = providers.CloudResource{
@@ -421,12 +421,12 @@ func BenchmarkDriftDetector_DetectDrift(b *testing.B) {
 			},
 		}
 	}
-	
+
 	mockProvider.On("DiscoverResources", mock.Anything, mock.Anything).Return(resources, nil)
 
 	detector := NewDriftDetector(mockProvider)
 	ctx := context.Background()
-	
+
 	desiredState := map[string]interface{}{
 		"resources": make([]map[string]interface{}, 100),
 	}
@@ -439,7 +439,7 @@ func BenchmarkDriftDetector_DetectDrift(b *testing.B) {
 
 func BenchmarkDriftDetector_CompareProperties(b *testing.B) {
 	detector := &DriftDetector{}
-	
+
 	actual := map[string]interface{}{
 		"instance_type": "t2.micro",
 		"ami":           "ami-12345",
@@ -450,7 +450,7 @@ func BenchmarkDriftDetector_CompareProperties(b *testing.B) {
 		},
 		"security_groups": []string{"sg-1", "sg-2", "sg-3"},
 	}
-	
+
 	desired := map[string]interface{}{
 		"instance_type": "t2.medium",
 		"ami":           "ami-67890",

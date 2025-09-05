@@ -85,13 +85,13 @@ func (p *ProgressIndicator) render() {
 	percent := float64(p.current) / float64(p.total) * 100
 	barWidth := 40
 	filled := int(float64(barWidth) * float64(p.current) / float64(p.total))
-	
+
 	// Build progress bar
 	bar := strings.Builder{}
 	bar.WriteString("\r")
 	bar.WriteString(p.message)
 	bar.WriteString(" [")
-	
+
 	for i := 0; i < barWidth; i++ {
 		if i < filled {
 			bar.WriteString("=")
@@ -101,15 +101,15 @@ func (p *ProgressIndicator) render() {
 			bar.WriteString(" ")
 		}
 	}
-	
+
 	bar.WriteString("] ")
-	
+
 	if p.showPercent {
 		bar.WriteString(fmt.Sprintf("%.1f%% ", percent))
 	}
-	
+
 	bar.WriteString(fmt.Sprintf("(%d/%d)", p.current, p.total))
-	
+
 	if p.showETA && p.current > 0 {
 		elapsed := time.Since(p.startTime)
 		eta := time.Duration(float64(elapsed) / float64(p.current) * float64(p.total-p.current))
@@ -117,22 +117,22 @@ func (p *ProgressIndicator) render() {
 			bar.WriteString(fmt.Sprintf(" ETA: %s", formatDuration(eta)))
 		}
 	}
-	
+
 	// Clear to end of line
 	bar.WriteString("\033[K")
-	
+
 	fmt.Fprint(p.writer, bar.String())
 }
 
 // Spinner provides an animated spinner for indeterminate operations
 type Spinner struct {
-	writer    io.Writer
-	message   string
-	frames    []string
-	current   int
-	active    bool
-	stopChan  chan bool
-	mu        sync.Mutex
+	writer   io.Writer
+	message  string
+	frames   []string
+	current  int
+	active   bool
+	stopChan chan bool
+	mu       sync.Mutex
 }
 
 // NewSpinner creates a new spinner
@@ -177,11 +177,11 @@ func (s *Spinner) Start() {
 func (s *Spinner) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if !s.active {
 		return
 	}
-	
+
 	s.active = false
 	s.stopChan <- true
 	fmt.Fprintf(s.writer, "\r\033[K")
@@ -248,7 +248,7 @@ func NewMultiProgress() *MultiProgress {
 func (m *MultiProgress) AddProgress(total int, message string) *ProgressIndicator {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	p := NewProgressIndicator(total, message)
 	m.indicators = append(m.indicators, p)
 	return p
@@ -258,7 +258,7 @@ func (m *MultiProgress) AddProgress(total int, message string) *ProgressIndicato
 func (m *MultiProgress) AddSpinner(message string) *Spinner {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	s := NewSpinner(message)
 	m.spinners = append(m.spinners, s)
 	return s
@@ -268,11 +268,11 @@ func (m *MultiProgress) AddSpinner(message string) *Spinner {
 func (m *MultiProgress) StopAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	for _, s := range m.spinners {
 		s.Stop()
 	}
-	
+
 	for _, p := range m.indicators {
 		p.Complete()
 	}

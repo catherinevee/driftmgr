@@ -21,21 +21,21 @@ const (
 	DiscoveryFailed         EventType = "discovery.failed"    // Alias for compatibility
 
 	// Drift events
-	EventDriftDetected          EventType = "drift.detected"
-	EventDriftAnalyzed          EventType = "drift.analyzed"
-	EventDriftRemediated        EventType = "drift.remediated"
-	DriftDetectionStarted       EventType = "drift.detection.started"
-	DriftDetectionCompleted     EventType = "drift.detection.completed"
-	DriftDetectionFailed        EventType = "drift.detection.failed"
+	EventDriftDetected      EventType = "drift.detected"
+	EventDriftAnalyzed      EventType = "drift.analyzed"
+	EventDriftRemediated    EventType = "drift.remediated"
+	DriftDetectionStarted   EventType = "drift.detection.started"
+	DriftDetectionCompleted EventType = "drift.detection.completed"
+	DriftDetectionFailed    EventType = "drift.detection.failed"
 
 	// Remediation events
-	EventRemediationStarted     EventType = "remediation.started"
-	EventRemediationProgress    EventType = "remediation.progress"
-	EventRemediationCompleted   EventType = "remediation.completed"
-	EventRemediationFailed      EventType = "remediation.failed"
-	RemediationStarted          EventType = "remediation.started"   // Alias
-	RemediationCompleted        EventType = "remediation.completed" // Alias
-	RemediationFailed           EventType = "remediation.failed"    // Alias
+	EventRemediationStarted   EventType = "remediation.started"
+	EventRemediationProgress  EventType = "remediation.progress"
+	EventRemediationCompleted EventType = "remediation.completed"
+	EventRemediationFailed    EventType = "remediation.failed"
+	RemediationStarted        EventType = "remediation.started"   // Alias
+	RemediationCompleted      EventType = "remediation.completed" // Alias
+	RemediationFailed         EventType = "remediation.failed"    // Alias
 
 	// System events
 	EventSystemStartup  EventType = "system.startup"
@@ -45,23 +45,23 @@ const (
 	EventSystemInfo     EventType = "system.info"
 
 	// State events
-	EventStateChanged    EventType = "state.changed"
-	EventStateBackup     EventType = "state.backup"
-	EventStateRestored   EventType = "state.restored"
-	EventStateLocked     EventType = "state.locked"
-	EventStateUnlocked   EventType = "state.unlocked"
+	EventStateChanged  EventType = "state.changed"
+	EventStateBackup   EventType = "state.backup"
+	EventStateRestored EventType = "state.restored"
+	EventStateLocked   EventType = "state.locked"
+	EventStateUnlocked EventType = "state.unlocked"
 
 	// Job events
-	EventJobQueued       EventType = "job.queued"
-	EventJobStarted      EventType = "job.started"
-	EventJobCompleted    EventType = "job.completed"
-	EventJobFailed       EventType = "job.failed"
-	EventJobCancelled    EventType = "job.cancelled"
-	JobCreated           EventType = "job.created"    // Alias for compatibility
-	JobStarted           EventType = "job.started"    // Alias for compatibility
-	JobCompleted         EventType = "job.completed"  // Alias for compatibility
-	JobFailed            EventType = "job.failed"     // Alias for compatibility
-	
+	EventJobQueued    EventType = "job.queued"
+	EventJobStarted   EventType = "job.started"
+	EventJobCompleted EventType = "job.completed"
+	EventJobFailed    EventType = "job.failed"
+	EventJobCancelled EventType = "job.cancelled"
+	JobCreated        EventType = "job.created"   // Alias for compatibility
+	JobStarted        EventType = "job.started"   // Alias for compatibility
+	JobCompleted      EventType = "job.completed" // Alias for compatibility
+	JobFailed         EventType = "job.failed"    // Alias for compatibility
+
 	// Resource events
 	EventResourceCreated EventType = "resource.created"
 	EventResourceUpdated EventType = "resource.updated"
@@ -69,14 +69,14 @@ const (
 	ResourceCreated      EventType = "resource.created" // Alias for compatibility
 	ResourceUpdated      EventType = "resource.updated" // Alias for compatibility
 	ResourceDeleted      EventType = "resource.deleted" // Alias for compatibility
-	
+
 	// Additional state events
-	EventStateImported   EventType = "state.imported"
-	EventStateAnalyzed   EventType = "state.analyzed"
-	EventStateDeleted    EventType = "state.deleted"
-	StateImported        EventType = "state.imported"  // Alias for compatibility
-	StateAnalyzed        EventType = "state.analyzed"  // Alias for compatibility
-	StateDeleted         EventType = "state.deleted"   // Alias for compatibility
+	EventStateImported EventType = "state.imported"
+	EventStateAnalyzed EventType = "state.analyzed"
+	EventStateDeleted  EventType = "state.deleted"
+	StateImported      EventType = "state.imported" // Alias for compatibility
+	StateAnalyzed      EventType = "state.analyzed" // Alias for compatibility
+	StateDeleted       EventType = "state.deleted"  // Alias for compatibility
 )
 
 // Event represents a system event

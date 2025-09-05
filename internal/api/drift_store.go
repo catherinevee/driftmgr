@@ -47,7 +47,7 @@ func (ds *DriftStore) Get(id string) (*detector.DriftResult, bool) {
 func (ds *DriftStore) List() []*detector.DriftResult {
 	ds.mu.RLock()
 	defer ds.mu.RUnlock()
-	
+
 	results := make([]*detector.DriftResult, 0, len(ds.results))
 	for _, result := range ds.results {
 		results = append(results, result)
@@ -73,16 +73,16 @@ func (ds *DriftStore) Clear() {
 func (ds *DriftStore) CleanupOld(maxAge time.Duration) int {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
-	
+
 	now := time.Now()
 	removed := 0
-	
+
 	for id, result := range ds.results {
 		if result.Timestamp.Before(now.Add(-maxAge)) {
 			delete(ds.results, id)
 			removed++
 		}
 	}
-	
+
 	return removed
 }

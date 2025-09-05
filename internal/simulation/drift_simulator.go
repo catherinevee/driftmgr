@@ -14,14 +14,14 @@ import (
 
 // DriftSimulator creates controlled drift for testing
 type DriftSimulator struct {
-	stateFile    string
-	provider     string
-	driftType    DriftType
+	stateFile      string
+	provider       string
+	driftType      DriftType
 	targetResource string
-	rollbackData  *RollbackData
-	awsSim       *AWSSimulator
-	azureSim     *AzureSimulator
-	gcpSim       *GCPSimulator
+	rollbackData   *RollbackData
+	awsSim         *AWSSimulator
+	azureSim       *AzureSimulator
+	gcpSim         *GCPSimulator
 }
 
 // DriftType represents the type of drift to simulate
@@ -38,16 +38,16 @@ const (
 
 // SimulationResult contains the result of a drift simulation
 type SimulationResult struct {
-	Success        bool                   `json:"success"`
-	DriftType      DriftType              `json:"drift_type"`
-	Provider       string                 `json:"provider"`
-	ResourceType   string                 `json:"resource_type"`
-	ResourceID     string                 `json:"resource_id"`
-	Changes        map[string]interface{} `json:"changes"`
-	RollbackData   *RollbackData          `json:"rollback_data,omitempty"`
-	ErrorMessage   string                 `json:"error,omitempty"`
-	CostEstimate   string                 `json:"cost_estimate"`
-	DetectedDrift  []DriftItem            `json:"detected_drift,omitempty"`
+	Success       bool                   `json:"success"`
+	DriftType     DriftType              `json:"drift_type"`
+	Provider      string                 `json:"provider"`
+	ResourceType  string                 `json:"resource_type"`
+	ResourceID    string                 `json:"resource_id"`
+	Changes       map[string]interface{} `json:"changes"`
+	RollbackData  *RollbackData          `json:"rollback_data,omitempty"`
+	ErrorMessage  string                 `json:"error,omitempty"`
+	CostEstimate  string                 `json:"cost_estimate"`
+	DetectedDrift []DriftItem            `json:"detected_drift,omitempty"`
 }
 
 // DriftItem represents a detected drift
@@ -83,9 +83,9 @@ type SimulatorConfig struct {
 // NewDriftSimulator creates a new drift simulator
 func NewDriftSimulator(config SimulatorConfig) (*DriftSimulator, error) {
 	sim := &DriftSimulator{
-		stateFile:    config.StateFile,
-		provider:     config.Provider,
-		driftType:    config.DriftType,
+		stateFile:      config.StateFile,
+		provider:       config.Provider,
+		driftType:      config.DriftType,
 		targetResource: config.TargetResource,
 	}
 
@@ -289,7 +289,7 @@ func (s *DriftSimulator) selectRandomDriftType() DriftType {
 		DriftTypeResourceCreation,
 		DriftTypeAttributeChange,
 	}
-	
+
 	rand.Seed(time.Now().UnixNano())
 	return types[rand.Intn(len(types))]
 }
@@ -316,14 +316,14 @@ func (s *DriftSimulator) GenerateReport(result *SimulationResult, drifts []Drift
 			report.WriteString(fmt.Sprintf("\n  Resource: %s\n", drift.ResourceID))
 			report.WriteString(fmt.Sprintf("  Type: %s\n", drift.DriftType))
 			report.WriteString(fmt.Sprintf("  Impact: %s\n", drift.Impact))
-			
+
 			if len(drift.Before) > 0 {
 				report.WriteString("  Before:\n")
 				for k, v := range drift.Before {
 					report.WriteString(fmt.Sprintf("    %s: %v\n", k, v))
 				}
 			}
-			
+
 			if len(drift.After) > 0 {
 				report.WriteString("  After:\n")
 				for k, v := range drift.After {

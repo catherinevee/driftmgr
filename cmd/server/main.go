@@ -103,25 +103,25 @@ func setupRoutes(server *api.Server) {
 	// Discovery endpoints
 	server.RegisterRoute("POST", v1+"/discover", server.HandleDiscovery)
 	server.RegisterRoute("GET", v1+"/discover/:id", server.HandleDiscoveryStatus)
-	
+
 	// Drift detection endpoints
 	server.RegisterRoute("POST", v1+"/drift/detect", server.HandleDriftDetection)
 	server.RegisterRoute("GET", v1+"/drift/:id", server.HandleDriftResults)
-	
-	// State management endpoints  
+
+	// State management endpoints
 	server.RegisterRoute("GET", v1+"/state", server.HandleListStates)
 	server.RegisterRoute("POST", v1+"/state/analyze", server.HandleStateAnalysis)
 	server.RegisterRoute("POST", v1+"/state/push", server.HandleStatePush)
 	server.RegisterRoute("POST", v1+"/state/pull", server.HandleStatePull)
-	
+
 	// Remediation endpoints
 	server.RegisterRoute("POST", v1+"/remediate", server.HandleRemediation)
 	server.RegisterRoute("GET", v1+"/remediate/:id", server.HandleRemediationStatus)
-	
+
 	// Resource endpoints
 	server.RegisterRoute("GET", v1+"/resources", server.HandleListResources)
 	server.RegisterRoute("GET", v1+"/resources/:id", server.HandleGetResource)
-	
+
 	// Metrics endpoint
 	server.RegisterRoute("GET", "/metrics", server.HandleMetrics)
 

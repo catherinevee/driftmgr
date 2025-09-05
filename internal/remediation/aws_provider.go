@@ -18,19 +18,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	// ddbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/apigateway"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
+	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elbTypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	"github.com/aws/aws-sdk-go-v2/service/ecr"
-	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdsTypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
@@ -39,18 +44,13 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretsmanagertypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	"github.com/aws/aws-sdk-go-v2/service/shield"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"github.com/aws/aws-sdk-go-v2/service/shield"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2/types"
-	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
-	"github.com/aws/aws-sdk-go-v2/service/apigateway"
-	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
-	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
-	elbTypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	// "github.com/aws/smithy-go"
 	"github.com/catherinevee/driftmgr/pkg/models"
 )
@@ -80,7 +80,7 @@ func NewAWSProviderWithContext(ctx context.Context) (*AWSProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AWS account ID: %w", err)
 	}
-	
+
 	// Get all available regions dynamically
 	ec2Client := ec2.NewFromConfig(cfg)
 	regionsResp, err := ec2Client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{})
@@ -128,7 +128,7 @@ func getDefaultAWSRegions() []string {
 	if regionsEnv := os.Getenv("AWS_REGIONS"); regionsEnv != "" {
 		return strings.Split(regionsEnv, ",")
 	}
-	
+
 	// Return comprehensive list of AWS regions
 	return []string{
 		"us-east-1",      // N. Virginia
@@ -858,8 +858,8 @@ func (ap *AWSProvider) discoverRoute53Resources(ctx context.Context, accountID s
 			State:    "active",
 			Created:  time.Now(), // Route53 doesn't provide creation time
 			Metadata: map[string]string{
-				"private_zone":    fmt.Sprintf("%v", zone.Config != nil && zone.Config.PrivateZone),
-				"resource_count":  fmt.Sprintf("%d", aws.ToInt64(zone.ResourceRecordSetCount)),
+				"private_zone":   fmt.Sprintf("%v", zone.Config != nil && zone.Config.PrivateZone),
+				"resource_count": fmt.Sprintf("%d", aws.ToInt64(zone.ResourceRecordSetCount)),
 			},
 		})
 
@@ -913,11 +913,11 @@ func (ap *AWSProvider) discoverRoute53Resources(ctx context.Context, accountID s
 					State:    "active",
 					Created:  time.Now(),
 					Metadata: map[string]string{
-						"type":               string(healthCheck.HealthCheckConfig.Type),
-						"resource_path":      aws.ToString(healthCheck.HealthCheckConfig.ResourcePath),
-						"port":               fmt.Sprintf("%d", aws.ToInt32(healthCheck.HealthCheckConfig.Port)),
-						"failure_threshold":  fmt.Sprintf("%d", aws.ToInt32(healthCheck.HealthCheckConfig.FailureThreshold)),
-						"request_interval":   fmt.Sprintf("%d", aws.ToInt32(healthCheck.HealthCheckConfig.RequestInterval)),
+						"type":              string(healthCheck.HealthCheckConfig.Type),
+						"resource_path":     aws.ToString(healthCheck.HealthCheckConfig.ResourcePath),
+						"port":              fmt.Sprintf("%d", aws.ToInt32(healthCheck.HealthCheckConfig.Port)),
+						"failure_threshold": fmt.Sprintf("%d", aws.ToInt32(healthCheck.HealthCheckConfig.FailureThreshold)),
+						"request_interval":  fmt.Sprintf("%d", aws.ToInt32(healthCheck.HealthCheckConfig.RequestInterval)),
 					},
 				})
 			}
@@ -1615,16 +1615,16 @@ func (ap *AWSProvider) discoverShieldResources(ctx context.Context, accountID st
 			State:    "active",
 			Created:  *subscription.Subscription.StartTime,
 			Metadata: map[string]string{
-				"auto_renew":     string(subscription.Subscription.AutoRenew),
+				"auto_renew":      string(subscription.Subscription.AutoRenew),
 				"time_commitment": fmt.Sprintf("%d", subscription.Subscription.TimeCommitmentInSeconds),
-				"limits":         fmt.Sprintf("%v", subscription.Subscription.Limits),
+				"limits":          fmt.Sprintf("%v", subscription.Subscription.Limits),
 			},
 		})
 	}
 
 	// List all Shield protections
 	paginator := shield.NewListProtectionsPaginator(client, &shield.ListProtectionsInput{})
-	
+
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -1637,14 +1637,14 @@ func (ap *AWSProvider) discoverShieldResources(ctx context.Context, accountID st
 			protectionDetail, err := client.DescribeProtection(ctx, &shield.DescribeProtectionInput{
 				ProtectionId: protection.Id,
 			})
-			
+
 			var resourceArn, protectionName string
 			var applicationLayerConfig map[string]interface{}
-			
+
 			if err == nil && protectionDetail.Protection != nil {
 				resourceArn = *protectionDetail.Protection.ResourceArn
 				protectionName = *protectionDetail.Protection.Name
-				
+
 				// Extract application layer automatic response configuration if present
 				if protectionDetail.Protection.ApplicationLayerAutomaticResponseConfiguration != nil {
 					applicationLayerConfig = map[string]interface{}{
@@ -1670,10 +1670,10 @@ func (ap *AWSProvider) discoverShieldResources(ctx context.Context, accountID st
 				State:    "active",
 				Created:  time.Now(),
 				Metadata: map[string]string{
-					"resource_arn":               resourceArn,
-					"protection_arn":             aws.ToString(protection.ProtectionArn),
-					"health_check_ids":           fmt.Sprintf("%v", protection.HealthCheckIds),
-					"application_layer_config":   fmt.Sprintf("%v", applicationLayerConfig),
+					"resource_arn":             resourceArn,
+					"protection_arn":           aws.ToString(protection.ProtectionArn),
+					"health_check_ids":         fmt.Sprintf("%v", protection.HealthCheckIds),
+					"application_layer_config": fmt.Sprintf("%v", applicationLayerConfig),
 				},
 			})
 		}
@@ -1681,7 +1681,7 @@ func (ap *AWSProvider) discoverShieldResources(ctx context.Context, accountID st
 
 	// List Shield protection groups
 	groupsPaginator := shield.NewListProtectionGroupsPaginator(client, &shield.ListProtectionGroupsInput{})
-	
+
 	for groupsPaginator.HasMorePages() {
 		page, err := groupsPaginator.NextPage(ctx)
 		if err != nil {
@@ -1699,10 +1699,10 @@ func (ap *AWSProvider) discoverShieldResources(ctx context.Context, accountID st
 				State:    "active",
 				Created:  time.Now(),
 				Metadata: map[string]string{
-					"aggregation":     string(group.Aggregation),
-					"pattern":         string(group.Pattern),
-					"resource_type":   string(group.ResourceType),
-					"members":         fmt.Sprintf("%v", group.Members),
+					"aggregation":   string(group.Aggregation),
+					"pattern":       string(group.Pattern),
+					"resource_type": string(group.ResourceType),
+					"members":       fmt.Sprintf("%v", group.Members),
 				},
 			})
 		}
@@ -1712,7 +1712,7 @@ func (ap *AWSProvider) discoverShieldResources(ctx context.Context, accountID st
 	attacks, err := client.ListAttacks(ctx, &shield.ListAttacksInput{
 		// Note: TimeRange parameters may need adjustment based on SDK version
 	})
-	
+
 	if err == nil && attacks.AttackSummaries != nil {
 		for _, attack := range attacks.AttackSummaries {
 			resources = append(resources, models.Resource{
@@ -1724,9 +1724,9 @@ func (ap *AWSProvider) discoverShieldResources(ctx context.Context, accountID st
 				State:    "historical",
 				Created:  *attack.StartTime,
 				Metadata: map[string]string{
-					"resource_arn":    aws.ToString(attack.ResourceArn),
-					"end_time":        fmt.Sprintf("%v", attack.EndTime),
-					"attack_vectors":  fmt.Sprintf("%v", attack.AttackVectors),
+					"resource_arn":   aws.ToString(attack.ResourceArn),
+					"end_time":       fmt.Sprintf("%v", attack.EndTime),
+					"attack_vectors": fmt.Sprintf("%v", attack.AttackVectors),
 				},
 			})
 		}
@@ -1779,11 +1779,11 @@ func (ap *AWSProvider) discoverCloudFrontResources(ctx context.Context, accountI
 					}
 					if origin.CustomOriginConfig != nil {
 						originData["custom_origin_config"] = map[string]interface{}{
-							"http_port":               aws.ToInt32(origin.CustomOriginConfig.HTTPPort),
-							"https_port":              aws.ToInt32(origin.CustomOriginConfig.HTTPSPort),
-							"origin_protocol_policy":  string(origin.CustomOriginConfig.OriginProtocolPolicy),
-							"origin_ssl_protocols":    origin.CustomOriginConfig.OriginSslProtocols.Items,
-							"origin_read_timeout":     aws.ToInt32(origin.CustomOriginConfig.OriginReadTimeout),
+							"http_port":                aws.ToInt32(origin.CustomOriginConfig.HTTPPort),
+							"https_port":               aws.ToInt32(origin.CustomOriginConfig.HTTPSPort),
+							"origin_protocol_policy":   string(origin.CustomOriginConfig.OriginProtocolPolicy),
+							"origin_ssl_protocols":     origin.CustomOriginConfig.OriginSslProtocols.Items,
+							"origin_read_timeout":      aws.ToInt32(origin.CustomOriginConfig.OriginReadTimeout),
 							"origin_keepalive_timeout": aws.ToInt32(origin.CustomOriginConfig.OriginKeepaliveTimeout),
 						}
 					}
@@ -1818,11 +1818,11 @@ func (ap *AWSProvider) discoverCloudFrontResources(ctx context.Context, accountI
 			if dist.DistributionConfig.CustomErrorResponses != nil && dist.DistributionConfig.CustomErrorResponses.Items != nil {
 				for _, errResp := range dist.DistributionConfig.CustomErrorResponses.Items {
 					errorResponses = append(errorResponses, map[string]interface{}{
-						"error_code":             aws.ToInt32(errResp.ErrorCode),
+						"error_code": aws.ToInt32(errResp.ErrorCode),
 						// ResponseCode might be *string or *int32 depending on SDK version
 						// "response_code":          aws.ToInt32(errResp.ResponseCode),
-						"response_page_path":     aws.ToString(errResp.ResponsePagePath),
-						"error_caching_min_ttl":  aws.ToInt64(errResp.ErrorCachingMinTTL),
+						"response_page_path":    aws.ToString(errResp.ResponsePagePath),
+						"error_caching_min_ttl": aws.ToInt64(errResp.ErrorCachingMinTTL),
 					})
 				}
 			}
@@ -1836,22 +1836,22 @@ func (ap *AWSProvider) discoverCloudFrontResources(ctx context.Context, accountI
 				State:    aws.ToString(dist.Status),
 				Created:  aws.ToTime(dist.LastModifiedTime),
 				Metadata: map[string]string{
-					"arn":                      aws.ToString(dist.ARN),
-					"domain_name":              aws.ToString(dist.DomainName),
-					"enabled":                  fmt.Sprintf("%v", aws.ToBool(dist.DistributionConfig.Enabled)),
-					"http_version":             string(dist.DistributionConfig.HttpVersion),
-					"is_ipv6_enabled":          fmt.Sprintf("%v", aws.ToBool(dist.DistributionConfig.IsIPV6Enabled)),
-					"price_class":              string(dist.DistributionConfig.PriceClass),
-					"comment":                  aws.ToString(dist.DistributionConfig.Comment),
-					"default_root_object":      aws.ToString(dist.DistributionConfig.DefaultRootObject),
-					"web_acl_id":               aws.ToString(dist.DistributionConfig.WebACLId),
-					"origins":                  fmt.Sprintf("%v", origins),
-					"cache_behaviors":          fmt.Sprintf("%v", cacheBehaviors),
-					"custom_error_responses":   fmt.Sprintf("%v", errorResponses),
-					"aliases":                  fmt.Sprintf("%v", dist.DistributionConfig.Aliases.Items),
-					"viewer_certificate":       fmt.Sprintf("%v", dist.DistributionConfig.ViewerCertificate),
-					"geo_restriction":          fmt.Sprintf("%v", dist.DistributionConfig.Restrictions.GeoRestriction),
-					"logging":                  fmt.Sprintf("%v", dist.DistributionConfig.Logging),
+					"arn":                    aws.ToString(dist.ARN),
+					"domain_name":            aws.ToString(dist.DomainName),
+					"enabled":                fmt.Sprintf("%v", aws.ToBool(dist.DistributionConfig.Enabled)),
+					"http_version":           string(dist.DistributionConfig.HttpVersion),
+					"is_ipv6_enabled":        fmt.Sprintf("%v", aws.ToBool(dist.DistributionConfig.IsIPV6Enabled)),
+					"price_class":            string(dist.DistributionConfig.PriceClass),
+					"comment":                aws.ToString(dist.DistributionConfig.Comment),
+					"default_root_object":    aws.ToString(dist.DistributionConfig.DefaultRootObject),
+					"web_acl_id":             aws.ToString(dist.DistributionConfig.WebACLId),
+					"origins":                fmt.Sprintf("%v", origins),
+					"cache_behaviors":        fmt.Sprintf("%v", cacheBehaviors),
+					"custom_error_responses": fmt.Sprintf("%v", errorResponses),
+					"aliases":                fmt.Sprintf("%v", dist.DistributionConfig.Aliases.Items),
+					"viewer_certificate":     fmt.Sprintf("%v", dist.DistributionConfig.ViewerCertificate),
+					"geo_restriction":        fmt.Sprintf("%v", dist.DistributionConfig.Restrictions.GeoRestriction),
+					"logging":                fmt.Sprintf("%v", dist.DistributionConfig.Logging),
 				},
 			})
 		}
@@ -1892,13 +1892,13 @@ func (ap *AWSProvider) discoverCloudFrontResources(ctx context.Context, accountI
 				State:    aws.ToString(item.Status),
 				Created:  aws.ToTime(item.LastModifiedTime),
 				Metadata: map[string]string{
-					"arn":              aws.ToString(item.ARN),
-					"domain_name":      aws.ToString(item.DomainName),
-					"enabled":          fmt.Sprintf("%v", aws.ToBool(item.Enabled)),
-					"comment":          aws.ToString(item.Comment),
-					"price_class":      string(item.PriceClass),
-					"trusted_signers":  fmt.Sprintf("%v", item.TrustedSigners),
-					"aliases":          fmt.Sprintf("%v", item.Aliases.Items),
+					"arn":             aws.ToString(item.ARN),
+					"domain_name":     aws.ToString(item.DomainName),
+					"enabled":         fmt.Sprintf("%v", aws.ToBool(item.Enabled)),
+					"comment":         aws.ToString(item.Comment),
+					"price_class":     string(item.PriceClass),
+					"trusted_signers": fmt.Sprintf("%v", item.TrustedSigners),
+					"aliases":         fmt.Sprintf("%v", item.Aliases.Items),
 				},
 			})
 		}
@@ -1934,8 +1934,8 @@ func (ap *AWSProvider) discoverAPIGatewayResources(ctx context.Context, accountI
 				if err == nil && listDeploymentsResp.Items != nil {
 					for _, deployment := range listDeploymentsResp.Items {
 						deployments = append(deployments, map[string]interface{}{
-							"id":          aws.ToString(deployment.Id),
-							"description": aws.ToString(deployment.Description),
+							"id":           aws.ToString(deployment.Id),
+							"description":  aws.ToString(deployment.Description),
 							"created_date": deployment.CreatedDate,
 						})
 					}
@@ -1950,16 +1950,16 @@ func (ap *AWSProvider) discoverAPIGatewayResources(ctx context.Context, accountI
 				if err == nil && listStagesResp.Item != nil {
 					for _, stage := range listStagesResp.Item {
 						stages = append(stages, map[string]interface{}{
-							"stage_name":        aws.ToString(stage.StageName),
-							"deployment_id":     aws.ToString(stage.DeploymentId),
-							"description":       aws.ToString(stage.Description),
+							"stage_name":            aws.ToString(stage.StageName),
+							"deployment_id":         aws.ToString(stage.DeploymentId),
+							"description":           aws.ToString(stage.Description),
 							"cache_cluster_enabled": stage.CacheClusterEnabled,
 							"cache_cluster_size":    string(stage.CacheClusterSize),
 							// ThrottleSettings might not be available in this SDK version
 							// "throttle_burst_limit": stage.ThrottleSettings.BurstLimit,
 							// "throttle_rate_limit":  stage.ThrottleSettings.RateLimit,
-							"created_date":         stage.CreatedDate,
-							"last_updated_date":    stage.LastUpdatedDate,
+							"created_date":      stage.CreatedDate,
+							"last_updated_date": stage.LastUpdatedDate,
 						})
 					}
 				}
@@ -2032,13 +2032,13 @@ func (ap *AWSProvider) discoverAPIGatewayResources(ctx context.Context, accountI
 				if err == nil && listStagesResp.Items != nil {
 					for _, stage := range listStagesResp.Items {
 						stages = append(stages, map[string]interface{}{
-							"stage_name":         aws.ToString(stage.StageName),
-							"deployment_id":      aws.ToString(stage.DeploymentId),
-							"description":        aws.ToString(stage.Description),
-							"auto_deploy":        aws.ToBool(stage.AutoDeploy),
+							"stage_name":          aws.ToString(stage.StageName),
+							"deployment_id":       aws.ToString(stage.DeploymentId),
+							"description":         aws.ToString(stage.Description),
+							"auto_deploy":         aws.ToBool(stage.AutoDeploy),
 							"api_gateway_managed": aws.ToBool(stage.ApiGatewayManaged),
-							"created_date":       stage.CreatedDate,
-							"last_updated_date":  stage.LastUpdatedDate,
+							"created_date":        stage.CreatedDate,
+							"last_updated_date":   stage.LastUpdatedDate,
 						})
 					}
 				}
@@ -2052,17 +2052,17 @@ func (ap *AWSProvider) discoverAPIGatewayResources(ctx context.Context, accountI
 					State:    "AVAILABLE",
 					Created:  aws.ToTime(api.CreatedDate),
 					Metadata: map[string]string{
-						"api_endpoint":              aws.ToString(api.ApiEndpoint),
-						"api_gateway_managed":       fmt.Sprintf("%v", aws.ToBool(api.ApiGatewayManaged)),
+						"api_endpoint":                 aws.ToString(api.ApiEndpoint),
+						"api_gateway_managed":          fmt.Sprintf("%v", aws.ToBool(api.ApiGatewayManaged)),
 						"api_key_selection_expression": aws.ToString(api.ApiKeySelectionExpression),
-						"cors_configuration":        fmt.Sprintf("%v", api.CorsConfiguration),
-						"description":               aws.ToString(api.Description),
-						"protocol_type":             string(api.ProtocolType),
-						"route_selection_expression": aws.ToString(api.RouteSelectionExpression),
-						"version":                   aws.ToString(api.Version),
-						"deployments":               fmt.Sprintf("%v", deployments),
-						"stages":                    fmt.Sprintf("%v", stages),
-						"tags":                      fmt.Sprintf("%v", api.Tags),
+						"cors_configuration":           fmt.Sprintf("%v", api.CorsConfiguration),
+						"description":                  aws.ToString(api.Description),
+						"protocol_type":                string(api.ProtocolType),
+						"route_selection_expression":   aws.ToString(api.RouteSelectionExpression),
+						"version":                      aws.ToString(api.Version),
+						"deployments":                  fmt.Sprintf("%v", deployments),
+						"stages":                       fmt.Sprintf("%v", stages),
+						"tags":                         fmt.Sprintf("%v", api.Tags),
 					},
 				})
 			}
@@ -2150,17 +2150,17 @@ func (ap *AWSProvider) discoverCognitoResources(ctx context.Context, accountID s
 						if err == nil && describeClientResp.UserPoolClient != nil {
 							clientDetails := describeClientResp.UserPoolClient
 							appClients = append(appClients, map[string]interface{}{
-								"client_id":                          aws.ToString(clientDetails.ClientId),
-								"client_name":                        aws.ToString(clientDetails.ClientName),
-								"refresh_token_validity":             clientDetails.RefreshTokenValidity,
-								"access_token_validity":              aws.ToInt32(clientDetails.AccessTokenValidity),
-								"id_token_validity":                  aws.ToInt32(clientDetails.IdTokenValidity),
-								"allowed_oauth_flows":                clientDetails.AllowedOAuthFlows,
-								"allowed_oauth_scopes":               clientDetails.AllowedOAuthScopes,
+								"client_id":                            aws.ToString(clientDetails.ClientId),
+								"client_name":                          aws.ToString(clientDetails.ClientName),
+								"refresh_token_validity":               clientDetails.RefreshTokenValidity,
+								"access_token_validity":                aws.ToInt32(clientDetails.AccessTokenValidity),
+								"id_token_validity":                    aws.ToInt32(clientDetails.IdTokenValidity),
+								"allowed_oauth_flows":                  clientDetails.AllowedOAuthFlows,
+								"allowed_oauth_scopes":                 clientDetails.AllowedOAuthScopes,
 								"allowed_oauth_flows_user_pool_client": aws.ToBool(clientDetails.AllowedOAuthFlowsUserPoolClient),
-								"callback_urls":                      clientDetails.CallbackURLs,
-								"logout_urls":                        clientDetails.LogoutURLs,
-								"supported_identity_providers":       clientDetails.SupportedIdentityProviders,
+								"callback_urls":                        clientDetails.CallbackURLs,
+								"logout_urls":                          clientDetails.LogoutURLs,
+								"supported_identity_providers":         clientDetails.SupportedIdentityProviders,
 							})
 						}
 					}
@@ -2203,24 +2203,24 @@ func (ap *AWSProvider) discoverCognitoResources(ctx context.Context, accountID s
 					State:    string(userPool.Status),
 					Created:  aws.ToTime(userPool.CreationDate),
 					Metadata: map[string]string{
-						"arn":                          aws.ToString(userPool.Arn),
-						"domain":                       aws.ToString(userPool.Domain),
-						"custom_domain":                aws.ToString(userPool.CustomDomain),
-						"estimated_number_of_users":    fmt.Sprintf("%d", userPool.EstimatedNumberOfUsers),
-						"mfa_configuration":            string(userPool.MfaConfiguration),
-						"email_configuration":          fmt.Sprintf("%v", userPool.EmailConfiguration),
-						"sms_configuration":            fmt.Sprintf("%v", userPool.SmsConfiguration),
-						"auto_verified_attributes":     fmt.Sprintf("%v", userPool.AutoVerifiedAttributes),
-						"alias_attributes":             fmt.Sprintf("%v", userPool.AliasAttributes),
-						"username_attributes":          fmt.Sprintf("%v", userPool.UsernameAttributes),
-						"account_recovery_setting":     fmt.Sprintf("%v", userPool.AccountRecoverySetting),
-						"password_policy":              fmt.Sprintf("%v", userPool.Policies),
-						"lambda_config":                fmt.Sprintf("%v", userPool.LambdaConfig),
-						"app_clients":                  fmt.Sprintf("%v", appClients),
-						"identity_providers":           fmt.Sprintf("%v", identityProviders),
-						"user_count_estimate":          fmt.Sprintf("%d", userCount),
-						"tags":                         fmt.Sprintf("%v", userPool.UserPoolTags),
-						"last_modified_date":           fmt.Sprintf("%v", userPool.LastModifiedDate),
+						"arn":                       aws.ToString(userPool.Arn),
+						"domain":                    aws.ToString(userPool.Domain),
+						"custom_domain":             aws.ToString(userPool.CustomDomain),
+						"estimated_number_of_users": fmt.Sprintf("%d", userPool.EstimatedNumberOfUsers),
+						"mfa_configuration":         string(userPool.MfaConfiguration),
+						"email_configuration":       fmt.Sprintf("%v", userPool.EmailConfiguration),
+						"sms_configuration":         fmt.Sprintf("%v", userPool.SmsConfiguration),
+						"auto_verified_attributes":  fmt.Sprintf("%v", userPool.AutoVerifiedAttributes),
+						"alias_attributes":          fmt.Sprintf("%v", userPool.AliasAttributes),
+						"username_attributes":       fmt.Sprintf("%v", userPool.UsernameAttributes),
+						"account_recovery_setting":  fmt.Sprintf("%v", userPool.AccountRecoverySetting),
+						"password_policy":           fmt.Sprintf("%v", userPool.Policies),
+						"lambda_config":             fmt.Sprintf("%v", userPool.LambdaConfig),
+						"app_clients":               fmt.Sprintf("%v", appClients),
+						"identity_providers":        fmt.Sprintf("%v", identityProviders),
+						"user_count_estimate":       fmt.Sprintf("%d", userCount),
+						"tags":                      fmt.Sprintf("%v", userPool.UserPoolTags),
+						"last_modified_date":        fmt.Sprintf("%v", userPool.LastModifiedDate),
 					},
 				})
 
@@ -2237,8 +2237,8 @@ func (ap *AWSProvider) discoverCognitoResources(ctx context.Context, accountID s
 								State:    "ACTIVE",
 								Created:  aws.ToTime(userPool.CreationDate),
 								Metadata: map[string]string{
-								"client_details": fmt.Sprintf("%v", client),
-							},
+									"client_details": fmt.Sprintf("%v", client),
+								},
 							})
 						}
 					}
@@ -2798,26 +2798,26 @@ func (ap *AWSProvider) deleteRDSInstance(ctx context.Context, resource models.Re
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := rds.NewFromConfig(cfg)
-	
+
 	// Check if final snapshot should be created
 	skipFinalSnapshot := true
 	if tags := resource.GetTagsAsMap(); tags["skip_final_snapshot"] == "false" {
 		skipFinalSnapshot = false
 	}
-	
+
 	input := &rds.DeleteDBInstanceInput{
 		DBInstanceIdentifier: aws.String(resource.Name),
 		SkipFinalSnapshot:    aws.Bool(skipFinalSnapshot),
 	}
-	
+
 	if !skipFinalSnapshot {
 		// Generate snapshot identifier
 		snapshotID := fmt.Sprintf("%s-final-snapshot-%d", resource.Name, time.Now().Unix())
 		input.FinalDBSnapshotIdentifier = aws.String(snapshotID)
 	}
-	
+
 	_, err = client.DeleteDBInstance(ctx, input)
 	if err != nil {
 		var notFoundErr *rdsTypes.DBInstanceNotFoundFault
@@ -2826,7 +2826,7 @@ func (ap *AWSProvider) deleteRDSInstance(ctx context.Context, resource models.Re
 		}
 		return fmt.Errorf("failed to delete RDS instance %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -2836,14 +2836,14 @@ func (ap *AWSProvider) deleteLambdaFunction(ctx context.Context, resource models
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := lambda.NewFromConfig(cfg)
-	
+
 	// Delete the function
 	_, err = client.DeleteFunction(ctx, &lambda.DeleteFunctionInput{
 		FunctionName: aws.String(resource.Name),
 	})
-	
+
 	if err != nil {
 		var notFoundErr *lambdaTypes.ResourceNotFoundException
 		if errors.As(err, &notFoundErr) {
@@ -2851,7 +2851,7 @@ func (ap *AWSProvider) deleteLambdaFunction(ctx context.Context, resource models
 		}
 		return fmt.Errorf("failed to delete Lambda function %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3074,9 +3074,9 @@ func (ap *AWSProvider) handleECSServiceDependencies(ctx context.Context, resourc
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := ecs.NewFromConfig(cfg)
-	
+
 	switch dependencyType {
 	case "task_definitions":
 		// List and deregister task definitions
@@ -3086,7 +3086,7 @@ func (ap *AWSProvider) handleECSServiceDependencies(ctx context.Context, resourc
 		if err != nil {
 			return fmt.Errorf("failed to list task definitions: %w", err)
 		}
-		
+
 		for _, taskDefArn := range taskDefs.TaskDefinitionArns {
 			// Check if this task definition is used by our service
 			if strings.Contains(taskDefArn, resource.Name) {
@@ -3098,7 +3098,7 @@ func (ap *AWSProvider) handleECSServiceDependencies(ctx context.Context, resourc
 				}
 			}
 		}
-		
+
 	case "tasks":
 		// Stop all running tasks
 		tasks, err := client.ListTasks(ctx, &ecs.ListTasksInput{
@@ -3114,7 +3114,7 @@ func (ap *AWSProvider) handleECSServiceDependencies(ctx context.Context, resourc
 				})
 			}
 		}
-		
+
 	case "target_groups":
 		// Deregister from target groups
 		if targetGroups, ok := resource.Properties["target_groups"].([]interface{}); ok {
@@ -3141,7 +3141,7 @@ func (ap *AWSProvider) handleECSServiceDependencies(ctx context.Context, resourc
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -3151,9 +3151,9 @@ func (ap *AWSProvider) handleRDSSnapshotDependencies(ctx context.Context, resour
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := rds.NewFromConfig(cfg)
-	
+
 	switch dependencyType {
 	case "automated_backups":
 		// Delete automated backups
@@ -3169,12 +3169,12 @@ func (ap *AWSProvider) handleRDSSnapshotDependencies(ctx context.Context, resour
 				}
 			}
 		}
-		
+
 	case "snapshots":
 		// List and optionally delete manual snapshots
 		snapshots, err := client.DescribeDBSnapshots(ctx, &rds.DescribeDBSnapshotsInput{
 			DBInstanceIdentifier: aws.String(resource.Name),
-			SnapshotType:        aws.String("manual"),
+			SnapshotType:         aws.String("manual"),
 		})
 		if err == nil {
 			for _, snapshot := range snapshots.DBSnapshots {
@@ -3186,7 +3186,7 @@ func (ap *AWSProvider) handleRDSSnapshotDependencies(ctx context.Context, resour
 				}
 			}
 		}
-		
+
 	case "read_replicas":
 		// Promote or delete read replicas
 		instance, err := client.DescribeDBInstances(ctx, &rds.DescribeDBInstancesInput{
@@ -3201,7 +3201,7 @@ func (ap *AWSProvider) handleRDSSnapshotDependencies(ctx context.Context, resour
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -3211,10 +3211,10 @@ func (ap *AWSProvider) handleVPCDependencies(ctx context.Context, resource model
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	ec2Client := ec2.NewFromConfig(cfg)
 	vpcID := resource.ID
-	
+
 	switch dependencyType {
 	case "instances":
 		// Terminate all instances in the VPC
@@ -3237,7 +3237,7 @@ func (ap *AWSProvider) handleVPCDependencies(ctx context.Context, resource model
 				})
 			}
 		}
-		
+
 	case "nat_gateways":
 		// Delete NAT gateways
 		natGateways, err := ec2Client.DescribeNatGateways(ctx, &ec2.DescribeNatGatewaysInput{
@@ -3254,7 +3254,7 @@ func (ap *AWSProvider) handleVPCDependencies(ctx context.Context, resource model
 				}
 			}
 		}
-		
+
 	case "internet_gateways":
 		// Detach and delete internet gateways
 		igws, err := ec2Client.DescribeInternetGateways(ctx, &ec2.DescribeInternetGatewaysInput{
@@ -3267,7 +3267,7 @@ func (ap *AWSProvider) handleVPCDependencies(ctx context.Context, resource model
 				// Detach from VPC
 				ec2Client.DetachInternetGateway(ctx, &ec2.DetachInternetGatewayInput{
 					InternetGatewayId: igw.InternetGatewayId,
-					VpcId:            aws.String(vpcID),
+					VpcId:             aws.String(vpcID),
 				})
 				// Delete IGW
 				ec2Client.DeleteInternetGateway(ctx, &ec2.DeleteInternetGatewayInput{
@@ -3275,7 +3275,7 @@ func (ap *AWSProvider) handleVPCDependencies(ctx context.Context, resource model
 				})
 			}
 		}
-		
+
 	case "subnets":
 		// Delete all subnets
 		subnets, err := ec2Client.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
@@ -3290,7 +3290,7 @@ func (ap *AWSProvider) handleVPCDependencies(ctx context.Context, resource model
 				})
 			}
 		}
-		
+
 	case "security_groups":
 		// Delete non-default security groups
 		secGroups, err := ec2Client.DescribeSecurityGroups(ctx, &ec2.DescribeSecurityGroupsInput{
@@ -3308,7 +3308,7 @@ func (ap *AWSProvider) handleVPCDependencies(ctx context.Context, resource model
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -3320,7 +3320,7 @@ func (ap *AWSProvider) shouldDeleteSnapshot(snapshot rdsTypes.DBSnapshot) bool {
 			return true
 		}
 	}
-	
+
 	// Check age - delete if older than 30 days
 	if snapshot.SnapshotCreateTime != nil {
 		age := time.Since(*snapshot.SnapshotCreateTime)
@@ -3328,7 +3328,7 @@ func (ap *AWSProvider) shouldDeleteSnapshot(snapshot rdsTypes.DBSnapshot) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -3370,9 +3370,9 @@ func (ap *AWSProvider) deleteECSCluster(ctx context.Context, resource models.Res
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := ecs.NewFromConfig(cfg)
-	
+
 	// First, list and stop all services in the cluster
 	serviceList, err := client.ListServices(ctx, &ecs.ListServicesInput{
 		Cluster: aws.String(resource.Name),
@@ -3393,7 +3393,7 @@ func (ap *AWSProvider) deleteECSCluster(ctx context.Context, resource models.Res
 			})
 		}
 	}
-	
+
 	// Delete the cluster
 	_, err = client.DeleteCluster(ctx, &ecs.DeleteClusterInput{
 		Cluster: aws.String(resource.Name),
@@ -3401,7 +3401,7 @@ func (ap *AWSProvider) deleteECSCluster(ctx context.Context, resource models.Res
 	if err != nil {
 		return fmt.Errorf("failed to delete ECS cluster %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3410,9 +3410,9 @@ func (ap *AWSProvider) deleteDynamoDBTable(ctx context.Context, resource models.
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := dynamodb.NewFromConfig(cfg)
-	
+
 	_, err = client.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 		TableName: aws.String(resource.Name),
 	})
@@ -3423,7 +3423,7 @@ func (ap *AWSProvider) deleteDynamoDBTable(ctx context.Context, resource models.
 		}
 		return fmt.Errorf("failed to delete DynamoDB table %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3432,16 +3432,16 @@ func (ap *AWSProvider) deleteElastiCacheCluster(ctx context.Context, resource mo
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := elasticache.NewFromConfig(cfg)
-	
+
 	_, err = client.DeleteCacheCluster(ctx, &elasticache.DeleteCacheClusterInput{
 		CacheClusterId: aws.String(resource.Name),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete ElastiCache cluster %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3450,23 +3450,23 @@ func (ap *AWSProvider) deleteSNSTopic(ctx context.Context, resource models.Resou
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := sns.NewFromConfig(cfg)
-	
+
 	// Get topic ARN from properties or construct it
 	topicArn := resource.Properties["arn"].(string)
 	if topicArn == "" {
 		// Construct ARN if not available
 		topicArn = fmt.Sprintf("arn:aws:sns:%s:%s:%s", resource.Region, ap.accountID, resource.Name)
 	}
-	
+
 	_, err = client.DeleteTopic(ctx, &sns.DeleteTopicInput{
 		TopicArn: aws.String(topicArn),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete SNS topic %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3475,9 +3475,9 @@ func (ap *AWSProvider) deleteSQSQueue(ctx context.Context, resource models.Resou
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := sqs.NewFromConfig(cfg)
-	
+
 	// Get queue URL
 	queueUrlOutput, err := client.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
 		QueueName: aws.String(resource.Name),
@@ -3485,14 +3485,14 @@ func (ap *AWSProvider) deleteSQSQueue(ctx context.Context, resource models.Resou
 	if err != nil {
 		return fmt.Errorf("failed to get SQS queue URL for %s: %w", resource.Name, err)
 	}
-	
+
 	_, err = client.DeleteQueue(ctx, &sqs.DeleteQueueInput{
 		QueueUrl: queueUrlOutput.QueueUrl,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete SQS queue %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3501,9 +3501,9 @@ func (ap *AWSProvider) deleteIAMRole(ctx context.Context, resource models.Resour
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := iam.NewFromConfig(cfg)
-	
+
 	// First, detach all policies
 	attachedPolicies, err := client.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
 		RoleName: aws.String(resource.Name),
@@ -3516,7 +3516,7 @@ func (ap *AWSProvider) deleteIAMRole(ctx context.Context, resource models.Resour
 			})
 		}
 	}
-	
+
 	// Delete inline policies
 	inlinePolicies, err := client.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
 		RoleName: aws.String(resource.Name),
@@ -3529,7 +3529,7 @@ func (ap *AWSProvider) deleteIAMRole(ctx context.Context, resource models.Resour
 			})
 		}
 	}
-	
+
 	// Delete the role
 	_, err = client.DeleteRole(ctx, &iam.DeleteRoleInput{
 		RoleName: aws.String(resource.Name),
@@ -3541,7 +3541,7 @@ func (ap *AWSProvider) deleteIAMRole(ctx context.Context, resource models.Resour
 		}
 		return fmt.Errorf("failed to delete IAM role %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3550,19 +3550,19 @@ func (ap *AWSProvider) deleteIAMPolicy(ctx context.Context, resource models.Reso
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := iam.NewFromConfig(cfg)
-	
+
 	// Get policy ARN
 	policyArn := resource.Properties["arn"].(string)
 	if policyArn == "" {
 		return fmt.Errorf("policy ARN not found for %s", resource.Name)
 	}
-	
+
 	// List and detach all entities using this policy
 	// Detach from users
 	users, err := client.ListEntitiesForPolicy(ctx, &iam.ListEntitiesForPolicyInput{
-		PolicyArn:  aws.String(policyArn),
+		PolicyArn:    aws.String(policyArn),
 		EntityFilter: iamTypes.EntityTypeUser,
 	})
 	if err == nil {
@@ -3573,7 +3573,7 @@ func (ap *AWSProvider) deleteIAMPolicy(ctx context.Context, resource models.Reso
 			})
 		}
 	}
-	
+
 	// Delete all non-default versions
 	versions, err := client.ListPolicyVersions(ctx, &iam.ListPolicyVersionsInput{
 		PolicyArn: aws.String(policyArn),
@@ -3588,7 +3588,7 @@ func (ap *AWSProvider) deleteIAMPolicy(ctx context.Context, resource models.Reso
 			}
 		}
 	}
-	
+
 	// Delete the policy
 	_, err = client.DeletePolicy(ctx, &iam.DeletePolicyInput{
 		PolicyArn: aws.String(policyArn),
@@ -3596,7 +3596,7 @@ func (ap *AWSProvider) deleteIAMPolicy(ctx context.Context, resource models.Reso
 	if err != nil {
 		return fmt.Errorf("failed to delete IAM policy %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3605,9 +3605,9 @@ func (ap *AWSProvider) deleteIAMUser(ctx context.Context, resource models.Resour
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := iam.NewFromConfig(cfg)
-	
+
 	// Delete access keys
 	accessKeys, err := client.ListAccessKeys(ctx, &iam.ListAccessKeysInput{
 		UserName: aws.String(resource.Name),
@@ -3620,7 +3620,7 @@ func (ap *AWSProvider) deleteIAMUser(ctx context.Context, resource models.Resour
 			})
 		}
 	}
-	
+
 	// Detach policies
 	attachedPolicies, err := client.ListAttachedUserPolicies(ctx, &iam.ListAttachedUserPoliciesInput{
 		UserName: aws.String(resource.Name),
@@ -3633,7 +3633,7 @@ func (ap *AWSProvider) deleteIAMUser(ctx context.Context, resource models.Resour
 			})
 		}
 	}
-	
+
 	// Remove from groups
 	groups, err := client.ListGroupsForUser(ctx, &iam.ListGroupsForUserInput{
 		UserName: aws.String(resource.Name),
@@ -3646,7 +3646,7 @@ func (ap *AWSProvider) deleteIAMUser(ctx context.Context, resource models.Resour
 			})
 		}
 	}
-	
+
 	// Delete the user
 	_, err = client.DeleteUser(ctx, &iam.DeleteUserInput{
 		UserName: aws.String(resource.Name),
@@ -3654,7 +3654,7 @@ func (ap *AWSProvider) deleteIAMUser(ctx context.Context, resource models.Resour
 	if err != nil {
 		return fmt.Errorf("failed to delete IAM user %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3663,15 +3663,15 @@ func (ap *AWSProvider) deleteRoute53HostedZone(ctx context.Context, resource mod
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := route53.NewFromConfig(cfg)
-	
+
 	// Get hosted zone ID
 	zoneID := resource.Properties["id"].(string)
 	if zoneID == "" {
 		return fmt.Errorf("hosted zone ID not found for %s", resource.Name)
 	}
-	
+
 	// List and delete all non-default record sets
 	recordSets, err := client.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 		HostedZoneId: aws.String(zoneID),
@@ -3690,7 +3690,7 @@ func (ap *AWSProvider) deleteRoute53HostedZone(ctx context.Context, resource mod
 				ResourceRecordSet: &rs,
 			})
 		}
-		
+
 		if len(changes) > 0 {
 			client.ChangeResourceRecordSets(ctx, &route53.ChangeResourceRecordSetsInput{
 				HostedZoneId: aws.String(zoneID),
@@ -3700,7 +3700,7 @@ func (ap *AWSProvider) deleteRoute53HostedZone(ctx context.Context, resource mod
 			})
 		}
 	}
-	
+
 	// Delete the hosted zone
 	_, err = client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{
 		Id: aws.String(zoneID),
@@ -3708,7 +3708,7 @@ func (ap *AWSProvider) deleteRoute53HostedZone(ctx context.Context, resource mod
 	if err != nil {
 		return fmt.Errorf("failed to delete Route53 hosted zone %s: %w", resource.Name, err)
 	}
-	
+
 	return nil
 }
 
@@ -3717,9 +3717,9 @@ func (ap *AWSProvider) deleteCloudFormationStack(ctx context.Context, resource m
 	if err != nil {
 		return fmt.Errorf("failed to get AWS config: %w", err)
 	}
-	
+
 	client := cloudformation.NewFromConfig(cfg)
-	
+
 	// Delete the stack
 	_, err = client.DeleteStack(ctx, &cloudformation.DeleteStackInput{
 		StackName: aws.String(resource.Name),
@@ -3727,7 +3727,7 @@ func (ap *AWSProvider) deleteCloudFormationStack(ctx context.Context, resource m
 	if err != nil {
 		return fmt.Errorf("failed to delete CloudFormation stack %s: %w", resource.Name, err)
 	}
-	
+
 	// Wait for stack deletion to complete
 	waiter := cloudformation.NewStackDeleteCompleteWaiter(client)
 	err = waiter.Wait(ctx, &cloudformation.DescribeStacksInput{
@@ -3740,7 +3740,7 @@ func (ap *AWSProvider) deleteCloudFormationStack(ctx context.Context, resource m
 		}
 		return fmt.Errorf("failed waiting for CloudFormation stack deletion: %w", err)
 	}
-	
+
 	return nil
 }
 

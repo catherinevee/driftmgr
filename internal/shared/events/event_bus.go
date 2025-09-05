@@ -16,14 +16,14 @@ const (
 	EventDiscoveryCompleted EventType = "discovery.completed"
 	EventDiscoveryFailed    EventType = "discovery.failed"
 	EventResourceDiscovered EventType = "discovery.resource"
-	
+
 	// Drift detection events
 	EventDriftDetectionStarted   EventType = "drift.started"
 	EventDriftDetectionProgress  EventType = "drift.progress"
 	EventDriftDetectionCompleted EventType = "drift.completed"
-	EventDriftDetected          EventType = "drift.detected"
-	EventDriftResolved          EventType = "drift.resolved"
-	
+	EventDriftDetected           EventType = "drift.detected"
+	EventDriftResolved           EventType = "drift.resolved"
+
 	// Remediation events
 	EventRemediationStarted   EventType = "remediation.started"
 	EventRemediationProgress  EventType = "remediation.progress"
@@ -31,32 +31,32 @@ const (
 	EventRemediationFailed    EventType = "remediation.failed"
 	EventResourceDeleted      EventType = "remediation.deleted"
 	EventResourceImported     EventType = "remediation.imported"
-	
+
 	// State management events
-	EventStateBackupCreated    EventType = "state.backup.created"
-	EventStatePulled          EventType = "state.pulled"
-	EventStatePushed          EventType = "state.pushed"
-	EventStateValidated       EventType = "state.validated"
-	EventStateModified        EventType = "state.modified"
-	
+	EventStateBackupCreated EventType = "state.backup.created"
+	EventStatePulled        EventType = "state.pulled"
+	EventStatePushed        EventType = "state.pushed"
+	EventStateValidated     EventType = "state.validated"
+	EventStateModified      EventType = "state.modified"
+
 	// System events
-	EventCacheCleared     EventType = "cache.cleared"
-	EventCacheRefreshed   EventType = "cache.refreshed"
-	EventHealthCheck      EventType = "health.check"
-	EventConfigChanged    EventType = "config.changed"
-	EventAuditLog        EventType = "audit.log"
-	
+	EventCacheCleared   EventType = "cache.cleared"
+	EventCacheRefreshed EventType = "cache.refreshed"
+	EventHealthCheck    EventType = "health.check"
+	EventConfigChanged  EventType = "config.changed"
+	EventAuditLog       EventType = "audit.log"
+
 	// Job events
 	EventJobQueued    EventType = "job.queued"
 	EventJobStarted   EventType = "job.started"
 	EventJobCompleted EventType = "job.completed"
 	EventJobFailed    EventType = "job.failed"
 	EventJobRetrying  EventType = "job.retrying"
-	
+
 	// WebSocket events
 	EventWSClientConnected    EventType = "ws.connected"
 	EventWSClientDisconnected EventType = "ws.disconnected"
-	EventWSMessage           EventType = "ws.message"
+	EventWSMessage            EventType = "ws.message"
 )
 
 // Event represents a system event
@@ -74,20 +74,20 @@ type Event struct {
 
 // Subscription represents a subscription to events
 type Subscription struct {
-	ID       string
-	Filter   EventFilter
-	Channel  chan Event
-	cancel   context.CancelFunc
-	ctx      context.Context
+	ID      string
+	Filter  EventFilter
+	Channel chan Event
+	cancel  context.CancelFunc
+	ctx     context.Context
 }
 
 // EventFilter defines criteria for event filtering
 type EventFilter struct {
-	Types     []EventType
-	Sources   []string
-	MinTime   *time.Time
-	MaxTime   *time.Time
-	Metadata  map[string]string
+	Types    []EventType
+	Sources  []string
+	MinTime  *time.Time
+	MaxTime  *time.Time
+	Metadata map[string]string
 }
 
 // EventHandler is a function that handles events
@@ -106,11 +106,11 @@ type EventBus struct {
 
 // EventMetrics tracks event bus metrics
 type EventMetrics struct {
-	mu               sync.RWMutex
-	EventsPublished  map[EventType]int64
-	EventsDelivered  map[EventType]int64
+	mu                sync.RWMutex
+	EventsPublished   map[EventType]int64
+	EventsDelivered   map[EventType]int64
 	SubscriptionCount int
-	ActiveHandlers   int
+	ActiveHandlers    int
 }
 
 // NewEventBus creates a new event bus
@@ -134,28 +134,28 @@ func (eb *EventBus) Publish(event Event) error {
 		eb.mu.RUnlock()
 		return nil
 	}
-	
+
 	// Set timestamp if not set
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now()
 	}
-	
+
 	// Generate ID if not set
 	if event.ID == "" {
 		event.ID = generateEventID()
 	}
-	
+
 	// Update metrics
 	eb.metrics.mu.Lock()
 	eb.metrics.EventsPublished[event.Type]++
 	eb.metrics.mu.Unlock()
-	
+
 	// Add to buffer
 	if len(eb.buffer) >= eb.bufferSize {
 		eb.buffer = eb.buffer[1:]
 	}
 	eb.buffer = append(eb.buffer, event)
-	
+
 	// Get subscriptions and handlers
 	subs := make([]*Subscription, 0, len(eb.subscriptions))
 	for _, sub := range eb.subscriptions {
@@ -163,11 +163,11 @@ func (eb *EventBus) Publish(event Event) error {
 			subs = append(subs, sub)
 		}
 	}
-	
+
 	handlers := make([]EventHandler, len(eb.handlers[event.Type]))
 	copy(handlers, eb.handlers[event.Type])
 	eb.mu.RUnlock()
-	
+
 	// Deliver to subscriptions
 	for _, sub := range subs {
 		select {
@@ -181,7 +181,7 @@ func (eb *EventBus) Publish(event Event) error {
 			// Channel full, skip
 		}
 	}
-	
+
 	// Execute handlers
 	for _, handler := range handlers {
 		go func(h EventHandler) {
@@ -193,7 +193,7 @@ func (eb *EventBus) Publish(event Event) error {
 			h(event)
 		}(handler)
 	}
-	
+
 	return nil
 }
 
@@ -201,11 +201,11 @@ func (eb *EventBus) Publish(event Event) error {
 func (eb *EventBus) Subscribe(ctx context.Context, filter EventFilter, bufferSize int) *Subscription {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
-	
+
 	if eb.closed {
 		return nil
 	}
-	
+
 	subCtx, cancel := context.WithCancel(ctx)
 	sub := &Subscription{
 		ID:      generateSubscriptionID(),
@@ -214,12 +214,12 @@ func (eb *EventBus) Subscribe(ctx context.Context, filter EventFilter, bufferSiz
 		cancel:  cancel,
 		ctx:     subCtx,
 	}
-	
+
 	eb.subscriptions[sub.ID] = sub
 	eb.metrics.mu.Lock()
 	eb.metrics.SubscriptionCount++
 	eb.metrics.mu.Unlock()
-	
+
 	// Send buffered events that match the filter
 	for _, event := range eb.buffer {
 		if eb.matchesFilter(event, filter) {
@@ -230,7 +230,7 @@ func (eb *EventBus) Subscribe(ctx context.Context, filter EventFilter, bufferSiz
 			}
 		}
 	}
-	
+
 	return sub
 }
 
@@ -239,15 +239,15 @@ func (eb *EventBus) Unsubscribe(sub *Subscription) {
 	if sub == nil {
 		return
 	}
-	
+
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
-	
+
 	if _, exists := eb.subscriptions[sub.ID]; exists {
 		delete(eb.subscriptions, sub.ID)
 		sub.cancel()
 		close(sub.Channel)
-		
+
 		eb.metrics.mu.Lock()
 		eb.metrics.SubscriptionCount--
 		eb.metrics.mu.Unlock()
@@ -258,13 +258,13 @@ func (eb *EventBus) Unsubscribe(sub *Subscription) {
 func (eb *EventBus) RegisterHandler(eventType EventType, handler EventHandler) {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
-	
+
 	if eb.closed {
 		return
 	}
-	
+
 	eb.handlers[eventType] = append(eb.handlers[eventType], handler)
-	
+
 	eb.metrics.mu.Lock()
 	eb.metrics.ActiveHandlers++
 	eb.metrics.mu.Unlock()
@@ -274,7 +274,7 @@ func (eb *EventBus) RegisterHandler(eventType EventType, handler EventHandler) {
 func (eb *EventBus) GetMetrics() EventMetrics {
 	eb.metrics.mu.RLock()
 	defer eb.metrics.mu.RUnlock()
-	
+
 	// Create a copy of metrics
 	metrics := EventMetrics{
 		EventsPublished:   make(map[EventType]int64),
@@ -282,14 +282,14 @@ func (eb *EventBus) GetMetrics() EventMetrics {
 		SubscriptionCount: eb.metrics.SubscriptionCount,
 		ActiveHandlers:    eb.metrics.ActiveHandlers,
 	}
-	
+
 	for k, v := range eb.metrics.EventsPublished {
 		metrics.EventsPublished[k] = v
 	}
 	for k, v := range eb.metrics.EventsDelivered {
 		metrics.EventsDelivered[k] = v
 	}
-	
+
 	return metrics
 }
 
@@ -297,7 +297,7 @@ func (eb *EventBus) GetMetrics() EventMetrics {
 func (eb *EventBus) GetBuffer() []Event {
 	eb.mu.RLock()
 	defer eb.mu.RUnlock()
-	
+
 	buffer := make([]Event, len(eb.buffer))
 	copy(buffer, eb.buffer)
 	return buffer
@@ -307,19 +307,19 @@ func (eb *EventBus) GetBuffer() []Event {
 func (eb *EventBus) Close() {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
-	
+
 	if eb.closed {
 		return
 	}
-	
+
 	eb.closed = true
-	
+
 	// Cancel all subscriptions
 	for _, sub := range eb.subscriptions {
 		sub.cancel()
 		close(sub.Channel)
 	}
-	
+
 	eb.subscriptions = make(map[string]*Subscription)
 	eb.handlers = make(map[EventType][]EventHandler)
 	eb.buffer = nil
@@ -340,7 +340,7 @@ func (eb *EventBus) matchesFilter(event Event, filter EventFilter) bool {
 			return false
 		}
 	}
-	
+
 	// Check sources
 	if len(filter.Sources) > 0 {
 		matched := false
@@ -354,7 +354,7 @@ func (eb *EventBus) matchesFilter(event Event, filter EventFilter) bool {
 			return false
 		}
 	}
-	
+
 	// Check time range
 	if filter.MinTime != nil && event.Timestamp.Before(*filter.MinTime) {
 		return false
@@ -362,7 +362,7 @@ func (eb *EventBus) matchesFilter(event Event, filter EventFilter) bool {
 	if filter.MaxTime != nil && event.Timestamp.After(*filter.MaxTime) {
 		return false
 	}
-	
+
 	// Check metadata
 	if len(filter.Metadata) > 0 {
 		for key, value := range filter.Metadata {
@@ -371,7 +371,7 @@ func (eb *EventBus) matchesFilter(event Event, filter EventFilter) bool {
 			}
 		}
 	}
-	
+
 	return true
 }
 

@@ -15,10 +15,10 @@ type StateCache struct {
 
 // CacheItem represents a cached state
 type CacheItem struct {
-	State     *TerraformState
-	ExpiresAt time.Time
+	State      *TerraformState
+	ExpiresAt  time.Time
 	AccessedAt time.Time
-	Size      int64
+	Size       int64
 }
 
 // NewStateCache creates a new state cache
@@ -112,11 +112,11 @@ func (c *StateCache) GetStats() CacheStats {
 
 	for _, item := range c.items {
 		stats.TotalSize += item.Size
-		
+
 		if item.AccessedAt.Before(stats.OldestItem) {
 			stats.OldestItem = item.AccessedAt
 		}
-		
+
 		if item.AccessedAt.After(stats.NewestItem) {
 			stats.NewestItem = item.AccessedAt
 		}
@@ -177,14 +177,14 @@ func (c *StateCache) evictOldest() {
 func (c *StateCache) calculateSize(state *TerraformState) int64 {
 	// Simple estimation based on resource count
 	// In production, you might want to use actual serialization size
-	baseSize := int64(1024) // Base overhead
+	baseSize := int64(1024)    // Base overhead
 	resourceSize := int64(512) // Estimated size per resource
-	
+
 	resourceCount := int64(len(state.Resources))
 	for _, resource := range state.Resources {
 		resourceCount += int64(len(resource.Instances))
 	}
-	
+
 	return baseSize + (resourceCount * resourceSize)
 }
 
@@ -192,7 +192,7 @@ func (c *StateCache) calculateSize(state *TerraformState) int64 {
 func (c *StateCache) SetTTL(ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.ttl = ttl
 }
 
@@ -200,9 +200,9 @@ func (c *StateCache) SetTTL(ttl time.Duration) {
 func (c *StateCache) SetMaxSize(size int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.maxSize = size
-	
+
 	// Evict items if necessary
 	for len(c.items) > c.maxSize {
 		c.evictOldest()
@@ -213,12 +213,12 @@ func (c *StateCache) SetMaxSize(size int) {
 func (c *StateCache) Has(key string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	item, exists := c.items[key]
 	if !exists {
 		return false
 	}
-	
+
 	// Check if expired
 	return !time.Now().After(item.ExpiresAt)
 }
@@ -227,12 +227,12 @@ func (c *StateCache) Has(key string) bool {
 func (c *StateCache) GetKeys() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	keys := make([]string, 0, len(c.items))
 	for key := range c.items {
 		keys = append(keys, key)
 	}
-	
+
 	return keys
 }
 
@@ -240,7 +240,7 @@ func (c *StateCache) GetKeys() []string {
 func (c *StateCache) Touch(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if item, exists := c.items[key]; exists {
 		item.AccessedAt = time.Now()
 		item.ExpiresAt = time.Now().Add(c.ttl)

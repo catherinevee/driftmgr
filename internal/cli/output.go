@@ -30,7 +30,7 @@ const (
 	ColorCyan   = "\033[36m"
 	ColorWhite  = "\033[37m"
 	ColorGray   = "\033[90m"
-	
+
 	ColorBold      = "\033[1m"
 	ColorUnderline = "\033[4m"
 )
@@ -112,12 +112,12 @@ func (f *OutputFormatter) Section(text string) {
 // Table prints data in table format
 func (f *OutputFormatter) Table(headers []string, rows [][]string) {
 	w := tabwriter.NewWriter(f.writer, 0, 0, 2, ' ', 0)
-	
+
 	// Print headers
 	if f.showHeaders && len(headers) > 0 {
 		headerLine := strings.Join(headers, "\t")
 		fmt.Fprintln(w, f.Color(headerLine, ColorBold))
-		
+
 		// Print separator
 		separators := make([]string, len(headers))
 		for i, header := range headers {
@@ -125,12 +125,12 @@ func (f *OutputFormatter) Table(headers []string, rows [][]string) {
 		}
 		fmt.Fprintln(w, strings.Join(separators, "\t"))
 	}
-	
+
 	// Print rows
 	for _, row := range rows {
 		fmt.Fprintln(w, strings.Join(row, "\t"))
 	}
-	
+
 	w.Flush()
 }
 
@@ -146,14 +146,14 @@ func (f *OutputFormatter) printTreeNode(node TreeNode, prefix string, isLast boo
 	if isLast {
 		connector = "└── "
 	}
-	
+
 	// Print current node
 	if prefix == "" {
 		fmt.Fprintln(f.writer, node.GetName())
 	} else {
 		fmt.Fprintf(f.writer, "%s%s%s\n", prefix, connector, node.GetName())
 	}
-	
+
 	// Determine the prefix for children
 	childPrefix := prefix
 	if prefix == "" {
@@ -164,7 +164,7 @@ func (f *OutputFormatter) printTreeNode(node TreeNode, prefix string, isLast boo
 	} else {
 		childPrefix = prefix + "│   "
 	}
-	
+
 	// Print children
 	children := node.GetChildren()
 	for i, child := range children {
@@ -194,7 +194,7 @@ func (n SimpleTreeNode) GetChildren() []TreeNode {
 
 // KeyValue prints a key-value pair
 func (f *OutputFormatter) KeyValue(key, value string) {
-	fmt.Fprintf(f.writer, "%s: %s\n", 
+	fmt.Fprintf(f.writer, "%s: %s\n",
 		f.Color(key, ColorBold),
 		value)
 }
@@ -207,7 +207,7 @@ func (f *OutputFormatter) KeyValueList(items map[string]string) {
 			maxKeyLen = len(key)
 		}
 	}
-	
+
 	for key, value := range items {
 		padding := strings.Repeat(" ", maxKeyLen-len(key))
 		fmt.Fprintf(f.writer, "%s%s : %s\n",
@@ -222,13 +222,13 @@ func (f *OutputFormatter) ProgressBar(current, total int, width int) {
 	if total <= 0 {
 		return
 	}
-	
+
 	percent := float64(current) / float64(total)
 	filled := int(float64(width) * percent)
-	
+
 	bar := strings.Builder{}
 	bar.WriteString("[")
-	
+
 	for i := 0; i < width; i++ {
 		if i < filled {
 			bar.WriteString("=")
@@ -238,10 +238,10 @@ func (f *OutputFormatter) ProgressBar(current, total int, width int) {
 			bar.WriteString(" ")
 		}
 	}
-	
+
 	bar.WriteString("] ")
 	bar.WriteString(fmt.Sprintf("%.1f%%", percent*100))
-	
+
 	fmt.Fprint(f.writer, "\r"+bar.String())
 	if current >= total {
 		fmt.Fprintln(f.writer)
@@ -271,23 +271,23 @@ func (f *OutputFormatter) Box(title, content string) {
 			maxLen = len(line)
 		}
 	}
-	
+
 	// Top border
 	fmt.Fprintf(f.writer, "┌─%s─┐\n", strings.Repeat("─", maxLen))
-	
+
 	// Title
 	if title != "" {
 		padding := strings.Repeat(" ", maxLen-len(title))
 		fmt.Fprintf(f.writer, "│ %s%s │\n", f.Color(title, ColorBold), padding)
 		fmt.Fprintf(f.writer, "├─%s─┤\n", strings.Repeat("─", maxLen))
 	}
-	
+
 	// Content
 	for _, line := range lines {
 		padding := strings.Repeat(" ", maxLen-len(line))
 		fmt.Fprintf(f.writer, "│ %s%s │\n", line, padding)
 	}
-	
+
 	// Bottom border
 	fmt.Fprintf(f.writer, "└─%s─┘\n", strings.Repeat("─", maxLen))
 }

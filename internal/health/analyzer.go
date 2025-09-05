@@ -27,27 +27,27 @@ type ProviderHealthChecker interface {
 
 // HealthReport contains the health analysis results for a resource
 type HealthReport struct {
-	Resource       string          `json:"resource"`
-	Status         HealthStatus    `json:"status"`
-	Score          int             `json:"score"` // 0-100
-	Issues         []HealthIssue   `json:"issues"`
-	Suggestions    []string        `json:"suggestions"`
-	Impact         ImpactLevel     `json:"impact"`
-	LastChecked    time.Time       `json:"last_checked"`
-	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	Resource    string                 `json:"resource"`
+	Status      HealthStatus           `json:"status"`
+	Score       int                    `json:"score"` // 0-100
+	Issues      []HealthIssue          `json:"issues"`
+	Suggestions []string               `json:"suggestions"`
+	Impact      ImpactLevel            `json:"impact"`
+	LastChecked time.Time              `json:"last_checked"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // HealthIssue represents a specific health problem
 type HealthIssue struct {
-	Type          IssueType    `json:"type"`
-	Severity      Severity     `json:"severity"`
-	Message       string       `json:"message"`
-	Field         string       `json:"field,omitempty"`
-	CurrentValue  interface{}  `json:"current_value,omitempty"`
-	ExpectedValue interface{}  `json:"expected_value,omitempty"`
-	Documentation string       `json:"documentation,omitempty"`
-	Category      string       `json:"category,omitempty"`
-	ResourceID    string       `json:"resource_id,omitempty"`
+	Type           IssueType   `json:"type"`
+	Severity       Severity    `json:"severity"`
+	Message        string      `json:"message"`
+	Field          string      `json:"field,omitempty"`
+	CurrentValue   interface{} `json:"current_value,omitempty"`
+	ExpectedValue  interface{} `json:"expected_value,omitempty"`
+	Documentation  string      `json:"documentation,omitempty"`
+	Category       string      `json:"category,omitempty"`
+	ResourceID     string      `json:"resource_id,omitempty"`
 	Recommendation string      `json:"recommendation,omitempty"`
 }
 
@@ -65,14 +65,14 @@ const (
 type IssueType string
 
 const (
-	IssueTypeMissingAttribute   IssueType = "missing_attribute"
-	IssueTypeDeprecated         IssueType = "deprecated"
-	IssueTypeSecurity           IssueType = "security"
-	IssueTypePerformance        IssueType = "performance"
-	IssueTypeConfiguration      IssueType = "configuration"
-	IssueTypeCost               IssueType = "cost"
-	IssueTypeCompliance         IssueType = "compliance"
-	IssueTypeDependency         IssueType = "dependency"
+	IssueTypeMissingAttribute IssueType = "missing_attribute"
+	IssueTypeDeprecated       IssueType = "deprecated"
+	IssueTypeSecurity         IssueType = "security"
+	IssueTypePerformance      IssueType = "performance"
+	IssueTypeConfiguration    IssueType = "configuration"
+	IssueTypeCost             IssueType = "cost"
+	IssueTypeCompliance       IssueType = "compliance"
+	IssueTypeDependency       IssueType = "dependency"
 )
 
 // Severity levels for issues
@@ -97,11 +97,11 @@ const (
 
 // SecurityRule defines a security check
 type SecurityRule struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 	Check       func(attributes map[string]interface{}) bool
-	Severity    Severity    `json:"severity"`
-	Remediation string      `json:"remediation"`
+	Severity    Severity `json:"severity"`
+	Remediation string   `json:"remediation"`
 }
 
 // HealthCheck defines a custom health check
@@ -114,9 +114,9 @@ type HealthCheck struct {
 
 // AnalyzerConfig configuration for health analyzer
 type AnalyzerConfig struct {
-	CheckDeprecation bool
-	CheckSecurity    bool
-	CheckCompliance  bool
+	CheckDeprecation   bool
+	CheckSecurity      bool
+	CheckCompliance    bool
 	CheckBestPractices bool
 }
 
@@ -131,7 +131,7 @@ func NewHealthAnalyzer(depGraph *graph.DependencyGraph) *HealthAnalyzer {
 
 	// Register default providers
 	analyzer.registerDefaultProviders()
-	
+
 	// Add default custom checks
 	analyzer.addDefaultChecks()
 
@@ -148,28 +148,28 @@ func NewResourceHealthAnalyzer(depGraph *graph.DependencyGraph, config AnalyzerC
 // AnalyzeState performs health analysis on entire state
 func (ha *HealthAnalyzer) AnalyzeState(state *state.TerraformState) (*StateHealthReport, error) {
 	report := &StateHealthReport{
-		Timestamp:       time.Now(),
-		TotalResources:  0,
+		Timestamp:        time.Now(),
+		TotalResources:   0,
 		HealthyResources: 0,
-		Issues:          make([]HealthReport, 0),
-		OverallScore:    100,
-		ResourceReports: make(map[string]*HealthReport),
+		Issues:           make([]HealthReport, 0),
+		OverallScore:     100,
+		ResourceReports:  make(map[string]*HealthReport),
 	}
 
 	for _, resource := range state.Resources {
 		for i, instance := range resource.Instances {
 			address := ha.formatResourceAddress(resource, i)
 			resourceReport := ha.AnalyzeResource(&resource, &instance)
-			
+
 			report.TotalResources++
 			report.ResourceReports[address] = resourceReport
-			
+
 			if resourceReport.Status == HealthStatusHealthy {
 				report.HealthyResources++
 			} else {
 				report.Issues = append(report.Issues, *resourceReport)
 			}
-			
+
 			// Update overall score
 			report.OverallScore = (report.OverallScore + resourceReport.Score) / 2
 		}
@@ -204,13 +204,13 @@ func (ha *HealthAnalyzer) AnalyzeResource(resource *state.Resource, instance *st
 			report.Issues = append(report.Issues, providerReport.Issues...)
 			report.Suggestions = append(report.Suggestions, providerReport.Suggestions...)
 		}
-		
+
 		// Check required attributes
 		ha.checkRequiredAttributes(resource, instance, checker, report)
-		
+
 		// Check deprecated attributes
 		ha.checkDeprecatedAttributes(resource, instance, checker, report)
-		
+
 		// Check security rules
 		ha.checkSecurityRules(resource, instance, checker, report)
 	}
@@ -234,9 +234,9 @@ func (ha *HealthAnalyzer) AnalyzeResource(resource *state.Resource, instance *st
 }
 
 // checkRequiredAttributes checks for missing required attributes
-func (ha *HealthAnalyzer) checkRequiredAttributes(resource *state.Resource, instance *state.Instance, 
+func (ha *HealthAnalyzer) checkRequiredAttributes(resource *state.Resource, instance *state.Instance,
 	checker ProviderHealthChecker, report *HealthReport) {
-	
+
 	required := checker.GetRequiredAttributes(resource.Type)
 	for _, attr := range required {
 		if instance.Attributes == nil || instance.Attributes[attr] == nil {
@@ -254,7 +254,7 @@ func (ha *HealthAnalyzer) checkRequiredAttributes(resource *state.Resource, inst
 // checkDeprecatedAttributes checks for usage of deprecated attributes
 func (ha *HealthAnalyzer) checkDeprecatedAttributes(resource *state.Resource, instance *state.Instance,
 	checker ProviderHealthChecker, report *HealthReport) {
-	
+
 	deprecated := checker.GetDeprecatedAttributes(resource.Type)
 	for _, attr := range deprecated {
 		if instance.Attributes != nil && instance.Attributes[attr] != nil {
@@ -265,11 +265,11 @@ func (ha *HealthAnalyzer) checkDeprecatedAttributes(resource *state.Resource, in
 				Field:        attr,
 				CurrentValue: instance.Attributes[attr],
 				Documentation: fmt.Sprintf("https://registry.terraform.io/providers/%s/latest/docs/resources/%s",
-					ha.extractProviderName(resource.Provider), 
+					ha.extractProviderName(resource.Provider),
 					strings.TrimPrefix(resource.Type, ha.extractProviderName(resource.Provider)+"_")),
 			})
-			
-			report.Suggestions = append(report.Suggestions, 
+
+			report.Suggestions = append(report.Suggestions,
 				fmt.Sprintf("Consider removing or replacing deprecated attribute '%s'", attr))
 		}
 	}
@@ -278,7 +278,7 @@ func (ha *HealthAnalyzer) checkDeprecatedAttributes(resource *state.Resource, in
 // checkSecurityRules checks security compliance
 func (ha *HealthAnalyzer) checkSecurityRules(resource *state.Resource, instance *state.Instance,
 	checker ProviderHealthChecker, report *HealthReport) {
-	
+
 	rules := checker.GetSecurityRules(resource.Type)
 	for _, rule := range rules {
 		if instance.Attributes != nil && !rule.Check(instance.Attributes) {
@@ -288,7 +288,7 @@ func (ha *HealthAnalyzer) checkSecurityRules(resource *state.Resource, instance 
 				Message:       rule.Description,
 				Documentation: rule.Remediation,
 			})
-			
+
 			if rule.Remediation != "" {
 				report.Suggestions = append(report.Suggestions, rule.Remediation)
 			}
@@ -304,7 +304,7 @@ func (ha *HealthAnalyzer) calculateImpact(resource *state.Resource) ImpactLevel 
 
 	address := fmt.Sprintf("%s.%s", resource.Type, resource.Name)
 	dependents := ha.graph.GetTransitiveDependents(address)
-	
+
 	switch {
 	case len(dependents) == 0:
 		return ImpactLevelLow
@@ -329,7 +329,7 @@ func (ha *HealthAnalyzer) updateReportStatus(report *HealthReport) {
 	scoreDeduction := 0
 	hasCritical := false
 	hasHigh := false
-	
+
 	for _, issue := range report.Issues {
 		switch issue.Severity {
 		case SeverityCritical:
@@ -346,7 +346,7 @@ func (ha *HealthAnalyzer) updateReportStatus(report *HealthReport) {
 	}
 
 	report.Score = max(0, 100-scoreDeduction)
-	
+
 	// Set status
 	if hasCritical {
 		report.Status = HealthStatusCritical
@@ -368,7 +368,7 @@ func (ha *HealthAnalyzer) addDefaultChecks() {
 			if instance.Attributes == nil {
 				return nil
 			}
-			
+
 			sensitiveFields := []string{"password", "secret", "token", "api_key", "access_key"}
 			for _, field := range sensitiveFields {
 				if val, exists := instance.Attributes[field]; exists {
@@ -390,14 +390,14 @@ func (ha *HealthAnalyzer) addDefaultChecks() {
 	ha.customChecks = append(ha.customChecks, HealthCheck{
 		Name:        "missing_tags",
 		Description: "Check for missing required tags",
-		Applies:     func(resourceType string) bool { 
+		Applies: func(resourceType string) bool {
 			return strings.Contains(resourceType, "instance") || strings.Contains(resourceType, "bucket")
 		},
 		Check: func(resource *state.Resource, instance *state.Instance) *HealthIssue {
 			if instance.Attributes == nil {
 				return nil
 			}
-			
+
 			tags, exists := instance.Attributes["tags"]
 			if !exists || tags == nil {
 				return &HealthIssue{
@@ -406,7 +406,7 @@ func (ha *HealthAnalyzer) addDefaultChecks() {
 					Message:  "Resource is missing tags",
 				}
 			}
-			
+
 			// Check for required tags
 			requiredTags := []string{"Environment", "Owner", "Project"}
 			if tagMap, ok := tags.(map[string]interface{}); ok {
@@ -421,7 +421,7 @@ func (ha *HealthAnalyzer) addDefaultChecks() {
 					}
 				}
 			}
-			
+
 			return nil
 		},
 	})

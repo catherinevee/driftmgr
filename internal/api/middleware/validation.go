@@ -14,19 +14,19 @@ import (
 
 // ValidationMiddleware provides input validation and sanitization
 type ValidationMiddleware struct {
-	validator         *validator.Validate
-	maxRequestSize    int64
-	allowedProviders  []string
-	allowedRegions    map[string][]string
+	validator          *validator.Validate
+	maxRequestSize     int64
+	allowedProviders   []string
+	allowedRegions     map[string][]string
 	pathTraversalRegex *regexp.Regexp
 	sqlInjectionRegex  *regexp.Regexp
-	xssPatterns       []*regexp.Regexp
+	xssPatterns        []*regexp.Regexp
 }
 
 // NewValidationMiddleware creates a new validation middleware
 func NewValidationMiddleware() *ValidationMiddleware {
 	v := validator.New()
-	
+
 	// Register custom validators
 	v.RegisterValidation("provider", validateProvider)
 	v.RegisterValidation("region", validateRegion)
@@ -62,7 +62,7 @@ func NewValidationMiddleware() *ValidationMiddleware {
 			},
 		},
 		pathTraversalRegex: regexp.MustCompile(`\.\./|\.\.\\|%2e%2e%2f|%252e%252e%252f`),
-		sqlInjectionRegex: regexp.MustCompile(`(?i)(union|select|insert|update|delete|drop|create|alter|exec|execute|script|javascript|eval|setTimeout|setInterval)`),
+		sqlInjectionRegex:  regexp.MustCompile(`(?i)(union|select|insert|update|delete|drop|create|alter|exec|execute|script|javascript|eval|setTimeout|setInterval)`),
 		xssPatterns: []*regexp.Regexp{
 			regexp.MustCompile(`(?i)<script[^>]*>.*?</script>`),
 			regexp.MustCompile(`(?i)javascript:`),
@@ -153,7 +153,7 @@ func (m *ValidationMiddleware) ValidateJSON(target interface{}) gin.HandlerFunc 
 		// Bind JSON to target struct
 		if err := c.ShouldBindJSON(target); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Invalid JSON format",
+				"error":   "Invalid JSON format",
 				"details": err.Error(),
 			})
 			c.Abort()
@@ -167,7 +167,7 @@ func (m *ValidationMiddleware) ValidateJSON(target interface{}) gin.HandlerFunc 
 				validationErrors[err.Field()] = fmt.Sprintf("Failed validation: %s", err.Tag())
 			}
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Validation failed",
+				"error":  "Validation failed",
 				"errors": validationErrors,
 			})
 			c.Abort()
@@ -241,7 +241,7 @@ func validateNoSQL(fl validator.FieldLevel) bool {
 		"(?i)xp_cmdshell",
 		"(?i)sp_executesql",
 	}
-	
+
 	for _, pattern := range sqlPatterns {
 		if matched, _ := regexp.MatchString(pattern, value); matched {
 			return false
@@ -264,7 +264,7 @@ func validateNoXSS(fl validator.FieldLevel) bool {
 		`<link`,
 		`<style`,
 	}
-	
+
 	for _, pattern := range xssPatterns {
 		if matched, _ := regexp.MatchString("(?i)"+pattern, value); matched {
 			return false
@@ -275,29 +275,29 @@ func validateNoXSS(fl validator.FieldLevel) bool {
 
 func validateSafePath(fl validator.FieldLevel) bool {
 	path := fl.Field().String()
-	
+
 	// Check for path traversal attempts
 	dangerous := []string{
 		"..", "~", "%00", "%2e", "%252e",
 		"..\\", "../", "..%2F", "..%5C",
 	}
-	
+
 	for _, d := range dangerous {
 		if strings.Contains(strings.ToLower(path), d) {
 			return false
 		}
 	}
-	
+
 	// Check for absolute paths (security risk)
 	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
 		return false
 	}
-	
+
 	// Check for drive letters (Windows)
 	if matched, _ := regexp.MatchString(`^[a-zA-Z]:`, path); matched {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -305,15 +305,15 @@ func validateSafePath(fl validator.FieldLevel) bool {
 func SanitizeString(input string) string {
 	// HTML escape
 	output := html.EscapeString(input)
-	
+
 	// Remove null bytes
 	output = strings.ReplaceAll(output, "\x00", "")
-	
+
 	// Limit length
 	if len(output) > 10000 {
 		output = output[:10000]
 	}
-	
+
 	return output
 }
 
@@ -333,7 +333,7 @@ func (m *ValidationMiddleware) ValidateRegion(provider, region string) error {
 	if !exists {
 		return fmt.Errorf("unknown provider: %s", provider)
 	}
-	
+
 	for _, allowed := range regions {
 		if region == allowed {
 			return nil
@@ -348,12 +348,12 @@ func ValidateResourceID(resourceID string) error {
 	if len(resourceID) == 0 || len(resourceID) > 256 {
 		return fmt.Errorf("invalid resource ID length")
 	}
-	
+
 	// Check format (alphanumeric, hyphens, underscores, slashes for ARNs)
 	matched, _ := regexp.MatchString(`^[a-zA-Z0-9\-_/:\.]+$`, resourceID)
 	if !matched {
 		return fmt.Errorf("invalid resource ID format")
 	}
-	
+
 	return nil
 }

@@ -52,7 +52,7 @@ func (l *Logger) Info(format string, v ...interface{}) {
 	l.mu.RLock()
 	level := l.currentLevel
 	l.mu.RUnlock()
-	
+
 	if level <= INFO {
 		l.infoLogger.Printf(format, v...)
 	}
@@ -63,7 +63,7 @@ func (l *Logger) Error(format string, v ...interface{}) {
 	l.mu.RLock()
 	level := l.currentLevel
 	l.mu.RUnlock()
-	
+
 	if level <= ERROR {
 		l.errorLogger.Printf(format, v...)
 	}
@@ -74,7 +74,7 @@ func (l *Logger) Warning(format string, v ...interface{}) {
 	l.mu.RLock()
 	level := l.currentLevel
 	l.mu.RUnlock()
-	
+
 	if level <= WARNING {
 		l.warningLogger.Printf(format, v...)
 	}
@@ -85,7 +85,7 @@ func (l *Logger) Debug(format string, v ...interface{}) {
 	l.mu.RLock()
 	level := l.currentLevel
 	l.mu.RUnlock()
-	
+
 	if level <= DEBUG {
 		l.debugLogger.Printf(format, v...)
 	}
@@ -133,14 +133,14 @@ func (l *Logger) WithField(key, value string) *Logger {
 func (l *Logger) SetLogLevel(level LogLevel) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	
+
 	oldLevel := l.currentLevel
 	l.currentLevel = level
-	
+
 	// Log the change at the appropriate level
 	levelName := l.getLevelName(level)
 	oldLevelName := l.getLevelName(oldLevel)
-	
+
 	// Force log this message regardless of level since it's important
 	l.infoLogger.Printf("Log level changed from %s to %s", oldLevelName, levelName)
 }
@@ -183,7 +183,7 @@ func (l *Logger) SetLogLevelFromString(levelStr string) error {
 	default:
 		return fmt.Errorf("invalid log level: %s", levelStr)
 	}
-	
+
 	l.SetLogLevel(level)
 	return nil
 }

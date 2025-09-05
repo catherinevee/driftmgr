@@ -20,12 +20,12 @@ import (
 
 // GCPProviderComplete implements CloudProvider for Google Cloud Platform with full API implementation
 type GCPProviderComplete struct {
-	projectID    string
-	region       string
-	zone         string
-	httpClient   *http.Client
-	tokenSource  oauth2.TokenSource
-	baseURLs     map[string]string
+	projectID   string
+	region      string
+	zone        string
+	httpClient  *http.Client
+	tokenSource oauth2.TokenSource
+	baseURLs    map[string]string
 }
 
 // NewGCPProviderComplete creates a new GCP provider with complete implementation
@@ -38,21 +38,21 @@ func NewGCPProviderComplete(projectID string) *GCPProviderComplete {
 			Timeout: 30 * time.Second,
 		},
 		baseURLs: map[string]string{
-			"compute":         "https://compute.googleapis.com/compute/v1",
-			"storage":         "https://storage.googleapis.com/storage/v1",
-			"sql":             "https://sqladmin.googleapis.com/v1",
-			"container":       "https://container.googleapis.com/v1",
+			"compute":              "https://compute.googleapis.com/compute/v1",
+			"storage":              "https://storage.googleapis.com/storage/v1",
+			"sql":                  "https://sqladmin.googleapis.com/v1",
+			"container":            "https://container.googleapis.com/v1",
 			"cloudresourcemanager": "https://cloudresourcemanager.googleapis.com/v3",
-			"iam":             "https://iam.googleapis.com/v1",
-			"pubsub":          "https://pubsub.googleapis.com/v1",
-			"functions":       "https://cloudfunctions.googleapis.com/v2",
-			"run":             "https://run.googleapis.com/v2",
-			"redis":           "https://redis.googleapis.com/v1",
-			"firestore":       "https://firestore.googleapis.com/v1",
-			"bigtable":        "https://bigtableadmin.googleapis.com/v2",
-			"kms":             "https://cloudkms.googleapis.com/v1",
-			"logging":         "https://logging.googleapis.com/v2",
-			"monitoring":      "https://monitoring.googleapis.com/v3",
+			"iam":                  "https://iam.googleapis.com/v1",
+			"pubsub":               "https://pubsub.googleapis.com/v1",
+			"functions":            "https://cloudfunctions.googleapis.com/v2",
+			"run":                  "https://run.googleapis.com/v2",
+			"redis":                "https://redis.googleapis.com/v1",
+			"firestore":            "https://firestore.googleapis.com/v1",
+			"bigtable":             "https://bigtableadmin.googleapis.com/v2",
+			"kms":                  "https://cloudkms.googleapis.com/v1",
+			"logging":              "https://logging.googleapis.com/v2",
+			"monitoring":           "https://monitoring.googleapis.com/v3",
 		},
 	}
 }
@@ -65,7 +65,7 @@ func (p *GCPProviderComplete) Name() string {
 // Connect establishes connection to GCP
 func (p *GCPProviderComplete) Connect(ctx context.Context) error {
 	// Try to authenticate using Application Default Credentials
-	creds, err := google.FindDefaultCredentials(ctx, 
+	creds, err := google.FindDefaultCredentials(ctx,
 		"https://www.googleapis.com/auth/cloud-platform",
 		"https://www.googleapis.com/auth/compute",
 		"https://www.googleapis.com/auth/storage",
@@ -77,7 +77,7 @@ func (p *GCPProviderComplete) Connect(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to read service account key: %w", err)
 			}
-			
+
 			creds, err = google.CredentialsFromJSON(ctx, data,
 				"https://www.googleapis.com/auth/cloud-platform",
 				"https://www.googleapis.com/auth/compute",
@@ -93,7 +93,7 @@ func (p *GCPProviderComplete) Connect(ctx context.Context) error {
 
 	p.tokenSource = creds.TokenSource
 	p.httpClient = oauth2.NewClient(ctx, p.tokenSource)
-	
+
 	// If project ID not set, try to get it from credentials
 	if p.projectID == "" && creds.ProjectID != "" {
 		p.projectID = creds.ProjectID
@@ -157,12 +157,12 @@ func (p *GCPProviderComplete) DiscoverResources(ctx context.Context, region stri
 	if region != "" {
 		p.zone = region + "-a" // Default to zone a in the region
 	}
-	
+
 	resources := []models.Resource{}
-	
+
 	// TODO: Implement actual resource discovery
 	// This would involve listing various resource types from GCP
-	
+
 	return resources, nil
 }
 
@@ -170,7 +170,7 @@ func (p *GCPProviderComplete) DiscoverResources(ctx context.Context, region stri
 func (p *GCPProviderComplete) GetResource(ctx context.Context, resourceID string) (*models.Resource, error) {
 	// Try to determine resource type from ID
 	// GCP resource IDs can have various formats
-	
+
 	// Try as different resource types
 	resourceTypes := []string{
 		"google_compute_instance",
@@ -182,21 +182,21 @@ func (p *GCPProviderComplete) GetResource(ctx context.Context, resourceID string
 		"google_sql_database_instance",
 		"google_container_cluster",
 	}
-	
+
 	// Extract resource name from potential full path
 	parts := strings.Split(resourceID, "/")
 	resourceName := resourceID
 	if len(parts) > 0 {
 		resourceName = parts[len(parts)-1]
 	}
-	
+
 	// Try each resource type
 	for _, resType := range resourceTypes {
 		if res, err := p.GetResourceByType(ctx, resType, resourceName); err == nil {
 			return res, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("unable to find resource with ID: %s", resourceID)
 }
 
@@ -351,12 +351,12 @@ func (p *GCPProviderComplete) getNetwork(ctx context.Context, networkName string
 		ID:   networkName,
 		Type: "google_compute_network",
 		Attributes: map[string]interface{}{
-			"name":                       network["name"],
-			"auto_create_subnetworks":    network["autoCreateSubnetworks"],
-			"routing_mode":               network["routingConfig"].(map[string]interface{})["routingMode"],
-			"mtu":                        network["mtu"],
-			"description":                network["description"],
-			"creation_timestamp":         network["creationTimestamp"],
+			"name":                    network["name"],
+			"auto_create_subnetworks": network["autoCreateSubnetworks"],
+			"routing_mode":            network["routingConfig"].(map[string]interface{})["routingMode"],
+			"mtu":                     network["mtu"],
+			"description":             network["description"],
+			"creation_timestamp":      network["creationTimestamp"],
 		},
 	}, nil
 }
@@ -380,13 +380,13 @@ func (p *GCPProviderComplete) getSubnetwork(ctx context.Context, subnetName stri
 		ID:   subnetName,
 		Type: "google_compute_subnetwork",
 		Attributes: map[string]interface{}{
-			"name":                    subnet["name"],
-			"network":                 subnet["network"],
-			"ip_cidr_range":           subnet["ipCidrRange"],
-			"region":                  p.region,
+			"name":                     subnet["name"],
+			"network":                  subnet["network"],
+			"ip_cidr_range":            subnet["ipCidrRange"],
+			"region":                   p.region,
 			"private_ip_google_access": subnet["privateIpGoogleAccess"],
-			"purpose":                 subnet["purpose"],
-			"creation_timestamp":      subnet["creationTimestamp"],
+			"purpose":                  subnet["purpose"],
+			"creation_timestamp":       subnet["creationTimestamp"],
 		},
 	}, nil
 }
@@ -410,17 +410,17 @@ func (p *GCPProviderComplete) getFirewall(ctx context.Context, firewallName stri
 		ID:   firewallName,
 		Type: "google_compute_firewall",
 		Attributes: map[string]interface{}{
-			"name":                firewall["name"],
-			"network":             firewall["network"],
-			"priority":            firewall["priority"],
-			"source_ranges":       firewall["sourceRanges"],
-			"destination_ranges":  firewall["destinationRanges"],
-			"allowed":              firewall["allowed"],
-			"denied":               firewall["denied"],
-			"direction":           firewall["direction"],
-			"target_tags":         firewall["targetTags"],
-			"source_tags":         firewall["sourceTags"],
-			"creation_timestamp":  firewall["creationTimestamp"],
+			"name":               firewall["name"],
+			"network":            firewall["network"],
+			"priority":           firewall["priority"],
+			"source_ranges":      firewall["sourceRanges"],
+			"destination_ranges": firewall["destinationRanges"],
+			"allowed":            firewall["allowed"],
+			"denied":             firewall["denied"],
+			"direction":          firewall["direction"],
+			"target_tags":        firewall["targetTags"],
+			"source_tags":        firewall["sourceTags"],
+			"creation_timestamp": firewall["creationTimestamp"],
 		},
 	}, nil
 }
@@ -507,16 +507,16 @@ func (p *GCPProviderComplete) getSQLInstance(ctx context.Context, instanceName s
 		ID:   instanceName,
 		Type: "google_sql_database_instance",
 		Attributes: map[string]interface{}{
-			"name":                instance["name"],
-			"database_version":    instance["databaseVersion"],
-			"region":              instance["region"],
-			"tier":                settings["tier"],
-			"disk_size":           settings["dataDiskSizeGb"],
-			"disk_type":           settings["dataDiskType"],
-			"availability_type":   settings["availabilityType"],
+			"name":                 instance["name"],
+			"database_version":     instance["databaseVersion"],
+			"region":               instance["region"],
+			"tier":                 settings["tier"],
+			"disk_size":            settings["dataDiskSizeGb"],
+			"disk_type":            settings["dataDiskType"],
+			"availability_type":    settings["availabilityType"],
 			"backup_configuration": settings["backupConfiguration"],
-			"ip_configuration":    settings["ipConfiguration"],
-			"state":               instance["state"],
+			"ip_configuration":     settings["ipConfiguration"],
+			"state":                instance["state"],
 		},
 	}, nil
 }
@@ -548,11 +548,11 @@ func (p *GCPProviderComplete) getSQLDatabase(ctx context.Context, dbID string) (
 		ID:   dbID,
 		Type: "google_sql_database",
 		Attributes: map[string]interface{}{
-			"name":          db["name"],
-			"instance":      instanceName,
-			"charset":       db["charset"],
-			"collation":     db["collation"],
-			"project":       db["project"],
+			"name":      db["name"],
+			"instance":  instanceName,
+			"charset":   db["charset"],
+			"collation": db["collation"],
+			"project":   db["project"],
 		},
 	}, nil
 }
@@ -576,19 +576,19 @@ func (p *GCPProviderComplete) getGKECluster(ctx context.Context, clusterName str
 		ID:   clusterName,
 		Type: "google_container_cluster",
 		Attributes: map[string]interface{}{
-			"name":                     cluster["name"],
-			"location":                 cluster["location"],
-			"initial_node_count":       cluster["initialNodeCount"],
-			"node_config":              cluster["nodeConfig"],
-			"master_auth":              cluster["masterAuth"],
-			"network":                  cluster["network"],
-			"subnetwork":               cluster["subnetwork"],
-			"cluster_ipv4_cidr":        cluster["clusterIpv4Cidr"],
-			"services_ipv4_cidr":       cluster["servicesIpv4Cidr"],
-			"status":                   cluster["status"],
-			"current_master_version":   cluster["currentMasterVersion"],
-			"current_node_version":     cluster["currentNodeVersion"],
-			"resource_labels":          cluster["resourceLabels"],
+			"name":                   cluster["name"],
+			"location":               cluster["location"],
+			"initial_node_count":     cluster["initialNodeCount"],
+			"node_config":            cluster["nodeConfig"],
+			"master_auth":            cluster["masterAuth"],
+			"network":                cluster["network"],
+			"subnetwork":             cluster["subnetwork"],
+			"cluster_ipv4_cidr":      cluster["clusterIpv4Cidr"],
+			"services_ipv4_cidr":     cluster["servicesIpv4Cidr"],
+			"status":                 cluster["status"],
+			"current_master_version": cluster["currentMasterVersion"],
+			"current_node_version":   cluster["currentNodeVersion"],
+			"resource_labels":        cluster["resourceLabels"],
 		},
 	}, nil
 }
@@ -612,10 +612,10 @@ func (p *GCPProviderComplete) getPubSubTopic(ctx context.Context, topicName stri
 		ID:   topicName,
 		Type: "google_pubsub_topic",
 		Attributes: map[string]interface{}{
-			"name":                    topic["name"],
-			"labels":                  topic["labels"],
+			"name":                       topic["name"],
+			"labels":                     topic["labels"],
 			"message_retention_duration": topic["messageRetentionDuration"],
-			"kms_key_name":            topic["kmsKeyName"],
+			"kms_key_name":               topic["kmsKeyName"],
 		},
 	}, nil
 }
@@ -697,12 +697,12 @@ func (p *GCPProviderComplete) getCloudRunService(ctx context.Context, serviceNam
 		ID:   serviceName,
 		Type: "google_cloud_run_service",
 		Attributes: map[string]interface{}{
-			"name":         service["name"],
-			"description":  service["description"],
-			"labels":       service["labels"],
-			"annotations":  service["annotations"],
-			"generation":   service["generation"],
-			"uri":          service["uri"],
+			"name":        service["name"],
+			"description": service["description"],
+			"labels":      service["labels"],
+			"annotations": service["annotations"],
+			"generation":  service["generation"],
+			"uri":         service["uri"],
 		},
 	}, nil
 }
@@ -757,8 +757,8 @@ func (p *GCPProviderComplete) getKMSKeyRing(ctx context.Context, keyRingName str
 		ID:   keyRingName,
 		Type: "google_kms_key_ring",
 		Attributes: map[string]interface{}{
-			"name":         keyRing["name"],
-			"create_time":  keyRing["createTime"],
+			"name":        keyRing["name"],
+			"create_time": keyRing["createTime"],
 		},
 	}, nil
 }
@@ -790,13 +790,13 @@ func (p *GCPProviderComplete) getKMSCryptoKey(ctx context.Context, keyID string)
 		ID:   keyID,
 		Type: "google_kms_crypto_key",
 		Attributes: map[string]interface{}{
-			"name":                        cryptoKey["name"],
-			"purpose":                     cryptoKey["purpose"],
-			"create_time":                 cryptoKey["createTime"],
-			"rotation_period":             cryptoKey["rotationPeriod"],
-			"next_rotation_time":          cryptoKey["nextRotationTime"],
-			"version_template":            cryptoKey["versionTemplate"],
-			"labels":                      cryptoKey["labels"],
+			"name":               cryptoKey["name"],
+			"purpose":            cryptoKey["purpose"],
+			"create_time":        cryptoKey["createTime"],
+			"rotation_period":    cryptoKey["rotationPeriod"],
+			"next_rotation_time": cryptoKey["nextRotationTime"],
+			"version_template":   cryptoKey["versionTemplate"],
+			"labels":             cryptoKey["labels"],
 		},
 	}, nil
 }
@@ -1193,10 +1193,10 @@ func (p *GCPProviderComplete) listRedisInstances(ctx context.Context) ([]*models
 			ID:   instance["name"].(string),
 			Type: "google_redis_instance",
 			Attributes: map[string]interface{}{
-				"name":          instance["name"],
-				"tier":          instance["tier"],
+				"name":           instance["name"],
+				"tier":           instance["tier"],
 				"memory_size_gb": instance["memorySizeGb"],
-				"state":         instance["state"],
+				"state":          instance["state"],
 			},
 		})
 	}

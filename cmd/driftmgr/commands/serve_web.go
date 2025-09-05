@@ -56,12 +56,12 @@ func HandleServeWeb(args []string) {
 
 	fmt.Println("Starting DriftMgr web server...")
 	fmt.Println("Loading cached resources...")
-	
+
 	// Create server with config
 	config := &api.ServerConfig{
 		Port: port,
 	}
-	
+
 	// Create and start server
 	server := api.NewServer(*config)
 

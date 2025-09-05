@@ -198,7 +198,6 @@ func (p *Parser) parseTerraform(block *hcl.Block, config *TerragruntConfig) erro
 	return nil
 }
 
-
 // parseDependencies parses the dependencies block
 func (p *Parser) parseDependencies(block *hcl.Block, config *TerragruntConfig) error {
 	config.Dependencies = &Dependencies{
@@ -314,7 +313,7 @@ func hclFunctions() map[string]function.Function {
 	return map[string]function.Function{
 		"find_in_parent_folders": function.New(&function.Spec{
 			Params: []function.Parameter{},
-			Type: function.StaticReturnType(cty.String),
+			Type:   function.StaticReturnType(cty.String),
 			Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
 				// Mock implementation
 				return cty.StringVal("../terragrunt.hcl"), nil
@@ -322,7 +321,7 @@ func hclFunctions() map[string]function.Function {
 		}),
 		"path_relative_to_include": function.New(&function.Spec{
 			Params: []function.Parameter{},
-			Type: function.StaticReturnType(cty.String),
+			Type:   function.StaticReturnType(cty.String),
 			Impl: func(args []cty.Value, retType cty.Type) (cty.Value, error) {
 				// Mock implementation
 				return cty.StringVal("."), nil
