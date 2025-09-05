@@ -352,9 +352,3 @@ func loadRollbackData() *simulation.RollbackData {
 func clearRollbackData() {
 	os.Remove(".driftmgr/rollback.json")
 }
-
-// Additional imports needed
-import (
-	"encoding/json"
-	"time"
-)

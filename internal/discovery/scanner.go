@@ -16,11 +16,15 @@ import (
 
 // BackendConfig represents a discovered Terraform backend configuration
 type BackendConfig struct {
-	Type       string                 `json:"type"`
-	Attributes map[string]interface{} `json:"attributes"`
-	FilePath   string                 `json:"file_path"`
-	Module     string                 `json:"module,omitempty"`
-	Workspace  string                 `json:"workspace,omitempty"`
+	ID           string                 `json:"id"`
+	Type         string                 `json:"type"`
+	Attributes   map[string]interface{} `json:"attributes"`
+	FilePath     string                 `json:"file_path"`
+	Module       string                 `json:"module,omitempty"`
+	Workspace    string                 `json:"workspace,omitempty"`
+	ConfigPath   string                 `json:"config_path"`
+	Config       map[string]interface{} `json:"config"`
+	WorkspaceDir string                 `json:"workspace_dir,omitempty"`
 }
 
 // Scanner discovers Terraform backend configurations

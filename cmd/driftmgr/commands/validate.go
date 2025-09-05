@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	// "github.com/catherinevee/driftmgr/internal/core/discovery" // Not yet implemented
+	"github.com/catherinevee/driftmgr/internal/discovery"
 )
 
 // HandleValidate handles the validate command

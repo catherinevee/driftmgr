@@ -108,7 +108,7 @@ jobs:
         go build -ldflags="$LDFLAGS" -o dist/driftmgr-$GOOS-$GOARCH$SUFFIX ./cmd/driftmgr
         
         # Build server binary
-        go build -ldflags="$LDFLAGS" -o dist/driftmgr-server-$GOOS-$GOARCH$SUFFIX ./cmd/driftmgr-server
+        go build -ldflags="$LDFLAGS" -o dist/driftmgr-server-$GOOS-$GOARCH$SUFFIX ./cmd/server
         
         # Build TUI binary if it exists
         if [ -d "cmd/driftmgr-tui" ]; then

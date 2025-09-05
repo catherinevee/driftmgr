@@ -12,7 +12,20 @@ import (
 
 	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/catherinevee/driftmgr/internal/remediation"
+	"github.com/catherinevee/driftmgr/internal/discovery"
+	"github.com/fatih/color"
 )
+
+// Simple deletion stub for compilation
+var deletion = struct {
+	NewAWSProvider   func() (interface{}, error)
+	NewAzureProvider func() (interface{}, error)
+	NewGCPProvider   func() (interface{}, error)
+}{
+	NewAWSProvider:   func() (interface{}, error) { return nil, fmt.Errorf("not implemented") },
+	NewAzureProvider: func() (interface{}, error) { return nil, fmt.Errorf("not implemented") },
+	NewGCPProvider:   func() (interface{}, error) { return nil, fmt.Errorf("not implemented") },
+}
 
 // BulkDeleteOptions represents options for bulk deletion
 type BulkDeleteOptions struct {

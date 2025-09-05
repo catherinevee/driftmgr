@@ -5,20 +5,64 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/api/handlers"
 )
 
+// CheckType represents the type of health check
+type CheckType string
+
+const (
+	CheckTypeLiveness  CheckType = "liveness"
+	CheckTypeReadiness CheckType = "readiness"
+)
+
+// HealthChecker manages health checks
+type HealthChecker struct {
+	checks  []HealthCheck
+	timeout time.Duration
+	mu      sync.RWMutex
+}
+
+// HealthCheck interface for health checks
+type HealthCheck interface {
+	Name() string
+	Check(ctx context.Context) error
+	Type() CheckType
+	Critical() bool
+}
+
+// NewHealthChecker creates a new health checker
+func NewHealthChecker(timeout time.Duration) *HealthChecker {
+	return &HealthChecker{
+		checks:  []HealthCheck{},
+		timeout: timeout,
+	}
+}
+
+// RegisterCheck registers a health check
+func (h *HealthChecker) RegisterCheck(check HealthCheck) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.checks = append(h.checks, check)
+}
+
+// Start starts background health checks
+func (h *HealthChecker) Start(ctx context.Context) {
+	// Background health check implementation would go here
+}
+
 // HealthServer provides health check endpoints
 type HealthServer struct {
-	checker *config.HealthChecker
+	checker *HealthChecker
 	db      *sql.DB
 }
 
 // NewHealthServer creates a new health server
 func NewHealthServer(db *sql.DB) *HealthServer {
-	checker := config.NewHealthChecker(5 * time.Second)
+	checker := NewHealthChecker(5 * time.Second)
 
 	// Add database check
 	if db != nil {
@@ -129,8 +173,8 @@ func (d *DatabaseCheck) Check(ctx context.Context) error {
 	return d.db.PingContext(ctx)
 }
 
-func (d *DatabaseCheck) Type() health.CheckType {
-	return health.CheckTypeReadiness
+func (d *DatabaseCheck) Type() CheckType {
+	return CheckTypeReadiness
 }
 
 func (d *DatabaseCheck) Critical() bool {
@@ -149,8 +193,8 @@ func (a *APICheck) Check(ctx context.Context) error {
 	return nil
 }
 
-func (a *APICheck) Type() health.CheckType {
-	return health.CheckTypeLiveness
+func (a *APICheck) Type() CheckType {
+	return CheckTypeLiveness
 }
 
 func (a *APICheck) Critical() bool {
@@ -170,8 +214,8 @@ func (d *DiscoveryCheck) Check(ctx context.Context) error {
 	return nil
 }
 
-func (d *DiscoveryCheck) Type() health.CheckType {
-	return health.CheckTypeReadiness
+func (d *DiscoveryCheck) Type() CheckType {
+	return CheckTypeReadiness
 }
 
 func (d *DiscoveryCheck) Critical() bool {

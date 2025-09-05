@@ -23,7 +23,7 @@ on:
         type: boolean
 
 env:
-  GO_VERSION: '1.23.8'
+  GO_VERSION: '1.23'
 
 jobs:
   dependency_scan:
@@ -263,7 +263,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./deployments/docker/Dockerfile
+        file: ./Dockerfile
         load: true
         tags: driftmgr:scan
         cache-from: type=gha

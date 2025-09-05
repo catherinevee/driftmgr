@@ -35,7 +35,7 @@ func NewProvider(providerName string, config map[string]interface{}) (CloudProvi
 		if p, ok := config["project_id"].(string); ok {
 			projectID = p
 		}
-		return NewGCPProvider(projectID, ""), nil
+		return gcp.NewGCPProviderComplete(projectID), nil
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", providerName)
 	}

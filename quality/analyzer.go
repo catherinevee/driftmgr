@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -49,6 +50,34 @@ func NewAnalyzer(projectRoot string) *Analyzer {
 	}
 }
 
+// AnalysisResults contains project-wide analysis results
+type AnalysisResults struct {
+	TotalFiles        int
+	TotalLines        int
+	TotalFunctions    int
+	AvgComplexity     float64
+	MaxComplexity     int
+	ComplexFunctions  []ComplexFunction
+	Issues            []Issue
+}
+
+// ComplexFunction represents a function with high complexity
+type ComplexFunction struct {
+	File       string
+	Function   string
+	Complexity int
+	Line       int
+}
+
+// Issue represents a quality issue
+type Issue struct {
+	File        string
+	Line        int
+	Type        string
+	Message     string
+	Severity    string
+}
+
 // FileMetrics contains metrics for a single file
 type FileMetrics struct {
 	Path                 string
@@ -65,6 +94,7 @@ type FileMetrics struct {
 // FunctionMetrics contains metrics for a function
 type FunctionMetrics struct {
 	Name                 string
+	LineNumber           int
 	Lines                int
 	Arguments            int
 	CyclomaticComplexity int
@@ -144,10 +174,12 @@ func (v *astVisitor) Visit(node ast.Node) ast.Visitor {
 }
 
 func (v *astVisitor) visitFunction(fn *ast.FuncDecl) ast.Visitor {
+	pos := v.fset.Position(fn.Pos())
 	funcMetrics := FunctionMetrics{
-		Name:      fn.Name.Name,
-		Lines:     countFunctionLines(v.fset, fn),
-		Arguments: countArguments(fn),
+		Name:       fn.Name.Name,
+		LineNumber: pos.Line,
+		Lines:      countFunctionLines(v.fset, fn),
+		Arguments:  countArguments(fn),
 	}
 
 	// Calculate complexity
@@ -220,6 +252,80 @@ func (v *astVisitor) checkFunctionViolations(fm *FunctionMetrics, fn *ast.FuncDe
 			Suggestion: "Simplify the logic or extract helper functions",
 		})
 	}
+}
+
+// AnalyzeProject analyzes the entire project
+func (a *Analyzer) AnalyzeProject() (*AnalysisResults, error) {
+	results := &AnalysisResults{
+		ComplexFunctions: []ComplexFunction{},
+		Issues:          []Issue{},
+	}
+	
+	err := filepath.Walk(a.projectRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		
+		// Skip vendor and test files
+		if strings.Contains(path, "vendor") || strings.Contains(path, ".git") {
+			return nil
+		}
+		
+		if strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go") {
+			fileMetrics, err := a.AnalyzeFile(path)
+			if err != nil {
+				return err
+			}
+			
+			results.TotalFiles++
+			results.TotalLines += fileMetrics.Lines
+			results.TotalFunctions += len(fileMetrics.Functions)
+			
+			// Track complex functions
+			for _, fn := range fileMetrics.Functions {
+				if fn.CyclomaticComplexity > a.thresholds.CyclomaticComplexity {
+					results.ComplexFunctions = append(results.ComplexFunctions, ComplexFunction{
+						File:       path,
+						Function:   fn.Name,
+						Complexity: fn.CyclomaticComplexity,
+						Line:       fn.LineNumber,
+					})
+				}
+				
+				if fn.CyclomaticComplexity > results.MaxComplexity {
+					results.MaxComplexity = fn.CyclomaticComplexity
+				}
+			}
+			
+			// Track issues
+			for _, violation := range fileMetrics.Violations {
+				results.Issues = append(results.Issues, Issue{
+					File:     path,
+					Line:     violation.Line,
+					Type:     violation.Type,
+					Message:  violation.Message,
+					Severity: violation.Severity,
+				})
+			}
+		}
+		
+		return nil
+	})
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	// Calculate average complexity
+	if results.TotalFunctions > 0 {
+		totalComplexity := 0
+		for _, fn := range results.ComplexFunctions {
+			totalComplexity += fn.Complexity
+		}
+		results.AvgComplexity = float64(totalComplexity) / float64(results.TotalFunctions)
+	}
+	
+	return results, nil
 }
 
 func (a *Analyzer) checkFileViolations(metrics *FileMetrics) {

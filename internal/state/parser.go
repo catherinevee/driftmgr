@@ -15,6 +15,14 @@ type TerraformState struct {
 	Outputs          map[string]OutputValue `json:"outputs,omitempty"`
 	Resources        []Resource             `json:"resources"`
 	CheckResults     []CheckResult          `json:"check_results,omitempty"`
+	Modules          []Module               `json:"modules,omitempty"`
+}
+
+// Module represents a module in the state
+type Module struct {
+	Path      []string               `json:"path"`
+	Outputs   map[string]OutputValue `json:"outputs,omitempty"`
+	Resources map[string]Resource    `json:"resources,omitempty"`
 }
 
 // Resource represents a resource in the state

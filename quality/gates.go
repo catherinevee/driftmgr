@@ -276,15 +276,15 @@ func (g *NamingGate) Check(projectPath string) (bool, []string) {
 
 // Helper functions
 
-func checkFileComplexity(filepath string, maxComplexity int) bool {
+func checkFileComplexity(filePath string, maxComplexity int) bool {
 	gate := &ComplexityGate{maxComplexity: maxComplexity}
-	violations := gate.checkFileComplexity(filepath)
+	violations := gate.checkFileComplexity(filePath)
 	return len(violations) == 0
 }
 
-func checkFileNaming(filepath string) bool {
+func checkFileNaming(filePath string) bool {
 	// Check file naming conventions
-	base := filepath.Base(filepath)
+	base := filepath.Base(filePath)
 	
 	// Files should be lowercase with underscores
 	if strings.ToLower(base) != base {

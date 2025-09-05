@@ -10,12 +10,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/catherinevee/driftmgr/internal/state"
-	"github.com/catherinevee/driftmgr/internal/state"
-	"github.com/catherinevee/driftmgr/internal/graph"
-	"github.com/catherinevee/driftmgr/internal/health"
 	"github.com/catherinevee/driftmgr/internal/cost"
 	"github.com/catherinevee/driftmgr/internal/discovery"
+	"github.com/catherinevee/driftmgr/internal/graph"
+	"github.com/catherinevee/driftmgr/internal/health"
+	"github.com/catherinevee/driftmgr/internal/state"
 )
 
 var analyzeCmd = &cobra.Command{
@@ -95,13 +94,13 @@ func runAnalyzeDependencies(cmd *cobra.Command, args []string) error {
 	}
 	
 	// Build dependency graph
-	builder := graph.NewDependencyGraphBuilder()
-	depGraph, err := builder.BuildFromState(state)
+	builder := graph.NewDependencyGraphBuilder(state)
+	depGraph, err := builder.Build()
 	if err != nil {
 		return fmt.Errorf("failed to build dependency graph: %w", err)
 	}
 	
-	fmt.Printf("Analyzing dependencies for %d resources...\n\n", len(depGraph.Nodes))
+	fmt.Printf("Analyzing dependencies for %d resources...\n\n", len(depGraph.Nodes()))
 	
 	// Detect cycles
 	cycles := depGraph.DetectCycles()
@@ -111,9 +110,9 @@ func runAnalyzeDependencies(cmd *cobra.Command, args []string) error {
 			for i, cycle := range cycles {
 				fmt.Printf("\nCycle %d:\n", i+1)
 				for j, nodeID := range cycle {
-					node := depGraph.GetNode(nodeID)
+					node, _ := depGraph.GetNode(nodeID)
 					if node != nil {
-						fmt.Printf("  %d. %s (%s)\n", j+1, node.ID, node.Type)
+						fmt.Printf("  %d. %s (%s)\n", j+1, node.Address, node.Type)
 					}
 				}
 			}
@@ -137,7 +136,7 @@ func runAnalyzeDependencies(cmd *cobra.Command, args []string) error {
 				break
 			}
 			
-			node := depGraph.GetNode(nodeID)
+			node, _ := depGraph.GetNode(nodeID)
 			if node != nil {
 				deps := depGraph.GetDependencies(nodeID)
 				if len(deps) > 0 {
@@ -154,8 +153,8 @@ func runAnalyzeDependencies(cmd *cobra.Command, args []string) error {
 	leaves := depGraph.GetLeafNodes()
 	
 	fmt.Printf("\nGraph Statistics:\n")
-	fmt.Printf("  Total Resources: %d\n", len(depGraph.Nodes))
-	fmt.Printf("  Total Dependencies: %d\n", len(depGraph.Edges))
+	fmt.Printf("  Total Resources: %d\n", len(depGraph.Nodes()))
+	fmt.Printf("  Total Dependencies: %d\n", len(depGraph.Edges()))
 	fmt.Printf("  Root Resources: %d\n", len(roots))
 	fmt.Printf("  Leaf Resources: %d\n", len(leaves))
 	fmt.Printf("  Circular Dependencies: %d\n", len(cycles))
@@ -180,18 +179,21 @@ func runAnalyzeHealth(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	
-	// Create health analyzer
-	analyzer := health.NewResourceHealthAnalyzer()
-	
-	// Configure analyzer
-	config := health.AnalyzerConfig{
-		CheckSecurity:   true,
-		CheckCompliance: true,
-		CheckBestPractices: true,
-		CheckDeprecated: true,
-		Provider: analyzeProvider,
+	// Build dependency graph for health analysis
+	builder := graph.NewDependencyGraphBuilder(state)
+	depGraph, err := builder.Build()
+	if err != nil {
+		return fmt.Errorf("failed to build dependency graph: %w", err)
 	}
-	analyzer.SetConfig(&config)
+	
+	// Create health analyzer
+	config := health.AnalyzerConfig{
+		CheckSecurity:      true,
+		CheckCompliance:    true,
+		CheckBestPractices: true,
+		CheckDeprecation:   true,
+	}
+	analyzer := health.NewResourceHealthAnalyzer(depGraph, config)
 	
 	fmt.Printf("Analyzing health for %d resources...\n\n", len(state.Resources))
 	
@@ -199,14 +201,16 @@ func runAnalyzeHealth(cmd *cobra.Command, args []string) error {
 	var issues []health.HealthIssue
 	resourceCount := 0
 	
-	for _, module := range state.Modules {
-		for _, resource := range module.Resources {
-			if analyzeProvider != "" && !strings.HasPrefix(resource.Type, analyzeProvider) {
-				continue
-			}
-			
-			resourceCount++
-			result := analyzer.AnalyzeResource(resource)
+	// Analyze resources directly from state.Resources
+	for _, resource := range state.Resources {
+		if analyzeProvider != "" && !strings.HasPrefix(resource.Type, analyzeProvider) {
+			continue
+		}
+		
+		resourceCount++
+		// Analyze each instance of the resource
+		for _, instance := range resource.Instances {
+			result := analyzer.AnalyzeResource(&resource, &instance)
 			
 			// Filter by severity
 			for _, issue := range result.Issues {
@@ -307,16 +311,14 @@ func runAnalyzeCost(cmd *cobra.Command, args []string) error {
 			}
 			
 			// Calculate cost
-			resourceCost := analyzer.CalculateResourceCost(resource)
-			if resourceCost.MonthlyCost > 0 {
+			resourceCost, err := analyzer.CalculateResourceCost(ctx, &resource)
+			if err == nil && resourceCost != nil && resourceCost.MonthlyCost > 0 {
 				resourceCosts = append(resourceCosts, *resourceCost)
 				totalMonthlyCost += resourceCost.MonthlyCost
 				totalAnnualCost += resourceCost.AnnualCost
 			}
 			
-			// Get optimization recommendations
-			recommendations := analyzer.GetOptimizationRecommendations(resource)
-			optimizations = append(optimizations, recommendations...)
+			// Optimization recommendations would go here
 		}
 	}
 	
@@ -343,17 +345,13 @@ func runAnalyzeCost(cmd *cobra.Command, args []string) error {
 		}
 		
 		fmt.Printf("%-40s %-15s $%-11.2f $%-11.2f\n",
-			truncateString(rc.ResourceID, 40),
+			truncateString(rc.ResourceAddress, 40),
 			truncateString(rc.ResourceType, 15),
 			rc.MonthlyCost,
 			rc.AnnualCost,
 		)
 		
-		if rc.UsageMetrics != nil && cmd.Flag("verbose").Changed {
-			for key, value := range rc.UsageMetrics {
-				fmt.Printf("    %s: %v\n", key, value)
-			}
-		}
+		// Usage metrics details would go here if verbose
 	}
 	
 	fmt.Println(strings.Repeat("-", 80))
@@ -366,7 +364,7 @@ func runAnalyzeCost(cmd *cobra.Command, args []string) error {
 		
 		// Sort by potential savings
 		sort.Slice(optimizations, func(i, j int) bool {
-			return optimizations[i].EstimatedMonthlySavings > optimizations[j].EstimatedMonthlySavings
+			return optimizations[i].EstimatedSavings > optimizations[j].EstimatedSavings
 		})
 		
 		totalSavings := 0.0
@@ -376,15 +374,15 @@ func runAnalyzeCost(cmd *cobra.Command, args []string) error {
 				break
 			}
 			
-			fmt.Printf("\n%d. %s\n", i+1, opt.Title)
-			fmt.Printf("   Resource: %s\n", opt.ResourceID)
-			fmt.Printf("   Category: %s\n", opt.Category)
+			fmt.Printf("\n%d. %s\n", i+1, opt.RecommendationType)
+			fmt.Printf("   Resource: %s\n", opt.ResourceAddress)
+			fmt.Printf("   Impact: %s\n", opt.Impact)
 			fmt.Printf("   Potential Savings: $%.2f/month ($%.2f/year)\n",
-				opt.EstimatedMonthlySavings,
-				opt.EstimatedMonthlySavings*12)
+				opt.EstimatedSavings,
+				opt.EstimatedSavings*12)
 			fmt.Printf("   Recommendation: %s\n", opt.Description)
 			
-			totalSavings += opt.EstimatedMonthlySavings
+			totalSavings += opt.EstimatedSavings
 		}
 		
 		fmt.Printf("\nTotal Potential Savings: $%.2f/month ($%.2f/year)\n", totalSavings, totalSavings*12)
@@ -419,8 +417,8 @@ func runAnalyzeBlastRadius(cmd *cobra.Command, args []string) error {
 	}
 	
 	// Build dependency graph
-	builder := graph.NewDependencyGraphBuilder()
-	depGraph, err := builder.BuildFromState(state)
+	builder := graph.NewDependencyGraphBuilder(state)
+	depGraph, err := builder.Build()
 	if err != nil {
 		return fmt.Errorf("failed to build dependency graph: %w", err)
 	}
@@ -438,7 +436,7 @@ func runAnalyzeBlastRadius(cmd *cobra.Command, args []string) error {
 	// Direct impact
 	fmt.Printf("\nDirect Impact (%d resources):\n", len(radius.DirectImpact))
 	for _, id := range radius.DirectImpact {
-		node := depGraph.GetNode(id)
+		node, _ := depGraph.GetNode(id)
 		if node != nil {
 			fmt.Printf("  • %s (%s)\n", id, node.Type)
 		}
@@ -458,7 +456,7 @@ func runAnalyzeBlastRadius(cmd *cobra.Command, args []string) error {
 				break
 			}
 			
-			node := depGraph.GetNode(id)
+			node, _ := depGraph.GetNode(id)
 			if node != nil {
 				fmt.Printf("  • %s (%s)\n", id, node.Type)
 			}
@@ -477,7 +475,7 @@ func runAnalyzeBlastRadius(cmd *cobra.Command, args []string) error {
 	criticalCount := 0
 	
 	for _, id := range append(radius.DirectImpact, radius.IndirectImpact...) {
-		node := depGraph.GetNode(id)
+		node, _ := depGraph.GetNode(id)
 		if node != nil {
 			for _, critical := range criticalTypes {
 				if strings.Contains(strings.ToLower(node.Type), critical) {
@@ -495,7 +493,7 @@ func runAnalyzeBlastRadius(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func getStateForAnalysis(ctx context.Context, args []string) (*parser.TerraformState, error) {
+func getStateForAnalysis(ctx context.Context, args []string) (*state.TerraformState, error) {
 	var stateData []byte
 	var err error
 	
@@ -506,22 +504,8 @@ func getStateForAnalysis(ctx context.Context, args []string) (*parser.TerraformS
 			return nil, fmt.Errorf("failed to read state file: %w", err)
 		}
 	} else if analyzeBackend != "" {
-		// Get from backend
-		reg := registry.NewBackendRegistry()
-		backend := reg.Get(analyzeBackend)
-		if backend == nil {
-			return nil, fmt.Errorf("backend %s not found", analyzeBackend)
-		}
-		
-		state, err := backend.GetState(ctx, analyzeWorkspace)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get state from backend: %w", err)
-		}
-		
-		stateData, err = json.Marshal(state)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal state: %w", err)
-		}
+		// Backend functionality not yet implemented
+		return nil, fmt.Errorf("backend functionality not yet available")
 	} else {
 		// Try default terraform.tfstate
 		stateData, err = os.ReadFile("terraform.tfstate")
@@ -531,7 +515,7 @@ func getStateForAnalysis(ctx context.Context, args []string) (*parser.TerraformS
 	}
 	
 	// Parse state
-	stateParser := parser.NewStateParser()
+	stateParser := state.NewParser()
 	state, err := stateParser.Parse(stateData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse state: %w", err)

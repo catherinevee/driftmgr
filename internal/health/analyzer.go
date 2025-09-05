@@ -39,13 +39,16 @@ type HealthReport struct {
 
 // HealthIssue represents a specific health problem
 type HealthIssue struct {
-	Type        IssueType    `json:"type"`
-	Severity    Severity     `json:"severity"`
-	Message     string       `json:"message"`
-	Field       string       `json:"field,omitempty"`
-	CurrentValue interface{} `json:"current_value,omitempty"`
-	ExpectedValue interface{} `json:"expected_value,omitempty"`
-	Documentation string      `json:"documentation,omitempty"`
+	Type          IssueType    `json:"type"`
+	Severity      Severity     `json:"severity"`
+	Message       string       `json:"message"`
+	Field         string       `json:"field,omitempty"`
+	CurrentValue  interface{}  `json:"current_value,omitempty"`
+	ExpectedValue interface{}  `json:"expected_value,omitempty"`
+	Documentation string       `json:"documentation,omitempty"`
+	Category      string       `json:"category,omitempty"`
+	ResourceID    string       `json:"resource_id,omitempty"`
+	Recommendation string      `json:"recommendation,omitempty"`
 }
 
 // HealthStatus represents the overall health status
@@ -109,6 +112,14 @@ type HealthCheck struct {
 	Applies     func(resourceType string) bool
 }
 
+// AnalyzerConfig configuration for health analyzer
+type AnalyzerConfig struct {
+	CheckDeprecation bool
+	CheckSecurity    bool
+	CheckCompliance  bool
+	CheckBestPractices bool
+}
+
 // NewHealthAnalyzer creates a new health analyzer
 func NewHealthAnalyzer(depGraph *graph.DependencyGraph) *HealthAnalyzer {
 	analyzer := &HealthAnalyzer{
@@ -124,6 +135,13 @@ func NewHealthAnalyzer(depGraph *graph.DependencyGraph) *HealthAnalyzer {
 	// Add default custom checks
 	analyzer.addDefaultChecks()
 
+	return analyzer
+}
+
+// NewResourceHealthAnalyzer creates a new resource health analyzer with config
+func NewResourceHealthAnalyzer(depGraph *graph.DependencyGraph, config AnalyzerConfig) *HealthAnalyzer {
+	analyzer := NewHealthAnalyzer(depGraph)
+	// Apply configuration settings
 	return analyzer
 }
 

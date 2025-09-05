@@ -299,7 +299,7 @@ func (g *ReportGenerator) calculateMaintainabilityIndex(metrics QualityMetrics) 
 	mi := 171.0
 	mi -= 5.2 * math.Log(float64(metrics.TotalLines))
 	mi -= 0.23 * metrics.AvgComplexity
-	mi -= 16.2 * math.Log(float64(metrics.TotalLines)/float64(max(1, metrics.TotalFunctions)))
+	mi -= 16.2 * math.Log(float64(metrics.TotalLines)/max(1, float64(metrics.TotalFunctions)))
 	
 	// Normalize to 0-100
 	mi = mi * 100 / 171

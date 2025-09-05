@@ -1,0 +1,249 @@
+# DriftMgr Production Configuration
+
+# Server configuration
+server:
+  host: 0.0.0.0
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 10s
+  
+# API configuration
+api:
+  base_path: /api
+  version: v1
+  rate_limit: 100
+  cors:
+    enabled: true
+    origins:
+      - "*"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    headers:
+      - Content-Type
+      - Authorization
+
+# Database configuration
+database:
+  type: postgres
+  host: ${DB_HOST:-localhost}
+  port: ${DB_PORT:-5432}
+  name: ${DB_NAME:-driftmgr}
+  user: ${DB_USER:-driftmgr}
+  password: ${DB_PASSWORD}
+  ssl_mode: ${DB_SSL_MODE:-disable}
+  max_connections: 25
+  max_idle_connections: 5
+  connection_lifetime: 5m
+
+# Cache configuration
+cache:
+  type: redis
+  host: ${REDIS_HOST:-localhost}
+  port: ${REDIS_PORT:-6379}
+  password: ${REDIS_PASSWORD}
+  db: 0
+  ttl: 5m
+  
+# Provider configuration
+providers:
+  aws:
+    regions:
+      - us-east-1
+      - us-west-2
+    assume_role_arn: ${AWS_ASSUME_ROLE_ARN}
+    external_id: ${AWS_EXTERNAL_ID}
+    max_retries: 3
+    timeout: 30s
+    
+  azure:
+    subscription_id: ${AZURE_SUBSCRIPTION_ID}
+    tenant_id: ${AZURE_TENANT_ID}
+    client_id: ${AZURE_CLIENT_ID}
+    client_secret: ${AZURE_CLIENT_SECRET}
+    timeout: 30s
+    
+  gcp:
+    project_id: ${GCP_PROJECT_ID}
+    credentials_path: ${GOOGLE_APPLICATION_CREDENTIALS}
+    timeout: 30s
+    
+  digitalocean:
+    token: ${DIGITALOCEAN_TOKEN}
+    timeout: 30s
+
+# State management
+state:
+  backends:
+    s3:
+      enabled: true
+      buckets:
+        - terraform-states
+      region: us-east-1
+    
+    azurerm:
+      enabled: true
+      storage_accounts:
+        - tfstatestorage
+    
+    gcs:
+      enabled: true
+      buckets:
+        - tf-state-bucket
+  
+  cache:
+    enabled: true
+    ttl: 5m
+    max_size: 100MB
+
+# Drift detection
+drift:
+  default_mode: smart
+  modes:
+    quick:
+      timeout: 30s
+      parallel_workers: 20
+      check_existence_only: true
+    
+    deep:
+      timeout: 5m
+      parallel_workers: 10
+      check_all_attributes: true
+    
+    smart:
+      timeout: 2m
+      parallel_workers: 15
+      criticality_based: true
+  
+  criticality:
+    critical:
+      - aws_db_instance
+      - aws_security_group
+      - aws_iam_role
+      - azure_sql_database
+      - google_sql_database_instance
+    
+    high:
+      - aws_alb
+      - aws_network_acl
+      - aws_kms_key
+      - azure_lb
+      - google_compute_firewall
+    
+    medium:
+      - aws_instance
+      - aws_s3_bucket
+      - azure_virtual_machine
+      - google_compute_instance
+    
+    low:
+      - aws_s3_bucket_object
+      - aws_route53_record
+      - tags
+
+# Remediation configuration
+remediation:
+  default_strategy: code_as_truth
+  strategies:
+    code_as_truth:
+      enabled: true
+      dry_run: true
+      require_approval: true
+    
+    cloud_as_truth:
+      enabled: true
+      create_pr: true
+      branch_prefix: drift-fix
+    
+    manual:
+      enabled: true
+      notification_channels:
+        - slack
+        - email
+  
+  safety:
+    max_resources_per_operation: 50
+    require_backup: true
+    rollback_on_error: true
+
+# Monitoring
+monitoring:
+  metrics:
+    enabled: true
+    port: 9090
+    path: /metrics
+  
+  health:
+    enabled: true
+    liveness_path: /health/live
+    readiness_path: /health/ready
+  
+  tracing:
+    enabled: ${TRACING_ENABLED:-false}
+    jaeger_endpoint: ${JAEGER_ENDPOINT:-http://localhost:14268/api/traces}
+    sample_rate: 0.1
+
+# Logging
+logging:
+  level: ${LOG_LEVEL:-info}
+  format: json
+  output: stdout
+  file:
+    enabled: false
+    path: /var/log/driftmgr/app.log
+    max_size: 100MB
+    max_backups: 7
+    max_age: 30
+
+# Security
+security:
+  jwt:
+    enabled: ${JWT_ENABLED:-false}
+    secret: ${JWT_SECRET}
+    expiry: 24h
+  
+  encryption:
+    enabled: true
+    key: ${ENCRYPTION_KEY}
+  
+  tls:
+    enabled: ${TLS_ENABLED:-false}
+    cert_file: ${TLS_CERT_FILE}
+    key_file: ${TLS_KEY_FILE}
+
+# Notifications
+notifications:
+  slack:
+    enabled: ${SLACK_ENABLED:-false}
+    webhook_url: ${SLACK_WEBHOOK_URL}
+    channel: ${SLACK_CHANNEL:-#driftmgr}
+  
+  email:
+    enabled: ${EMAIL_ENABLED:-false}
+    smtp_host: ${SMTP_HOST}
+    smtp_port: ${SMTP_PORT:-587}
+    smtp_user: ${SMTP_USER}
+    smtp_password: ${SMTP_PASSWORD}
+    from: ${EMAIL_FROM:-driftmgr@example.com}
+    to:
+      - ${EMAIL_TO}
+
+# Performance tuning
+performance:
+  workers: ${WORKERS:-10}
+  batch_size: ${BATCH_SIZE:-100}
+  rate_limit: ${RATE_LIMIT:-1000}
+  timeout: ${TIMEOUT:-30s}
+  max_concurrent_operations: 50
+
+# Feature flags
+features:
+  continuous_monitoring: true
+  auto_remediation: false
+  terragrunt_support: true
+  import_generation: true
+  cost_analysis: true
+  compliance_reporting: true

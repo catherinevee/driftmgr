@@ -716,8 +716,18 @@ func displayPlanSummary(plan *remediation.RemediationPlan) {
 	fmt.Println(strings.Repeat("─", 60))
 }
 
+// DriftRecord represents a drift record from the API
+type DriftRecord struct {
+	ResourceID   string
+	ResourceType string
+	Provider     string
+	Region       string
+	DriftType    string
+	Severity     string
+}
+
 // convertDriftRecordToResult converts a DriftRecord to DriftResult
-func convertDriftRecordToResult(record *api.DriftRecord) *models.DriftResult {
+func convertDriftRecordToResult(record *DriftRecord) *models.DriftResult {
 	result := &models.DriftResult{
 		ResourceID:   record.ResourceID,
 		ResourceName: record.ResourceID, // Use ResourceID as name if not available

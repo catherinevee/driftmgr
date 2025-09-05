@@ -168,8 +168,16 @@ Before marking any feature as complete:
 
 ### Common Commands
 ```bash
-# Build
+# Build main CLI
 go build -o driftmgr.exe ./cmd/driftmgr
+
+# Build server mode
+go build -o driftmgr-server.exe ./cmd/driftmgr-server
+# Alternative server location
+go build -o server.exe ./cmd/server
+
+# Build validation tool
+go build -o validate.exe ./cmd/validate
 
 # Test
 go test ./... -v
@@ -177,7 +185,7 @@ go test ./... -v
 # Run
 ./driftmgr.exe discover --provider aws --region us-east-1
 
-# Docker build
+# Docker build (using root Dockerfile)
 docker build -t catherinevee/driftmgr:latest .
 
 # Run in Docker
@@ -282,6 +290,18 @@ docker run --rm -v ~/.aws:/root/.aws catherinevee/driftmgr discover --provider a
 ### Credential Detection
 - **Problem**: Can't find cloud credentials
 - **Solution**: Check environment variables and credential files
+
+## GitHub Actions Workflows
+
+### Available Commands for Workflows
+- **Main CLI**: `./cmd/driftmgr` - Primary drift management tool
+- **Server Mode**: `./cmd/driftmgr-server` or `./cmd/server` - API server
+- **Validation Tool**: `./cmd/validate` - State and configuration validation
+- **Quality Tools**: Located in `quality/cmd/` for code quality analysis
+- **UAT Tools**: Located in `tests/uat/` for user acceptance testing
+
+### Dockerfile Location
+The project uses the root `./Dockerfile` for all Docker builds. The alternative location at `./deployments/docker/Dockerfile` is deprecated.
 
 ## CI/CD Secrets Required
 

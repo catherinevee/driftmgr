@@ -39,6 +39,16 @@ type ResourceCost struct {
 	Tags            map[string]string  `json:"tags,omitempty"`
 }
 
+// OptimizationRecommendation represents a cost optimization recommendation
+type OptimizationRecommendation struct {
+	ResourceAddress   string  `json:"resource_address"`
+	RecommendationType string `json:"recommendation_type"`
+	Description       string  `json:"description"`
+	EstimatedSavings  float64 `json:"estimated_savings"`
+	Impact            string  `json:"impact"`
+	Confidence        float64 `json:"confidence"`
+}
+
 // StateCostReport represents the cost analysis for an entire state
 type StateCostReport struct {
 	Timestamp       time.Time                   `json:"timestamp"`
@@ -415,6 +425,21 @@ func (ca *CostAnalyzer) GetCostTrend(ctx context.Context, historicalReports []*S
 	}
 	
 	return trend
+}
+
+// CalculateResourceCost calculates the cost for a single resource
+func (ca *CostAnalyzer) CalculateResourceCost(ctx context.Context, resource *state.Resource) (*ResourceCost, error) {
+	// Use the AnalyzeResource method for single resource cost calculation
+	if len(resource.Instances) == 0 {
+		return nil, fmt.Errorf("no instances found for resource %s", resource.Name)
+	}
+	
+	cost, err := ca.AnalyzeResource(ctx, resource, &resource.Instances[0], 0)
+	if err != nil {
+		return nil, err
+	}
+	
+	return cost, nil
 }
 
 // CostTrend represents cost trend analysis
