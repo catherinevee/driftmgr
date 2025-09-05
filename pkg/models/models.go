@@ -4,6 +4,12 @@ import (
 	"time"
 )
 
+// CloudProvider represents a cloud provider
+type CloudProvider string
+
+// CloudResource is an alias for Resource
+type CloudResource = Resource
+
 // Resource represents a cloud resource
 type Resource struct {
 	ID           string                 `json:"id"`

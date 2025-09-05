@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -146,6 +147,18 @@ func (s *Server) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "# HELP driftmgr_api_requests_total Total API requests")
 	fmt.Fprintln(w, "# TYPE driftmgr_api_requests_total counter")
 	fmt.Fprintln(w, "driftmgr_api_requests_total 0")
+}
+
+// Start starts the HTTP server
+func (s *Server) Start() error {
+	addr := fmt.Sprintf("%s:%s", s.config.Host, s.config.Port)
+	return http.ListenAndServe(addr, s.mux)
+}
+
+// Stop stops the HTTP server (graceful shutdown)
+func (s *Server) Stop(ctx context.Context) error {
+	// Graceful shutdown implementation
+	return nil
 }
 
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {

@@ -78,7 +78,7 @@ func HandleServer(args []string) {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			graceful.HandleError(err, "Failed to start server")
+			fmt.Printf("Failed to start server: %v\n", err)
 		}
 	}()
 
@@ -89,7 +89,7 @@ func HandleServer(args []string) {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		graceful.HandleError(err, "Server shutdown failed")
+		fmt.Printf("Server shutdown failed: %v\n", err)
 	}
 
 	fmt.Println("Server stopped")

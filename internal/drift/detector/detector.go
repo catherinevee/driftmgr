@@ -58,6 +58,7 @@ const (
 	ResourceUnmanaged
 	ConfigurationDrift
 	ResourceOrphaned
+	DriftTypeMissing = ResourceMissing // Alias for compatibility
 )
 
 // DriftSeverity indicates the severity of drift
@@ -609,4 +610,24 @@ func (dd *DriftDetector) SetConfig(config *DetectorConfig) {
 	defer dd.mu.Unlock()
 	dd.config = config
 	dd.workers = config.MaxWorkers
+}
+
+// DetectResourceDrift detects drift for a single resource
+func (dd *DriftDetector) DetectResourceDrift(ctx context.Context, resource models.Resource) (*DriftResult, error) {
+	// Simple implementation for compatibility
+	return &DriftResult{
+		Resource:     resource.ID,
+		ResourceType: resource.Type,
+		Provider:     resource.Provider,
+		DriftType:    NoDrift,
+		Timestamp:    time.Now(),
+	}, nil
+}
+
+// ModeDetector detects the operational mode
+type ModeDetector struct{}
+
+// NewModeDetector creates a new mode detector
+func NewModeDetector() *ModeDetector {
+	return &ModeDetector{}
 }

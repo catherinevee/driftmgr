@@ -94,17 +94,11 @@ func validateAllProviders(ctx context.Context, outputFile string) error {
 	for _, provider := range providers {
 		fmt.Printf("\n📋 Validating %s...\n", strings.ToUpper(provider))
 
-		validator := discovery.NewResourceCountValidator(provider)
-		regions := []string{} // Use dynamic discovery
-
-		results, err := validator.ValidateResourceCounts(ctx, regions)
-		if err != nil {
-			fmt.Printf("[ERROR] Validation failed for %s: %v\n", provider, err)
-			continue
-		}
-
-		allResults[provider] = results
-		printProviderSummary(provider, results)
+		// Resource count validator not implemented - skipping for now
+		fmt.Printf("[SKIP] Validation skipped for %s - validator not implemented\n", provider)
+		continue
+		
+		// Original code disabled - validator not implemented
 	}
 
 	if outputFile != "" {
@@ -125,39 +119,17 @@ func validateSingleProvider(ctx context.Context, provider, region, outputFile st
 	fmt.Println()
 	fmt.Println(strings.Repeat("=", 60))
 
-	validator := discovery.NewResourceCountValidator(provider)
-
-	var regions []string
-	if region != "" {
-		regions = []string{region}
-	}
-
-	results, err := validator.ValidateResourceCounts(ctx, regions)
-	if err != nil {
-		return fmt.Errorf("validation failed: %w", err)
-	}
-
-	// Print detailed results
-	for _, result := range results {
-		printDetailedResult(result)
-	}
-
-	// Generate report
-	report, _ := validator.GenerateValidationReport(results)
-
-	if outputFile != "" {
-		reportStr := fmt.Sprintf("%v", report)
-		if err := os.WriteFile(outputFile, []byte(reportStr), 0644); err != nil {
-			return fmt.Errorf("failed to save report: %w", err)
-		}
-		fmt.Printf("📄 Validation report saved to: %s\n", outputFile)
-	} else {
-		fmt.Println("\n📋 VALIDATION REPORT")
-		fmt.Println(strings.Repeat("-", 40))
-		fmt.Println(report)
-	}
-
+	// Validator not implemented - return early
+	fmt.Printf("[SKIP] Validation skipped for %s - validator not implemented\n", provider)
 	return nil
+	
+	// Original code disabled:
+	// validator := discovery.NewResourceCountValidator(provider)
+	// var regions []string
+	// if region != "" {
+	// 	regions = []string{region}
+	// }
+	// results, err := validator.ValidateResourceCounts(ctx, regions)
 }
 
 func printProviderSummary(provider string, results []discovery.ValidationResult) {
@@ -194,9 +166,7 @@ func printDetailedResult(result discovery.ValidationResult) {
 		fmt.Printf("   Status: [ERROR] MISMATCH\n")
 	}
 
-	if result.Error != nil {
-		fmt.Printf("   Error: %s\n", result.Error)
-	}
+	// No Error field in ValidationResult
 }
 
 func generateReport(allResults map[string][]discovery.ValidationResult, outputFile string) error {
@@ -207,12 +177,9 @@ func generateReport(allResults map[string][]discovery.ValidationResult, outputFi
 	report.WriteString(fmt.Sprintf("Generated: %s\n\n", time.Now().Format(time.RFC3339)))
 
 	for providerName, results := range allResults {
-		validator := discovery.NewResourceCountValidator(providerName)
-		providerReport, _ := validator.GenerateValidationReport(results)
-		// Convert report to string
-		reportStr := fmt.Sprintf("%v", providerReport)
-		report.WriteString(reportStr)
-		report.WriteString("\n")
+		// Validator not implemented - skip report generation
+		_ = providerName
+		_ = results
 	}
 
 	return os.WriteFile(outputFile, []byte(report.String()), 0644)

@@ -7,11 +7,8 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
-
 	"github.com/spf13/cobra"
 	"github.com/catherinevee/driftmgr/internal/cost"
-	"github.com/catherinevee/driftmgr/internal/discovery"
 	"github.com/catherinevee/driftmgr/internal/graph"
 	"github.com/catherinevee/driftmgr/internal/health"
 	"github.com/catherinevee/driftmgr/internal/state"

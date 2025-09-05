@@ -57,19 +57,13 @@ func HandleServeWeb(args []string) {
 	fmt.Println("Starting DriftMgr web server...")
 	fmt.Println("Loading cached resources...")
 	
-	// Create server options
-	options := api.ServerOptions{
-		Port:         port,
-		AutoDiscover: autoDiscover,
-		ScanInterval: scanInterval,
-		Debug:        debug,
+	// Create server with config
+	config := &api.ServerConfig{
+		Port: port,
 	}
 	
-	// Create and start server with options
-	server, err := api.NewServerWithOptions(options)
-	if err != nil {
-		log.Fatal("Failed to create server:", err)
-	}
+	// Create and start server
+	server := api.NewServer(*config)
 
 	fmt.Printf("\nStarting DriftMgr Web Server on port %s\n", port)
 	if autoDiscover {

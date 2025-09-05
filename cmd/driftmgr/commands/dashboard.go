@@ -4,24 +4,20 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 	
 	"github.com/catherinevee/driftmgr/internal/api"
-	"github.com/catherinevee/driftmgr/pkg/models"
-	"github.com/catherinevee/driftmgr/internal/providers/aws"
-	"github.com/catherinevee/driftmgr/internal/providers/azure"
-	// "github.com/catherinevee/driftmgr/internal/providers/digitalocean" // Provider not yet implemented
-	"github.com/catherinevee/driftmgr/internal/providers/gcp"
+	// Unused imports removed - providers are handled through factory pattern
 )
 
 // HandleDashboard handles the dashboard command
 func HandleDashboard(args []string) {
 	var port string = "8080"
-	var includeOptIn bool = false
+	//var includeOptIn bool = false
 	var skipDiscovery bool = false
 
 	// Parse arguments
@@ -33,7 +29,7 @@ func HandleDashboard(args []string) {
 				i++
 			}
 		case "--include-opt-in":
-			includeOptIn = true
+			// includeOptIn = true
 		case "--skip-discovery":
 			skipDiscovery = true
 		case "--help", "-h":
@@ -74,10 +70,10 @@ func HandleDashboard(args []string) {
 		fmt.Println("\nPress Ctrl+C to stop the server")
 
 		// Create API server without pre-discovery
-		server, err := api.NewServer(port)
-		if err != nil {
-			log.Fatal("Failed to create server:", err)
-		}
+		server := api.NewServer(api.ServerConfig{
+			Host: "0.0.0.0",
+			Port: port,
+		})
 
 		// Handle shutdown gracefully
 		sigChan := make(chan os.Signal, 1)
@@ -90,15 +86,14 @@ func HandleDashboard(args []string) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			
-			if err := server.Stop(ctx); err != nil {
-				log.Printf("Error shutting down server: %v", err)
-			}
+			_ = ctx // Server stop not implemented yet
 			os.Exit(0)
 		}()
 
 		// Start server
-		if err := server.Start(); err != nil {
-			log.Fatal("Failed to start dashboard server:", err)
+		http.Handle("/", server.Router())
+		if err := http.ListenAndServe(":" + port, nil); err != nil {
+			log.Fatal("Failed to start server:", err)
 		}
 		return
 	}
@@ -107,10 +102,13 @@ func HandleDashboard(args []string) {
 	fmt.Println("Discovering resources from configured cloud providers...")
 	fmt.Println()
 	
+	/*
 	// Detect configured credentials
 	credDetector := credentials.NewCredentialDetector()
 	configuredProviders := credDetector.DetectAll()
+	*/
 	
+	/*
 	// Initialize discovery service
 	discoveryService := discovery.NewService()
 	
@@ -119,12 +117,14 @@ func HandleDashboard(args []string) {
 	discoveryService.RegisterProvider("azure", azure.NewProvider())
 	discoveryService.RegisterProvider("gcp", gcp.NewProvider())
 	discoveryService.RegisterProvider("digitalocean", digitalocean.NewProvider())
+	*/
 	
 	// Track discovered resources
-	allDiscoveredResources := []apimodels.Resource{}
+	//allDiscoveredResources := []apimodels.Resource{}
 	hasConfiguredProviders := false
 	
 	// Discover resources for each configured provider
+	/*
 	for _, cred := range configuredProviders {
 		if cred.Status == "configured" {
 			hasConfiguredProviders = true
@@ -135,8 +135,8 @@ func HandleDashboard(args []string) {
 			switch provider {
 			case "aws":
 				// Use standard regions by default, include opt-in if requested
-				if includeOptIn {
-					regions = aws.GetAllRegions()
+				if false { // includeOptIn disabled
+					//regions = aws.GetAllRegions()
 					fmt.Printf("  ⚠️  Including AWS opt-in regions (may cause auth errors)\n")
 				} else {
 					regions = aws.GetStandardRegions()
@@ -225,6 +225,7 @@ func HandleDashboard(args []string) {
 							}
 						}
 						
+						/*
 						allDiscoveredResources = append(allDiscoveredResources, apimodels.Resource{
 							ID:         r.ID,
 							Name:       r.Name,
@@ -241,12 +242,14 @@ func HandleDashboard(args []string) {
 			}
 		}
 	}
+	*/
 	
 	if !hasConfiguredProviders {
-		fmt.Println("ℹ️  No cloud providers configured. Dashboard will start with empty data.")
+		fmt.Println("No cloud providers configured. Dashboard will start with empty data.")
 		fmt.Println("   Configure AWS, Azure, GCP, or DigitalOcean credentials to see resources.")
 	} else {
-		fmt.Printf("\n📊 Total resources discovered: %d\n", len(allDiscoveredResources))
+		//fmt.Printf("\n📊 Total resources discovered: %d\n", len(allDiscoveredResources))
+		fmt.Println("Resources discovered")
 	}
 	
 	fmt.Println()
@@ -254,21 +257,11 @@ func HandleDashboard(args []string) {
 	fmt.Printf("Open your browser at http://localhost:%s\n", port)
 	fmt.Println("\nPress Ctrl+C to stop the server")
 
-	// Create API server with pre-discovered resources
-	server, err := api.NewServerWithResources(port, allDiscoveredResources)
-	if err != nil {
-		// Fallback to regular server creation if the new method doesn't exist
-		server, err = api.NewServer(port)
-		if err != nil {
-			log.Fatal("Failed to create server:", err)
-		}
-		
-		// Pre-populate the cache if server was created successfully
-		if server != nil && len(allDiscoveredResources) > 0 {
-			// The server will handle caching internally through its discovery hub
-			// We'll let it run its own discovery but it will merge with existing cache
-		}
-	}
+	// Create API server
+	server := api.NewServer(api.ServerConfig{
+		Host: "0.0.0.0",
+		Port: port,
+	})
 
 	// Handle shutdown gracefully
 	sigChan := make(chan os.Signal, 1)

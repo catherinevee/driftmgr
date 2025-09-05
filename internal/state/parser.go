@@ -3,8 +3,53 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 )
+
+// StateFile represents a Terraform state file
+type StateFile struct {
+	*TerraformState
+	Path string `json:"path,omitempty"`
+}
+
+// State is an alias for TerraformState
+type State = TerraformState
+
+// StateParser handles parsing of Terraform state files
+type StateParser struct{}
+
+// NewStateParser creates a new state parser
+func NewStateParser() *StateParser {
+	return &StateParser{}
+}
+
+// ParseFile parses a Terraform state file
+func (p *StateParser) ParseFile(path string) (*StateFile, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read state file: %w", err)
+	}
+	
+	stateFile, err := p.Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	stateFile.Path = path
+	return stateFile, nil
+}
+
+// Parse parses Terraform state data
+func (p *StateParser) Parse(data []byte) (*StateFile, error) {
+	var state TerraformState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, fmt.Errorf("failed to parse state: %w", err)
+	}
+	
+	return &StateFile{
+		TerraformState: &state,
+	}, nil
+}
 
 // TerraformState represents a complete Terraform state file
 type TerraformState struct {

@@ -2,10 +2,12 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/catherinevee/driftmgr/internal/simulation"
 )

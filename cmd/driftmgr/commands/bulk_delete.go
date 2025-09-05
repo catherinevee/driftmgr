@@ -16,16 +16,6 @@ import (
 	"github.com/fatih/color"
 )
 
-// Simple deletion stub for compilation
-var deletion = struct {
-	NewAWSProvider   func() (interface{}, error)
-	NewAzureProvider func() (interface{}, error)
-	NewGCPProvider   func() (interface{}, error)
-}{
-	NewAWSProvider:   func() (interface{}, error) { return nil, fmt.Errorf("not implemented") },
-	NewAzureProvider: func() (interface{}, error) { return nil, fmt.Errorf("not implemented") },
-	NewGCPProvider:   func() (interface{}, error) { return nil, fmt.Errorf("not implemented") },
-}
 
 // BulkDeleteOptions represents options for bulk deletion
 type BulkDeleteOptions struct {
@@ -117,7 +107,7 @@ func HandleBulkDelete(args []string) {
 
 	// Execute bulk deletion
 	if err := executeBulkDelete(opts); err != nil {
-		color.Printf(color.Red, "Error: %v\n", err)
+		color.Red("Error: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -198,7 +188,7 @@ func executeBulkDelete(opts *BulkDeleteOptions) error {
 	// Step 5: Confirm deletion
 	if !opts.Confirm && !opts.DryRun {
 		fmt.Printf("\n%s Delete %d resources? (yes/no): ", 
-			color.Sprint(color.Yellow, "WARNING:"), len(resources))
+			color.YellowString("WARNING:"), len(resources))
 		
 		reader := bufio.NewReader(os.Stdin)
 		response, _ := reader.ReadString('\n')
@@ -235,23 +225,22 @@ func discoverResourcesToDelete(ctx context.Context, opts *BulkDeleteOptions) ([]
 	}
 
 	// Otherwise, discover with filters
-	discoveryService, err := discovery.InitializeServiceSilent(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// Create a parallel discoverer for resource discovery
+	discoveryService := discovery.NewParallelDiscoverer(discovery.ParallelDiscoveryConfig{
+		MaxWorkers:     10,
+		MaxConcurrency: 5,
+		Timeout:        5 * time.Minute,
+	})
 
-	discoveryOpts := discovery.DiscoveryOptions{
-		Regions: []string{opts.Region},
-	}
-
-	result, err := discoveryService.DiscoverProvider(ctx, opts.Provider, discoveryOpts)
+	// Discover resources using parallel discovery
+	resources, err := discoveryService.DiscoverAllResources(ctx, []string{opts.Provider}, []string{opts.Region})
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply filters
 	filtered := []models.Resource{}
-	for _, res := range result.Resources {
+	for _, res := range resources {
 		// Filter by type
 		if opts.ResourceType != "" && !matchesResourceType(res.Type, opts.ResourceType) {
 			continue
@@ -480,9 +469,9 @@ func performBulkDeletion(ctx context.Context, resources []models.Resource, opts 
 				map[bool]string{true: "✓", false: "✗"}[err == nil])
 			
 			if err != nil {
-				color.Printf(color.Red, "Failed: %v\n", err)
+				color.Red("Failed: %v\n", err)
 			} else {
-				color.Println(color.Green, "Success")
+				color.Green("Success")
 			}
 		}
 	}
@@ -494,14 +483,14 @@ func deleteResource(ctx context.Context, resource models.Resource, opts *BulkDel
 	// Get the appropriate deletion provider
 	switch resource.Provider {
 	case "aws":
-		provider, err := deletion.NewAWSProvider()
+		provider, err := remediation.NewAWSProvider()
 		if err != nil {
 			return err
 		}
 		return provider.DeleteResource(ctx, resource)
 		
 	case "azure":
-		provider, err := deletion.NewAzureProvider()
+		provider, err := remediation.NewAzureProvider()
 		if err != nil {
 			return err
 		}
@@ -509,7 +498,7 @@ func deleteResource(ctx context.Context, resource models.Resource, opts *BulkDel
 		
 	case "gcp":
 		// Create GCP deletion provider
-		provider, err := deletion.NewGCPProvider()
+		provider, err := remediation.NewGCPProvider()
 		if err != nil {
 			return fmt.Errorf("failed to create GCP provider: %w", err)
 		}
@@ -559,9 +548,9 @@ func displayDeletionResults(results []DeletionResult) {
 	}
 	
 	fmt.Println("\n=== Deletion Summary ===")
-	color.Printf(color.Green, "Successful: %d\n", successful)
+	color.Green("Successful: %d\n", successful)
 	if failed > 0 {
-		color.Printf(color.Red, "Failed: %d\n", failed)
+		color.Red("Failed: %d\n", failed)
 	}
 	fmt.Printf("Total time: %s\n", totalDuration)
 	

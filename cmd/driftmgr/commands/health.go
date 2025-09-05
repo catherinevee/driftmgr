@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/api/handlers"
 )
 
 // CheckType represents the type of health check
@@ -52,6 +51,67 @@ func (h *HealthChecker) RegisterCheck(check HealthCheck) {
 // Start starts background health checks
 func (h *HealthChecker) Start(ctx context.Context) {
 	// Background health check implementation would go here
+}
+
+// GetStatus returns the overall health status
+func (h *HealthChecker) GetStatus(ctx context.Context) (map[string]interface{}, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	
+	status := map[string]interface{}{
+		"status": "healthy",
+		"checks": []map[string]interface{}{},
+	}
+	
+	for _, check := range h.checks {
+		checkStatus := map[string]interface{}{
+			"name": check.Name(),
+			"type": check.Type(),
+		}
+		
+		if err := check.Check(ctx); err != nil {
+			checkStatus["status"] = "unhealthy"
+			checkStatus["error"] = err.Error()
+			if check.Critical() {
+				status["status"] = "unhealthy"
+			}
+		} else {
+			checkStatus["status"] = "healthy"
+		}
+		
+		checks := status["checks"].([]map[string]interface{})
+		status["checks"] = append(checks, checkStatus)
+	}
+	
+	return status, nil
+}
+
+// GetLivenessStatus returns the liveness status
+func (h *HealthChecker) GetLivenessStatus(ctx context.Context) (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"status": "alive",
+	}, nil
+}
+
+// GetReadinessStatus returns the readiness status
+func (h *HealthChecker) GetReadinessStatus(ctx context.Context) (map[string]interface{}, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	
+	for _, check := range h.checks {
+		if check.Type() == CheckTypeReadiness && check.Critical() {
+			if err := check.Check(ctx); err != nil {
+				return map[string]interface{}{
+					"status": "not_ready",
+					"error":  err.Error(),
+				}, nil
+			}
+		}
+	}
+	
+	return map[string]interface{}{
+		"status": "ready",
+	}, nil
 }
 
 // HealthServer provides health check endpoints
