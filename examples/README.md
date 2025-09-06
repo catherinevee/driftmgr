@@ -270,7 +270,7 @@ jobs:
         run: |
           CRITICAL=$(jq '.summary.critical_count' drift.json)
           if [ "$CRITICAL" -gt 0 ]; then
-            echo "❌ Critical drift detected!"
+            echo "Critical drift detected!"
             exit 1
           fi
       

@@ -265,7 +265,7 @@ driftmgr report consolidate \
     --output consolidated-drift-report.html \
     --format html
 
-echo "✓ Multi-account drift detection complete!"
+echo "Multi-account drift detection complete!"
 echo "  Reports available in: ./reports/"
 echo "  Consolidated report: ./consolidated-drift-report.html"
 ```

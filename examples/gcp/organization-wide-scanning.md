@@ -313,7 +313,7 @@ check_project_drift() {
     
     # Check exit code
     if [ ${PIPESTATUS[0]} -eq 0 ]; then
-        echo -e "  ${GREEN}✓ Drift detection completed${NC}"
+        echo -e "  ${GREEN}Drift detection completed${NC}"
     else
         echo -e "  ${RED}✗ Drift detection failed${NC}"
     fi
@@ -375,7 +375,7 @@ export_to_bigquery() {
             "${report}.bq"
     done
     
-    echo -e "${GREEN}✓ Export complete${NC}"
+    echo -e "${GREEN}Export complete${NC}"
 }
 
 # Function to send notifications

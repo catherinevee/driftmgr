@@ -34,43 +34,43 @@ Write-Host "First, let's see what resources are managed in the state file:" -For
 Run-Command -Command ".\driftmgr.exe state analyze --state $StateFile" `
             -Description "Analyzing current state file"
 
-Write-Host "`n🎯 Step 2: Simulate Tag Drift" -ForegroundColor Green
+Write-Host "`nStep 2: Simulate Tag Drift" -ForegroundColor Green
 Write-Host "Now we'll add tags to resources to simulate configuration drift:" -ForegroundColor White
 
 Run-Command -Command ".\driftmgr.exe simulate-drift --state $StateFile --provider $Provider --type tag-change --auto-rollback=false" `
             -Description "Creating tag drift on $Provider resources"
 
-Write-Host "`n🔍 Step 3: Detect the Drift" -ForegroundColor Green
+Write-Host "`nStep 3: Detect the Drift" -ForegroundColor Green
 Write-Host "DriftMgr should now detect the changes we made:" -ForegroundColor White
 
 Run-Command -Command ".\driftmgr.exe state analyze --state $StateFile --check-drift" `
             -Description "Running drift detection"
 
-Write-Host "`n🚀 Step 4: Simulate Unmanaged Resource Creation" -ForegroundColor Green
+Write-Host "`nStep 4: Simulate Unmanaged Resource Creation" -ForegroundColor Green
 Write-Host "Let's create a resource that's not in Terraform state:" -ForegroundColor White
 
 Run-Command -Command ".\driftmgr.exe simulate-drift --state $StateFile --provider $Provider --type resource-creation" `
             -Description "Creating unmanaged $Provider resource"
 
-Write-Host "`n🔍 Step 5: Discover Unmanaged Resources" -ForegroundColor Green
+Write-Host "`nStep 5: Discover Unmanaged Resources" -ForegroundColor Green
 Write-Host "Now let's find resources that aren't in Terraform:" -ForegroundColor White
 
 Run-Command -Command ".\driftmgr.exe discover --provider $Provider --unmanaged-only" `
             -Description "Discovering unmanaged resources"
 
-Write-Host "`n🛡️ Step 6: Simulate Security Rule Drift" -ForegroundColor Green
+Write-Host "`nStep 6: Simulate Security Rule Drift" -ForegroundColor Green
 Write-Host "Adding a security group/firewall rule:" -ForegroundColor White
 
 Run-Command -Command ".\driftmgr.exe simulate-drift --state $StateFile --provider $Provider --type rule-addition" `
             -Description "Adding security rule"
 
-Write-Host "`n📊 Step 7: Generate Drift Report" -ForegroundColor Green
+Write-Host "`nStep 7: Generate Drift Report" -ForegroundColor Green
 Write-Host "Let's see a comprehensive drift report:" -ForegroundColor White
 
 Run-Command -Command ".\driftmgr.exe drift report --state $StateFile --provider $Provider --format detailed" `
             -Description "Generating drift report"
 
-Write-Host "`n🔄 Step 8: Rollback All Changes" -ForegroundColor Green
+Write-Host "`nStep 8: Rollback All Changes" -ForegroundColor Green
 Write-Host "Finally, let's clean up all the drift we created:" -ForegroundColor White
 
 $confirm = Read-Host "Ready to rollback all changes? (y/n)"
@@ -79,7 +79,7 @@ if ($confirm -eq 'y') {
                 -Description "Rolling back drift simulation"
 }
 
-Write-Host "`n✅ Demo Complete!" -ForegroundColor Green
+Write-Host "`nDemo Complete!" -ForegroundColor Green
 Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "What we demonstrated:" -ForegroundColor White

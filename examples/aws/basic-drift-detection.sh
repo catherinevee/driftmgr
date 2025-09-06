@@ -46,7 +46,7 @@ driftmgr discover \
     --save-to discovered-resources.json
 
 echo ""
-echo "✓ Discovery complete. Results saved to discovered-resources.json"
+echo "Discovery complete. Results saved to discovered-resources.json"
 echo ""
 
 # Step 2: Check if state file exists
@@ -72,7 +72,7 @@ driftmgr drift detect \
     --save-report drift-report.json
 
 echo ""
-echo "✓ Drift detection complete. Report saved to drift-report.json"
+echo "Drift detection complete. Report saved to drift-report.json"
 echo ""
 
 # Step 4: Analyze Results
@@ -94,13 +94,13 @@ if command -v jq &> /dev/null; then
     echo ""
     
     if [ "$DRIFTED_RESOURCES" -gt 0 ]; then
-        echo "⚠️  Drift detected! Review drift-report.json for details."
+        echo "WARNING: Drift detected! Review drift-report.json for details."
         echo ""
         echo "Drifted resources:"
         jq -r '.drifted_resources[]?.resource_id // empty' drift-report.json | head -10
         echo ""
     else
-        echo "✓ No drift detected. Infrastructure matches state file."
+        echo "No drift detected. Infrastructure matches state file."
         echo ""
     fi
 else
@@ -119,7 +119,7 @@ if [ "$DRIFTED_RESOURCES" -gt 0 ] || [ "$UNMANAGED_RESOURCES" -gt 0 ]; then
         --output-format terraform \
         --save-to remediation-plan.tf
     
-    echo "✓ Remediation plan saved to remediation-plan.tf"
+    echo "Remediation plan saved to remediation-plan.tf"
     echo ""
     echo "Review the plan and apply with:"
     echo "  terraform plan -out=tfplan"
