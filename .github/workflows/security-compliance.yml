@@ -69,7 +69,8 @@ jobs:
 
     - name: Upload Gosec results
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && github.event_name != 'pull_request'
+      continue-on-error: true
       with:
         sarif_file: gosec.sarif
 
@@ -84,7 +85,8 @@ jobs:
 
     - name: Upload Semgrep results
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && github.event_name != 'pull_request'
+      continue-on-error: true
       with:
         sarif_file: semgrep.sarif
 
@@ -125,7 +127,8 @@ jobs:
 
     - name: Upload Snyk results
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && github.event_name != 'pull_request'
+      continue-on-error: true
       with:
         sarif_file: snyk.sarif
 

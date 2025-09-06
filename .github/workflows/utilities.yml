@@ -193,11 +193,13 @@ jobs:
 
     - name: Store benchmark results
       uses: benchmark-action/github-action-benchmark@v1
+      continue-on-error: true
       with:
         tool: 'go'
         output-file-path: benchmark-results.txt
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        auto-push: true
+        auto-push: false
+        comment-on-alert: false
 
   # ============== GENERATE DOCUMENTATION ==============
   generate-docs:

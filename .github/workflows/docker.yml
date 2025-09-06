@@ -95,8 +95,8 @@ jobs:
     - name: Test Docker image
       run: |
         echo "Testing Docker image..."
-        docker run --rm driftmgr:test --version
-        docker run --rm driftmgr:test --help
+        docker run --rm driftmgr:test version
+        docker run --rm driftmgr:test help
         
         # Test with docker-compose
         if [ -f "docker-compose.test.yml" ]; then
@@ -114,7 +114,8 @@ jobs:
 
     - name: Upload Trivy results to GitHub Security
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && github.event_name != 'pull_request'
+      continue-on-error: true
       with:
         sarif_file: 'trivy-results.sarif'
 

@@ -376,19 +376,21 @@ jobs:
         fi
 
     - name: Notify Slack on success
-      if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.SLACK_WEBHOOK_URL != ''
+      continue-on-error: true
       uses: 8398a7/action-slack@v3
       with:
         status: success
         text: 'CI/CD pipeline completed successfully for ${{ github.ref }}'
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
 
     - name: Notify Slack on failure
-      if: failure()
+      if: failure() && secrets.SLACK_WEBHOOK_URL != ''
+      continue-on-error: true
       uses: 8398a7/action-slack@v3
       with:
         status: failure
         text: 'CI/CD pipeline failed for ${{ github.ref }}'
       env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}

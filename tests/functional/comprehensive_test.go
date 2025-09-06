@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/cli"
+	"github.com/catherinevee/driftmgr/internal/credentials"
 	"github.com/catherinevee/driftmgr/internal/discovery"
 	"github.com/catherinevee/driftmgr/internal/drift"
 	"github.com/catherinevee/driftmgr/internal/progress"
-	"github.com/catherinevee/driftmgr/internal/credentials"
 	"github.com/catherinevee/driftmgr/internal/state"
 )
 
