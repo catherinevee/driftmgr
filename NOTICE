@@ -1,0 +1,194 @@
+DriftMgr
+Copyright (c) 2025 Catherine Vee and DriftMgr Contributors
+
+This product includes software developed by the DriftMgr project
+(https://github.com/catherinevee/driftmgr).
+
+===============================================================================
+
+Third-Party Software Notices and Attributions
+
+This project incorporates components from the following open source projects:
+
+-------------------------------------------------------------------------------
+
+AWS SDK for Go
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Licensed under the Apache License, Version 2.0
+https://github.com/aws/aws-sdk-go
+
+-------------------------------------------------------------------------------
+
+Azure SDK for Go
+Copyright (c) Microsoft Corporation. All rights reserved.
+Licensed under the MIT License
+https://github.com/Azure/azure-sdk-for-go
+
+-------------------------------------------------------------------------------
+
+Google Cloud Client Libraries for Go
+Copyright (c) Google LLC
+Licensed under the Apache License, Version 2.0
+https://github.com/googleapis/google-cloud-go
+
+-------------------------------------------------------------------------------
+
+Cobra - CLI Framework
+Copyright (c) 2015 Steve Francia & spf13
+Licensed under the Apache License, Version 2.0
+https://github.com/spf13/cobra
+
+-------------------------------------------------------------------------------
+
+Viper - Configuration Management
+Copyright (c) 2014 Steve Francia
+Licensed under the MIT License
+https://github.com/spf13/viper
+
+-------------------------------------------------------------------------------
+
+Gin Web Framework
+Copyright (c) 2014 Manuel Martínez-Almeida
+Licensed under the MIT License
+https://github.com/gin-gonic/gin
+
+-------------------------------------------------------------------------------
+
+Gorilla WebSocket
+Copyright (c) 2023 The Gorilla Authors
+Licensed under the BSD 2-Clause License
+https://github.com/gorilla/websocket
+
+-------------------------------------------------------------------------------
+
+Testify - Testing Toolkit
+Copyright (c) 2012-2020 Mat Ryer, Tyler Bunnell and contributors
+Licensed under the MIT License
+https://github.com/stretchr/testify
+
+-------------------------------------------------------------------------------
+
+Logrus - Structured Logger
+Copyright (c) 2014 Simon Eskildsen
+Licensed under the MIT License
+https://github.com/sirupsen/logrus
+
+-------------------------------------------------------------------------------
+
+GORM - ORM Library
+Copyright (c) 2013-NOW Jinzhu
+Licensed under the MIT License
+https://gorm.io
+
+-------------------------------------------------------------------------------
+
+UUID Package
+Copyright (c) 2009-2014 Google Inc. All rights reserved.
+Licensed under the BSD 3-Clause License
+https://github.com/google/uuid
+
+-------------------------------------------------------------------------------
+
+Go-Colorable
+Copyright (c) 2016 Yasuhiro Matsumoto
+Licensed under the MIT License
+https://github.com/mattn/go-colorable
+
+-------------------------------------------------------------------------------
+
+Go-IsaTTY
+Copyright (c) Yasuhiro Matsumoto
+Licensed under the MIT License
+https://github.com/mattn/go-isatty
+
+-------------------------------------------------------------------------------
+
+Survey - Interactive Prompts
+Copyright (c) 2021 Alec Aivazis
+Licensed under the MIT License
+https://github.com/AlecAivazis/survey
+
+-------------------------------------------------------------------------------
+
+DigitalOcean Go Client
+Copyright (c) 2024 DigitalOcean
+Licensed under the Apache License, Version 2.0
+https://github.com/digitalocean/godo
+
+-------------------------------------------------------------------------------
+
+HashiCorp HCL
+Copyright (c) 2014 HashiCorp, Inc.
+Licensed under the Mozilla Public License 2.0
+https://github.com/hashicorp/hcl
+
+-------------------------------------------------------------------------------
+
+HashiCorp Terraform (State File Structures)
+Copyright (c) 2014 HashiCorp, Inc.
+Licensed under the Mozilla Public License 2.0
+https://github.com/hashicorp/terraform
+
+-------------------------------------------------------------------------------
+
+Open Policy Agent
+Copyright (c) 2016 The OPA Authors
+Licensed under the Apache License, Version 2.0
+https://github.com/open-policy-agent/opa
+
+-------------------------------------------------------------------------------
+
+Go-Retryable HTTP
+Copyright (c) 2015 HashiCorp, Inc.
+Licensed under the Mozilla Public License 2.0
+https://github.com/hashicorp/go-retryablehttp
+
+-------------------------------------------------------------------------------
+
+Go-Version
+Copyright (c) 2014 HashiCorp, Inc.
+Licensed under the Mozilla Public License 2.0
+https://github.com/hashicorp/go-version
+
+-------------------------------------------------------------------------------
+
+Go-Getter
+Copyright (c) 2015 HashiCorp, Inc.
+Licensed under the Mozilla Public License 2.0
+https://github.com/hashicorp/go-getter
+
+-------------------------------------------------------------------------------
+
+Prometheus Client for Go
+Copyright (c) 2012-2015 The Prometheus Authors
+Licensed under the Apache License, Version 2.0
+https://github.com/prometheus/client_golang
+
+-------------------------------------------------------------------------------
+
+Go-Redis
+Copyright (c) 2013 The github.com/redis/go-redis Authors
+Licensed under the BSD 2-Clause License
+https://github.com/redis/go-redis
+
+-------------------------------------------------------------------------------
+
+Additional Dependencies:
+
+This software also depends on various other open source packages listed in
+go.mod. Each of these dependencies retains its original license as specified
+in its respective repository.
+
+===============================================================================
+
+NOTICE FOR DOCKER IMAGES:
+
+The Docker images distributed for this project include:
+- Alpine Linux (https://alpinelinux.org/)
+- Go runtime and standard library
+
+===============================================================================
+
+For questions about licensing or attribution, please contact:
+- GitHub Issues: https://github.com/catherinevee/driftmgr/issues
+- Email: (provide contact email if desired)
