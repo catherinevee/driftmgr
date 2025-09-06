@@ -98,10 +98,10 @@ jobs:
         docker run --rm driftmgr:test version
         docker run --rm driftmgr:test help
         
-        # Test with docker-compose
+        # Test with docker compose (if test file exists)
         if [ -f "docker-compose.test.yml" ]; then
-          docker-compose -f docker-compose.test.yml up --abort-on-container-exit
-          docker-compose -f docker-compose.test.yml down -v
+          docker compose -f docker-compose.test.yml up --abort-on-container-exit
+          docker compose -f docker-compose.test.yml down -v
         fi
 
     - name: Security scan with Trivy
@@ -246,26 +246,26 @@ jobs:
         sed -i 's|catherinevee/driftmgr:.*|driftmgr:test|g' docker-compose.yml
         
         # Start services
-        docker-compose up -d
+        docker compose up -d
         
         # Wait for services to be healthy
         sleep 10
         
         # Check services are running
-        docker-compose ps
-        docker-compose logs
+        docker compose ps
+        docker compose logs
         
         # Test connectivity
         curl -f http://localhost:8080/health || true
         
         # Clean up
-        docker-compose down -v
+        docker compose down -v
 
     - name: Test docker-compose.test.yml
       if: hashFiles('docker-compose.test.yml') != ''
       run: |
-        docker-compose -f docker-compose.test.yml up --abort-on-container-exit
-        docker-compose -f docker-compose.test.yml down -v
+        docker compose -f docker-compose.test.yml up --abort-on-container-exit
+        docker compose -f docker-compose.test.yml down -v
 
   # ============== RELEASE DOCKER IMAGE ==============
   docker-release:
