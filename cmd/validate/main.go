@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -180,7 +181,7 @@ func validateProvider(providerName string, result *ValidationResult, verbose boo
 
 	// Create provider instance
 	factory := providers.NewProviderFactory(nil)
-	provider, err := factory.Create(providerName)
+	provider, err := factory.CreateProvider(providerName)
 	if err != nil {
 		result.Valid = false
 		result.Errors = append(result.Errors, fmt.Sprintf("Invalid provider %s: %v", providerName, err))
@@ -188,17 +189,13 @@ func validateProvider(providerName string, result *ValidationResult, verbose boo
 		return
 	}
 
-	// Validate provider credentials
-	if err := provider.Validate(); err != nil {
+	// Validate provider credentials using ValidateCredentials
+	ctx := context.Background()
+	if err := provider.ValidateCredentials(ctx); err != nil {
 		result.Valid = false
 		result.Errors = append(result.Errors, fmt.Sprintf("Provider %s validation failed: %v", providerName, err))
 		result.Stats.InvalidProviders = 1
 		return
-	}
-
-	// Test provider connectivity
-	if err := provider.TestConnection(); err != nil {
-		result.Warnings = append(result.Warnings, fmt.Sprintf("Provider %s connection test failed: %v", providerName, err))
 	}
 
 	result.Stats.ValidProviders = 1

@@ -271,7 +271,7 @@ func (eb *EventBus) RegisterHandler(eventType EventType, handler EventHandler) {
 }
 
 // GetMetrics returns current event bus metrics
-func (eb *EventBus) GetMetrics() EventMetrics {
+func (eb *EventBus) GetMetrics() *EventMetrics {
 	eb.metrics.mu.RLock()
 	defer eb.metrics.mu.RUnlock()
 
@@ -290,7 +290,7 @@ func (eb *EventBus) GetMetrics() EventMetrics {
 		metrics.EventsDelivered[k] = v
 	}
 
-	return metrics
+	return &metrics
 }
 
 // GetBuffer returns the current event buffer

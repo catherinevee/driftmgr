@@ -423,7 +423,7 @@ func handleRemediate(ctx context.Context, args []string) {
 		fmt.Printf("\n%d. %s\n", i+1, output.Color(action.Description, cli.ColorBold))
 		fmt.Printf("   Type: %s\n", action.Type)
 		fmt.Printf("   Resource: %s\n", action.Resource)
-		fmt.Printf("   Risk: %s\n", action.RiskLevel)
+		fmt.Printf("   Risk: %v\n", action.RiskLevel)
 
 		if action.Type == remediation.ActionTypeImport {
 			fmt.Printf("   Command: terraform import %s %s\n", action.Resource, action.Resource)
@@ -454,7 +454,7 @@ func handleRemediate(ctx context.Context, args []string) {
 		"Do you want to apply this remediation plan?",
 		[]string{
 			fmt.Sprintf("%d actions will be executed", len(plan.Actions)),
-			fmt.Sprintf("Risk level: %s", plan.RiskLevel),
+			fmt.Sprintf("Risk level: %v", plan.RiskLevel),
 			fmt.Sprintf("Estimated duration: %v", plan.EstimatedDuration),
 		},
 	)
@@ -1963,7 +1963,7 @@ func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.S
 			<td>%s</td>
 			<td>%s</td>
 			<td>%s</td>
-			<td>%s</td>
+			<td>%v</td>
 			<td>%s</td>
 			<td>
 `, severityClass, drift.Resource, drift.ResourceType, drift.Provider, drift.Severity, drift.DriftType))
@@ -1972,7 +1972,7 @@ func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.S
 			if len(drift.Differences) > 0 {
 				html.WriteString("<pre>")
 				for key, diff := range drift.Differences {
-					html.WriteString(fmt.Sprintf("%s:\n  Expected: %v\n  Actual: %v\n", key, diff.Expected, diff.Actual))
+					html.WriteString(fmt.Sprintf("%v:\n  Expected: %v\n  Actual: %v\n", key, diff.Expected, diff.Actual))
 				}
 				html.WriteString("</pre>")
 			}

@@ -196,7 +196,7 @@ func (m *ContinuousMonitor) pollProviders(ctx context.Context) []CloudEvent {
 // pollProvider polls a single provider for changes
 func (m *ContinuousMonitor) pollProvider(ctx context.Context, name string, provider providers.CloudProvider) []CloudEvent {
 	// Get current state
-	resources, err := provider.DiscoverResources(ctx)
+	resources, err := provider.DiscoverResources(ctx, "")
 	if err != nil {
 		fmt.Printf("Error polling %s: %v\n", name, err)
 		return nil
