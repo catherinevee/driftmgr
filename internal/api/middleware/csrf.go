@@ -3,13 +3,20 @@ package middleware
 import (
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+)
+
+// ContextKey for storing auth information
+type ContextKey string
+
+const (
+	UserContextKey   ContextKey = "user"
+	ClaimsContextKey ContextKey = "claims"
 )
 
 // CSRFMiddleware provides CSRF protection

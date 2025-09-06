@@ -13,7 +13,7 @@ import (
 
 	"github.com/catherinevee/driftmgr/internal/drift/comparator"
 	"github.com/catherinevee/driftmgr/internal/drift/detector"
-	importgen "github.com/catherinevee/driftmgr/internal/remediation/import"
+	importgen "github.com/catherinevee/driftmgr/internal/remediation/tfimport"
 	"github.com/google/uuid"
 )
 

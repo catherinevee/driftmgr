@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/catherinevee/driftmgr/internal/discovery"
 	"github.com/catherinevee/driftmgr/internal/providers"
 	"github.com/catherinevee/driftmgr/internal/state"
 )
@@ -103,7 +102,7 @@ func validateStateFile(path string, result *ValidationResult, verbose bool) {
 	}
 
 	// Parse state file
-	stateParser := state.NewParser()
+	stateParser := state.NewStateParser()
 	tfState, err := stateParser.ParseFile(path)
 	if err != nil {
 		result.Valid = false
@@ -180,7 +179,7 @@ func validateProvider(providerName string, result *ValidationResult, verbose boo
 	result.Stats.TotalProviders = 1
 
 	// Create provider instance
-	factory := providers.NewFactory()
+	factory := providers.NewProviderFactory(nil)
 	provider, err := factory.Create(providerName)
 	if err != nil {
 		result.Valid = false
