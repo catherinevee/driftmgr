@@ -137,6 +137,12 @@ test_*.html
 test_*.ps1
 verify_*.ps1
 
+# Temporary issue and release notes files
+issue*.md
+release_notes*.md
+test-build.exe
+*-test.exe
+
 # === Archives ===
 *.tar.gz
 *.zip
