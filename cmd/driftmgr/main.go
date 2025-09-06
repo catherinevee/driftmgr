@@ -33,6 +33,18 @@ import (
 )
 
 func main() {
+	// Handle version and help flags first
+	if len(os.Args) >= 2 {
+		if os.Args[1] == "--version" || os.Args[1] == "-v" {
+			fmt.Println("DriftMgr v3.0.0")
+			os.Exit(0)
+		}
+		if os.Args[1] == "--help" || os.Args[1] == "-h" {
+			printUsage()
+			os.Exit(0)
+		}
+	}
+
 	if len(os.Args) < 2 {
 		printUsage()
 		os.Exit(1)
