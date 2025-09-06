@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/core/color"
-	"github.com/catherinevee/driftmgr/internal/core/discovery"
-	"github.com/catherinevee/driftmgr/internal/core/drift"
-	"github.com/catherinevee/driftmgr/internal/core/progress"
+	"github.com/catherinevee/driftmgr/internal/cli"
+	"github.com/catherinevee/driftmgr/internal/discovery"
+	"github.com/catherinevee/driftmgr/internal/drift"
+	"github.com/catherinevee/driftmgr/internal/progress"
 	"github.com/catherinevee/driftmgr/internal/credentials"
-	"github.com/catherinevee/driftmgr/internal/terraform/state"
+	"github.com/catherinevee/driftmgr/internal/state"
 )
 
 // Test configuration
@@ -206,13 +206,13 @@ func TestColorSupport(t *testing.T) {
 			fn   func(string) string
 			text string
 		}{
-			{"AWS Color", color.AWS, "AWS Provider"},
-			{"Azure Color", color.Azure, "Azure Provider"},
-			{"GCP Color", color.GCP, "GCP Provider"},
-			{"Success Color", color.Success, "Success"},
-			{"Error Color", color.Error, "Error"},
-			{"Warning Color", color.Warning, "Warning"},
-			{"Info Color", color.Info, "Info"},
+			{"AWS Color", cli.AWS, "AWS Provider"},
+			{"Azure Color", cli.Azure, "Azure Provider"},
+			{"GCP Color", cli.GCP, "GCP Provider"},
+			{"Success Color", cli.Success, "Success"},
+			{"Error Color", cli.Error, "Error"},
+			{"Warning Color", cli.Warning, "Warning"},
+			{"Info Color", cli.Info, "Info"},
 		}
 
 		for _, tt := range tests {

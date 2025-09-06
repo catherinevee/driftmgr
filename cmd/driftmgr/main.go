@@ -1964,7 +1964,7 @@ func generateHTMLReport(driftResults []*detector.DriftResult, stateData *state.S
 			<td>%s</td>
 			<td>%s</td>
 			<td>%v</td>
-			<td>%s</td>
+			<td>%v</td>
 			<td>
 `, severityClass, drift.Resource, drift.ResourceType, drift.Provider, drift.Severity, drift.DriftType))
 
@@ -2030,7 +2030,7 @@ func generateMarkdownReport(driftResults []*detector.DriftResult, stateData *sta
 		md.WriteString("|-------------|------|----------|----------|------------|\n")
 
 		for _, drift := range driftResults {
-			md.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
+			md.WriteString(fmt.Sprintf("| %s | %s | %s | %v | %v |\n",
 				drift.Resource, drift.ResourceType, drift.Provider, drift.Severity, drift.DriftType))
 		}
 
@@ -2040,13 +2040,13 @@ func generateMarkdownReport(driftResults []*detector.DriftResult, stateData *sta
 			md.WriteString(fmt.Sprintf("#### %s\n\n", drift.Resource))
 			md.WriteString(fmt.Sprintf("- **Type:** %s\n", drift.ResourceType))
 			md.WriteString(fmt.Sprintf("- **Provider:** %s\n", drift.Provider))
-			md.WriteString(fmt.Sprintf("- **Severity:** %s\n", drift.Severity))
+			md.WriteString(fmt.Sprintf("- **Severity:** %v\n", drift.Severity))
 
 			if len(drift.Differences) > 0 {
 				md.WriteString("\n**Differences:**\n\n")
 				md.WriteString("```diff\n")
 				for key, diff := range drift.Differences {
-					md.WriteString(fmt.Sprintf("%s:\n", key))
+					md.WriteString(fmt.Sprintf("%v:\n", key))
 					md.WriteString(fmt.Sprintf("- Expected: %v\n", diff.Expected))
 					md.WriteString(fmt.Sprintf("+ Actual: %v\n", diff.Actual))
 				}

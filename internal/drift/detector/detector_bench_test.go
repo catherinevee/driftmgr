@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/catherinevee/driftmgr/internal/state/parser"
+	"github.com/catherinevee/driftmgr/internal/state"
 	"github.com/catherinevee/driftmgr/pkg/models"
 )
 
@@ -196,13 +196,13 @@ func generateMockResources(count int) []*models.Resource {
 	return resources
 }
 
-func generateMockState(count int) *parser.TerraformState {
-	resources := make([]parser.Resource, count)
+func generateMockState(count int) *state.TerraformState {
+	resources := make([]state.Resource, count)
 	for i := 0; i < count; i++ {
-		resources[i] = parser.Resource{
+		resources[i] = state.Resource{
 			Type: "aws_instance",
 			Name: fmt.Sprintf("instance-%d", i),
-			Instances: []parser.Instance{
+			Instances: []state.Instance{
 				{
 					Attributes: map[string]interface{}{
 						"id":            fmt.Sprintf("resource-%d", i),
@@ -214,7 +214,7 @@ func generateMockState(count int) *parser.TerraformState {
 		}
 	}
 
-	return &parser.TerraformState{
+	return &state.TerraformState{
 		Version:   4,
 		Resources: resources,
 	}
