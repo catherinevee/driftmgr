@@ -538,4 +538,4 @@ MIT License - see [LICENSE](LICENSE)
 
 - Documentation: [docs.driftmgr.io](https://docs.driftmgr.io)
 - Issues: [GitHub Issues](https://github.com/catherinevee/driftmgr/issues)
-- Discussions: [GitHub Discussions](https://github.com/catherinevee/driftmgr/discussions)
+- Discussions: [GitHub Discussions](https://github.com/catherinevee/driftmgr/discussions)# Trigger workflows
