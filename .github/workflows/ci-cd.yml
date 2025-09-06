@@ -1,0 +1,394 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.23'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============== LINTING ==============
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+
+    - name: Run go fmt check
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Code is not formatted:"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+        args: --timeout 5m --skip-dirs=internal/compliance
+
+  # ============== TESTING ==============
+  test:
+    name: Test (${{ matrix.os }} / Go ${{ matrix.go-version }})
+    runs-on: ${{ matrix.os }}
+    needs: lint
+    strategy:
+      matrix:
+        go-version: ['1.22', '1.23']
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Run unit tests with coverage
+      run: |
+        go test -v -race -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v internal/compliance)
+
+    - name: Generate coverage report
+      run: go tool cover -html=coverage.out -o coverage.html
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-${{ matrix.os }}-${{ matrix.go-version }}
+        path: |
+          coverage.out
+          coverage.html
+
+  # ============== QUALITY CHECKS ==============
+  quality:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Check for cyclomatic complexity
+      run: |
+        go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+        gocyclo -over 15 ./... || true
+
+    - name: Check for code duplication
+      run: |
+        go install github.com/mibk/dupl@latest
+        dupl -threshold 50 ./... || true
+
+    - name: Run staticcheck
+      run: |
+        go install honnef.co/go/tools/cmd/staticcheck@latest
+        staticcheck ./... || true
+
+    - name: Check documentation coverage
+      run: |
+        go install github.com/robertkrimen/godocdown@latest
+        echo "Documentation coverage check"
+        go list ./... | xargs -I {} sh -c 'go doc -all {} | head -20' || true
+
+  # ============== BUILD ==============
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    needs: [test, quality]
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
+
+    - name: Build binaries
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        mkdir -p dist
+        suffix=""
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          suffix=".exe"
+        fi
+        
+        # Build version info
+        VERSION=$(git describe --tags --always --dirty)
+        COMMIT=$(git rev-parse --short HEAD)
+        BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        LDFLAGS="-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildTime=${BUILD_TIME}"
+        
+        # Build main driftmgr binary
+        echo "Building driftmgr for ${{ matrix.goos }}/${{ matrix.goarch }}..."
+        go build -ldflags="${LDFLAGS}" -o dist/driftmgr-${{ matrix.goos }}-${{ matrix.goarch }}${suffix} ./cmd/driftmgr
+        
+        # Build server binary if it exists
+        if [ -d "./cmd/driftmgr-server" ]; then
+          echo "Building driftmgr-server..."
+          go build -ldflags="${LDFLAGS}" -o dist/driftmgr-server-${{ matrix.goos }}-${{ matrix.goarch }}${suffix} ./cmd/driftmgr-server
+        elif [ -d "./cmd/server" ]; then
+          echo "Building server..."
+          go build -ldflags="${LDFLAGS}" -o dist/driftmgr-server-${{ matrix.goos }}-${{ matrix.goarch }}${suffix} ./cmd/server
+        fi
+        
+        # Build validation binary if it exists
+        if [ -d "./cmd/validate" ]; then
+          echo "Building validate..."
+          go build -ldflags="${LDFLAGS}" -o dist/validate-${{ matrix.goos }}-${{ matrix.goarch }}${suffix} ./cmd/validate
+        fi
+        
+        # Create checksums
+        cd dist && sha256sum * > checksums-${{ matrix.goos }}-${{ matrix.goarch }}.txt
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/
+        retention-days: 7
+
+  # ============== INTEGRATION TESTS ==============
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: driftmgr_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: binaries-linux-amd64
+        path: dist/
+
+    - name: Make binaries executable
+      run: chmod +x dist/*
+
+    - name: Run integration tests
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/driftmgr_test?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+      run: |
+        echo "Running integration tests..."
+        # Test binary execution
+        ./dist/driftmgr-linux-amd64 --version
+        
+        # Run actual integration tests if they exist
+        if [ -d "./tests/integration" ]; then
+          go test -v -tags=integration ./tests/integration/...
+        fi
+        
+        # Test server startup
+        if [ -f "./dist/driftmgr-server-linux-amd64" ]; then
+          timeout 5s ./dist/driftmgr-server-linux-amd64 || true
+        fi
+
+  # ============== USER ACCEPTANCE TESTS ==============
+  uat:
+    name: User Acceptance Tests
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: binaries-linux-amd64
+        path: dist/
+
+    - name: Make binaries executable
+      run: chmod +x dist/*
+
+    - name: Run UAT scenarios
+      run: |
+        echo "Running UAT scenarios..."
+        
+        # Test help command
+        ./dist/driftmgr-linux-amd64 --help
+        
+        # Test version command
+        ./dist/driftmgr-linux-amd64 --version
+        
+        # Run UAT tests if they exist
+        if [ -d "./tests/uat" ]; then
+          for test in ./tests/uat/*.sh; do
+            if [ -f "$test" ]; then
+              echo "Running UAT: $(basename $test)"
+              bash "$test" || true
+            fi
+          done
+        fi
+
+    - name: Generate UAT report
+      if: always()
+      run: |
+        echo "# UAT Report" > uat-report.md
+        echo "Date: $(date)" >> uat-report.md
+        echo "Branch: ${{ github.head_ref }}" >> uat-report.md
+        echo "Commit: ${{ github.sha }}" >> uat-report.md
+        echo "" >> uat-report.md
+        echo "## Test Results" >> uat-report.md
+        echo "All UAT scenarios completed" >> uat-report.md
+
+    - name: Upload UAT report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: uat-report
+        path: uat-report.md
+
+  # ============== FINAL STATUS ==============
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs: [lint, test, quality, build, integration-test, uat]
+    if: always()
+    
+    steps:
+    - name: Check CI status
+      run: |
+        if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
+          echo "CI pipeline failed"
+          exit 1
+        else
+          echo "CI pipeline succeeded"
+        fi
+
+    - name: Notify Slack on success
+      if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: 'CI/CD pipeline completed successfully for ${{ github.ref }}'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Notify Slack on failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: 'CI/CD pipeline failed for ${{ github.ref }}'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

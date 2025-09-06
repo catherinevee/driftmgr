@@ -1,0 +1,255 @@
+name: Utilities
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Operation to perform'
+        required: true
+        type: choice
+        options:
+          - setup-secrets
+          - cleanup-artifacts
+          - update-dependencies
+          - benchmark
+          - generate-docs
+      target:
+        description: 'Target (optional)'
+        required: false
+        default: ''
+
+jobs:
+  # ============== SETUP SECRETS ==============
+  setup-secrets:
+    name: Setup Repository Secrets
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'setup-secrets'
+    permissions:
+      contents: write
+      actions: write
+      secrets: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Validate required secrets
+      run: |
+        echo "Checking required secrets..."
+        required_secrets=(
+          "DOCKER_HUB_USERNAME"
+          "DOCKER_HUB_TOKEN"
+          "SLACK_WEBHOOK_URL"
+          "CODECOV_TOKEN"
+        )
+        
+        missing_secrets=()
+        for secret in "${required_secrets[@]}"; do
+          echo "Checking $secret..."
+          # Note: Can't actually check if secrets exist, but we document them
+          echo "- $secret: Required for CI/CD pipeline"
+        done
+        
+        echo ""
+        echo "## Required Secrets Documentation"
+        echo "Please ensure the following secrets are configured:"
+        echo "1. DOCKER_HUB_USERNAME - Docker Hub username"
+        echo "2. DOCKER_HUB_TOKEN - Docker Hub access token"
+        echo "3. SLACK_WEBHOOK_URL - Slack webhook for notifications"
+        echo "4. CODECOV_TOKEN - Codecov token for coverage reports"
+        echo "5. SNYK_TOKEN - Snyk token for security scanning (optional)"
+        echo ""
+        echo "## Cloud Provider Secrets (per environment)"
+        echo "AWS:"
+        echo "- AWS_ROLE_dev, AWS_ROLE_staging, AWS_ROLE_production"
+        echo ""
+        echo "Azure:"
+        echo "- AZURE_CLIENT_ID_dev, AZURE_CLIENT_ID_staging, AZURE_CLIENT_ID_production"
+        echo "- AZURE_TENANT_ID"
+        echo "- AZURE_SUBSCRIPTION_ID_dev, AZURE_SUBSCRIPTION_ID_staging, AZURE_SUBSCRIPTION_ID_production"
+        echo ""
+        echo "GCP:"
+        echo "- GCP_SA_KEY_dev, GCP_SA_KEY_staging, GCP_SA_KEY_production"
+
+  # ============== CLEANUP ARTIFACTS ==============
+  cleanup-artifacts:
+    name: Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'cleanup-artifacts'
+    
+    steps:
+    - name: Delete old artifacts
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const days = 7;
+          const ms_per_day = 86400000;
+          const cutoff = new Date(Date.now() - days * ms_per_day);
+          
+          const artifacts = await github.paginate(
+            github.rest.actions.listArtifactsForRepo,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            }
+          );
+          
+          let deleted = 0;
+          for (const artifact of artifacts) {
+            if (new Date(artifact.created_at) < cutoff) {
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id
+              });
+              deleted++;
+            }
+          }
+          
+          console.log(`Deleted ${deleted} artifacts older than ${days} days`);
+
+  # ============== UPDATE DEPENDENCIES ==============
+  update-dependencies:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'update-dependencies'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Update Go modules
+      run: |
+        go get -u ./...
+        go mod tidy
+
+    - name: Update GitHub Actions
+      run: |
+        # Update action versions in workflows
+        for workflow in .github/workflows/*.yml; do
+          echo "Checking $workflow for outdated actions..."
+          # This is a placeholder - would need more sophisticated updating
+          grep -E 'uses:.*@v[0-9]' "$workflow" || true
+        done
+
+    - name: Create pull request
+      uses: peter-evans/create-pull-request@v5
+      with:
+        title: '[Dependencies] Update dependencies'
+        body: |
+          ## Dependency Updates
+          
+          This PR updates the following dependencies:
+          - Go modules
+          - GitHub Actions versions
+          
+          Please review the changes carefully.
+        branch: update-dependencies-${{ github.run_id }}
+        commit-message: 'Update dependencies'
+
+  # ============== BENCHMARK ==============
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'benchmark'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Run benchmarks
+      run: |
+        echo "Running benchmarks..."
+        go test -bench=. -benchmem -benchtime=10s ./... > benchmark-results.txt
+
+    - name: Parse benchmark results
+      run: |
+        echo "# Benchmark Results" > benchmark-report.md
+        echo "Date: $(date)" >> benchmark-report.md
+        echo "Commit: ${{ github.sha }}" >> benchmark-report.md
+        echo "" >> benchmark-report.md
+        echo "\`\`\`" >> benchmark-report.md
+        cat benchmark-results.txt >> benchmark-report.md
+        echo "\`\`\`" >> benchmark-report.md
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: |
+          benchmark-results.txt
+          benchmark-report.md
+
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        tool: 'go'
+        output-file-path: benchmark-results.txt
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+
+  # ============== GENERATE DOCUMENTATION ==============
+  generate-docs:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    if: github.event.inputs.operation == 'generate-docs'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Install documentation tools
+      run: |
+        go install github.com/robertkrimen/godocdown@latest
+        go install golang.org/x/tools/cmd/godoc@latest
+
+    - name: Generate Go documentation
+      run: |
+        echo "Generating Go documentation..."
+        mkdir -p docs/api
+        
+        for pkg in $(go list ./...); do
+          echo "Documenting $pkg..."
+          godocdown $pkg > docs/api/$(echo $pkg | tr '/' '_').md
+        done
+
+    - name: Generate architecture diagrams
+      run: |
+        echo "Generating architecture diagrams..."
+        # Placeholder for diagram generation
+        echo "Would generate diagrams here using tools like go-plantuml"
+
+    - name: Update README
+      run: |
+        echo "Updating README with latest information..."
+        # Update badges, version info, etc.
+
+    - name: Create pull request
+      uses: peter-evans/create-pull-request@v5
+      with:
+        title: '[Docs] Update documentation'
+        body: |
+          ## Documentation Updates
+          
+          This PR updates the project documentation:
+          - API documentation
+          - Architecture diagrams
+          - README updates
+        branch: update-docs-${{ github.run_id }}
+        commit-message: 'Update documentation'

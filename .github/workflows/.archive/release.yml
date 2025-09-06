@@ -1,0 +1,366 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.2.3)'
+        required: true
+        type: string
+      pre_release:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GO_VERSION: '1.23'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Test Before Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Run tests
+      run: |
+        go mod download
+        go test -v -race ./...
+
+    - name: Run integration tests
+      run: |
+        # Run integration tests if they exist
+        if [ -d "tests/integration" ]; then
+          go test -v -tags=integration ./tests/integration/...
+        fi
+
+  build:
+    name: Build Release Artifacts
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${GITHUB_REF#refs/tags/}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version_no_v=${VERSION#v}" >> $GITHUB_OUTPUT
+
+    - name: Build binaries
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        VERSION: ${{ steps.version.outputs.version }}
+      run: |
+        mkdir -p dist
+        
+        # Set binary suffix for Windows
+        SUFFIX=""
+        if [ "$GOOS" = "windows" ]; then
+          SUFFIX=".exe"
+        fi
+        
+        # Build flags with version info
+        LDFLAGS="-s -w -X main.version=$VERSION -X main.commit=$(git rev-parse HEAD) -X main.date=$(date -u '+%Y-%m-%d_%H:%M:%S')"
+        
+        # Build main driftmgr binary
+        go build -ldflags="$LDFLAGS" -o dist/driftmgr-$GOOS-$GOARCH$SUFFIX ./cmd/driftmgr
+        
+        # Build server binary
+        go build -ldflags="$LDFLAGS" -o dist/driftmgr-server-$GOOS-$GOARCH$SUFFIX ./cmd/server
+        
+        # Build TUI binary if it exists
+        if [ -d "cmd/driftmgr-tui" ]; then
+          go build -ldflags="$LDFLAGS" -o dist/driftmgr-tui-$GOOS-$GOARCH$SUFFIX ./cmd/driftmgr-tui
+        fi
+        
+        # Create archive
+        cd dist
+        if [ "$GOOS" = "windows" ]; then
+          zip -r driftmgr-$VERSION-$GOOS-$GOARCH.zip *$GOOS-$GOARCH*
+        else
+          tar -czf driftmgr-$VERSION-$GOOS-$GOARCH.tar.gz *$GOOS-$GOARCH*
+        fi
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: driftmgr-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/
+
+  docker:
+    name: Build and Push Docker Images
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${GITHUB_REF#refs/tags/}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version_no_v=${VERSION#v}" >> $GITHUB_OUTPUT
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=tag
+          type=raw,value=${{ steps.version.outputs.version }}
+          type=raw,value=${{ steps.version.outputs.version_no_v }}
+          type=raw,value=latest
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ steps.version.outputs.version }}
+          COMMIT=${{ github.sha }}
+          DATE=${{ github.event.head_commit.timestamp }}
+
+  create_release:
+    name: Create GitHub Release
+    needs: [build, docker]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${GITHUB_REF#refs/tags/}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Generate changelog from commits since last tag
+        LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -n "$LAST_TAG" ]; then
+          echo "## Changes since $LAST_TAG" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD >> CHANGELOG.md
+        else
+          echo "## Initial Release" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "First release of DriftMgr - Infrastructure Drift Detection and Management Tool" >> CHANGELOG.md
+        fi
+        
+        echo "" >> CHANGELOG.md
+        echo "## Docker Images" >> CHANGELOG.md
+        echo "- \`ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}\`" >> CHANGELOG.md
+        echo "- \`ghcr.io/${{ github.repository }}:latest\`" >> CHANGELOG.md
+        
+        echo "" >> CHANGELOG.md
+        echo "## Installation" >> CHANGELOG.md
+        echo "Download the appropriate binary for your platform from the assets below." >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### Quick Install Script" >> CHANGELOG.md
+        echo "\`\`\`bash" >> CHANGELOG.md
+        echo "curl -sSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | bash" >> CHANGELOG.md
+        echo "\`\`\`" >> CHANGELOG.md
+
+    - name: Organize release assets
+      run: |
+        mkdir -p release-assets
+        
+        # Copy and organize all build artifacts
+        find artifacts/ -name "*.tar.gz" -o -name "*.zip" | while read file; do
+          cp "$file" release-assets/
+        done
+        
+        # Generate checksums
+        cd release-assets
+        sha256sum * > checksums.txt
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
+        body_path: CHANGELOG.md
+        draft: false
+        prerelease: ${{ github.event.inputs.pre_release || false }}
+        files: |
+          release-assets/*
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  update_homebrew:
+    name: Update Homebrew Formula
+    needs: create_release
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.inputs.pre_release }}
+    
+    steps:
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${GITHUB_REF#refs/tags/}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version_no_v=${VERSION#v}" >> $GITHUB_OUTPUT
+
+    - name: Update Homebrew formula
+      uses: dawidd6/action-homebrew-bump-formula@v3
+      with:
+        token: ${{ secrets.HOMEBREW_TOKEN }}
+        formula: driftmgr
+        tag: ${{ steps.version.outputs.version }}
+        revision: ${{ github.sha }}
+
+  notify:
+    name: Notify Release
+    needs: [create_release, update_homebrew]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${GITHUB_REF#refs/tags/}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Send Slack notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: |
+          🚀 DriftMgr ${{ steps.version.outputs.version }} Released!
+          
+          📦 Release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}
+          🐳 Docker: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+          🍺 Homebrew: brew install driftmgr
+          
+          Status: ${{ needs.create_release.result }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Send email notification
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: ${{ secrets.SMTP_SERVER }}
+        server_port: 587
+        username: ${{ secrets.SMTP_USERNAME }}
+        password: ${{ secrets.SMTP_PASSWORD }}
+        subject: "DriftMgr ${{ steps.version.outputs.version }} Released"
+        body: |
+          DriftMgr version ${{ steps.version.outputs.version }} has been successfully released!
+          
+          Release Notes: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}
+          Docker Image: ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+          
+          The release includes:
+          - Multi-platform binaries (Linux, Windows, macOS)
+          - Docker images for amd64 and arm64
+          - Updated Homebrew formula
+          
+          Happy drifting!
+        to: ${{ secrets.NOTIFICATION_EMAIL_TO }}
+        from: ${{ secrets.NOTIFICATION_EMAIL_FROM }}
+
+  security_scan:
+    name: Security Scan Release
+    needs: create_release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Run Trivy vulnerability scanner on image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'ghcr.io/${{ github.repository }}:${{ needs.create_release.outputs.version }}'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
