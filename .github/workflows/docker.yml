@@ -67,7 +67,6 @@ jobs:
       with:
         images: |
           ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
-          ${{ env.DOCKER_HUB_IMAGE }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -191,7 +190,6 @@ jobs:
       with:
         images: |
           ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
-          ${{ env.DOCKER_HUB_IMAGE }}
         tags: |
           type=ref,event=branch
           type=semver,pattern={{version}}
