@@ -71,6 +71,8 @@ jobs:
 
     - name: Configure AWS credentials
       if: matrix.provider == 'aws'
+      continue-on-error: true
+      id: aws-auth
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets[format('AWS_ROLE_{0}', matrix.environment)] }}
@@ -78,6 +80,8 @@ jobs:
 
     - name: Configure Azure credentials
       if: matrix.provider == 'azure'
+      continue-on-error: true
+      id: azure-auth
       uses: azure/login@v1
       with:
         client-id: ${{ secrets[format('AZURE_CLIENT_ID_{0}', matrix.environment)] }}
@@ -86,11 +90,45 @@ jobs:
 
     - name: Configure GCP credentials
       if: matrix.provider == 'gcp'
+      continue-on-error: true
+      id: gcp-auth
       uses: google-github-actions/auth@v2
       with:
         credentials_json: ${{ secrets[format('GCP_SA_KEY_{0}', matrix.environment)] }}
 
+    - name: Check authentication status
+      id: check-auth
+      run: |
+        echo "Checking authentication for ${{ matrix.provider }}..."
+        AUTH_SUCCESS="false"
+        
+        if [ "${{ matrix.provider }}" == "aws" ]; then
+          if aws sts get-caller-identity >/dev/null 2>&1; then
+            echo "AWS authentication successful"
+            AUTH_SUCCESS="true"
+          else
+            echo "AWS authentication failed or not configured"
+          fi
+        elif [ "${{ matrix.provider }}" == "azure" ]; then
+          if az account show >/dev/null 2>&1; then
+            echo "Azure authentication successful"
+            AUTH_SUCCESS="true"
+          else
+            echo "Azure authentication failed or not configured"
+          fi
+        elif [ "${{ matrix.provider }}" == "gcp" ]; then
+          if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ] && [ -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+            echo "GCP authentication successful"
+            AUTH_SUCCESS="true"
+          else
+            echo "GCP authentication failed or not configured"
+          fi
+        fi
+        
+        echo "auth_success=$AUTH_SUCCESS" >> $GITHUB_OUTPUT
+
     - name: Run drift detection
+      if: steps.check-auth.outputs.auth_success == 'true'
       id: drift
       run: |
         ./driftmgr drift detect \
@@ -99,24 +137,51 @@ jobs:
           --output json \
           --save-report drift-${{ matrix.provider }}-${{ matrix.environment }}.json
 
+    - name: Skip drift detection (no credentials)
+      if: steps.check-auth.outputs.auth_success != 'true'
+      run: |
+        echo "⚠️ Skipping drift detection for ${{ matrix.provider }} in ${{ matrix.environment }} - credentials not configured"
+        echo "To enable drift detection, configure the following secrets:"
+        if [ "${{ matrix.provider }}" == "aws" ]; then
+          echo "  - AWS_ROLE_${{ matrix.environment }}"
+        elif [ "${{ matrix.provider }}" == "azure" ]; then
+          echo "  - AZURE_CLIENT_ID_${{ matrix.environment }}"
+          echo "  - AZURE_TENANT_ID"
+          echo "  - AZURE_SUBSCRIPTION_ID_${{ matrix.environment }}"
+        elif [ "${{ matrix.provider }}" == "gcp" ]; then
+          echo "  - GCP_SA_KEY_${{ matrix.environment }}"
+        fi
+
     - name: Parse drift results
+      if: steps.check-auth.outputs.auth_success == 'true'
       id: parse
       run: |
-        DRIFTED=$(jq '.summary.drifted_resources' drift-${{ matrix.provider }}-${{ matrix.environment }}.json)
-        MISSING=$(jq '.summary.missing_resources' drift-${{ matrix.provider }}-${{ matrix.environment }}.json)
-        UNMANAGED=$(jq '.summary.unmanaged_resources' drift-${{ matrix.provider }}-${{ matrix.environment }}.json)
+        REPORT_FILE="drift-${{ matrix.provider }}-${{ matrix.environment }}.json"
         
-        echo "drifted=$DRIFTED" >> $GITHUB_OUTPUT
-        echo "missing=$MISSING" >> $GITHUB_OUTPUT
-        echo "unmanaged=$UNMANAGED" >> $GITHUB_OUTPUT
-        
-        if [ "$DRIFTED" -gt 0 ] || [ "$MISSING" -gt 0 ]; then
-          echo "drift_detected=true" >> $GITHUB_OUTPUT
+        if [ -f "$REPORT_FILE" ]; then
+          DRIFTED=$(jq '.summary.drifted_resources' $REPORT_FILE)
+          MISSING=$(jq '.summary.missing_resources' $REPORT_FILE)
+          UNMANAGED=$(jq '.summary.unmanaged_resources' $REPORT_FILE)
+          
+          echo "drifted=$DRIFTED" >> $GITHUB_OUTPUT
+          echo "missing=$MISSING" >> $GITHUB_OUTPUT
+          echo "unmanaged=$UNMANAGED" >> $GITHUB_OUTPUT
+          
+          if [ "$DRIFTED" -gt 0 ] || [ "$MISSING" -gt 0 ]; then
+            echo "drift_detected=true" >> $GITHUB_OUTPUT
+          else
+            echo "drift_detected=false" >> $GITHUB_OUTPUT
+          fi
         else
+          echo "Report file not found - drift detection was skipped"
+          echo "drifted=0" >> $GITHUB_OUTPUT
+          echo "missing=0" >> $GITHUB_OUTPUT
+          echo "unmanaged=0" >> $GITHUB_OUTPUT
           echo "drift_detected=false" >> $GITHUB_OUTPUT
         fi
 
     - name: Upload drift report
+      if: steps.check-auth.outputs.auth_success == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: drift-report-${{ matrix.provider }}-${{ matrix.environment }}
@@ -246,6 +311,7 @@ jobs:
     
     steps:
     - name: Download all drift reports
+      continue-on-error: true
       uses: actions/download-artifact@v4
       with:
         pattern: drift-report-*
