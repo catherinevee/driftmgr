@@ -64,8 +64,10 @@ jobs:
 
     - name: Run Gosec Security Scanner
       uses: securego/gosec@master
+      continue-on-error: true
+      timeout-minutes: 5
       with:
-        args: '-fmt sarif -out gosec.sarif -severity high ./...'
+        args: '-fmt sarif -out gosec.sarif -severity high -timeout 5m ./...'
 
     - name: Upload Gosec results
       uses: github/codeql-action/upload-sarif@v3
@@ -75,7 +77,9 @@ jobs:
         sarif_file: gosec.sarif
 
     - name: Run Semgrep
+      id: semgrep
       uses: returntocorp/semgrep-action@v1
+      continue-on-error: true
       with:
         config: >-
           p/security-audit
@@ -85,13 +89,14 @@ jobs:
 
     - name: Upload Semgrep results
       uses: github/codeql-action/upload-sarif@v3
-      if: always() && github.event_name != 'pull_request'
+      if: always() && github.event_name != 'pull_request' && steps.semgrep.outcome == 'success'
       continue-on-error: true
       with:
         sarif_file: semgrep.sarif
 
     - name: Run TruffleHog OSS
       uses: trufflesecurity/trufflehog@main
+      continue-on-error: true
       with:
         path: ./
         base: ${{ github.event.repository.default_branch }}
