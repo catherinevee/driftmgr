@@ -149,7 +149,7 @@ services:
 
   # Test OAuth Provider (Mock)
   oauth-mock:
-    image: ghcr.io/navikt/mock-oauth2-server:latest
+    image: quay.io/navikt/mock-oauth2-server:latest
     container_name: driftmgr-test-oauth
     ports:
       - "8090:8080"

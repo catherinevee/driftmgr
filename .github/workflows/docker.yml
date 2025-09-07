@@ -20,26 +20,14 @@ on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      push_to_registry:
-        description: 'Push to registry'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
 
 env:
-  REGISTRY_GHCR: ghcr.io
-  REGISTRY_DOCKER: docker.io
+  REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  DOCKER_HUB_IMAGE: catherinevee/driftmgr
 
 jobs:
-  # ============== BUILD & TEST DOCKER IMAGE ==============
-  docker-build:
-    name: Build Docker Image
+  build:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,264 +36,59 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
       with:
-        driver-opts: |
-          network=host
-          image=moby/buildkit:master
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: |
-          ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
-          type=semver,pattern={{major}}
-          type=sha,prefix={{branch}}-
           type=raw,value=v3.0.1
           type=raw,value=latest,enable={{is_default_branch}}
-          type=raw,value={{date 'YYYYMMDD'}}-{{sha}}
 
-    - name: Build test image
+    - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./Dockerfile
-        platforms: linux/amd64
-        load: true
-        tags: driftmgr:test
+        platforms: ${{ github.event_name == 'release' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         build-args: |
           VERSION=${{ github.sha }}
           BUILD_DATE=${{ github.event.repository.updated_at }}
 
-    - name: Test Docker image
-      run: |
-        echo "Testing Docker image..."
-        docker run --rm driftmgr:test version
-        docker run --rm driftmgr:test help
-        
-        # Test with docker compose (if test file exists)
-        if [ -f "docker-compose.test.yml" ]; then
-          echo "Found docker-compose.test.yml, attempting to run tests..."
-          docker compose -f docker-compose.test.yml up --abort-on-container-exit || echo "Docker compose test failed, continuing..."
-          docker compose -f docker-compose.test.yml down -v || true
-        fi
-
-    - name: Security scan with Trivy
+    - name: Run Trivy vulnerability scanner
+      if: github.event_name != 'pull_request'
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: driftmgr:test
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
         format: 'sarif'
         output: 'trivy-results.sarif'
-        severity: 'CRITICAL,HIGH'
 
     - name: Upload Trivy results to GitHub Security
+      if: github.event_name != 'pull_request'
       uses: github/codeql-action/upload-sarif@v3
-      if: always() && github.event_name != 'pull_request'
       continue-on-error: true
       with:
         sarif_file: 'trivy-results.sarif'
-
-    - name: Build multi-platform image
-      id: build
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        # Only build for multiple platforms on releases to speed up regular builds
-        platforms: ${{ github.event_name == 'release' && 'linux/amd64,linux/arm64,linux/arm/v7' || 'linux/amd64' }}
-        push: false
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        outputs: type=docker,dest=/tmp/driftmgr-image.tar
-        build-args: |
-          VERSION=${{ steps.meta.outputs.version }}
-          COMMIT=${{ github.sha }}
-          BUILD_DATE=${{ github.event.repository.updated_at }}
-
-    - name: Upload Docker image artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: docker-image
-        path: /tmp/driftmgr-image.tar
-        retention-days: 1
-
-  # ============== PUSH TO REGISTRIES ==============
-  docker-push:
-    name: Push to Registries
-    runs-on: ubuntu-latest
-    needs: docker-build
-    if: |
-      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
-      github.event_name == 'release' ||
-      github.event.inputs.push_to_registry == 'true'
-    permissions:
-      contents: read
-      packages: write
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Download Docker image artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: docker-image
-        path: /tmp
-
-    - name: Load Docker image
-      run: docker load < /tmp/driftmgr-image.tar
-
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY_GHCR }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    # Docker Hub login removed - using public image catherinevee/driftmgr
-
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: |
-          ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=raw,value=v3.0.1
-          type=raw,value=latest,enable={{is_default_branch}}
-
-    - name: Push to registries
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        # Only build for multiple platforms on releases to speed up regular builds
-        platforms: ${{ github.event_name == 'release' && 'linux/amd64,linux/arm64,linux/arm/v7' || 'linux/amd64' }}
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-    # Docker Hub description update removed - requires credentials
-
-  # ============== DOCKER COMPOSE VALIDATION ==============
-  docker-compose-test:
-    name: Docker Compose Test
-    runs-on: ubuntu-latest
-    needs: docker-build
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Download Docker image artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: docker-image
-        path: /tmp
-
-    - name: Load Docker image
-      run: docker load < /tmp/driftmgr-image.tar
-
-    - name: Test docker-compose.yml
-      run: |
-        # Update image references to use local test image
-        sed -i 's|catherinevee/driftmgr:.*|driftmgr:test|g' docker-compose.yml
-        
-        # Start services
-        docker compose up -d
-        
-        # Wait for services to be healthy
-        sleep 10
-        
-        # Check services are running
-        docker compose ps
-        docker compose logs
-        
-        # Test connectivity
-        curl -f http://localhost:8080/health || true
-        
-        # Clean up
-        docker compose down -v
-
-    - name: Test docker-compose.test.yml
-      if: hashFiles('docker-compose.test.yml') != ''
-      run: |
-        docker compose -f docker-compose.test.yml up --abort-on-container-exit
-        docker compose -f docker-compose.test.yml down -v
-
-  # ============== RELEASE DOCKER IMAGE ==============
-  docker-release:
-    name: Release Docker Image
-    runs-on: ubuntu-latest
-    needs: [docker-push]
-    if: github.event_name == 'release'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Generate SBOM
-      uses: anchore/sbom-action@v0
-      with:
-        image: ${{ env.DOCKER_HUB_IMAGE }}:${{ github.event.release.tag_name }}
-        format: cyclonedx-json
-        output-file: sbom.cyclonedx.json
-
-    - name: Attach SBOM to release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: sbom.cyclonedx.json
-
-    - name: Sign container image
-      if: github.event_name == 'release'
-      env:
-        COSIGN_EXPERIMENTAL: 1
-      run: |
-        # Install cosign
-        curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
-        chmod +x cosign
-        
-        # Sign the images
-        ./cosign sign ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ github.event.release.tag_name }}
-        ./cosign sign ${{ env.DOCKER_HUB_IMAGE }}:${{ github.event.release.tag_name }}
-
-    - name: Create Docker Hub release notes
-      run: |
-        echo "# Release ${{ github.event.release.tag_name }}" > DOCKER_RELEASE.md
-        echo "" >> DOCKER_RELEASE.md
-        echo "## What's Changed" >> DOCKER_RELEASE.md
-        echo "${{ github.event.release.body }}" >> DOCKER_RELEASE.md
-        echo "" >> DOCKER_RELEASE.md
-        echo "## Docker Images" >> DOCKER_RELEASE.md
-        echo "- \`docker pull ${{ env.DOCKER_HUB_IMAGE }}:${{ github.event.release.tag_name }}\`" >> DOCKER_RELEASE.md
-        echo "- \`docker pull ${{ env.DOCKER_HUB_IMAGE }}:latest\`" >> DOCKER_RELEASE.md
-        echo "" >> DOCKER_RELEASE.md
-        echo "## Supported Platforms" >> DOCKER_RELEASE.md
-        echo "- linux/amd64" >> DOCKER_RELEASE.md
-        echo "- linux/arm64" >> DOCKER_RELEASE.md
-        echo "- linux/arm/v7" >> DOCKER_RELEASE.md
