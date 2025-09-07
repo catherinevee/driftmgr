@@ -75,6 +75,7 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
           type=sha,prefix={{branch}}-
+          type=raw,value=v3.0.1
           type=raw,value=latest,enable={{is_default_branch}}
           type=raw,value={{date 'YYYYMMDD'}}-{{sha}}
 
@@ -182,12 +183,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY_DOCKER }}
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+    # Docker Hub login removed - using public image catherinevee/driftmgr
 
     - name: Extract metadata
       id: meta
@@ -200,6 +196,7 @@ jobs:
           type=ref,event=branch
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=v3.0.1
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Push to registries
@@ -215,14 +212,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Update Docker Hub description
-      if: github.event_name == 'release'
-      uses: peter-evans/dockerhub-description@v3
-      with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_TOKEN }}
-        repository: ${{ env.DOCKER_HUB_IMAGE }}
-        readme-filepath: ./README.md
+    # Docker Hub description update removed - requires credentials
 
   # ============== DOCKER COMPOSE VALIDATION ==============
   docker-compose-test:
