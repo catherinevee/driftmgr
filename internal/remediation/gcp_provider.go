@@ -1139,8 +1139,8 @@ func (gp *GCPProvider) discoverBigQueryDatasets(ctx context.Context, accountID s
 			if access.Entity != "" {
 				accessEntry["entity"] = access.Entity
 			}
-			if string(access.EntityType) != "" {
-				accessEntry["entity_type"] = string(access.EntityType)
+			if access.EntityType != 0 {
+				accessEntry["entity_type"] = access.EntityType
 			}
 			if access.Role != "" {
 				accessEntry["role"] = string(access.Role)

@@ -442,6 +442,15 @@ func (ca *CostAnalyzer) CalculateResourceCost(ctx context.Context, resource *sta
 	return cost, nil
 }
 
+// CostAnalysis represents a cost analysis result
+type CostAnalysis struct {
+	TotalCost     float64            `json:"total_cost"`
+	ResourceCount int                `json:"resource_count"`
+	Currency      string             `json:"currency"`
+	CostByType    map[string]float64 `json:"cost_by_type"`
+	CostByRegion  map[string]float64 `json:"cost_by_region"`
+}
+
 // CostTrend represents cost trend analysis
 type CostTrend struct {
 	Period        string       `json:"period"`

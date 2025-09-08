@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/config"
+	// "github.com/catherinevee/driftmgr/internal/config" // Package removed
 	"github.com/catherinevee/driftmgr/internal/discovery"
 	"github.com/catherinevee/driftmgr/internal/state"
-	"github.com/catherinevee/driftmgr/internal/visualization"
+	// "github.com/catherinevee/driftmgr/internal/visualization" // Package removed
 	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

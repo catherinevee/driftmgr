@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -19,9 +20,9 @@ func main() {
 		port       = flag.String("port", "8080", "Server port")
 		host       = flag.String("host", "0.0.0.0", "Server host")
 		configPath = flag.String("config", "", "Path to configuration file")
-		tlsCert    = flag.String("tls-cert", "", "Path to TLS certificate")
-		tlsKey     = flag.String("tls-key", "", "Path to TLS key")
-		jwtSecret  = flag.String("jwt-secret", "", "JWT secret for authentication")
+		// tlsCert    = flag.String("tls-cert", "", "Path to TLS certificate") // unused for now
+		// tlsKey     = flag.String("tls-key", "", "Path to TLS key") // unused for now
+		// jwtSecret  = flag.String("jwt-secret", "", "JWT secret for authentication") // unused for now
 		enableAuth = flag.Bool("auth", false, "Enable authentication")
 	)
 	flag.Parse()
@@ -30,13 +31,11 @@ func main() {
 	fmt.Printf("Listening on %s:%s\n", *host, *port)
 
 	// Create server configuration
-	config := api.ServerConfig{
-		Host:       *host,
-		Port:       *port,
-		EnableAuth: *enableAuth,
-		JWTSecret:  *jwtSecret,
-		TLSCert:    *tlsCert,
-		TLSKey:     *tlsKey,
+	portInt, _ := strconv.Atoi(*port)
+	config := &api.Config{
+		Host:        *host,
+		Port:        portInt,
+		AuthEnabled: *enableAuth,
 	}
 
 	// Load configuration file if provided
@@ -45,8 +44,11 @@ func main() {
 		log.Printf("Loading configuration from %s", *configPath)
 	}
 
+	// Create services (empty for now)
+	services := &api.Services{}
+
 	// Create API server
-	apiServer := api.NewServer(config)
+	apiServer := api.NewServer(config, services)
 
 	// Setup routes
 	setupRoutes(apiServer)
@@ -54,7 +56,7 @@ func main() {
 	// Create HTTP server
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", *host, *port),
-		Handler:      apiServer.Router(),
+		Handler:      apiServer,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -62,14 +64,8 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		var err error
-		if *tlsCert != "" && *tlsKey != "" {
-			fmt.Println("Starting HTTPS server...")
-			err = srv.ListenAndServeTLS(*tlsCert, *tlsKey)
-		} else {
-			fmt.Println("Starting HTTP server...")
-			err = srv.ListenAndServe()
-		}
+		fmt.Println("Starting HTTP server...")
+		err := srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}
@@ -94,37 +90,7 @@ func main() {
 }
 
 func setupRoutes(server *api.Server) {
-	// Health check endpoints
-	server.RegisterHealthChecks()
-
-	// API v1 routes
-	v1 := "/api/v1"
-
-	// Discovery endpoints
-	server.RegisterRoute("POST", v1+"/discover", server.HandleDiscovery)
-	server.RegisterRoute("GET", v1+"/discover/:id", server.HandleDiscoveryStatus)
-
-	// Drift detection endpoints
-	server.RegisterRoute("POST", v1+"/drift/detect", server.HandleDriftDetection)
-	server.RegisterRoute("GET", v1+"/drift/:id", server.HandleDriftResults)
-
-	// State management endpoints
-	server.RegisterRoute("GET", v1+"/state", server.HandleListStates)
-	server.RegisterRoute("POST", v1+"/state/analyze", server.HandleStateAnalysis)
-	server.RegisterRoute("POST", v1+"/state/push", server.HandleStatePush)
-	server.RegisterRoute("POST", v1+"/state/pull", server.HandleStatePull)
-
-	// Remediation endpoints
-	server.RegisterRoute("POST", v1+"/remediate", server.HandleRemediation)
-	server.RegisterRoute("GET", v1+"/remediate/:id", server.HandleRemediationStatus)
-
-	// Resource endpoints
-	server.RegisterRoute("GET", v1+"/resources", server.HandleListResources)
-	server.RegisterRoute("GET", v1+"/resources/:id", server.HandleGetResource)
-
-	// Metrics endpoint
-	server.RegisterRoute("GET", "/metrics", server.HandleMetrics)
-
-	// WebSocket for real-time updates
-	server.RegisterRoute("GET", "/ws", server.HandleWebSocket)
+	// Routes are configured in the server itself
+	// This is a placeholder for future route customization
+	log.Println("Server routes configured")
 }

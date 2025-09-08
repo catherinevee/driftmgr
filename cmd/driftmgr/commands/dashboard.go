@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -69,11 +69,15 @@ func HandleDashboard(args []string) {
 		fmt.Printf("Open your browser at http://localhost:%s\n", port)
 		fmt.Println("\nPress Ctrl+C to stop the server")
 
+		// Convert port to int
+		portInt, _ := strconv.Atoi(port)
 		// Create API server without pre-discovery
-		server := api.NewServer(api.ServerConfig{
+		config := &api.Config{
 			Host: "0.0.0.0",
-			Port: port,
-		})
+			Port: portInt,
+		}
+		services := &api.Services{}
+		server := api.NewServer(config, services)
 
 		// Handle shutdown gracefully
 		sigChan := make(chan os.Signal, 1)
@@ -91,8 +95,7 @@ func HandleDashboard(args []string) {
 		}()
 
 		// Start server
-		http.Handle("/", server.Router())
-		if err := http.ListenAndServe(":"+port, nil); err != nil {
+		if err := server.Start(context.Background()); err != nil {
 			log.Fatal("Failed to start server:", err)
 		}
 		return
@@ -257,11 +260,15 @@ func HandleDashboard(args []string) {
 	fmt.Printf("Open your browser at http://localhost:%s\n", port)
 	fmt.Println("\nPress Ctrl+C to stop the server")
 
+	// Convert port to int
+	portInt, _ := strconv.Atoi(port)
 	// Create API server
-	server := api.NewServer(api.ServerConfig{
+	config := &api.Config{
 		Host: "0.0.0.0",
-		Port: port,
-	})
+		Port: portInt,
+	}
+	services := &api.Services{}
+	server := api.NewServer(config, services)
 
 	// Handle shutdown gracefully
 	sigChan := make(chan os.Signal, 1)
@@ -281,7 +288,7 @@ func HandleDashboard(args []string) {
 	}()
 
 	// Start server
-	if err := server.Start(); err != nil {
+	if err := server.Start(context.Background()); err != nil {
 		log.Fatal("Failed to start dashboard server:", err)
 	}
 }

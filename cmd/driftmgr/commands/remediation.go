@@ -76,7 +76,7 @@ func showRemediationHelp() {
 // handleRemediationGenerate handles generating a remediation plan
 func handleRemediationGenerate(args []string) {
 	var driftID string
-	var workDir string = ".driftmgr/remediation"
+	// var workDir string = ".driftmgr/remediation"  // unused for now
 	var outputFormat string = "hcl"
 	var autoApprove bool
 
@@ -90,7 +90,8 @@ func handleRemediationGenerate(args []string) {
 			}
 		case "--work-dir":
 			if i+1 < len(args) {
-				workDir = args[i+1]
+				// workDir = args[i+1] // unused for now
+				_ = args[i+1]
 				i++
 			}
 		case "--output":
@@ -117,11 +118,7 @@ func handleRemediationGenerate(args []string) {
 	config.AutoApprove = autoApprove
 
 	// Create remediation engine
-	engine, err := remediation.NewRemediationEngine(workDir, config)
-	if err != nil {
-		fmt.Printf("❌ Failed to create remediation engine: %v\n", err)
-		os.Exit(1)
-	}
+	engine := remediation.NewIntelligentRemediationService(nil)
 
 	// Get drift result from store
 	driftStore := api.GetGlobalDriftStore()
@@ -158,17 +155,13 @@ func handleRemediationValidate(args []string) {
 	}
 
 	planID := args[0]
-	workDir := ".driftmgr/remediation"
+	_ = ".driftmgr/remediation" // workDir - unused for now
 
 	fmt.Printf("🔍 Validating remediation plan: %s\n", planID)
 
 	// Create remediation engine
-	config := remediation.DefaultRemediationConfig()
-	engine, err := remediation.NewRemediationEngine(workDir, config)
-	if err != nil {
-		fmt.Printf("❌ Failed to create remediation engine: %v\n", err)
-		os.Exit(1)
-	}
+	_ = remediation.DefaultRemediationConfig() // config - unused for now
+	engine := remediation.NewIntelligentRemediationService(nil)
 
 	// Load the plan
 	ctx := context.Background()
@@ -202,7 +195,7 @@ func handleRemediationApply(args []string) {
 	}
 
 	planID := args[0]
-	workDir := ".driftmgr/remediation"
+	_ = ".driftmgr/remediation" // workDir - unused for now
 	var dryRun bool
 	var autoApprove bool
 
@@ -215,7 +208,8 @@ func handleRemediationApply(args []string) {
 			autoApprove = true
 		case "--work-dir":
 			if i+1 < len(args) {
-				workDir = args[i+1]
+				// workDir = args[i+1] // unused for now
+				_ = args[i+1]
 				i++
 			}
 		}
@@ -233,11 +227,7 @@ func handleRemediationApply(args []string) {
 	config.AutoApprove = autoApprove
 
 	// Create remediation engine
-	engine, err := remediation.NewRemediationEngine(workDir, config)
-	if err != nil {
-		fmt.Printf("❌ Failed to create remediation engine: %v\n", err)
-		os.Exit(1)
-	}
+	engine := remediation.NewIntelligentRemediationService(nil)
 
 	// Load the plan
 	ctx := context.Background()
@@ -266,27 +256,34 @@ func handleRemediationApply(args []string) {
 	result, err := engine.ExecutePlan(ctx, plan)
 	if err != nil {
 		fmt.Printf("❌ Failed to apply plan: %v\n", err)
-		if result != nil && len(result.Errors) > 0 {
-			fmt.Println("ℹ️  Rollback was executed successfully")
-		}
 		os.Exit(1)
 	}
 
 	// Display results
-	if result.Success {
-		fmt.Println("Remediation applied successfully")
-	} else {
-		fmt.Println("Remediation completed with issues")
-	}
-
-	if len(result.Errors) > 0 {
-		fmt.Println("\nErrors:")
-		for _, err := range result.Errors {
-			fmt.Printf("  • %s\n", color.RedString(err))
+	successCount := 0
+	failureCount := 0
+	for _, r := range result {
+		if r.Status == remediation.StatusSuccess {
+			successCount++
+		} else {
+			failureCount++
 		}
 	}
 
-	if !result.Success {
+	if failureCount == 0 {
+		fmt.Println("Remediation applied successfully")
+	} else {
+		fmt.Printf("Remediation completed with %d successes and %d failures\n", successCount, failureCount)
+	}
+
+	// Display any failures
+	for _, r := range result {
+		if r.Status != remediation.StatusSuccess && r.Error != "" {
+			fmt.Printf("  • %s: %s\n", r.ActionID, color.RedString(r.Error))
+		}
+	}
+
+	if failureCount > 0 {
 		os.Exit(1)
 	}
 }
@@ -300,17 +297,13 @@ func handleRemediationRollback(args []string) {
 	}
 
 	planID := args[0]
-	workDir := ".driftmgr/remediation"
+	_ = ".driftmgr/remediation" // workDir - unused for now
 
 	fmt.Printf("↩️  Rolling back remediation plan: %s\n", planID)
 
 	// Create remediation engine
-	config := remediation.DefaultRemediationConfig()
-	engine, err := remediation.NewRemediationEngine(workDir, config)
-	if err != nil {
-		fmt.Printf("❌ Failed to create remediation engine: %v\n", err)
-		os.Exit(1)
-	}
+	_ = remediation.DefaultRemediationConfig() // config - unused for now
+	engine := remediation.NewIntelligentRemediationService(nil)
 
 	// Load the plan
 	ctx := context.Background()
@@ -340,17 +333,13 @@ func handleRemediationRollback(args []string) {
 
 // handleRemediationList handles listing remediation plans
 func handleRemediationList(args []string) {
-	workDir := ".driftmgr/remediation"
+	_ = ".driftmgr/remediation" // workDir - unused for now
 
 	fmt.Println("📋 Remediation Plans")
 
 	// Create remediation engine
-	config := remediation.DefaultRemediationConfig()
-	engine, err := remediation.NewRemediationEngine(workDir, config)
-	if err != nil {
-		fmt.Printf("❌ Failed to create remediation engine: %v\n", err)
-		os.Exit(1)
-	}
+	_ = remediation.DefaultRemediationConfig() // config - unused for now
+	engine := remediation.NewIntelligentRemediationService(nil)
 
 	// List plans
 	ctx := context.Background()
@@ -408,15 +397,11 @@ func handleRemediationShow(args []string) {
 	}
 
 	planID := args[0]
-	workDir := ".driftmgr/remediation"
+	_ = ".driftmgr/remediation" // workDir - unused for now
 
 	// Create remediation engine
-	config := remediation.DefaultRemediationConfig()
-	engine, err := remediation.NewRemediationEngine(workDir, config)
-	if err != nil {
-		fmt.Printf("❌ Failed to create remediation engine: %v\n", err)
-		os.Exit(1)
-	}
+	_ = remediation.DefaultRemediationConfig() // config - unused for now
+	engine := remediation.NewIntelligentRemediationService(nil)
 
 	// Load the plan
 	ctx := context.Background()

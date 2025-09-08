@@ -11,14 +11,11 @@
 
 Advanced Terraform drift detection and remediation for multi-cloud environments.
 
-[![Security](https://github.com/catherinevee/driftmgr/actions/workflows/security.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/security.yml)
-[![CI](https://github.com/catherinevee/driftmgr/actions/workflows/ci.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/ci.yml)
-[![Tests](https://github.com/catherinevee/driftmgr/actions/workflows/test.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/test.yml)
-[![License](https://img.shields.io/github/license/catherinevee/driftmgr)](LICENSE)
-[![CodeQL](https://github.com/catherinevee/driftmgr/actions/workflows/codeql.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/catherinevee/driftmgr/badge)](https://securityscorecards.dev/viewer/?uri=github.com/catherinevee/driftmgr)
-[![Dependency Review](https://github.com/catherinevee/driftmgr/actions/workflows/dependencies.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/dependencies.yml)
-[![codecov](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
+[![CI/CD Pipeline](https://github.com/catherinevee/driftmgr/actions/workflows/ci.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/ci.yml)
+[![Test Coverage](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
+[![Security Scan](https://github.com/catherinevee/driftmgr/actions/workflows/security.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/security.yml)
+[![Code Style: gofmt](https://img.shields.io/badge/code%20style-gofmt-000000.svg)](https://golang.org/cmd/gofmt/)
+[![Linting: golangci-lint](https://img.shields.io/badge/%20linting-golangci--lint-%231674b1?style=flat&labelColor=ef8336)](https://golangci-lint.run/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
 
 ## Table of Contents

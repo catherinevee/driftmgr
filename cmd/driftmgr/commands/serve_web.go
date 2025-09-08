@@ -1,8 +1,10 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/catherinevee/driftmgr/internal/api"
 )
@@ -58,12 +60,15 @@ func HandleServeWeb(args []string) {
 	fmt.Println("Loading cached resources...")
 
 	// Create server with config
-	config := &api.ServerConfig{
-		Port: port,
+	portInt, _ := strconv.Atoi(port)
+	config := &api.Config{
+		Host: "0.0.0.0",
+		Port: portInt,
 	}
+	services := &api.Services{}
 
 	// Create and start server
-	server := api.NewServer(*config)
+	server := api.NewServer(config, services)
 
 	fmt.Printf("\nStarting DriftMgr Web Server on port %s\n", port)
 	if autoDiscover {
@@ -76,7 +81,7 @@ func HandleServeWeb(args []string) {
 	fmt.Println("\nPress Ctrl+C to stop the server")
 
 	// Start server
-	if err := server.Start(); err != nil {
+	if err := server.Start(context.Background()); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }

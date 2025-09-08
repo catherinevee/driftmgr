@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriftMgr - Cloud Health Management Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-cloud"></i> DriftMgr</h2>
+                <p>Cloud Health Management</p>
+            </div>
+            
+            <ul class="sidebar-menu">
+                <li class="menu-item active" data-page="overview">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Overview</span>
+                </li>
+                <li class="menu-item" data-page="resources">
+                    <i class="fas fa-server"></i>
+                    <span>Resources</span>
+                </li>
+                <li class="menu-item" data-page="drift">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Drift Detection</span>
+                </li>
+                <li class="menu-item" data-page="health">
+                    <i class="fas fa-heartbeat"></i>
+                    <span>Health Monitoring</span>
+                </li>
+                <li class="menu-item" data-page="cost">
+                    <i class="fas fa-dollar-sign"></i>
+                    <span>Cost Analysis</span>
+                </li>
+                <li class="menu-item" data-page="security">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Security</span>
+                </li>
+                <li class="menu-item" data-page="automation">
+                    <i class="fas fa-robot"></i>
+                    <span>Automation</span>
+                </li>
+                <li class="menu-item" data-page="analytics">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Analytics</span>
+                </li>
+                <li class="menu-item" data-page="bi">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Business Intelligence</span>
+                </li>
+                <li class="menu-item" data-page="tenants">
+                    <i class="fas fa-users"></i>
+                    <span>Multi-Tenant</span>
+                </li>
+                <li class="menu-item" data-page="integrations">
+                    <i class="fas fa-plug"></i>
+                    <span>Integrations</span>
+                </li>
+                <li class="menu-item" data-page="settings">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="sidebar-toggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 id="page-title">Overview</h1>
+                </div>
+                <div class="header-right">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="Search resources, alerts...">
+                    </div>
+                    <div class="notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge">3</span>
+                    </div>
+                    <div class="user-menu">
+                        <img src="https://via.placeholder.com/32" alt="User" class="user-avatar">
+                        <span>Admin User</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content">
+                <!-- Overview Page -->
+                <div id="overview-page" class="page active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-server"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3>Total Resources</h3>
+                                <p class="stat-number">1,247</p>
+                                <span class="stat-change positive">+12%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3>Drift Alerts</h3>
+                                <p class="stat-number">23</p>
+                                <span class="stat-change negative">+5</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-heartbeat"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3>Health Score</h3>
+                                <p class="stat-number">94%</p>
+                                <span class="stat-change positive">+2%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3>Monthly Cost</h3>
+                                <p class="stat-number">$12,450</p>
+                                <span class="stat-change negative">+8%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <h3>Resource Distribution</h3>
+                            <canvas id="resourceChart"></canvas>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <h3>Cost Trend</h3>
+                            <canvas id="costChart"></canvas>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <h3>Health Status</h3>
+                            <canvas id="healthChart"></canvas>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <h3>Drift Detection</h3>
+                            <canvas id="driftChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="recent-activity">
+                        <h3>Recent Activity</h3>
+                        <div class="activity-list">
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p><strong>Drift detected</strong> in production-web-server-01</p>
+                                    <span class="activity-time">2 minutes ago</span>
+                                </div>
+                            </div>
+                            
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p><strong>Health check passed</strong> for database-cluster</p>
+                                    <span class="activity-time">5 minutes ago</span>
+                                </div>
+                            </div>
+                            
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-dollar-sign text-info"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p><strong>Cost optimization</strong> saved $450 this month</p>
+                                    <span class="activity-time">1 hour ago</span>
+                                </div>
+                            </div>
+                            
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-robot text-primary"></i>
+                                </div>
+                                <div class="activity-content">
+                                    <p><strong>Automation workflow</strong> completed successfully</p>
+                                    <span class="activity-time">2 hours ago</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resources Page -->
+                <div id="resources-page" class="page">
+                    <div class="page-header">
+                        <h2>Resources</h2>
+                        <div class="page-actions">
+                            <button class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Add Resource
+                            </button>
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-sync"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="filters">
+                        <select class="filter-select">
+                            <option>All Providers</option>
+                            <option>AWS</option>
+                            <option>Azure</option>
+                            <option>GCP</option>
+                            <option>DigitalOcean</option>
+                        </select>
+                        <select class="filter-select">
+                            <option>All Regions</option>
+                            <option>us-east-1</option>
+                            <option>us-west-2</option>
+                            <option>eu-west-1</option>
+                        </select>
+                        <select class="filter-select">
+                            <option>All Status</option>
+                            <option>Active</option>
+                            <option>Inactive</option>
+                            <option>Error</option>
+                        </select>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Provider</th>
+                                    <th>Region</th>
+                                    <th>Status</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>production-web-server-01</td>
+                                    <td>aws_instance</td>
+                                    <td>AWS</td>
+                                    <td>us-east-1</td>
+                                    <td><span class="status-badge status-active">Active</span></td>
+                                    <td>2 minutes ago</td>
+                                    <td>
+                                        <button class="btn-icon" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>database-cluster</td>
+                                    <td>aws_rds_cluster</td>
+                                    <td>AWS</td>
+                                    <td>us-east-1</td>
+                                    <td><span class="status-badge status-active">Active</span></td>
+                                    <td>5 minutes ago</td>
+                                    <td>
+                                        <button class="btn-icon" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>load-balancer-01</td>
+                                    <td>aws_lb</td>
+                                    <td>AWS</td>
+                                    <td>us-west-2</td>
+                                    <td><span class="status-badge status-warning">Warning</span></td>
+                                    <td>1 hour ago</td>
+                                    <td>
+                                        <button class="btn-icon" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Drift Detection Page -->
+                <div id="drift-page" class="page">
+                    <div class="page-header">
+                        <h2>Drift Detection</h2>
+                        <div class="page-actions">
+                            <button class="btn btn-primary">
+                                <i class="fas fa-search"></i> Run Detection
+                            </button>
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-download"></i> Export Report
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="drift-summary">
+                        <div class="drift-card">
+                            <h3>Configuration Drift</h3>
+                            <p class="drift-count">15</p>
+                            <span class="drift-severity high">High</span>
+                        </div>
+                        <div class="drift-card">
+                            <h3>Resource Drift</h3>
+                            <p class="drift-count">8</p>
+                            <span class="drift-severity medium">Medium</span>
+                        </div>
+                        <div class="drift-card">
+                            <h3>Tag Drift</h3>
+                            <p class="drift-count">23</p>
+                            <span class="drift-severity low">Low</span>
+                        </div>
+                    </div>
+                    
+                    <div class="drift-list">
+                        <h3>Recent Drift Detections</h3>
+                        <div class="drift-item">
+                            <div class="drift-icon">
+                                <i class="fas fa-exclamation-triangle text-danger"></i>
+                            </div>
+                            <div class="drift-content">
+                                <h4>Configuration Drift - production-web-server-01</h4>
+                                <p>Instance type changed from t3.medium to t3.large</p>
+                                <div class="drift-meta">
+                                    <span class="drift-severity high">High</span>
+                                    <span class="drift-time">2 minutes ago</span>
+                                </div>
+                            </div>
+                            <div class="drift-actions">
+                                <button class="btn btn-sm btn-primary">Remediate</button>
+                                <button class="btn btn-sm btn-secondary">Ignore</button>
+                            </div>
+                        </div>
+                        
+                        <div class="drift-item">
+                            <div class="drift-icon">
+                                <i class="fas fa-exclamation-triangle text-warning"></i>
+                            </div>
+                            <div class="drift-content">
+                                <h4>Tag Drift - database-cluster</h4>
+                                <p>Missing required tags: Environment, Owner</p>
+                                <div class="drift-meta">
+                                    <span class="drift-severity medium">Medium</span>
+                                    <span class="drift-time">1 hour ago</span>
+                                </div>
+                            </div>
+                            <div class="drift-actions">
+                                <button class="btn btn-sm btn-primary">Remediate</button>
+                                <button class="btn btn-sm btn-secondary">Ignore</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Other pages would be implemented similarly -->
+                <div id="health-page" class="page">
+                    <h2>Health Monitoring</h2>
+                    <p>Health monitoring dashboard content...</p>
+                </div>
+                
+                <div id="cost-page" class="page">
+                    <h2>Cost Analysis</h2>
+                    <p>Cost analysis dashboard content...</p>
+                </div>
+                
+                <div id="security-page" class="page">
+                    <h2>Security</h2>
+                    <p>Security dashboard content...</p>
+                </div>
+                
+                <div id="automation-page" class="page">
+                    <h2>Automation</h2>
+                    <p>Automation dashboard content...</p>
+                </div>
+                
+                <div id="analytics-page" class="page">
+                    <h2>Analytics</h2>
+                    <p>Analytics dashboard content...</p>
+                </div>
+                
+                <div id="bi-page" class="page">
+                    <h2>Business Intelligence</h2>
+                    <p>Business intelligence dashboard content...</p>
+                </div>
+                
+                <div id="tenants-page" class="page">
+                    <h2>Multi-Tenant Management</h2>
+                    <p>Multi-tenant management content...</p>
+                </div>
+                
+                <div id="integrations-page" class="page">
+                    <h2>Integrations</h2>
+                    <p>Integrations management content...</p>
+                </div>
+                
+                <div id="settings-page" class="page">
+                    <h2>Settings</h2>
+                    <p>Settings content...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

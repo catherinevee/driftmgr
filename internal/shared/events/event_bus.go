@@ -93,6 +93,16 @@ type EventFilter struct {
 // EventHandler is a function that handles events
 type EventHandler func(event Event)
 
+// EventBusInterface defines the contract for event bus implementations
+type EventBusInterface interface {
+	Publish(event Event) error
+	Subscribe(ctx context.Context, filter EventFilter, bufferSize int) *Subscription
+	Unsubscribe(sub *Subscription)
+	RegisterHandler(eventType EventType, handler EventHandler)
+	GetMetrics() *EventMetrics
+	Close()
+}
+
 // EventBus manages event publishing and subscriptions
 type EventBus struct {
 	mu            sync.RWMutex

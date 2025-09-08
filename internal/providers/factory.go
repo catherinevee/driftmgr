@@ -8,6 +8,7 @@ import (
 
 	"github.com/catherinevee/driftmgr/internal/providers/aws"
 	"github.com/catherinevee/driftmgr/internal/providers/azure"
+	"github.com/catherinevee/driftmgr/internal/providers/digitalocean"
 	"github.com/catherinevee/driftmgr/internal/providers/gcp"
 )
 
@@ -36,6 +37,12 @@ func NewProvider(providerName string, config map[string]interface{}) (CloudProvi
 			projectID = p
 		}
 		return gcp.NewGCPProviderComplete(projectID), nil
+	case "digitalocean":
+		region := ""
+		if r, ok := config["region"].(string); ok {
+			region = r
+		}
+		return digitalocean.NewDigitalOceanProvider(region), nil
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", providerName)
 	}
@@ -124,6 +131,14 @@ func NewGCPProviderComplete(projectID, region, credentialsPath string) *gcp.GCPP
 	return provider
 }
 
+// NewDigitalOceanProvider creates a new DigitalOcean provider with the specified region
+func NewDigitalOceanProvider(region string) *digitalocean.DigitalOceanProvider {
+	if region == "" {
+		region = "nyc1"
+	}
+	return digitalocean.NewDigitalOceanProvider(region)
+}
+
 // ProviderFactory creates cloud providers based on configuration
 type ProviderFactory struct {
 	config map[string]interface{}
@@ -196,6 +211,14 @@ func (pf *ProviderFactory) CreateProvider(providerName string) (CloudProvider, e
 
 		return NewGCPProviderComplete(projectID, region, credentialsPath), nil
 
+	case "digitalocean":
+		region := ""
+		if r, ok := pf.config["digitalocean_region"].(string); ok {
+			region = r
+		}
+
+		return NewDigitalOceanProvider(region), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", providerName)
 	}
@@ -222,6 +245,11 @@ func DetectProviders() []string {
 		providers = append(providers, "gcp")
 	} else if os.Getenv("GCP_PROJECT") != "" || os.Getenv("GOOGLE_CLOUD_PROJECT") != "" {
 		providers = append(providers, "gcp")
+	}
+
+	// Check for DigitalOcean credentials
+	if os.Getenv("DIGITALOCEAN_TOKEN") != "" {
+		providers = append(providers, "digitalocean")
 	}
 
 	return providers
@@ -258,6 +286,13 @@ func ValidateProviderCredentials(providerName string) error {
 			if os.Getenv("GCP_PROJECT") == "" && os.Getenv("GOOGLE_CLOUD_PROJECT") == "" {
 				return fmt.Errorf("GCP credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS or configure gcloud")
 			}
+		}
+		return nil
+
+	case "digitalocean":
+		// Check for DigitalOcean credentials
+		if os.Getenv("DIGITALOCEAN_TOKEN") == "" {
+			return fmt.Errorf("DigitalOcean token not found. Set DIGITALOCEAN_TOKEN environment variable")
 		}
 		return nil
 
