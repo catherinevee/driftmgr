@@ -43,8 +43,6 @@ local.yaml
 *-local.yaml
 configs/local/
 
-# Claude
-.claude/
 
 # === Testing ===
 testdata/tmp/
