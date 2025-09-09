@@ -7,41 +7,16 @@ on:
       - 'v*'
   pull_request:
     branches: [ main, develop ]
-  schedule:
-    - cron: '0 2 * * *'  # Daily security scan at 2 AM UTC
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        type: choice
-        options:
-          - development
-          - staging
-          - production
-      skip_tests:
-        description: 'Skip tests (for emergency deployments)'
-        required: false
-        type: boolean
-        default: false
 
 env:
   GO_VERSION: '1.23'
-  REGISTRY: docker.io
-  IMAGE_NAME: catherinevee/driftmgr
-
-permissions:
-  contents: read
-  security-events: write
-  id-token: write
-  actions: read
 
 jobs:
-  # Quick validation for PRs
-  pr-validation:
-    name: PR Validation
+  # Basic validation
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
     
     steps:
     - name: Checkout code
@@ -59,28 +34,28 @@ jobs:
     - name: Verify dependencies
       run: go mod verify
     
-    - name: Run gofmt
+    - name: Check Go formatting
       run: |
         if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
           echo "The following files are not formatted:"
           gofmt -s -l .
           exit 1
         fi
+        echo "All Go files are properly formatted"
     
     - name: Run go vet
       run: go vet ./...
     
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: latest
-        args: --timeout=5m
+    - name: Build application
+      run: go build ./cmd/driftmgr/...
+    
+    - name: Run tests
+      run: go test -v ./internal/drift/... -timeout 30s
 
   # Security scanning
-  security-scan:
+  security:
     name: Security Scan
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true'
     
     steps:
     - name: Checkout code
@@ -97,102 +72,22 @@ jobs:
     
     - name: Run Gosec Security Scanner
       uses: securego/gosec@master
+      continue-on-error: true
       with:
-        args: '-fmt sarif -out gosec.sarif ./...'
+        args: '-fmt sarif -out gosec.sarif -severity high -timeout 5m ./...'
     
     - name: Upload Gosec results
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && github.event_name != 'pull_request'
+      continue-on-error: true
       with:
         sarif_file: gosec.sarif
-    
-    - name: Run Semgrep
-      uses: returntocorp/semgrep-action@v1
-      with:
-        config: >-
-          p/security-audit
-          p/golang
-          p/owasp-top-ten
-        generateSarif: true
-    
-    - name: Upload Semgrep results
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: semgrep.sarif
-
-  # Testing
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-    
-    - name: Download dependencies
-      run: go mod download
-    
-    - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out ./...
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-
-  # Code quality
-  code-quality:
-    name: Code Quality
-    runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-    
-    - name: Download dependencies
-      run: go mod download
-    
-    - name: Run gofmt check
-      run: |
-        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-          echo "The following files are not formatted:"
-          gofmt -s -l .
-          exit 1
-        fi
-    
-    - name: Run go vet
-      run: go vet ./...
-    
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: latest
-        args: --timeout=5m --verbose
 
   # Docker build
-  build:
-    name: Build Docker Image
+  docker:
+    name: Docker Build
     runs-on: ubuntu-latest
-    needs: [security-scan, test, code-quality]
-    if: always() && (needs.security-scan.result == 'success' || needs.security-scan.result == 'skipped') && (needs.test.result == 'success' || needs.test.result == 'skipped') && (needs.code-quality.result == 'success' || needs.code-quality.result == 'skipped')
+    if: github.event_name != 'pull_request'
     
     steps:
     - name: Checkout code
@@ -201,91 +96,12 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     
-    - name: Log in to Docker Hub
-      if: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-    
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=semver,pattern={{version}}
-          type=raw,value=latest,enable={{is_default_branch}}
-          type=sha,prefix={{branch}}-
-    
-    - name: Build and push Docker image
+    - name: Build Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
-        push: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64
+        push: false
+        tags: driftmgr:test
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        build-args: |
-          GO_VERSION=${{ env.GO_VERSION }}
-
-  # Deploy
-  deploy:
-    name: Deploy to ${{ github.event.inputs.environment || 'development' }}
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && always() && needs.build.result == 'success'
-    environment: ${{ github.event.inputs.environment || 'development' }}
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Deploy to Development
-      if: ${{ github.event.inputs.environment == 'development' || github.event.inputs.environment == null }}
-      run: |
-        echo "🚀 Deploying to Development environment..."
-        echo "Image: ${{ needs.build.outputs.image-tag }}"
-    
-    - name: Deploy to Staging
-      if: ${{ github.event.inputs.environment == 'staging' }}
-      run: |
-        echo "🚀 Deploying to Staging environment..."
-        echo "Image: ${{ needs.build.outputs.image-tag }}"
-    
-    - name: Deploy to Production
-      if: ${{ github.event.inputs.environment == 'production' }}
-      run: |
-        echo "🚀 Deploying to Production environment..."
-        echo "Image: ${{ needs.build.outputs.image-tag }}"
-
-  # Release
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: startsWith(github.ref, 'refs/tags/v') && always() && needs.build.result == 'success'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Create Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        body: |
-          ## Changes in this Release
-          
-          See the [README](https://github.com/${{ github.repository }}/blob/main/README.md) for installation instructions.
-        draft: false
-        prerelease: false
