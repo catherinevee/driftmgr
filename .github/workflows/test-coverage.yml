@@ -1,0 +1,63 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.23'
+
+jobs:
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run tests with coverage
+      run: |
+        echo "Running tests with coverage..."
+        go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/drift/... -timeout 30s
+        go test -v -race -coverprofile=coverage-additional.out -covermode=atomic ./cmd/driftmgr/... -timeout 30s
+        
+        # Combine coverage files
+        echo "mode: atomic" > coverage-combined.out
+        tail -n +2 coverage.out >> coverage-combined.out
+        tail -n +2 coverage-additional.out >> coverage-combined.out
+    
+    - name: Generate coverage report
+      run: |
+        echo "Generating coverage report..."
+        go tool cover -html=coverage-combined.out -o coverage.html
+        go tool cover -func=coverage-combined.out
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage-combined.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        verbose: true
+    
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: |
+          coverage-combined.out
+          coverage.html
