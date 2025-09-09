@@ -31,4 +31,4 @@ jobs:
       uses: golangci/golangci-lint-action@v6
       with:
         version: latest
-        args: --timeout=5m --verbose --skip-dirs=tests --skip-files=".*_test\.go$"
+        args: --timeout=5m --verbose

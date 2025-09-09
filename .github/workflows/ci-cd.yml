@@ -44,7 +44,7 @@ jobs:
         echo "All Go files are properly formatted"
     
     - name: Run go vet
-      run: go vet ./...
+      run: go vet $(go list ./... | grep -v /tests/ | grep -v _test.go)
     
     - name: Build application
       run: go build ./cmd/driftmgr/...

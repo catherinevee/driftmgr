@@ -77,6 +77,10 @@ linters:
 
 issues:
   uniq-by-line: true
+  exclude-dirs:
+    - tests/
+  exclude-files:
+    - ".*_test\\.go$"
   exclude-rules:
     - path: _test\.go
       linters:
