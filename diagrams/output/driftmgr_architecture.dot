@@ -1,0 +1,69 @@
+digraph  {
+	subgraph cluster_s10 {
+		label="Analysis & Intelligence";
+		n11[fillcolor="lightyellow",label="Analytics\\n& BI",shape="diamond",style="filled"];
+		n14[fillcolor="lightyellow",label="Automation\\nEngine",shape="diamond",style="filled"];
+		n13[fillcolor="lightyellow",label="Compliance\\n& Policy",shape="diamond",style="filled"];
+		n12[fillcolor="lightyellow",label="Cost\\nAnalyzer",shape="diamond",style="filled"];
+		
+	}
+	subgraph cluster_s20 {
+		label="Backend Storage";
+		n22[fillcolor="lightcoral",label="Azure Blob\\nStorage",shape="cylinder",style="filled"];
+		n23[fillcolor="lightcoral",label="GCS\\nStorage",shape="cylinder",style="filled"];
+		n24[fillcolor="lightcoral",label="Local\\nBackend",shape="cylinder",style="filled"];
+		n21[fillcolor="lightcoral",label="S3\\nBackend",shape="cylinder",style="filled"];
+		
+	}
+	subgraph cluster_s15 {
+		label="Cloud Providers";
+		n16[fillcolor="orange",label="AWS\\nProvider",shape="box3d",style="filled"];
+		n17[fillcolor="orange",label="Azure\\nProvider",shape="box3d",style="filled"];
+		n19[fillcolor="orange",label="DigitalOcean\\nProvider",shape="box3d",style="filled"];
+		n18[fillcolor="orange",label="GCP\\nProvider",shape="box3d",style="filled"];
+		
+	}
+	subgraph cluster_s5 {
+		label="Core Services";
+		n9[fillcolor="lightgreen",label="Resource\\nDiscovery",shape="ellipse",style="filled"];
+		n6[fillcolor="lightgreen",label="Drift Detection\\nEngine",shape="ellipse",style="filled"];
+		n8[fillcolor="lightgreen",label="Remediation\\nEngine",shape="ellipse",style="filled"];
+		n7[fillcolor="lightgreen",label="State\\nManager",shape="ellipse",style="filled"];
+		
+	}
+	subgraph cluster_s1 {
+		label="User Interface";
+		n4[fillcolor="lightblue",label="REST API\\n(Server)",shape="box",style="filled"];
+		n2[fillcolor="lightblue",label="CLI\\n(driftmgr)",shape="box",style="filled"];
+		n3[fillcolor="lightblue",label="Web UI\\n(Dashboard)",shape="box",style="filled"];
+		
+	}
+	fontname="Arial";fontsize="16";label="DriftMgr Architecture";labelloc="t";rankdir="TB";
+	n25[fillcolor="lightgray",label="Terraform\\nState Files",shape="folder",style="filled"];
+	n11->n14;
+	n4->n6;
+	n4->n7;
+	n4->n8;
+	n2->n6;
+	n13->n8;
+	n9->n16;
+	n9->n17;
+	n9->n18;
+	n9->n19;
+	n6->n9;
+	n6->n7[dir="both"];
+	n6->n11;
+	n6->n12;
+	n8->n7[dir="both"];
+	n7->n25[dir="both"];
+	n7->n21[dir="both"];
+	n7->n22[dir="both"];
+	n7->n23[dir="both"];
+	n7->n24[dir="both"];
+	n25->n21[dir="both"];
+	n25->n22[dir="both"];
+	n25->n23[dir="both"];
+	n25->n24[dir="both"];
+	n3->n4;
+	
+}
