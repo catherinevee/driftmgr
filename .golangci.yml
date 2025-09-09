@@ -5,8 +5,7 @@ run:
 
 output:
   formats:
-  - format: colored-line-number
-  print-issued-line: true
+    - format: colored-line-number
   print-linter-name: true
 
 linters-settings:
@@ -23,12 +22,8 @@ linters-settings:
     simplify: true
   goimports:
     local-prefixes: github.com/catherinevee/driftmgr
-  golint:
-    min-confidence: 0
-  gomnd:
-    settings:
-      mnd:
-        checks: argument,case,condition,operation,return,assign
+  mnd:
+    checks: [argument,case,condition,operation,return,assign]
   govet:
     enable:
     - atomicalign
@@ -44,11 +39,6 @@ linters-settings:
   prealloc:
     for-loops: true
     range-loops: true
-    slice-append: true
-  revive:
-    min-confidence: 0
-  unused:
-    check-exported: false
 
 linters:
   enable:
