@@ -56,7 +56,7 @@ func (c *CodeAsTruth) GetDescription() string {
 
 // Validate checks if the strategy can handle the given drift
 func (c *CodeAsTruth) Validate(drift *detector.DriftResult) error {
-	if drift == nil || !drift.HasDrift {
+	if drift == nil || len(drift.Differences) == 0 || drift.DriftType == detector.NoDrift {
 		return fmt.Errorf("no drift detected")
 	}
 

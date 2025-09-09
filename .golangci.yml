@@ -1,178 +1,107 @@
 run:
   timeout: 5m
-  issues-exit-code: 1
   tests: true
-  skip-dirs:
-    - vendor
-    - .git
-    - data
-    - docs
-    - scripts
-    - examples
-    - deployments
-  skip-files:
-    - ".*_test.go"
-    - ".*_mock.go"
-    - ".*_generated.go"
+  modules-download-mode: readonly
 
 output:
-  format: colored-line-number
-  print-issued-lines: true
+  formats:
+  - format: colored-line-number
+  print-issued-line: true
   print-linter-name: true
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  gocritic:
+    enabled-tags:
+    - diagnostic
+    - experimental
+    - opinionated
+    - performance
+    - style
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/catherinevee/driftmgr
+  golint:
+    min-confidence: 0
+  gomnd:
+    settings:
+      mnd:
+        checks: argument,case,condition,operation,return,assign
+  govet:
+    enable:
+    - atomicalign
+    - deepequalerrors
+    - findcall
+    - nilness
+    - reflectvaluecompare
+    - unusedwrite
+  misspell:
+    locale: US
+  nakedret:
+    max-func-lines: 30
+  prealloc:
+    for-loops: true
+    range-loops: true
+    slice-append: true
+  revive:
+    min-confidence: 0
+  unused:
+    check-exported: false
 
 linters:
   enable:
-    # Default linters
-    - errcheck      # Checking for unchecked errors
-    - gosimple      # Simplify code
-    - govet         # Vet examines Go source code
-    - ineffassign   # Detects ineffectual assignments
-    - staticcheck   # Static analysis
-    - unused        # Checks for unused code
-    
-    # Additional linters for code quality
-    - bodyclose     # Checks HTTP response body is closed
-    - dogsled       # Checks assignments with too many blank identifiers
-    - dupl          # Code duplication detection
-    - exportloopref # Checks for pointers to enclosing loop variables
-    - gocognit      # Cognitive complexity check
-    - goconst       # Finds repeated strings that could be constants
-    - gocritic      # Opinionated Go source code linter
-    - gocyclo       # Cyclomatic complexity check
-    - gofmt         # Gofmt checks formatting
-    - goimports     # Check import statements are formatted
-    - goprintffuncname # Checks that printf-like functions end with 'f'
-    - gosec         # Security problems detection
-    - misspell      # Finds commonly misspelled English words
-    - nakedret      # Finds naked returns in large functions
-    - noctx         # Finds http requests without context.Context
-    - nolintlint    # Reports ill-formed or insufficient nolint directives
-    - prealloc      # Finds slice declarations that could be preallocated
-    - revive        # Fast, configurable, extensible linter
-    - rowserrcheck  # Checks if Err of rows is checked
-    - sqlclosecheck # Checks that sql.Rows and sql.Stmt are closed
-    - stylecheck    # Style checker
-    - unconvert     # Unnecessary type conversions
-    - unparam       # Reports unused function parameters
-    - whitespace    # Detects leading and trailing whitespace
-
-  disable:
-    - depguard      # Dependency guard
-    - exhaustive    # Too strict for our use case
-    - funlen        # We have some legitimately long functions
-    - gochecknoglobals # We use some global configs
-    - gochecknoinits # Init functions are sometimes necessary
-    - godot         # Too pedantic about comments
-    - godox         # We want to keep TODO/FIXME comments
-    - golint        # Deprecated, replaced by revive
-    - gomnd         # Magic numbers are sometimes OK
-    - interfacer    # Deprecated
-    - lll           # Line length limit is too restrictive
-    - maligned      # Deprecated
-    - nlreturn      # Too strict about newlines
-    - scopelint     # Deprecated
-    - testpackage   # We use same package for tests
-    - wrapcheck     # Too strict about error wrapping
-    - wsl           # Too strict about whitespace
-
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
-
-  govet:
-    check-shadowing: true
-    enable-all: true
-
-  gocyclo:
-    min-complexity: 15
-
-  gocognit:
-    min-complexity: 20
-
-  dupl:
-    threshold: 100
-
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-
-  misspell:
-    locale: US
-
-  gosec:
-    severity: medium
-    confidence: medium
-    excludes:
-      - G304 # File path provided as taint input
-      - G404 # Use of weak random number generator (we use it for non-security purposes)
-
-  goimports:
-    local-prefixes: github.com/catherinevee/driftmgr
-
-  gofmt:
-    simplify: true
-
-  revive:
-    confidence: 0.8
-    severity: warning
-    rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unused-parameter
-      - name: unreachable-code
-      - name: redefines-builtin-id
+  - bodyclose
+  - copyloopvar
+  - dogsled
+  - dupl
+  - errcheck
+  - gochecknoinits
+  - goconst
+  - gocritic
+  - gocyclo
+  - gofmt
+  - goimports
+  - goprintffuncname
+  - gosec
+  - gosimple
+  - govet
+  - ineffassign
+  - misspell
+  - mnd
+  - nakedret
+  - noctx
+  - nolintlint
+  - prealloc
+  - revive
+  - rowserrcheck
+  - predeclared
+  - staticcheck
+  - stylecheck
+  - typecheck
+  - unconvert
+  - unparam
+  - unused
+  - whitespace
 
 issues:
+  uniq-by-line: true
   exclude-rules:
-    # Exclude test files from some linters
-    - path: _test\.go
-      linters:
-        - dupl
-        - gosec
-        - goconst
-
-    # Exclude generated files
-    - path: .*_generated\.go
-      linters:
-        - gosec
-        - dupl
-        - goconst
-        - gocyclo
-        - gocognit
-
-    # Exclude main packages from some checks
-    - path: cmd/.*\.go
-      linters:
-        - gochecknoglobals
-
-  exclude-use-default: false
-  max-issues-per-linter: 0
-  max-same-issues: 0
-  new: false
-
-  # Excluding configuration per-path, per-linter, per-text and per-source
-  exclude:
-    # Ignore long lines in comments with URLs
-    - "^.*https?://.*$"
-    # Ignore TODO/FIXME comments
-    - "^.*TODO.*$"
-    - "^.*FIXME.*$"
+  - path: _test\.go
+    linters:
+    - mnd
+    - gocyclo
+    - goconst
+  - path: cmd/
+    linters:
+    - mnd
+  - text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv) is not checked"
+    linters:
+    - errcheck
+  - text: "exported (function|method|type|var|const) .* should have comment"
+    linters:
+    - revive
+  - text: "should have a package comment"
+    linters:
+    - revive

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -11,16 +12,18 @@ func main() {
 	fmt.Println("Starting quick test server...")
 
 	// Create server without pre-discovery
-	server, err := api.NewServer("8085")
-	if err != nil {
-		log.Fatal("Failed to create server:", err)
+	config := &api.Config{
+		Port: 8085,
 	}
+	services := &api.Services{}
+	server := api.NewServer(config, services)
 
 	fmt.Println("Server created, starting on port 8085")
 	fmt.Println("Check http://localhost:8085/api/v1/resources/stats for cached resources")
 
 	// Start server
-	if err := server.Start(); err != nil {
+	ctx := context.Background()
+	if err := server.Start(ctx); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }

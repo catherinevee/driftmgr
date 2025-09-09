@@ -18,31 +18,31 @@ type WorkflowEngine struct {
 
 // Workflow represents an automation workflow
 type Workflow struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Category    string          `json:"category"`
-	Steps       []WorkflowStep  `json:"steps"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Category    string            `json:"category"`
+	Steps       []WorkflowStep    `json:"steps"`
 	Triggers    []WorkflowTrigger `json:"triggers"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
-	IsActive    bool            `json:"is_active"`
-	Version     string          `json:"version"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+	IsActive    bool              `json:"is_active"`
+	Version     string            `json:"version"`
 }
 
 // WorkflowStep represents a step in a workflow
 type WorkflowStep struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Type        string                 `json:"type"`
-	Action      string                 `json:"action"`
-	Parameters  map[string]interface{} `json:"parameters"`
-	Conditions  []StepCondition        `json:"conditions"`
-	OnSuccess   string                 `json:"on_success"`
-	OnFailure   string                 `json:"on_failure"`
-	Timeout     time.Duration          `json:"timeout"`
-	Retries     int                    `json:"retries"`
-	Order       int                    `json:"order"`
+	ID         string                 `json:"id"`
+	Name       string                 `json:"name"`
+	Type       string                 `json:"type"`
+	Action     string                 `json:"action"`
+	Parameters map[string]interface{} `json:"parameters"`
+	Conditions []StepCondition        `json:"conditions"`
+	OnSuccess  string                 `json:"on_success"`
+	OnFailure  string                 `json:"on_failure"`
+	Timeout    time.Duration          `json:"timeout"`
+	Retries    int                    `json:"retries"`
+	Order      int                    `json:"order"`
 }
 
 // StepCondition represents a condition for step execution
@@ -72,16 +72,16 @@ type TriggerCondition struct {
 
 // WorkflowExecution represents an execution instance
 type WorkflowExecution struct {
-	ID          string       `json:"id"`
-	WorkflowID  string       `json:"workflow_id"`
-	Status      string       `json:"status"`
-	StartTime   time.Time    `json:"start_time"`
-	EndTime     time.Time    `json:"end_time"`
-	Duration    time.Duration `json:"duration"`
-	StepResults []StepResult `json:"step_results"`
+	ID          string                 `json:"id"`
+	WorkflowID  string                 `json:"workflow_id"`
+	Status      string                 `json:"status"`
+	StartTime   time.Time              `json:"start_time"`
+	EndTime     time.Time              `json:"end_time"`
+	Duration    time.Duration          `json:"duration"`
+	StepResults []StepResult           `json:"step_results"`
 	Input       map[string]interface{} `json:"input"`
 	Output      map[string]interface{} `json:"output"`
-	Error       string       `json:"error,omitempty"`
+	Error       string                 `json:"error,omitempty"`
 }
 
 // StepResult represents the result of a step execution
@@ -97,14 +97,14 @@ type StepResult struct {
 
 // WorkflowTemplate represents a workflow template
 type WorkflowTemplate struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Category    string                 `json:"category"`
-	Parameters  []TemplateParameter    `json:"parameters"`
-	Template    Workflow               `json:"template"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Category    string              `json:"category"`
+	Parameters  []TemplateParameter `json:"parameters"`
+	Template    Workflow            `json:"template"`
+	CreatedAt   time.Time           `json:"created_at"`
+	UpdatedAt   time.Time           `json:"updated_at"`
 }
 
 // TemplateParameter represents a template parameter

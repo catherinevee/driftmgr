@@ -13,8 +13,8 @@ type AutomationService struct {
 	ruleEngine     *RuleEngine
 	scheduler      *Scheduler
 	mu             sync.RWMutex
-	eventBus       EventBus
-	config         *AutomationConfig
+	// eventBus removed for interface simplification
+	config *AutomationConfig
 }
 
 // AutomationConfig represents configuration for the automation service
@@ -45,15 +45,14 @@ func NewAutomationService() *AutomationService {
 	}
 
 	// Create components
-	workflowEngine := NewWorkflowEngine(eventBus)
-	ruleEngine := NewRuleEngine(eventBus)
-	scheduler := NewScheduler(eventBus)
+	workflowEngine := NewWorkflowEngine()
+	ruleEngine := NewRuleEngine()
+	scheduler := NewScheduler()
 
 	return &AutomationService{
 		workflowEngine: workflowEngine,
 		ruleEngine:     ruleEngine,
 		scheduler:      scheduler,
-		eventBus:       eventBus,
 		config:         config,
 	}
 }
@@ -91,16 +90,7 @@ func (as *AutomationService) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to create default automations: %w", err)
 	}
 
-	// Publish event
-	if as.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "automation_service_started",
-			Message:   "Automation service started",
-			Severity:  "info",
-			Timestamp: time.Now(),
-		}
-		as.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -112,16 +102,7 @@ func (as *AutomationService) Stop(ctx context.Context) error {
 		return fmt.Errorf("failed to stop scheduler: %w", err)
 	}
 
-	// Publish event
-	if as.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "automation_service_stopped",
-			Message:   "Automation service stopped",
-			Severity:  "info",
-			Timestamp: time.Now(),
-		}
-		as.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -284,14 +265,13 @@ func (as *AutomationService) createDefaultAutomations(ctx context.Context) error
 				{
 					ID:   "schedule_trigger",
 					Type: "schedule",
-					Config: map[string]interface{}{
+					Parameters: map[string]interface{}{
 						"cron": "*/5 * * * *", // Every 5 minutes
 					},
-					Enabled: true,
+					IsActive: true,
 				},
 			},
-			Variables: make(map[string]interface{}),
-			Enabled:   true,
+			IsActive: true,
 		},
 		{
 			Name:        "Auto-Backup Resources",
@@ -323,14 +303,13 @@ func (as *AutomationService) createDefaultAutomations(ctx context.Context) error
 				{
 					ID:   "daily_trigger",
 					Type: "schedule",
-					Config: map[string]interface{}{
+					Parameters: map[string]interface{}{
 						"cron": "0 2 * * *", // Daily at 2 AM
 					},
-					Enabled: true,
+					IsActive: true,
 				},
 			},
-			Variables: make(map[string]interface{}),
-			Enabled:   true,
+			IsActive: true,
 		},
 		{
 			Name:        "Auto-Remediate Issues",
@@ -362,14 +341,13 @@ func (as *AutomationService) createDefaultAutomations(ctx context.Context) error
 				{
 					ID:   "event_trigger",
 					Type: "event",
-					Config: map[string]interface{}{
+					Parameters: map[string]interface{}{
 						"event_type": "health_check_failed",
 					},
-					Enabled: true,
+					IsActive: true,
 				},
 			},
-			Variables: make(map[string]interface{}),
-			Enabled:   true,
+			IsActive: true,
 		},
 	}
 

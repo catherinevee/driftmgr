@@ -23,12 +23,12 @@ func NewCostExecutor() *CostExecutor {
 // Execute executes a cost optimization remediation action
 func (ce *CostExecutor) Execute(ctx context.Context, action *remediation.RemediationAction) (*remediation.ActionResult, error) {
 	result := &remediation.ActionResult{
-		ActionID: action.ID,
+		ActionID:   action.ID,
 		ResourceID: action.Resource,
-		Action: string(action.Type),
-		Status: remediation.StatusSuccess,
-		Output: "Cost optimization completed successfully",
-		Changes: []string{},
+		Action:     string(action.Type),
+		Status:     remediation.StatusSuccess,
+		Output:     "Cost optimization completed successfully",
+		Changes:    []string{},
 	}
 
 	// Get the operation type from parameters
@@ -36,8 +36,8 @@ func (ce *CostExecutor) Execute(ctx context.Context, action *remediation.Remedia
 	if !ok {
 		return &remediation.ActionResult{
 			ActionID: action.ID,
-			Status: remediation.StatusFailed,
-			Error: "operation parameter is required",
+			Status:   remediation.StatusFailed,
+			Error:    "operation parameter is required",
 		}, fmt.Errorf("operation parameter is required")
 	}
 
@@ -55,8 +55,8 @@ func (ce *CostExecutor) Execute(ctx context.Context, action *remediation.Remedia
 	default:
 		return &remediation.ActionResult{
 			ActionID: action.ID,
-			Status: remediation.StatusFailed,
-			Error:   fmt.Sprintf("unsupported operation: %s", operation),
+			Status:   remediation.StatusFailed,
+			Error:    fmt.Sprintf("unsupported operation: %s", operation),
 		}, fmt.Errorf("unsupported operation: %s", operation)
 	}
 }
@@ -115,26 +115,25 @@ func (ce *CostExecutor) resizeInstance(ctx context.Context, action *remediation.
 	time.Sleep(500 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.Resource,
-		Field:      "instance_type",
-		OldValue:   "old_instance_type",
-		NewValue:   newInstanceType,
-		ChangeType: "update",
-		Metadata: map[string]interface{}{
-			"new_instance_type": newInstanceType,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "instance_type",
+	//	OldValue:   "old_instance_type",
+	//	NewValue:   newInstanceType,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"new_instance_type": newInstanceType,
+	//	},
+	// }
+	// Convert change to string description
+	changeDesc := fmt.Sprintf("Resized instance to %s", newInstanceType)
+	result.Changes = append(result.Changes, changeDesc)
 
 	// Calculate estimated cost savings (this would be more sophisticated in real implementation)
-	estimatedSavings := 50.0              // $50/month estimated savings
-	result.CostImpact = -estimatedSavings // Negative means cost reduction
+	estimatedSavings := 50.0 // $50/month estimated savings
 
-	result.Message = fmt.Sprintf("Resized instance %s to %s (estimated savings: $%.2f/month)", action.ResourceID, newInstanceType, estimatedSavings)
-	result.Metrics["instance_resized"] = 1
-	result.Metrics["estimated_monthly_savings"] = estimatedSavings
-	result.RiskLevel = remediation.RiskLevelMedium
+	result.Output = fmt.Sprintf("Resized instance %s to %s (estimated savings: $%.2f/month)", action.Resource, newInstanceType, estimatedSavings)
 
 	return result, nil
 }
@@ -148,29 +147,26 @@ func (ce *CostExecutor) enableAutoScaling(ctx context.Context, action *remediati
 	time.Sleep(400 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.Resource,
-		Field:      "auto_scaling",
-		OldValue:   false,
-		NewValue:   true,
-		ChangeType: "update",
-		Metadata: map[string]interface{}{
-			"min_capacity": minCapacity,
-			"max_capacity": maxCapacity,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "auto_scaling",
+	//	OldValue:   false,
+	//	NewValue:   true,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"min_capacity": minCapacity,
+	//		"max_capacity": maxCapacity,
+	//	},
+	// }
+	// Convert change to string description
+	changeDesc := fmt.Sprintf("Enabled auto-scaling (min: %d, max: %d)", minCapacity, maxCapacity)
+	result.Changes = append(result.Changes, changeDesc)
 
 	// Calculate estimated cost savings
 	estimatedSavings := 30.0 // $30/month estimated savings
-	result.CostImpact = -estimatedSavings
 
-	result.Message = fmt.Sprintf("Enabled auto-scaling for resource %s (min: %d, max: %d, estimated savings: $%.2f/month)", action.ResourceID, minCapacity, maxCapacity, estimatedSavings)
-	result.Metrics["auto_scaling_enabled"] = 1
-	result.Metrics["min_capacity"] = minCapacity
-	result.Metrics["max_capacity"] = maxCapacity
-	result.Metrics["estimated_monthly_savings"] = estimatedSavings
-	result.RiskLevel = remediation.RiskLevelLow
+	result.Output = fmt.Sprintf("Enabled auto-scaling for resource %s (min: %d, max: %d, estimated savings: $%.2f/month)", action.Resource, minCapacity, maxCapacity, estimatedSavings)
 
 	return result, nil
 }
@@ -183,27 +179,24 @@ func (ce *CostExecutor) scheduleShutdown(ctx context.Context, action *remediatio
 	time.Sleep(300 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.Resource,
-		Field:      "shutdown_schedule",
-		OldValue:   nil,
-		NewValue:   schedule,
-		ChangeType: remediation.ChangeTypeCreate,
-		Metadata: map[string]interface{}{
-			"schedule": schedule,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "shutdown_schedule",
+	//	OldValue:   nil,
+	//	NewValue:   schedule,
+	//	ChangeType: "create",
+	//	Metadata: map[string]interface{}{
+	//		"schedule": schedule,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Scheduled shutdown: %s", schedule)
+	result.Changes = append(result.Changes, changeDesc)
 
 	// Calculate estimated cost savings (assuming 8 hours of shutdown per day)
 	estimatedSavings := 40.0 // $40/month estimated savings
-	result.CostImpact = -estimatedSavings
 
-	result.Message = fmt.Sprintf("Scheduled shutdown for resource %s: %s (estimated savings: $%.2f/month)", action.ResourceID, schedule, estimatedSavings)
-	result.Metrics["shutdown_scheduled"] = 1
-	result.Metrics["schedule"] = schedule
-	result.Metrics["estimated_monthly_savings"] = estimatedSavings
-	result.RiskLevel = remediation.RiskLevelLow
+	result.Output = fmt.Sprintf("Scheduled shutdown for resource %s: %s (estimated savings: $%.2f/month)", action.Resource, schedule, estimatedSavings)
 
 	return result, nil
 }
@@ -216,27 +209,24 @@ func (ce *CostExecutor) optimizeStorage(ctx context.Context, action *remediation
 	time.Sleep(350 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.Resource,
-		Field:      "storage_type",
-		OldValue:   "old_storage_type",
-		NewValue:   storageType,
-		ChangeType: "update",
-		Metadata: map[string]interface{}{
-			"new_storage_type": storageType,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "storage_type",
+	//	OldValue:   "old_storage_type",
+	//	NewValue:   storageType,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"new_storage_type": storageType,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Optimized storage to %s", storageType)
+	result.Changes = append(result.Changes, changeDesc)
 
 	// Calculate estimated cost savings
 	estimatedSavings := 25.0 // $25/month estimated savings
-	result.CostImpact = -estimatedSavings
 
-	result.Message = fmt.Sprintf("Optimized storage for resource %s to %s (estimated savings: $%.2f/month)", action.ResourceID, storageType, estimatedSavings)
-	result.Metrics["storage_optimized"] = 1
-	result.Metrics["new_storage_type"] = storageType
-	result.Metrics["estimated_monthly_savings"] = estimatedSavings
-	result.RiskLevel = remediation.RiskLevelLow
+	result.Output = fmt.Sprintf("Optimized storage for resource %s to %s (estimated savings: $%.2f/month)", action.Resource, storageType, estimatedSavings)
 
 	return result, nil
 }
@@ -247,26 +237,24 @@ func (ce *CostExecutor) removeUnusedResources(ctx context.Context, action *remed
 	time.Sleep(200 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.Resource,
-		Field:      "status",
-		OldValue:   "active",
-		NewValue:   "terminated",
-		ChangeType: remediation.ChangeTypeDelete,
-		Metadata: map[string]interface{}{
-			"reason": "unused_resource",
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "status",
+	//	OldValue:   "active",
+	//	NewValue:   "terminated",
+	//	ChangeType: "delete",
+	//	Metadata: map[string]interface{}{
+	//		"reason": "unused_resource",
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Removed unused resource")
+	result.Changes = append(result.Changes, changeDesc)
 
 	// Calculate estimated cost savings
 	estimatedSavings := 100.0 // $100/month estimated savings
-	result.CostImpact = -estimatedSavings
 
-	result.Message = fmt.Sprintf("Removed unused resource %s (estimated savings: $%.2f/month)", action.ResourceID, estimatedSavings)
-	result.Metrics["unused_resource_removed"] = 1
-	result.Metrics["estimated_monthly_savings"] = estimatedSavings
-	result.RiskLevel = remediation.RiskLevelHigh // High risk as this removes resources
+	result.Output = fmt.Sprintf("Removed unused resource %s (estimated savings: $%.2f/month)", action.Resource, estimatedSavings)
 
 	return result, nil
 }

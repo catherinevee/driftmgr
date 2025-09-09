@@ -14,6 +14,7 @@ import (
 	"github.com/catherinevee/driftmgr/internal/drift/comparator"
 	"github.com/catherinevee/driftmgr/internal/drift/detector"
 	importgen "github.com/catherinevee/driftmgr/internal/remediation/tfimport"
+	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/google/uuid"
 )
 
@@ -63,7 +64,7 @@ func (c *CloudAsTruth) GetDescription() string {
 
 // Validate checks if the strategy can handle the given drift
 func (c *CloudAsTruth) Validate(drift *detector.DriftResult) error {
-	if drift == nil || !drift.HasDrift {
+	if drift == nil || len(drift.Differences) == 0 || drift.DriftType == detector.NoDrift {
 		return fmt.Errorf("no drift detected")
 	}
 
@@ -205,7 +206,16 @@ func (c *CloudAsTruth) analyzeDriftAndCreateActions(drift *detector.DriftResult)
 		switch diff.Type {
 		case comparator.DiffTypeAdded:
 			// Unmanaged resource - generate import
-			if resource, ok := diff.Actual.(map[string]interface{}); ok {
+			if resourceMap, ok := diff.Actual.(map[string]interface{}); ok {
+				// Convert map to models.Resource
+				resource := models.Resource{
+					ID:         getStringFromMap(resourceMap, "id"),
+					Name:       getStringFromMap(resourceMap, "name"),
+					Type:       getStringFromMap(resourceMap, "type"),
+					Provider:   getStringFromMap(resourceMap, "provider"),
+					Region:     getStringFromMap(resourceMap, "region"),
+					Attributes: resourceMap,
+				}
 				importCmd, err := c.importGenerator.GenerateImportCommand(resource)
 				if err == nil {
 					actions = append(actions, RemediationAction{
@@ -575,4 +585,14 @@ func (c *CloudAsTruth) generatePRBody(summary *DriftSummary) string {
 	var buf bytes.Buffer
 	t.Execute(&buf, summary)
 	return buf.String()
+}
+
+// getStringFromMap safely extracts a string value from a map
+func getStringFromMap(m map[string]interface{}, key string) string {
+	if val, exists := m[key]; exists {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
 }

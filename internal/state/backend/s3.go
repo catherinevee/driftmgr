@@ -15,6 +15,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -131,7 +132,7 @@ func (s *S3Backend) initializeClients(ctx context.Context) error {
 
 		// Update config with assumed role credentials
 		cfg.Credentials = aws.NewCredentialsCache(
-			aws.NewStaticCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(
 				*result.Credentials.AccessKeyId,
 				*result.Credentials.SecretAccessKey,
 				*result.Credentials.SessionToken,
@@ -188,7 +189,7 @@ func (s *S3Backend) Pull(ctx context.Context) (*StateData, error) {
 	state := &StateData{
 		Data:         data,
 		LastModified: *result.LastModified,
-		Size:         result.ContentLength,
+		Size:         *result.ContentLength,
 	}
 
 	// Extract version and serial from metadata
@@ -353,7 +354,7 @@ func (s *S3Backend) GetVersions(ctx context.Context) ([]*StateVersion, error) {
 			ID:        *version.VersionId,
 			VersionID: *version.VersionId,
 			Created:   *version.LastModified,
-			Size:      version.Size,
+			Size:      *version.Size,
 			IsLatest:  *version.IsLatest,
 		}
 
@@ -407,7 +408,7 @@ func (s *S3Backend) GetVersion(ctx context.Context, versionID string) (*StateDat
 	state := &StateData{
 		Data:         data,
 		LastModified: *result.LastModified,
-		Size:         result.ContentLength,
+		Size:         *result.ContentLength,
 	}
 
 	// Parse state metadata
@@ -500,7 +501,7 @@ func (s *S3Backend) CreateWorkspace(ctx context.Context, name string) error {
 	}
 
 	// Create empty state for new workspace
-	stateKey := s.getWorkspaceStateKey(name)
+	_ = s.getWorkspaceStateKey(name) // TODO: Use stateKey for actual state creation
 	emptyState := &StateData{
 		Version: 4,
 		Serial:  0,

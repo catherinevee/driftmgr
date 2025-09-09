@@ -23,20 +23,25 @@ func NewTagExecutor() *TagExecutor {
 // Execute executes a tag remediation action
 func (te *TagExecutor) Execute(ctx context.Context, action *remediation.RemediationAction) (*remediation.ActionResult, error) {
 	result := &remediation.ActionResult{
-		Success:    true,
-		Message:    "Tag remediation completed successfully",
-		Changes:    []remediation.ResourceChange{},
-		Metrics:    make(map[string]interface{}),
-		CostImpact: 0.0,
-		RiskLevel:  remediation.RiskLevelLow,
+		ActionID:   action.ID,
+		ResourceID: action.Resource,
+		Action:     string(action.Type),
+		Status:     remediation.StatusSuccess,
+		StartTime:  time.Now(),
+		Changes:    []string{},
 	}
 
 	// Get the operation type from parameters
 	operation, ok := action.Parameters["operation"].(string)
 	if !ok {
 		return &remediation.ActionResult{
-			Success: false,
-			Error:   "operation parameter is required",
+			ActionID:   action.ID,
+			ResourceID: action.Resource,
+			Action:     string(action.Type),
+			Status:     remediation.StatusFailed,
+			StartTime:  time.Now(),
+			EndTime:    time.Now(),
+			Error:      "operation parameter is required",
 		}, fmt.Errorf("operation parameter is required")
 	}
 
@@ -51,8 +56,13 @@ func (te *TagExecutor) Execute(ctx context.Context, action *remediation.Remediat
 		return te.addRequiredTags(ctx, action, result)
 	default:
 		return &remediation.ActionResult{
-			Success: false,
-			Error:   fmt.Sprintf("unsupported operation: %s", operation),
+			ActionID:   action.ID,
+			ResourceID: action.Resource,
+			Action:     string(action.Type),
+			Status:     remediation.StatusFailed,
+			StartTime:  time.Now(),
+			EndTime:    time.Now(),
+			Error:      fmt.Sprintf("unsupported operation: %s", operation),
 		}, fmt.Errorf("unsupported operation: %s", operation)
 	}
 }
@@ -106,21 +116,23 @@ func (te *TagExecutor) addTag(ctx context.Context, action *remediation.Remediati
 	time.Sleep(100 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.ResourceID,
-		Field:      fmt.Sprintf("tags.%s", key),
-		OldValue:   nil,
-		NewValue:   value,
-		ChangeType: remediation.ChangeTypeCreate,
-		Metadata: map[string]interface{}{
-			"tag_key":   key,
-			"tag_value": value,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      fmt.Sprintf("tags.%s", key),
+	//	OldValue:   nil,
+	//	NewValue:   value,
+	//	ChangeType: "create",
+	//	Metadata: map[string]interface{}{
+	//		"tag_key":   key,
+	//		"tag_value": value,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Added tag %s=%s", key, value)
+	result.Changes = append(result.Changes, changeDesc)
 
-	result.Message = fmt.Sprintf("Added tag %s=%s to resource %s", key, value, action.ResourceID)
-	result.Metrics["tags_added"] = 1
+	result.Output = fmt.Sprintf("Added tag %s=%s to resource %s", key, value, action.Resource)
+	result.EndTime = time.Now()
 
 	return result, nil
 }
@@ -133,20 +145,22 @@ func (te *TagExecutor) removeTag(ctx context.Context, action *remediation.Remedi
 	time.Sleep(100 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.ResourceID,
-		Field:      fmt.Sprintf("tags.%s", key),
-		OldValue:   "existing_value", // In real implementation, this would be the actual old value
-		NewValue:   nil,
-		ChangeType: remediation.ChangeTypeDelete,
-		Metadata: map[string]interface{}{
-			"tag_key": key,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      fmt.Sprintf("tags.%s", key),
+	//	OldValue:   "existing_value", // In real implementation, this would be the actual old value
+	//	NewValue:   nil,
+	//	ChangeType: "delete",
+	//	Metadata: map[string]interface{}{
+	//		"tag_key": key,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Removed tag %s", key)
+	result.Changes = append(result.Changes, changeDesc)
 
-	result.Message = fmt.Sprintf("Removed tag %s from resource %s", key, action.ResourceID)
-	result.Metrics["tags_removed"] = 1
+	result.Output = fmt.Sprintf("Removed tag %s from resource %s", key, action.Resource)
+	result.EndTime = time.Now()
 
 	return result, nil
 }
@@ -160,21 +174,23 @@ func (te *TagExecutor) updateTag(ctx context.Context, action *remediation.Remedi
 	time.Sleep(100 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.ResourceID,
-		Field:      fmt.Sprintf("tags.%s", key),
-		OldValue:   "old_value", // In real implementation, this would be the actual old value
-		NewValue:   value,
-		ChangeType: remediation.ChangeTypeUpdate,
-		Metadata: map[string]interface{}{
-			"tag_key":   key,
-			"tag_value": value,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      fmt.Sprintf("tags.%s", key),
+	//	OldValue:   "old_value", // In real implementation, this would be the actual old value
+	//	NewValue:   value,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"tag_key":   key,
+	//		"tag_value": value,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Updated tag %s=%s", key, value)
+	result.Changes = append(result.Changes, changeDesc)
 
-	result.Message = fmt.Sprintf("Updated tag %s=%s on resource %s", key, value, action.ResourceID)
-	result.Metrics["tags_updated"] = 1
+	result.Output = fmt.Sprintf("Updated tag %s=%s on resource %s", key, value, action.Resource)
+	result.EndTime = time.Now()
 
 	return result, nil
 }
@@ -188,23 +204,25 @@ func (te *TagExecutor) addRequiredTags(ctx context.Context, action *remediation.
 
 	tagsAdded := 0
 	for key, value := range requiredTags {
-		change := remediation.ResourceChange{
-			ResourceID: action.ResourceID,
-			Field:      fmt.Sprintf("tags.%s", key),
-			OldValue:   nil,
-			NewValue:   value,
-			ChangeType: remediation.ChangeTypeCreate,
-			Metadata: map[string]interface{}{
-				"tag_key":   key,
-				"tag_value": value,
-			},
-		}
-		result.Changes = append(result.Changes, change)
+		// TODO: Define ResourceChange struct or use different approach
+		// change := remediation.ResourceChange{
+		//	ResourceID: action.Resource,
+		//	Field:      fmt.Sprintf("tags.%s", key),
+		//	OldValue:   nil,
+		//	NewValue:   value,
+		//	ChangeType: "create",
+		//	Metadata: map[string]interface{}{
+		//		"tag_key":   key,
+		//		"tag_value": value,
+		//	},
+		// }
+		changeDesc := fmt.Sprintf("Added required tag %s=%v", key, value)
+		result.Changes = append(result.Changes, changeDesc)
 		tagsAdded++
 	}
 
-	result.Message = fmt.Sprintf("Added %d required tags to resource %s", tagsAdded, action.ResourceID)
-	result.Metrics["tags_added"] = tagsAdded
+	result.Output = fmt.Sprintf("Added %d required tags to resource %s", tagsAdded, action.Resource)
+	result.EndTime = time.Now()
 
 	return result, nil
 }

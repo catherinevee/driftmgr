@@ -33,7 +33,6 @@ type ActionExecutor interface {
 	Validate(action *RemediationAction) error
 }
 
-
 // RemediationEvent represents a remediation-related event
 type RemediationEvent struct {
 	Type       string                 `json:"type"`

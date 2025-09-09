@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	
+
 	"github.com/catherinevee/driftmgr/pkg/models"
 )
 
@@ -53,7 +53,7 @@ func (p *TestProvider) DiscoverResources(ctx context.Context, region string) ([]
 		}
 		return filtered, nil
 	}
-	
+
 	// Try to load from fixture file
 	if p.fixturesPath != "" {
 		fixturePath := filepath.Join(p.fixturesPath, fmt.Sprintf("%s.json", region))
@@ -62,15 +62,15 @@ func (p *TestProvider) DiscoverResources(ctx context.Context, region string) ([]
 			// Return empty list if no fixture
 			return []models.Resource{}, nil
 		}
-		
+
 		var resources []models.Resource
 		if err := json.Unmarshal(data, &resources); err != nil {
 			return nil, fmt.Errorf("invalid fixture data: %w", err)
 		}
-		
+
 		return resources, nil
 	}
-	
+
 	// Return default test data if no fixtures
 	return p.getDefaultTestResources(region), nil
 }
@@ -83,7 +83,7 @@ func (p *TestProvider) GetResource(ctx context.Context, resourceID string) (*mod
 			return &r, nil
 		}
 	}
-	
+
 	// Try to find in all regions
 	if p.fixturesPath != "" {
 		regions := []string{"us-east-1", "us-west-2", "eu-west-1"}
@@ -96,7 +96,7 @@ func (p *TestProvider) GetResource(ctx context.Context, resourceID string) (*mod
 			}
 		}
 	}
-	
+
 	return nil, fmt.Errorf("resource not found: %s", resourceID)
 }
 
@@ -137,8 +137,8 @@ func (p *TestProvider) getDefaultTestResources(region string) []models.Resource 
 			Name:     "Test Instance 1",
 			Properties: map[string]interface{}{
 				"instance_type": "t2.micro",
-				"state":        "running",
-				"vpc_id":       "vpc-test123",
+				"state":         "running",
+				"vpc_id":        "vpc-test123",
 			},
 		},
 		{

@@ -23,20 +23,25 @@ func NewSecurityExecutor() *SecurityExecutor {
 // Execute executes a security remediation action
 func (se *SecurityExecutor) Execute(ctx context.Context, action *remediation.RemediationAction) (*remediation.ActionResult, error) {
 	result := &remediation.ActionResult{
-		Success:    true,
-		Message:    "Security remediation completed successfully",
-		Changes:    []remediation.ResourceChange{},
-		Metrics:    make(map[string]interface{}),
-		CostImpact: 0.0,
-		RiskLevel:  remediation.RiskLevelMedium,
+		ActionID:   action.ID,
+		ResourceID: action.Resource,
+		Action:     string(action.Type),
+		Status:     remediation.StatusSuccess,
+		StartTime:  time.Now(),
+		Changes:    []string{},
 	}
 
 	// Get the operation type from parameters
 	operation, ok := action.Parameters["operation"].(string)
 	if !ok {
 		return &remediation.ActionResult{
-			Success: false,
-			Error:   "operation parameter is required",
+			ActionID:   action.ID,
+			ResourceID: action.Resource,
+			Action:     string(action.Type),
+			Status:     remediation.StatusFailed,
+			StartTime:  time.Now(),
+			EndTime:    time.Now(),
+			Error:      "operation parameter is required",
 		}, fmt.Errorf("operation parameter is required")
 	}
 
@@ -53,8 +58,13 @@ func (se *SecurityExecutor) Execute(ctx context.Context, action *remediation.Rem
 		return se.enableBackup(ctx, action, result)
 	default:
 		return &remediation.ActionResult{
-			Success: false,
-			Error:   fmt.Sprintf("unsupported operation: %s", operation),
+			ActionID:   action.ID,
+			ResourceID: action.Resource,
+			Action:     string(action.Type),
+			Status:     remediation.StatusFailed,
+			StartTime:  time.Now(),
+			EndTime:    time.Now(),
+			Error:      fmt.Sprintf("unsupported operation: %s", operation),
 		}, fmt.Errorf("unsupported operation: %s", operation)
 	}
 }
@@ -109,21 +119,22 @@ func (se *SecurityExecutor) enableEncryption(ctx context.Context, action *remedi
 	time.Sleep(200 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.ResourceID,
-		Field:      "encryption",
-		OldValue:   false,
-		NewValue:   true,
-		ChangeType: remediation.ChangeTypeUpdate,
-		Metadata: map[string]interface{}{
-			"encryption_type": encryptionType,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "encryption",
+	//	OldValue:   false,
+	//	NewValue:   true,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"encryption_type": encryptionType,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Enabled encryption: %s", encryptionType)
+	result.Changes = append(result.Changes, changeDesc)
 
-	result.Message = fmt.Sprintf("Enabled %s encryption on resource %s", encryptionType, action.ResourceID)
-	result.Metrics["encryption_enabled"] = 1
-	result.RiskLevel = remediation.RiskLevelLow
+	result.Output = fmt.Sprintf("Enabled %s encryption on resource %s", encryptionType, action.Resource)
+	result.EndTime = time.Now()
 
 	return result, nil
 }
@@ -134,21 +145,22 @@ func (se *SecurityExecutor) restrictPublicAccess(ctx context.Context, action *re
 	time.Sleep(150 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.ResourceID,
-		Field:      "public_access",
-		OldValue:   true,
-		NewValue:   false,
-		ChangeType: remediation.ChangeTypeUpdate,
-		Metadata: map[string]interface{}{
-			"access_restriction": "public_access_blocked",
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "public_access",
+	//	OldValue:   true,
+	//	NewValue:   false,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"access_restriction": "public_access_blocked",
+	//	},
+	// }
+	changeDesc := "Restricted public access"
+	result.Changes = append(result.Changes, changeDesc)
 
-	result.Message = fmt.Sprintf("Restricted public access to resource %s", action.ResourceID)
-	result.Metrics["public_access_restricted"] = 1
-	result.RiskLevel = remediation.RiskLevelLow
+	result.Output = fmt.Sprintf("Restricted public access to resource %s", action.Resource)
+	result.EndTime = time.Now()
 
 	return result, nil
 }
@@ -161,21 +173,22 @@ func (se *SecurityExecutor) updateSecurityGroup(ctx context.Context, action *rem
 	time.Sleep(300 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.ResourceID,
-		Field:      "security_group",
-		OldValue:   "old_security_group",
-		NewValue:   securityGroupID,
-		ChangeType: remediation.ChangeTypeUpdate,
-		Metadata: map[string]interface{}{
-			"security_group_id": securityGroupID,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "security_group",
+	//	OldValue:   "old_security_group",
+	//	NewValue:   securityGroupID,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"security_group_id": securityGroupID,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Updated security group to %s", securityGroupID)
+	result.Changes = append(result.Changes, changeDesc)
 
-	result.Message = fmt.Sprintf("Updated security group for resource %s to %s", action.ResourceID, securityGroupID)
-	result.Metrics["security_group_updated"] = 1
-	result.RiskLevel = remediation.RiskLevelMedium
+	result.Output = fmt.Sprintf("Updated security group for resource %s to %s", action.Resource, securityGroupID)
+	result.EndTime = time.Now()
 
 	return result, nil
 }
@@ -191,21 +204,22 @@ func (se *SecurityExecutor) enableMonitoring(ctx context.Context, action *remedi
 	time.Sleep(250 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.ResourceID,
-		Field:      "monitoring",
-		OldValue:   false,
-		NewValue:   true,
-		ChangeType: remediation.ChangeTypeUpdate,
-		Metadata: map[string]interface{}{
-			"monitoring_type": monitoringType,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "monitoring",
+	//	OldValue:   false,
+	//	NewValue:   true,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"monitoring_type": monitoringType,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Enabled %s monitoring", monitoringType)
+	result.Changes = append(result.Changes, changeDesc)
 
-	result.Message = fmt.Sprintf("Enabled %s monitoring on resource %s", monitoringType, action.ResourceID)
-	result.Metrics["monitoring_enabled"] = 1
-	result.RiskLevel = remediation.RiskLevelLow
+	result.Output = fmt.Sprintf("Enabled %s monitoring on resource %s", monitoringType, action.Resource)
+	result.EndTime = time.Now()
 
 	return result, nil
 }
@@ -218,22 +232,22 @@ func (se *SecurityExecutor) enableBackup(ctx context.Context, action *remediatio
 	time.Sleep(200 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	change := remediation.ResourceChange{
-		ResourceID: action.ResourceID,
-		Field:      "backup",
-		OldValue:   false,
-		NewValue:   true,
-		ChangeType: remediation.ChangeTypeUpdate,
-		Metadata: map[string]interface{}{
-			"retention_days": retentionDays,
-		},
-	}
-	result.Changes = append(result.Changes, change)
+	// TODO: Define ResourceChange struct or use different approach
+	// change := remediation.ResourceChange{
+	//	ResourceID: action.Resource,
+	//	Field:      "backup",
+	//	OldValue:   false,
+	//	NewValue:   true,
+	//	ChangeType: "update",
+	//	Metadata: map[string]interface{}{
+	//		"retention_days": retentionDays,
+	//	},
+	// }
+	changeDesc := fmt.Sprintf("Enabled backup with %d days retention", retentionDays)
+	result.Changes = append(result.Changes, changeDesc)
 
-	result.Message = fmt.Sprintf("Enabled backup on resource %s with %d days retention", action.ResourceID, retentionDays)
-	result.Metrics["backup_enabled"] = 1
-	result.Metrics["retention_days"] = retentionDays
-	result.RiskLevel = remediation.RiskLevelLow
+	result.Output = fmt.Sprintf("Enabled backup on resource %s with %d days retention", action.Resource, retentionDays)
+	result.EndTime = time.Now()
 
 	return result, nil
 }

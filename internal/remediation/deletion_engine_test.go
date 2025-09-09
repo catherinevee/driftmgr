@@ -11,4 +11,3 @@ func TestDeletionEngine_NewEngine(t *testing.T) {
 	assert.NotNil(t, engine)
 	assert.NotNil(t, engine.providers)
 }
-

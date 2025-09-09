@@ -9,10 +9,10 @@ import (
 
 // RuleEngine manages automation rules
 type RuleEngine struct {
-	rules    map[string]*AutomationRule
-	mu       sync.RWMutex
+	rules map[string]*AutomationRule
+	mu    sync.RWMutex
 	// eventBus removed for interface simplification
-	config   *RuleConfig
+	config *RuleConfig
 }
 
 // AutomationRule represents an automation rule
@@ -67,9 +67,8 @@ func NewRuleEngine() *RuleEngine {
 	}
 
 	return &RuleEngine{
-		rules:    make(map[string]*AutomationRule),
-		eventBus: eventBus,
-		config:   config,
+		rules:  make(map[string]*AutomationRule),
+		config: config,
 	}
 }
 
@@ -101,21 +100,7 @@ func (re *RuleEngine) CreateRule(ctx context.Context, rule *AutomationRule) erro
 	// Store rule
 	re.rules[rule.ID] = rule
 
-	// Publish event
-	if re.eventBus != nil {
-// Event publishing simplified
-			Type:      "rule_created",
-			Message:   fmt.Sprintf("Automation rule '%s' created", rule.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-			Metadata: map[string]interface{}{
-				"rule_name": rule.Name,
-				"category":  rule.Category,
-				"priority":  rule.Priority,
-			},
-		}
-// Event publishing simplified
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -151,20 +136,7 @@ func (re *RuleEngine) UpdateRule(ctx context.Context, ruleID string, updates *Au
 	}
 	rule.UpdatedAt = time.Now()
 
-	// Publish event
-	if re.eventBus != nil {
-// Event publishing simplified
-			Type:      "rule_updated",
-			Message:   fmt.Sprintf("Automation rule '%s' updated", rule.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-			Metadata: map[string]interface{}{
-				"rule_name": rule.Name,
-				"category":  rule.Category,
-			},
-		}
-// Event publishing simplified
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -174,7 +146,7 @@ func (re *RuleEngine) DeleteRule(ctx context.Context, ruleID string) error {
 	re.mu.Lock()
 	defer re.mu.Unlock()
 
-	rule, exists := re.rules[ruleID]
+	_, exists := re.rules[ruleID]
 	if !exists {
 		return fmt.Errorf("rule %s not found", ruleID)
 	}
@@ -182,19 +154,7 @@ func (re *RuleEngine) DeleteRule(ctx context.Context, ruleID string) error {
 	// Delete rule
 	delete(re.rules, ruleID)
 
-	// Publish event
-	if re.eventBus != nil {
-// Event publishing simplified
-			Type:      "rule_deleted",
-			Message:   fmt.Sprintf("Automation rule '%s' deleted", rule.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-			Metadata: map[string]interface{}{
-				"rule_name": rule.Name,
-			},
-		}
-// Event publishing simplified
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -266,21 +226,7 @@ func (re *RuleEngine) EvaluateRules(ctx context.Context, data map[string]interfa
 				}
 			}
 
-			// Publish event
-			if re.eventBus != nil {
-// Event publishing simplified
-					Type:      "rule_triggered",
-					Message:   fmt.Sprintf("Automation rule '%s' triggered", rule.Name),
-					Severity:  "info",
-					Timestamp: time.Now(),
-					Metadata: map[string]interface{}{
-						"rule_name": rule.Name,
-						"category":  rule.Category,
-						"priority":  rule.Priority,
-					},
-				}
-// Event publishing simplified
-			}
+			// TODO: Implement event publishing
 		}
 	}
 

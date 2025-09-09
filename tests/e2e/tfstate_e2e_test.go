@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/terraform/state"
+	"github.com/catherinevee/driftmgr/internal/state"
 	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

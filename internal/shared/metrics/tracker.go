@@ -45,12 +45,12 @@ type MetricsTracker struct {
 
 var (
 	globalTracker *MetricsTracker
-	once          sync.Once
+	trackerOnce   sync.Once
 )
 
 // GetGlobalTracker returns the global metrics tracker instance
 func GetGlobalTracker() *MetricsTracker {
-	once.Do(func() {
+	trackerOnce.Do(func() {
 		globalTracker = &MetricsTracker{}
 	})
 	return globalTracker

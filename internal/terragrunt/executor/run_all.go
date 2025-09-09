@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/catherinevee/driftmgr/internal/terragrunt/parser"
 	"github.com/catherinevee/driftmgr/internal/terragrunt/resolver"
 )
 
@@ -63,8 +62,8 @@ type TerraformChanges struct {
 	Destroy int `json:"destroy"`
 }
 
-// TerragruntExecutor executes terragrunt commands across modules
-type TerragruntExecutor struct {
+// RunAllExecutor executes terragrunt commands across modules
+type RunAllExecutor struct {
 	resolver  *resolver.DependencyResolver
 	options   *RunAllOptions
 	results   *RunAllResult
@@ -75,8 +74,8 @@ type TerragruntExecutor struct {
 	cancel    context.CancelFunc
 }
 
-// NewTerragruntExecutor creates a new terragrunt executor
-func NewTerragruntExecutor(options *RunAllOptions) *TerragruntExecutor {
+// NewRunAllExecutor creates a new run-all executor
+func NewRunAllExecutor(options *RunAllOptions) *RunAllExecutor {
 	if options.Parallelism <= 0 {
 		options.Parallelism = 10 // Default parallelism
 	}
@@ -87,9 +86,10 @@ func NewTerragruntExecutor(options *RunAllOptions) *TerragruntExecutor {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &TerragruntExecutor{
+	return &RunAllExecutor{
 		resolver:  resolver.NewDependencyResolver(),
 		options:   options,
+		results:   &RunAllResult{},
 		semaphore: make(chan struct{}, options.Parallelism),
 		ctx:       ctx,
 		cancel:    cancel,
@@ -97,7 +97,7 @@ func NewTerragruntExecutor(options *RunAllOptions) *TerragruntExecutor {
 }
 
 // RunAll executes the command across all modules
-func (e *TerragruntExecutor) RunAll(rootDir string) (*RunAllResult, error) {
+func (e *RunAllExecutor) RunAll(rootDir string) (*RunAllResult, error) {
 	// Initialize results
 	e.results = &RunAllResult{
 		StartTime:     time.Now(),
@@ -151,7 +151,7 @@ func (e *TerragruntExecutor) RunAll(rootDir string) (*RunAllResult, error) {
 }
 
 // filterModules filters modules based on options
-func (e *TerragruntExecutor) filterModules(graph *resolver.DependencyGraph) []string {
+func (e *RunAllExecutor) filterModules(graph *resolver.DependencyGraph) []string {
 	var modules []string
 
 	for path, module := range graph.Modules {
@@ -193,7 +193,7 @@ func (e *TerragruntExecutor) filterModules(graph *resolver.DependencyGraph) []st
 }
 
 // executeGroup executes a group of modules in parallel
-func (e *TerragruntExecutor) executeGroup(group []string, graph *resolver.DependencyGraph) error {
+func (e *RunAllExecutor) executeGroup(group []string, graph *resolver.DependencyGraph) error {
 	var groupErrors []error
 
 	for _, modulePath := range group {
@@ -250,7 +250,7 @@ func (e *TerragruntExecutor) executeGroup(group []string, graph *resolver.Depend
 }
 
 // executeModule executes terraform/terragrunt on a single module
-func (e *TerragruntExecutor) executeModule(module *resolver.Module) *ModuleExecResult {
+func (e *RunAllExecutor) executeModule(module *resolver.Module) *ModuleExecResult {
 	result := &ModuleExecResult{
 		Module:    module.Path,
 		Status:    resolver.ModuleStatusRunning,
@@ -316,7 +316,7 @@ func (e *TerragruntExecutor) executeModule(module *resolver.Module) *ModuleExecR
 }
 
 // recordModuleResult records the result of a module execution
-func (e *TerragruntExecutor) recordModuleResult(path string, result *ModuleExecResult) {
+func (e *RunAllExecutor) recordModuleResult(path string, result *ModuleExecResult) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -352,7 +352,7 @@ func parseChanges(output string) *TerraformChanges {
 }
 
 // GetProgress returns current execution progress
-func (e *TerragruntExecutor) GetProgress() map[string]interface{} {
+func (e *RunAllExecutor) GetProgress() map[string]interface{} {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -371,12 +371,12 @@ func (e *TerragruntExecutor) GetProgress() map[string]interface{} {
 }
 
 // Cancel cancels the execution
-func (e *TerragruntExecutor) Cancel() {
+func (e *RunAllExecutor) Cancel() {
 	e.cancel()
 }
 
 // GeneratePlanSummary generates a summary of the execution plan
-func (e *TerragruntExecutor) GeneratePlanSummary(rootDir string) (*PlanSummary, error) {
+func (e *RunAllExecutor) GeneratePlanSummary(rootDir string) (*PlanSummary, error) {
 	graph, err := e.resolver.ResolveDirectory(rootDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve dependencies: %w", err)

@@ -17,24 +17,15 @@ type AutomationCommand struct {
 
 // NewAutomationCommand creates a new automation command
 func NewAutomationCommand() *AutomationCommand {
-	// Create a mock event bus for demonstration
-	eventBus := &MockAutomationEventBus{}
-
 	// Create automation service
-	service := automation.NewAutomationService(eventBus)
+	service := automation.NewAutomationService()
 
 	return &AutomationCommand{
 		service: service,
 	}
 }
 
-// MockAutomationEventBus is a mock implementation of the EventBus interface
-type MockAutomationEventBus struct{}
-
-func (m *MockAutomationEventBus) PublishWorkflowEvent(event automation.WorkflowEvent) error {
-	fmt.Printf("Automation Event: %s - %s\n", event.Type, event.Message)
-	return nil
-}
+// TODO: Event bus functionality removed - implement if needed
 
 // HandleAutomation handles the automation command
 func HandleAutomation(args []string) {
@@ -150,14 +141,13 @@ func (cmd *AutomationCommand) handleCreateWorkflow(args []string) {
 			{
 				ID:   "trigger1",
 				Type: "event",
-				Config: map[string]interface{}{
+				Parameters: map[string]interface{}{
 					"event_type": "resource_created",
 				},
-				Enabled: true,
+				IsActive: true,
 			},
 		},
-		Variables: make(map[string]interface{}),
-		Enabled:   true,
+		IsActive: true,
 	}
 
 	ctx := context.Background()
@@ -194,7 +184,7 @@ func (cmd *AutomationCommand) handleListWorkflows(args []string) {
 			workflow.Name,
 			workflow.Category,
 			len(workflow.Steps),
-			workflow.Enabled,
+			workflow.IsActive,
 			workflow.CreatedAt.Format("2006-01-02 15:04:05"),
 		)
 	}

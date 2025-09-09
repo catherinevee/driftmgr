@@ -133,7 +133,9 @@ func (m *CSRFMiddleware) ProtectCSRF() gin.HandlerFunc {
 			// Try to get from claims
 			if claims, exists := c.Get(string(ClaimsContextKey)); exists {
 				if authClaims, ok := claims.(map[string]interface{}); ok {
-					sessionID = authClaims.SessionID
+					if sessionIDVal, exists := authClaims["session_id"]; exists {
+						sessionID = sessionIDVal
+					}
 				}
 			}
 		}
@@ -168,7 +170,9 @@ func (m *CSRFMiddleware) GetCSRFToken() gin.HandlerFunc {
 			// Try to get from claims
 			if claims, exists := c.Get(string(ClaimsContextKey)); exists {
 				if authClaims, ok := claims.(map[string]interface{}); ok {
-					sessionID = authClaims.SessionID
+					if sessionIDVal, exists := authClaims["session_id"]; exists {
+						sessionID = sessionIDVal
+					}
 				}
 			}
 		}

@@ -48,7 +48,7 @@ type metricData struct {
 	sum        float64
 	min        float64
 	max        float64
-	histogram  *Histogram
+	histogram  *HistogramMetric
 	lastUpdate time.Time
 	mu         sync.RWMutex
 }
@@ -115,7 +115,7 @@ func (c *Collector) recordMetric(name string, metricType MetricType, value float
 			},
 			min:       value,
 			max:       value,
-			histogram: NewHistogram(),
+			histogram: NewHistogramMetric(),
 		}
 		c.metrics[key] = data
 	}
@@ -301,21 +301,21 @@ func (c *Collector) collectSystemMetrics() {
 	c.Gauge("system.cpu.count", float64(runtime.NumCPU()), nil)
 }
 
-// Histogram provides histogram functionality
-type Histogram struct {
+// HistogramMetric provides histogram functionality
+type HistogramMetric struct {
 	values []float64
 	mu     sync.RWMutex
 }
 
-// NewHistogram creates a new histogram
-func NewHistogram() *Histogram {
-	return &Histogram{
+// NewHistogramMetric creates a new histogram metric
+func NewHistogramMetric() *HistogramMetric {
+	return &HistogramMetric{
 		values: make([]float64, 0, 100),
 	}
 }
 
 // Record records a value
-func (h *Histogram) Record(value float64) {
+func (h *HistogramMetric) Record(value float64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.values = append(h.values, value)
@@ -327,7 +327,7 @@ func (h *Histogram) Record(value float64) {
 }
 
 // Percentile calculates a percentile
-func (h *Histogram) Percentile(p float64) float64 {
+func (h *HistogramMetric) Percentile(p float64) float64 {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 

@@ -10,6 +10,37 @@ import (
 	statePkg "github.com/catherinevee/driftmgr/internal/state"
 )
 
+// S3Config represents S3 backend configuration
+type S3Config struct {
+	Bucket         string `json:"bucket"`
+	Key            string `json:"key"`
+	Region         string `json:"region"`
+	DynamoDBTable  string `json:"dynamodb_table"`
+	Encrypt        bool   `json:"encrypt"`
+	Profile        string `json:"profile"`
+	RoleARN        string `json:"role_arn"`
+	ExternalID     string `json:"external_id"`
+	SessionName    string `json:"session_name"`
+	Endpoint       string `json:"endpoint"`
+	SkipValidation bool   `json:"skip_validation"`
+}
+
+// AzureConfig represents Azure backend configuration
+type AzureConfig struct {
+	StorageAccountName string `json:"storage_account_name"`
+	ContainerName      string `json:"container_name"`
+	Key                string `json:"key"`
+	ResourceGroupName  string `json:"resource_group_name"`
+	SubscriptionID     string `json:"subscription_id"`
+	TenantID           string `json:"tenant_id"`
+	ClientID           string `json:"client_id"`
+	ClientSecret       string `json:"client_secret"`
+	UseMSI             bool   `json:"use_msi"`
+	Environment        string `json:"environment"`
+	Endpoint           string `json:"endpoint"`
+	Encrypt            bool   `json:"encrypt"`
+}
+
 // Adapter bridges the new Backend interface with the legacy state.Backend interface
 type Adapter struct {
 	backend Backend
@@ -233,7 +264,7 @@ func CreateBackendAdapter(config *BackendConfig) (statePkg.Backend, error) {
 
 	switch strings.ToLower(config.Type) {
 	case "s3":
-		s3Config := &S3Config{
+		_ = &S3Config{
 			Bucket:         getStringFromConfig(config.Config, "bucket"),
 			Key:            getStringFromConfig(config.Config, "key"),
 			Region:         getStringFromConfig(config.Config, "region"),
@@ -246,23 +277,11 @@ func CreateBackendAdapter(config *BackendConfig) (statePkg.Backend, error) {
 			Endpoint:       getStringFromConfig(config.Config, "endpoint"),
 			SkipValidation: getBoolFromConfig(config.Config, "skip_validation"),
 		}
-		backend, err = NewS3Backend(s3Config)
+		backend, err = NewS3Backend(config)
 
 	case "azurerm":
-		azureConfig := &AzureConfig{
-			StorageAccountName: getStringFromConfig(config.Config, "storage_account_name"),
-			ContainerName:      getStringFromConfig(config.Config, "container_name"),
-			Key:                getStringFromConfig(config.Config, "key"),
-			ResourceGroupName:  getStringFromConfig(config.Config, "resource_group_name"),
-			SubscriptionID:     getStringFromConfig(config.Config, "subscription_id"),
-			TenantID:           getStringFromConfig(config.Config, "tenant_id"),
-			ClientID:           getStringFromConfig(config.Config, "client_id"),
-			ClientSecret:       getStringFromConfig(config.Config, "client_secret"),
-			UseMSI:             getBoolFromConfig(config.Config, "use_msi"),
-			Environment:        getStringFromConfig(config.Config, "environment"),
-			Endpoint:           getStringFromConfig(config.Config, "endpoint"),
-		}
-		backend, err = NewAzureBackend(azureConfig)
+		// TODO: Fix Azure backend implementation
+		return nil, fmt.Errorf("Azure backend temporarily disabled due to SDK compatibility issues")
 
 	case "gcs":
 		// TODO: Implement GCS backend

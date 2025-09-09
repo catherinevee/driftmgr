@@ -21,7 +21,7 @@ func main() {
 	// Create services
 	services := &api.Services{
 		Analytics:   analytics.NewAnalyticsService(),
-		Automation:  automation.NewAutomationService(nil),
+		Automation:  automation.NewAutomationService(),
 		BI:          bi.NewBIService(),
 		Cost:        cost.NewCostAnalyzer(),
 		Remediation: remediation.NewIntelligentRemediationService(nil),

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/providers"
-	"github.com/catherinevee/driftmgr/internal/shared/errors"
 )
 
 // ContinuousMonitor provides real-time infrastructure monitoring
@@ -202,8 +201,14 @@ func (m *ContinuousMonitor) pollProvider(ctx context.Context, name string, provi
 		return nil
 	}
 
+	// Convert resources to interface{} slice for change detection
+	resourceInterfaces := make([]interface{}, len(resources))
+	for i, resource := range resources {
+		resourceInterfaces[i] = resource
+	}
+
 	// Detect changes
-	changes := m.changeDetector.DetectChanges(name, resources)
+	changes := m.changeDetector.DetectChanges(name, resourceInterfaces)
 
 	// Convert to events
 	var events []CloudEvent

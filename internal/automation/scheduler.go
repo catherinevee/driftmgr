@@ -9,9 +9,9 @@ import (
 
 // Scheduler manages scheduled automation jobs
 type Scheduler struct {
-	jobs     map[string]*ScheduledJob
-	mu       sync.RWMutex
-	
+	jobs map[string]*ScheduledJob
+	mu   sync.RWMutex
+
 	config   *SchedulerConfig
 	stopChan chan struct{}
 	running  bool
@@ -58,7 +58,6 @@ func NewScheduler() *Scheduler {
 
 	return &Scheduler{
 		jobs:     make(map[string]*ScheduledJob),
-		eventBus: eventBus,
 		config:   config,
 		stopChan: make(chan struct{}),
 		running:  false,
@@ -80,16 +79,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	// Start the scheduler loop
 	go s.schedulerLoop(ctx)
 
-	// Publish event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "scheduler_started",
-			Message:   "Scheduler started",
-			Severity:  "info",
-			Timestamp: time.Now(),
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -106,16 +96,7 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	s.running = false
 	close(s.stopChan)
 
-	// Publish event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "scheduler_stopped",
-			Message:   "Scheduler stopped",
-			Severity:  "info",
-			Timestamp: time.Now(),
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -152,22 +133,7 @@ func (s *Scheduler) ScheduleJob(ctx context.Context, job *ScheduledJob) (*Schedu
 	// Store job
 	s.jobs[job.ID] = job
 
-	// Publish event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "job_scheduled",
-			Message:   fmt.Sprintf("Job '%s' scheduled", job.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-			Metadata: map[string]interface{}{
-				"job_name": job.Name,
-				"job_type": job.Type,
-				"schedule": job.Schedule,
-				"next_run": job.NextRun,
-			},
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return job, nil
 }
@@ -226,20 +192,7 @@ func (s *Scheduler) UpdateJob(ctx context.Context, jobID string, updates *Schedu
 	}
 	job.UpdatedAt = time.Now()
 
-	// Publish event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "job_updated",
-			Message:   fmt.Sprintf("Job '%s' updated", job.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-			Metadata: map[string]interface{}{
-				"job_name": job.Name,
-				"job_type": job.Type,
-			},
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -249,7 +202,7 @@ func (s *Scheduler) DeleteJob(ctx context.Context, jobID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	job, exists := s.jobs[jobID]
+	_, exists := s.jobs[jobID]
 	if !exists {
 		return fmt.Errorf("job %s not found", jobID)
 	}
@@ -257,19 +210,7 @@ func (s *Scheduler) DeleteJob(ctx context.Context, jobID string) error {
 	// Delete job
 	delete(s.jobs, jobID)
 
-	// Publish event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "job_deleted",
-			Message:   fmt.Sprintf("Job '%s' deleted", job.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-			Metadata: map[string]interface{}{
-				"job_name": job.Name,
-			},
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -287,16 +228,7 @@ func (s *Scheduler) EnableJob(ctx context.Context, jobID string) error {
 	job.Enabled = true
 	job.UpdatedAt = time.Now()
 
-	// Publish event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "job_enabled",
-			Message:   fmt.Sprintf("Job '%s' enabled", job.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -314,16 +246,7 @@ func (s *Scheduler) DisableJob(ctx context.Context, jobID string) error {
 	job.Enabled = false
 	job.UpdatedAt = time.Now()
 
-	// Publish event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "job_disabled",
-			Message:   fmt.Sprintf("Job '%s' disabled", job.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	return nil
 }
@@ -433,20 +356,7 @@ func (s *Scheduler) runJob(ctx context.Context, job *ScheduledJob) {
 	}
 	s.mu.Unlock()
 
-	// Publish event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "job_started",
-			Message:   fmt.Sprintf("Job '%s' started", job.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-			Metadata: map[string]interface{}{
-				"job_name": job.Name,
-				"job_type": job.Type,
-			},
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	// Execute job based on type
 	var err error
@@ -461,21 +371,7 @@ func (s *Scheduler) runJob(ctx context.Context, job *ScheduledJob) {
 		err = fmt.Errorf("unknown job type: %s", job.Type)
 	}
 
-	// Publish completion event
-	if s.eventBus != nil {
-		event := WorkflowEvent{
-			Type:      "job_completed",
-			Message:   fmt.Sprintf("Job '%s' completed", job.Name),
-			Severity:  "info",
-			Timestamp: time.Now(),
-			Metadata: map[string]interface{}{
-				"job_name": job.Name,
-				"job_type": job.Type,
-				"success":  err == nil,
-			},
-		}
-		s.eventBus.PublishWorkflowEvent(event)
-	}
+	// TODO: Implement event publishing
 
 	if err != nil {
 		fmt.Printf("Job %s failed: %v\n", job.Name, err)

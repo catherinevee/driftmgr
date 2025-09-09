@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/drift/detector"
-	"github.com/catherinevee/driftmgr/pkg/models"
 )
 
 // StrategyType defines the type of remediation strategy
