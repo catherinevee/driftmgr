@@ -45,7 +45,7 @@ type BackupOptions struct {
 func NewBackupManager(backupDir string) *BackupManager {
 	return &BackupManager{
 		backupDir:   backupDir,
-		maxBackups:  30,
+		maxBackups:  10,
 		compression: true,
 		metadata:    make(map[string]*BackupMetadata),
 	}
@@ -54,6 +54,14 @@ func NewBackupManager(backupDir string) *BackupManager {
 func (bm *BackupManager) CreateBackup(backupID string, state interface{}) error {
 	bm.mu.Lock()
 	defer bm.mu.Unlock()
+
+	// Validate inputs
+	if backupID == "" {
+		return errors.New("backup ID cannot be empty")
+	}
+	if state == nil {
+		return errors.New("state cannot be nil")
+	}
 
 	// Ensure backup directory exists
 	if err := os.MkdirAll(bm.backupDir, 0755); err != nil {
@@ -85,14 +93,21 @@ func (bm *BackupManager) CreateBackup(backupID string, state interface{}) error 
 		return fmt.Errorf("failed to stat backup file: %w", err)
 	}
 
+	// Extract state version if it's a TerraformState
+	stateVersion := 0
+	if tfState, ok := state.(*TerraformState); ok {
+		stateVersion = tfState.Version
+	}
+
 	// Store metadata
 	bm.metadata[backupID] = &BackupMetadata{
-		ID:          backupID,
-		Timestamp:   time.Now(),
-		Size:        fileInfo.Size(),
-		Compressed:  bm.compression,
-		Encrypted:   bm.encryption,
-		Description: fmt.Sprintf("Backup created at %s", time.Now().Format(time.RFC3339)),
+		ID:           backupID,
+		Timestamp:    time.Now(),
+		Size:         fileInfo.Size(),
+		Compressed:   bm.compression,
+		Encrypted:    bm.encryption,
+		StateVersion: stateVersion,
+		Description:  fmt.Sprintf("Backup created at %s", time.Now().Format(time.RFC3339)),
 	}
 
 	// Cleanup old backups
@@ -239,10 +254,21 @@ func (bm *BackupManager) cleanupOldBackups() error {
 		return err
 	}
 
-	// Group backups by ID
-	backupGroups := make(map[string][]os.DirEntry)
+	// Collect all backup files
+	type backupFile struct {
+		name string
+		info os.DirEntry
+		id   string
+	}
+
+	var backups []backupFile
 	for _, file := range files {
 		if file.IsDir() {
+			continue
+		}
+
+		// Skip non-backup files like metadata.json
+		if !strings.Contains(file.Name(), "_") {
 			continue
 		}
 
@@ -252,27 +278,28 @@ func (bm *BackupManager) cleanupOldBackups() error {
 			continue
 		}
 
-		backupID := parts[0]
-		backupGroups[backupID] = append(backupGroups[backupID], file)
+		backups = append(backups, backupFile{
+			name: file.Name(),
+			info: file,
+			id:   parts[0],
+		})
 	}
 
-	// Keep only maxBackups per ID
-	for _, group := range backupGroups {
-		if len(group) <= bm.maxBackups {
-			continue
-		}
-
+	// If we have more than maxBackups total, delete oldest
+	if len(backups) > bm.maxBackups {
 		// Sort by name (timestamp is in the name)
-		sort.Slice(group, func(i, j int) bool {
-			return group[i].Name() < group[j].Name()
+		sort.Slice(backups, func(i, j int) bool {
+			return backups[i].name < backups[j].name
 		})
 
-		// Delete oldest backups
-		for i := 0; i < len(group)-bm.maxBackups; i++ {
-			oldFile := filepath.Join(bm.backupDir, group[i].Name())
+		// Delete oldest backups to keep only maxBackups total
+		for i := 0; i < len(backups)-bm.maxBackups; i++ {
+			oldFile := filepath.Join(bm.backupDir, backups[i].name)
 			if err := os.Remove(oldFile); err != nil {
 				fmt.Fprintf(os.Stderr, "failed to delete old backup %s: %v\n", oldFile, err)
 			}
+			// Also remove from metadata
+			delete(bm.metadata, backups[i].id)
 		}
 	}
 

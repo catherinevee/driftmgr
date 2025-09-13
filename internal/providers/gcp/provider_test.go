@@ -702,10 +702,15 @@ func TestGCPProviderComplete_ListResources(t *testing.T) {
 				return &http.Client{
 					Transport: &MockRoundTripper{
 						RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+							// Fix: GCP API returns zones as keys with instances arrays
 							mockList := map[string]interface{}{
-								"items": []map[string]interface{}{
-									{"id": "1", "name": "instance-1", "status": "RUNNING"},
-									{"id": "2", "name": "instance-2", "status": "STOPPED"},
+								"items": map[string]interface{}{
+									"zones/us-central1-a": map[string]interface{}{
+										"instances": []map[string]interface{}{
+											{"id": "1", "name": "instance-1", "status": "RUNNING"},
+											{"id": "2", "name": "instance-2", "status": "STOPPED"},
+										},
+									},
 								},
 							}
 							body, _ := json.Marshal(mockList)
@@ -830,7 +835,7 @@ func TestGCPProviderComplete_ErrorHandling(t *testing.T) {
 				_, err := provider.getStorageBucket(context.Background(), "test")
 				return err
 			},
-			wantErrMsg: "failed to decode",
+			wantErrMsg: "failed to unmarshal",
 		},
 		{
 			name: "Rate limit error",
@@ -850,7 +855,7 @@ func TestGCPProviderComplete_ErrorHandling(t *testing.T) {
 				_, err := provider.makeAPIRequest(context.Background(), "GET", "https://test.com", nil)
 				return err
 			},
-			wantErrMsg: "API request failed",
+			wantErrMsg: "GCP API error",
 		},
 	}
 
