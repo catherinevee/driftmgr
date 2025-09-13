@@ -38,8 +38,8 @@ func DiscoverHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response := map[string]interface{}{
-			"status": "accepted",
-			"id":     "discovery-" + time.Now().Format("20060102-150405"),
+			"status":  "accepted",
+			"id":      "discovery-" + time.Now().Format("20060102-150405"),
 			"request": req,
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -98,8 +98,8 @@ func ConfigHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		response := map[string]interface{}{
-			"status":  "updated",
-			"config":  config,
+			"status": "updated",
+			"config": config,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)

@@ -515,14 +515,14 @@ func TestDigitalOceanProvider_getDroplet(t *testing.T) {
 	provider.apiToken = "test-token"
 
 	mockDroplet := Droplet{
-		ID:       12345,
-		Name:     "test-droplet",
-		Memory:   1024,
-		VCPUs:    1,
-		Disk:     25,
-		Status:   "active",
-		SizeSlug: "s-1vcpu-1gb",
-		Tags:     []string{"web", "production"},
+		ID:        12345,
+		Name:      "test-droplet",
+		Memory:    1024,
+		VCPUs:     1,
+		Disk:      25,
+		Status:    "active",
+		SizeSlug:  "s-1vcpu-1gb",
+		Tags:      []string{"web", "production"},
 		CreatedAt: time.Now(),
 	}
 

@@ -1025,8 +1025,8 @@ func TestAWSProvider_DetailedResourceTests(t *testing.T) {
 
 				// Check if it's the right type of error for some resources
 				if tc.resourceType == "aws_instance" || tc.resourceType == "aws_s3_bucket" ||
-				   tc.resourceType == "aws_iam_role" || tc.resourceType == "aws_lambda_function" ||
-				   tc.resourceType == "aws_dynamodb_table" {
+					tc.resourceType == "aws_iam_role" || tc.resourceType == "aws_lambda_function" ||
+					tc.resourceType == "aws_dynamodb_table" {
 					var notFound *NotFoundError
 					if errors.As(err, &notFound) {
 						assert.Equal(t, tc.resourceType, notFound.ResourceType)
@@ -1411,7 +1411,7 @@ func TestAWSProvider_ResourceTypeSwitching(t *testing.T) {
 			resourceType string
 			testID       string
 		}{
-			{"aws_instance_special", "i-test"},     // starts with aws_instance
+			{"aws_instance_special", "i-test"},    // starts with aws_instance
 			{"aws_s3_bucket_test", "test-bucket"}, // starts with aws_s3_bucket
 		}
 

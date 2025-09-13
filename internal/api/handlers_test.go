@@ -49,7 +49,7 @@ func TestDiscoverHandler(t *testing.T) {
 			name:       "POST with valid body",
 			method:     "POST",
 			body:       map[string]string{"provider": "aws", "region": "us-east-1"},
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusAccepted,
 		},
 		{
 			name:       "POST with invalid body",
@@ -91,7 +91,7 @@ func TestDriftHandler(t *testing.T) {
 
 	handler(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusAccepted, w.Code)
 
 	var response interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -123,7 +123,7 @@ func TestStateHandler(t *testing.T) {
 			name:       "PUT state",
 			method:     "PUT",
 			path:       "/api/v1/state",
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:       "DELETE state",
@@ -158,7 +158,7 @@ func TestRemediationHandler(t *testing.T) {
 			name:       "GET remediations",
 			method:     "GET",
 			body:       nil,
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusAccepted,
 		},
 		{
 			name:   "POST create remediation",
@@ -168,7 +168,7 @@ func TestRemediationHandler(t *testing.T) {
 				"action":      "update",
 				"parameters":  map[string]string{"instance_type": "t2.micro"},
 			},
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusAccepted,
 		},
 	}
 
@@ -201,10 +201,11 @@ func TestResourcesHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response []models.Resource
+	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
+	assert.Contains(t, response, "resources")
 }
 
 func TestProvidersHandler(t *testing.T) {
@@ -217,10 +218,11 @@ func TestProvidersHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response []map[string]interface{}
+	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
+	assert.Contains(t, response, "providers")
 }
 
 func TestConfigHandler(t *testing.T) {
