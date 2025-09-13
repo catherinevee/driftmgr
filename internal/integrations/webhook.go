@@ -261,3 +261,20 @@ func (wh *WebhookHandler) GetConfig() *WebhookConfig {
 	defer wh.mu.RUnlock()
 	return wh.config
 }
+
+// Register is an alias for RegisterHandler for compatibility
+func (wh *WebhookHandler) Register(webhookType string, processor WebhookProcessor) error {
+	return wh.RegisterHandler(webhookType, processor)
+}
+
+// Process is an alias for ProcessWebhook for compatibility
+func (wh *WebhookHandler) Process(ctx context.Context, webhookType string, payload []byte, headers map[string]string) (*WebhookResult, error) {
+	return wh.ProcessWebhook(ctx, webhookType, payload, headers)
+}
+
+// Unregister removes a webhook processor
+func (wh *WebhookHandler) Unregister(webhookType string) {
+	wh.mu.Lock()
+	defer wh.mu.Unlock()
+	delete(wh.handlers, webhookType)
+}

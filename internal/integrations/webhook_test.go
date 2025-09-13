@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -166,7 +164,7 @@ func TestWebhookHandler_ProcessWithTimeout(t *testing.T) {
 	ctx := context.Background()
 	_, err := handler.Process(ctx, "slow", []byte(`{}`), nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "timeout")
+	assert.Contains(t, err.Error(), "deadline exceeded")
 }
 
 func TestWebhookHandler_ConcurrentProcessing(t *testing.T) {

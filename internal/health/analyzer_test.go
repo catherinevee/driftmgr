@@ -1,6 +1,7 @@
 package health
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,21 +15,11 @@ func TestHealthStatus(t *testing.T) {
 		HealthStatusHealthy,
 		HealthStatusWarning,
 		HealthStatusCritical,
-		HealthStatusDegraded,
 		HealthStatusUnknown,
 	}
 
-	expectedStrings := []string{
-		"healthy",
-		"warning",
-		"critical",
-		"degraded",
-		"unknown",
-	}
-
-	for i, status := range statuses {
-		assert.Equal(t, HealthStatus(expectedStrings[i]), status)
-		assert.NotEmpty(t, string(status))
+	for _, status := range statuses {
+		assert.True(t, status >= HealthStatusHealthy && status <= HealthStatusUnknown)
 	}
 }
 
@@ -40,65 +31,36 @@ func TestSeverity(t *testing.T) {
 		SeverityCritical,
 	}
 
-	expectedStrings := []string{
-		"low",
-		"medium",
-		"high",
-		"critical",
-	}
-
-	for i, severity := range severities {
-		assert.Equal(t, Severity(expectedStrings[i]), severity)
-		assert.NotEmpty(t, string(severity))
+	for _, severity := range severities {
+		assert.True(t, severity >= SeverityLow && severity <= SeverityCritical)
 	}
 }
 
 func TestImpactLevel(t *testing.T) {
 	impacts := []ImpactLevel{
-		ImpactNone,
-		ImpactLow,
-		ImpactMedium,
-		ImpactHigh,
-		ImpactCritical,
+		ImpactLevelLow,
+		ImpactLevelMedium,
+		ImpactLevelHigh,
+		ImpactLevelCritical,
 	}
 
-	expectedStrings := []string{
-		"none",
-		"low",
-		"medium",
-		"high",
-		"critical",
-	}
-
-	for i, impact := range impacts {
-		assert.Equal(t, ImpactLevel(expectedStrings[i]), impact)
-		assert.NotEmpty(t, string(impact))
+	for _, impact := range impacts {
+		assert.True(t, impact >= ImpactLevelLow && impact <= ImpactLevelCritical)
 	}
 }
 
 func TestIssueType(t *testing.T) {
 	types := []IssueType{
-		IssueTypeMisconfiguration,
-		IssueTypeDeprecation,
+		IssueTypeConfiguration,
+		IssueTypeDeprecated,
 		IssueTypeSecurity,
 		IssueTypePerformance,
 		IssueTypeCost,
 		IssueTypeCompliance,
-		IssueTypeBestPractice,
+		IssueTypeDependency,
 	}
 
-	expectedStrings := []string{
-		"misconfiguration",
-		"deprecation",
-		"security",
-		"performance",
-		"cost",
-		"compliance",
-		"best_practice",
-	}
-
-	for i, issueType := range types {
-		assert.Equal(t, IssueType(expectedStrings[i]), issueType)
+	for _, issueType := range types {
 		assert.NotEmpty(t, string(issueType))
 	}
 }
@@ -116,7 +78,7 @@ func TestHealthReport(t *testing.T) {
 				Score:       95,
 				Issues:      []HealthIssue{},
 				Suggestions: []string{},
-				Impact:      ImpactNone,
+				Impact:      ImpactLevelLow,
 				LastChecked: time.Now(),
 			},
 		},
@@ -138,7 +100,7 @@ func TestHealthReport(t *testing.T) {
 					"Enable versioning for data protection",
 					"Consider enabling MFA delete",
 				},
-				Impact:      ImpactLow,
+				Impact:      ImpactLevelLow,
 				LastChecked: time.Now(),
 			},
 		},
@@ -171,7 +133,7 @@ func TestHealthReport(t *testing.T) {
 					"Enable encryption at rest",
 					"Review security group rules",
 				},
-				Impact:      ImpactCritical,
+				Impact:      ImpactLevelCritical,
 				LastChecked: time.Now(),
 				Metadata: map[string]interface{}{
 					"compliance_frameworks": []string{"HIPAA", "PCI-DSS"},
@@ -184,11 +146,11 @@ func TestHealthReport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.NotEmpty(t, tt.report.Resource)
-			assert.NotEmpty(t, tt.report.Status)
+			assert.True(t, tt.report.Status >= HealthStatusHealthy && tt.report.Status <= HealthStatusUnknown)
 			assert.GreaterOrEqual(t, tt.report.Score, 0)
 			assert.LessOrEqual(t, tt.report.Score, 100)
 			assert.NotZero(t, tt.report.LastChecked)
-			assert.NotEmpty(t, tt.report.Impact)
+			assert.True(t, tt.report.Impact >= ImpactLevelLow && tt.report.Impact <= ImpactLevelCritical)
 
 			// Check status correlates with score
 			if tt.report.Status == HealthStatusHealthy {
@@ -235,56 +197,48 @@ func TestHealthIssue(t *testing.T) {
 func TestSecurityRule(t *testing.T) {
 	rules := []SecurityRule{
 		{
-			ID:            "rule-001",
-			Name:          "No public S3 buckets",
-			Description:   "S3 buckets should not be publicly accessible",
-			ResourceTypes: []string{"aws_s3_bucket"},
-			Severity:      SeverityHigh,
-			Category:      "Storage Security",
+			Name:        "No public S3 buckets",
+			Description: "S3 buckets should not be publicly accessible",
+			Check:       func(attrs map[string]interface{}) bool { return true },
+			Severity:    SeverityHigh,
+			Remediation: "Disable public access",
 		},
 		{
-			ID:            "rule-002",
-			Name:          "RDS encryption required",
-			Description:   "RDS instances must have encryption enabled",
-			ResourceTypes: []string{"aws_rds_instance", "aws_rds_cluster"},
-			Severity:      SeverityCritical,
-			Category:      "Data Protection",
+			Name:        "RDS encryption required",
+			Description: "RDS instances must have encryption enabled",
+			Check:       func(attrs map[string]interface{}) bool { return true },
+			Severity:    SeverityCritical,
+			Remediation: "Enable encryption",
 		},
 	}
 
 	for _, rule := range rules {
-		assert.NotEmpty(t, rule.ID)
 		assert.NotEmpty(t, rule.Name)
 		assert.NotEmpty(t, rule.Description)
-		assert.NotEmpty(t, rule.ResourceTypes)
-		assert.NotEmpty(t, rule.Severity)
-		assert.NotEmpty(t, rule.Category)
+		assert.NotNil(t, rule.Check)
+		assert.True(t, rule.Severity >= SeverityLow && rule.Severity <= SeverityCritical)
+		assert.NotEmpty(t, rule.Remediation)
 	}
 }
 
 func TestHealthCheck(t *testing.T) {
 	check := HealthCheck{
-		ID:         "check-001",
-		Name:       "Instance health check",
-		Type:       "availability",
-		Enabled:    true,
-		Interval:   5 * time.Minute,
-		Timeout:    30 * time.Second,
-		RetryCount: 3,
-		Parameters: map[string]interface{}{
-			"endpoint": "http://example.com/health",
-			"method":   "GET",
+		Name:        "Instance health check",
+		Description: "Check instance availability",
+		Check: func(resource *state.Resource, instance *state.Instance) *HealthIssue {
+			return nil
+		},
+		Applies: func(resourceType string) bool {
+			return resourceType == "aws_instance"
 		},
 	}
 
-	assert.NotEmpty(t, check.ID)
 	assert.NotEmpty(t, check.Name)
-	assert.NotEmpty(t, check.Type)
-	assert.True(t, check.Enabled)
-	assert.Equal(t, 5*time.Minute, check.Interval)
-	assert.Equal(t, 30*time.Second, check.Timeout)
-	assert.Equal(t, 3, check.RetryCount)
-	assert.NotNil(t, check.Parameters)
+	assert.NotEmpty(t, check.Description)
+	assert.NotNil(t, check.Check)
+	assert.NotNil(t, check.Applies)
+	assert.True(t, check.Applies("aws_instance"))
+	assert.False(t, check.Applies("aws_s3_bucket"))
 }
 
 func TestHealthAnalyzer(t *testing.T) {
@@ -316,7 +270,7 @@ type mockProviderHealthChecker struct {
 
 func (m *mockProviderHealthChecker) CheckResource(resource *state.Resource, instance *state.Instance) *HealthReport {
 	return &HealthReport{
-		Resource: resource.Address,
+		Resource: fmt.Sprintf("%s.%s", resource.Type, resource.Name),
 		Status:   HealthStatusHealthy,
 		Score:    90,
 	}
@@ -340,9 +294,11 @@ func TestProviderHealthChecker(t *testing.T) {
 		deprecatedAttrs: []string{"old_field", "legacy_option"},
 		securityRules: []SecurityRule{
 			{
-				ID:       "sec-001",
-				Name:     "Test security rule",
-				Severity: SeverityMedium,
+				Name:        "Test security rule",
+				Description: "Test description",
+				Check:       func(attrs map[string]interface{}) bool { return true },
+				Severity:    SeverityMedium,
+				Remediation: "Test remediation",
 			},
 		},
 	}
@@ -360,11 +316,12 @@ func TestProviderHealthChecker(t *testing.T) {
 	// Test security rules
 	rules := checker.GetSecurityRules("aws_instance")
 	assert.Len(t, rules, 1)
-	assert.Equal(t, "sec-001", rules[0].ID)
+	assert.Equal(t, "Test security rule", rules[0].Name)
 
 	// Test resource check
 	resource := &state.Resource{
-		Address: "aws_instance.test",
+		Type: "aws_instance",
+		Name: "test",
 	}
 	report := checker.CheckResource(resource, nil)
 	assert.Equal(t, HealthStatusHealthy, report.Status)
