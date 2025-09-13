@@ -124,7 +124,13 @@
       "Bash(do test -d \"internal/$dir\")",
       "Read(//c/c/Users/cathe/OneDrive/Desktop/github/driftmgr/**)",
       "Bash(codecov:*)",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "Bash(./codecov.exe:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(xargs:*)",
+      "Bash(if [ -f test_coverage.out ])",
+      "Bash(else echo \"Coverage file not found\")",
+      "WebSearch"
     ],
     "deny": [],
     "ask": [],
