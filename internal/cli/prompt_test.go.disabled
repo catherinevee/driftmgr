@@ -1,0 +1,614 @@
+package cli
+
+import (
+	"bufio"
+	"bytes"
+	"io"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+// MockReader provides a way to simulate user input
+type MockReader struct {
+	*bufio.Reader
+}
+
+func NewMockReader(input string) *MockReader {
+	return &MockReader{
+		Reader: bufio.NewReader(strings.NewReader(input)),
+	}
+}
+
+func TestNewPrompt(t *testing.T) {
+	prompt := NewPrompt()
+	assert.NotNil(t, prompt)
+	assert.NotNil(t, prompt.reader)
+	assert.NotNil(t, prompt.formatter)
+}
+
+func TestPrompt_Confirm(t *testing.T) {
+	tests := []struct {
+		name       string
+		message    string
+		input      string
+		defaultYes bool
+		expected   bool
+	}{
+		{
+			name:       "Yes with default yes",
+			message:    "Continue?",
+			input:      "y\n",
+			defaultYes: true,
+			expected:   true,
+		},
+		{
+			name:       "Yes full word",
+			message:    "Continue?",
+			input:      "yes\n",
+			defaultYes: false,
+			expected:   true,
+		},
+		{
+			name:       "No with default yes",
+			message:    "Continue?",
+			input:      "n\n",
+			defaultYes: true,
+			expected:   false,
+		},
+		{
+			name:       "No full word",
+			message:    "Continue?",
+			input:      "no\n",
+			defaultYes: false,
+			expected:   false,
+		},
+		{
+			name:       "Empty input with default yes",
+			message:    "Continue?",
+			input:      "\n",
+			defaultYes: true,
+			expected:   true,
+		},
+		{
+			name:       "Empty input with default no",
+			message:    "Continue?",
+			input:      "\n",
+			defaultYes: false,
+			expected:   false,
+		},
+		{
+			name:       "Uppercase Y",
+			message:    "Continue?",
+			input:      "Y\n",
+			defaultYes: false,
+			expected:   true,
+		},
+		{
+			name:       "Uppercase YES",
+			message:    "Continue?",
+			input:      "YES\n",
+			defaultYes: false,
+			expected:   true,
+		},
+		{
+			name:       "Invalid input defaults",
+			message:    "Continue?",
+			input:      "maybe\n",
+			defaultYes: true,
+			expected:   false,
+		},
+		{
+			name:       "Whitespace around input",
+			message:    "Continue?",
+			input:      "  y  \n",
+			defaultYes: false,
+			expected:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			prompt := &Prompt{
+				reader:    bufio.NewReader(strings.NewReader(tt.input)),
+				formatter: NewOutputFormatter(),
+			}
+
+			result := prompt.Confirm(tt.message, tt.defaultYes)
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			var buf bytes.Buffer
+			io.Copy(&buf, r)
+			output := buf.String()
+
+			assert.Equal(t, tt.expected, result)
+			assert.Contains(t, output, tt.message)
+			if tt.defaultYes {
+				assert.Contains(t, output, "[Y/n]")
+			} else {
+				assert.Contains(t, output, "[y/N]")
+			}
+		})
+	}
+}
+
+func TestPrompt_ConfirmWithDetails(t *testing.T) {
+	tests := []struct {
+		name     string
+		message  string
+		details  []string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "Confirm with details - yes",
+			message:  "Apply these changes?",
+			details:  []string{"Change 1", "Change 2", "Change 3"},
+			input:    "y\n",
+			expected: true,
+		},
+		{
+			name:     "Confirm with details - no",
+			message:  "Apply these changes?",
+			details:  []string{"Change 1", "Change 2"},
+			input:    "n\n",
+			expected: false,
+		},
+		{
+			name:     "Confirm with no details",
+			message:  "Continue?",
+			details:  []string{},
+			input:    "y\n",
+			expected: true,
+		},
+		{
+			name:     "Confirm with many details",
+			message:  "Review changes",
+			details:  []string{"Detail 1", "Detail 2", "Detail 3", "Detail 4", "Detail 5"},
+			input:    "yes\n",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			prompt := &Prompt{
+				reader:    bufio.NewReader(strings.NewReader(tt.input)),
+				formatter: NewOutputFormatter(),
+			}
+
+			result := prompt.ConfirmWithDetails(tt.message, tt.details)
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			var buf bytes.Buffer
+			io.Copy(&buf, r)
+			output := buf.String()
+
+			assert.Equal(t, tt.expected, result)
+			assert.Contains(t, output, tt.message)
+			for _, detail := range tt.details {
+				assert.Contains(t, output, detail)
+			}
+		})
+	}
+}
+
+func TestPrompt_Select(t *testing.T) {
+	tests := []struct {
+		name         string
+		prompt       string
+		defaultValue string
+		input        string
+		expected     string
+	}{
+		{
+			name:         "Simple string input",
+			prompt:       "Enter name",
+			defaultValue: "",
+			input:        "John Doe\n",
+			expected:     "John Doe",
+		},
+		{
+			name:         "Empty input with default",
+			prompt:       "Enter name",
+			defaultValue: "Default Name",
+			input:        "\n",
+			expected:     "Default Name",
+		},
+		{
+			name:         "Override default",
+			prompt:       "Enter name",
+			defaultValue: "Default",
+			input:        "Custom\n",
+			expected:     "Custom",
+		},
+		{
+			name:         "Whitespace trimmed",
+			prompt:       "Enter value",
+			defaultValue: "",
+			input:        "  trimmed  \n",
+			expected:     "trimmed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			prompt := &Prompt{
+				reader:    bufio.NewReader(strings.NewReader(tt.input)),
+				formatter: NewOutputFormatter(),
+			}
+
+			// Test Select method instead
+			result, _ := prompt.Select(tt.prompt, []string{"Option 1", "Option 2"})
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			var buf bytes.Buffer
+			io.Copy(&buf, r)
+			output := buf.String()
+
+			assert.Equal(t, tt.expected, result)
+			assert.Contains(t, output, tt.prompt)
+			if tt.defaultValue != "" {
+				assert.Contains(t, output, tt.defaultValue)
+			}
+		})
+	}
+}
+
+func TestPrompt_AskInt(t *testing.T) {
+	tests := []struct {
+		name         string
+		prompt       string
+		defaultValue int
+		input        string
+		expected     int
+	}{
+		{
+			name:         "Valid integer",
+			prompt:       "Enter number",
+			defaultValue: 0,
+			input:        "42\n",
+			expected:     42,
+		},
+		{
+			name:         "Empty input with default",
+			prompt:       "Enter number",
+			defaultValue: 10,
+			input:        "\n",
+			expected:     10,
+		},
+		{
+			name:         "Negative number",
+			prompt:       "Enter number",
+			defaultValue: 0,
+			input:        "-5\n",
+			expected:     -5,
+		},
+		{
+			name:         "Invalid input uses default",
+			prompt:       "Enter number",
+			defaultValue: 5,
+			input:        "abc\n",
+			expected:     5,
+		},
+		{
+			name:         "Large number",
+			prompt:       "Enter number",
+			defaultValue: 0,
+			input:        "999999\n",
+			expected:     999999,
+		},
+		{
+			name:         "Zero",
+			prompt:       "Enter number",
+			defaultValue: 10,
+			input:        "0\n",
+			expected:     0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			prompt := &Prompt{
+				reader:    bufio.NewReader(strings.NewReader(tt.input)),
+				formatter: NewOutputFormatter(),
+			}
+
+			result := prompt.AskInt(tt.prompt, tt.defaultValue)
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			var buf bytes.Buffer
+			io.Copy(&buf, r)
+			output := buf.String()
+
+			assert.Equal(t, tt.expected, result)
+			assert.Contains(t, output, tt.prompt)
+		})
+	}
+}
+
+func TestPrompt_AskChoice(t *testing.T) {
+	tests := []struct {
+		name         string
+		prompt       string
+		choices      []string
+		defaultIndex int
+		input        string
+		expected     int
+	}{
+		{
+			name:         "Select first choice",
+			prompt:       "Select option",
+			choices:      []string{"Option 1", "Option 2", "Option 3"},
+			defaultIndex: 0,
+			input:        "1\n",
+			expected:     0,
+		},
+		{
+			name:         "Select middle choice",
+			prompt:       "Select option",
+			choices:      []string{"Option 1", "Option 2", "Option 3"},
+			defaultIndex: 0,
+			input:        "2\n",
+			expected:     1,
+		},
+		{
+			name:         "Select last choice",
+			prompt:       "Select option",
+			choices:      []string{"Option 1", "Option 2", "Option 3"},
+			defaultIndex: 0,
+			input:        "3\n",
+			expected:     2,
+		},
+		{
+			name:         "Empty input uses default",
+			prompt:       "Select option",
+			choices:      []string{"Option 1", "Option 2", "Option 3"},
+			defaultIndex: 1,
+			input:        "\n",
+			expected:     1,
+		},
+		{
+			name:         "Invalid number uses default",
+			prompt:       "Select option",
+			choices:      []string{"Option 1", "Option 2"},
+			defaultIndex: 0,
+			input:        "5\n",
+			expected:     0,
+		},
+		{
+			name:         "Zero uses default",
+			prompt:       "Select option",
+			choices:      []string{"Option 1", "Option 2"},
+			defaultIndex: 1,
+			input:        "0\n",
+			expected:     1,
+		},
+		{
+			name:         "Non-numeric uses default",
+			prompt:       "Select option",
+			choices:      []string{"Option 1", "Option 2"},
+			defaultIndex: 0,
+			input:        "abc\n",
+			expected:     0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			prompt := &Prompt{
+				reader:    bufio.NewReader(strings.NewReader(tt.input)),
+				formatter: NewOutputFormatter(),
+			}
+
+			result := prompt.AskChoice(tt.prompt, tt.choices, tt.defaultIndex)
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			var buf bytes.Buffer
+			io.Copy(&buf, r)
+			output := buf.String()
+
+			assert.Equal(t, tt.expected, result)
+			assert.Contains(t, output, tt.prompt)
+			for _, choice := range tt.choices {
+				assert.Contains(t, output, choice)
+			}
+		})
+	}
+}
+
+func TestPrompt_AskMultiChoice(t *testing.T) {
+	tests := []struct {
+		name     string
+		prompt   string
+		choices  []string
+		input    string
+		expected []int
+	}{
+		{
+			name:     "Single selection",
+			prompt:   "Select options",
+			choices:  []string{"Option 1", "Option 2", "Option 3"},
+			input:    "1\n",
+			expected: []int{0},
+		},
+		{
+			name:     "Multiple selections",
+			prompt:   "Select options",
+			choices:  []string{"Option 1", "Option 2", "Option 3"},
+			input:    "1,3\n",
+			expected: []int{0, 2},
+		},
+		{
+			name:     "All selections",
+			prompt:   "Select options",
+			choices:  []string{"Option 1", "Option 2", "Option 3"},
+			input:    "1,2,3\n",
+			expected: []int{0, 1, 2},
+		},
+		{
+			name:     "Empty selection",
+			prompt:   "Select options",
+			choices:  []string{"Option 1", "Option 2"},
+			input:    "\n",
+			expected: []int{},
+		},
+		{
+			name:     "Invalid selections filtered",
+			prompt:   "Select options",
+			choices:  []string{"Option 1", "Option 2", "Option 3"},
+			input:    "1,5,2\n",
+			expected: []int{0, 1},
+		},
+		{
+			name:     "Duplicate selections",
+			prompt:   "Select options",
+			choices:  []string{"Option 1", "Option 2"},
+			input:    "1,1,2\n",
+			expected: []int{0, 0, 1},
+		},
+		{
+			name:     "Whitespace in input",
+			prompt:   "Select options",
+			choices:  []string{"Option 1", "Option 2", "Option 3"},
+			input:    " 1 , 2 , 3 \n",
+			expected: []int{0, 1, 2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			prompt := &Prompt{
+				reader:    bufio.NewReader(strings.NewReader(tt.input)),
+				formatter: NewOutputFormatter(),
+			}
+
+			result := prompt.AskMultiChoice(tt.prompt, tt.choices)
+
+			// Restore stdout
+			w.Close()
+			os.Stdout = oldStdout
+
+			// Read captured output
+			var buf bytes.Buffer
+			io.Copy(&buf, r)
+			output := buf.String()
+
+			assert.Equal(t, tt.expected, result)
+			assert.Contains(t, output, tt.prompt)
+			for _, choice := range tt.choices {
+				assert.Contains(t, output, choice)
+			}
+		})
+	}
+}
+
+func TestPrompt_ReadError(t *testing.T) {
+	// Test handling of read errors
+	prompt := &Prompt{
+		reader:    bufio.NewReader(&errorReader{}),
+		formatter: NewOutputFormatter(),
+	}
+
+	// Should return default value on error
+	result := prompt.Confirm("Continue?", true)
+	assert.True(t, result)
+
+	result = prompt.Confirm("Continue?", false)
+	assert.False(t, result)
+}
+
+// errorReader simulates read errors
+type errorReader struct{}
+
+func (r *errorReader) Read(p []byte) (n int, err error) {
+	return 0, io.ErrUnexpectedEOF
+}
+
+func BenchmarkPrompt_Confirm(b *testing.B) {
+	prompt := &Prompt{
+		reader:    bufio.NewReader(strings.NewReader("y\n")),
+		formatter: NewOutputFormatter(),
+	}
+
+	oldStdout := os.Stdout
+	os.Stdout = io.Discard.(*os.File)
+	defer func() { os.Stdout = oldStdout }()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		prompt.reader = bufio.NewReader(strings.NewReader("y\n"))
+		prompt.Confirm("Continue?", false)
+	}
+}
+
+func BenchmarkPrompt_AskChoice(b *testing.B) {
+	prompt := &Prompt{
+		reader:    bufio.NewReader(strings.NewReader("2\n")),
+		formatter: NewOutputFormatter(),
+	}
+
+	choices := []string{"Option 1", "Option 2", "Option 3"}
+
+	oldStdout := os.Stdout
+	os.Stdout = io.Discard.(*os.File)
+	defer func() { os.Stdout = oldStdout }()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		prompt.reader = bufio.NewReader(strings.NewReader("2\n"))
+		prompt.AskChoice("Select", choices, 0)
+	}
+}
