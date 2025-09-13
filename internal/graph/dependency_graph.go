@@ -636,3 +636,51 @@ func (dg *DependencyGraph) GetCriticalPath() []string {
 
 	return path
 }
+
+// AddNode adds a node to the graph (primarily for testing)
+func (dg *DependencyGraph) AddNode(node *ResourceNode) {
+	if dg.nodes == nil {
+		dg.nodes = make(map[string]*ResourceNode)
+	}
+
+	dg.nodes[node.Address] = node
+}
+
+// AddEdge adds an edge between two nodes (primarily for testing)
+func (dg *DependencyGraph) AddEdge(from, to string) {
+	if dg.edges == nil {
+		dg.edges = make(map[string][]string)
+	}
+
+	// Add edge to edges map
+	if !dg.hasEdge(from, to) {
+		dg.edges[from] = append(dg.edges[from], to)
+	}
+
+	// Update node dependencies and dependents
+	if fromNode, exists := dg.nodes[from]; exists {
+		found := false
+		for _, dep := range fromNode.Dependencies {
+			if dep == to {
+				found = true
+				break
+			}
+		}
+		if !found {
+			fromNode.Dependencies = append(fromNode.Dependencies, to)
+		}
+	}
+
+	if toNode, exists := dg.nodes[to]; exists {
+		found := false
+		for _, dep := range toNode.Dependents {
+			if dep == from {
+				found = true
+				break
+			}
+		}
+		if !found {
+			toNode.Dependents = append(toNode.Dependents, from)
+		}
+	}
+}
