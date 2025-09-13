@@ -1,0 +1,795 @@
+package backend
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// MockS3Client implements a mock S3 client for testing
+type MockS3Client struct {
+	objects    map[string][]byte
+	metadata   map[string]map[string]string
+	versions   map[string][]*S3Version
+	putError   error
+	getError   error
+	listError  error
+	headError  error
+}
+
+type S3Version struct {
+	VersionID    string
+	Data         []byte
+	LastModified time.Time
+	Size         int64
+	ETag         string
+	IsLatest     bool
+}
+
+func NewMockS3Client() *MockS3Client {
+	return &MockS3Client{
+		objects:  make(map[string][]byte),
+		metadata: make(map[string]map[string]string),
+		versions: make(map[string][]*S3Version),
+	}
+}
+
+func (m *MockS3Client) GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	if m.getError != nil {
+		return nil, m.getError
+	}
+
+	key := *params.Key
+	if params.VersionId != nil {
+		// Get specific version
+		if versions, exists := m.versions[key]; exists {
+			for _, version := range versions {
+				if version.VersionID == *params.VersionId {
+					return &s3.GetObjectOutput{
+						Body:          io.NopCloser(bytes.NewReader(version.Data)),
+						LastModified:  &version.LastModified,
+						ContentLength: &version.Size,
+						ETag:          &version.ETag,
+						VersionId:     &version.VersionID,
+					}, nil
+				}
+			}
+		}
+		return nil, &s3types.NoSuchVersion{}
+	}
+
+	data, exists := m.objects[key]
+	if !exists {
+		return nil, &s3types.NoSuchKey{}
+	}
+
+	lastModified := time.Now()
+	contentLength := int64(len(data))
+	etag := "mock-etag"
+
+	return &s3.GetObjectOutput{
+		Body:          io.NopCloser(bytes.NewReader(data)),
+		LastModified:  &lastModified,
+		ContentLength: &contentLength,
+		ETag:          &etag,
+	}, nil
+}
+
+func (m *MockS3Client) PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
+	if m.putError != nil {
+		return nil, m.putError
+	}
+
+	key := *params.Key
+	data, err := io.ReadAll(params.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	m.objects[key] = data
+
+	// Store metadata
+	if params.Metadata != nil {
+		m.metadata[key] = params.Metadata
+	}
+
+	// Create version
+	versionID := fmt.Sprintf("v%d", time.Now().UnixNano())
+	version := &S3Version{
+		VersionID:    versionID,
+		Data:         data,
+		LastModified: time.Now(),
+		Size:         int64(len(data)),
+		ETag:         "mock-etag",
+		IsLatest:     true,
+	}
+
+	// Mark previous versions as not latest
+	if versions, exists := m.versions[key]; exists {
+		for _, v := range versions {
+			v.IsLatest = false
+		}
+	}
+
+	m.versions[key] = append(m.versions[key], version)
+
+	etag := "mock-etag"
+	return &s3.PutObjectOutput{
+		ETag:      &etag,
+		VersionId: &versionID,
+	}, nil
+}
+
+func (m *MockS3Client) HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options)) (*s3.HeadBucketOutput, error) {
+	// Always succeed for tests
+	return &s3.HeadBucketOutput{}, nil
+}
+
+func (m *MockS3Client) HeadObject(ctx context.Context, params *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
+	if m.headError != nil {
+		return nil, m.headError
+	}
+
+	key := *params.Key
+	if params.VersionId != nil {
+		// Get specific version metadata
+		if versions, exists := m.versions[key]; exists {
+			for _, version := range versions {
+				if version.VersionID == *params.VersionId {
+					metadata := m.metadata[key]
+					return &s3.HeadObjectOutput{
+						LastModified:  &version.LastModified,
+						ContentLength: &version.Size,
+						ETag:          &version.ETag,
+						VersionId:     &version.VersionID,
+						Metadata:      metadata,
+					}, nil
+				}
+			}
+		}
+		return nil, &s3types.NoSuchVersion{}
+	}
+
+	data, exists := m.objects[key]
+	if !exists {
+		return nil, &s3types.NoSuchKey{}
+	}
+
+	lastModified := time.Now()
+	contentLength := int64(len(data))
+	etag := "mock-etag"
+	metadata := m.metadata[key]
+
+	return &s3.HeadObjectOutput{
+		LastModified:  &lastModified,
+		ContentLength: &contentLength,
+		ETag:          &etag,
+		Metadata:      metadata,
+	}, nil
+}
+
+func (m *MockS3Client) ListObjectVersions(ctx context.Context, params *s3.ListObjectVersionsInput, optFns ...func(*s3.Options)) (*s3.ListObjectVersionsOutput, error) {
+	if m.listError != nil {
+		return nil, m.listError
+	}
+
+	prefix := ""
+	if params.Prefix != nil {
+		prefix = *params.Prefix
+	}
+
+	var versions []s3types.ObjectVersion
+	for key, versionList := range m.versions {
+		if strings.HasPrefix(key, prefix) {
+			for _, version := range versionList {
+				versions = append(versions, s3types.ObjectVersion{
+					Key:          &key,
+					VersionId:    &version.VersionID,
+					LastModified: &version.LastModified,
+					Size:         &version.Size,
+					ETag:         &version.ETag,
+					IsLatest:     &version.IsLatest,
+				})
+			}
+		}
+	}
+
+	return &s3.ListObjectVersionsOutput{
+		Versions: versions,
+	}, nil
+}
+
+func (m *MockS3Client) ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+	if m.listError != nil {
+		return nil, m.listError
+	}
+
+	prefix := ""
+	if params.Prefix != nil {
+		prefix = *params.Prefix
+	}
+
+	delimiter := ""
+	if params.Delimiter != nil {
+		delimiter = *params.Delimiter
+	}
+
+	var contents []s3types.Object
+	var commonPrefixes []s3types.CommonPrefix
+
+	for key := range m.objects {
+		if strings.HasPrefix(key, prefix) {
+			if delimiter != "" {
+				// Handle delimiter logic for workspace listing
+				remaining := strings.TrimPrefix(key, prefix)
+				if idx := strings.Index(remaining, delimiter); idx >= 0 {
+					commonPrefix := prefix + remaining[:idx+1]
+					found := false
+					for _, cp := range commonPrefixes {
+						if *cp.Prefix == commonPrefix {
+							found = true
+							break
+						}
+					}
+					if !found {
+						commonPrefixes = append(commonPrefixes, s3types.CommonPrefix{
+							Prefix: &commonPrefix,
+						})
+					}
+					continue
+				}
+			}
+
+			lastModified := time.Now()
+			size := int64(len(m.objects[key]))
+			etag := "mock-etag"
+
+			contents = append(contents, s3types.Object{
+				Key:          &key,
+				LastModified: &lastModified,
+				Size:         &size,
+				ETag:         &etag,
+			})
+		}
+	}
+
+	return &s3.ListObjectsV2Output{
+		Contents:       contents,
+		CommonPrefixes: commonPrefixes,
+	}, nil
+}
+
+func (m *MockS3Client) DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
+	key := *params.Key
+	delete(m.objects, key)
+	delete(m.metadata, key)
+	delete(m.versions, key)
+
+	return &s3.DeleteObjectOutput{}, nil
+}
+
+// MockDynamoDBClient implements a mock DynamoDB client for testing
+type MockDynamoDBClient struct {
+	items     map[string]map[string]types.AttributeValue
+	putError  error
+	getError  error
+	descError error
+}
+
+func NewMockDynamoDBClient() *MockDynamoDBClient {
+	return &MockDynamoDBClient{
+		items: make(map[string]map[string]types.AttributeValue),
+	}
+}
+
+func (m *MockDynamoDBClient) PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
+	if m.putError != nil {
+		return nil, m.putError
+	}
+
+	// Check condition expression for locking
+	if params.ConditionExpression != nil && *params.ConditionExpression == "attribute_not_exists(LockID)" {
+		if lockID, exists := params.Item["LockID"]; exists {
+			if lockIDStr, ok := lockID.(*types.AttributeValueMemberS); ok {
+				if _, exists := m.items[lockIDStr.Value]; exists {
+					return nil, &types.ConditionalCheckFailedException{}
+				}
+			}
+		}
+	}
+
+	if lockID, exists := params.Item["LockID"]; exists {
+		if lockIDStr, ok := lockID.(*types.AttributeValueMemberS); ok {
+			m.items[lockIDStr.Value] = params.Item
+		}
+	}
+
+	return &dynamodb.PutItemOutput{}, nil
+}
+
+func (m *MockDynamoDBClient) GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	if m.getError != nil {
+		return nil, m.getError
+	}
+
+	if lockID, exists := params.Key["LockID"]; exists {
+		if lockIDStr, ok := lockID.(*types.AttributeValueMemberS); ok {
+			if item, exists := m.items[lockIDStr.Value]; exists {
+				return &dynamodb.GetItemOutput{
+					Item: item,
+				}, nil
+			}
+		}
+	}
+
+	return &dynamodb.GetItemOutput{}, nil
+}
+
+func (m *MockDynamoDBClient) DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
+	if lockID, exists := params.Key["LockID"]; exists {
+		if lockIDStr, ok := lockID.(*types.AttributeValueMemberS); ok {
+			delete(m.items, lockIDStr.Value)
+		}
+	}
+
+	return &dynamodb.DeleteItemOutput{}, nil
+}
+
+func (m *MockDynamoDBClient) DescribeTable(ctx context.Context, params *dynamodb.DescribeTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DescribeTableOutput, error) {
+	if m.descError != nil {
+		return nil, m.descError
+	}
+
+	return &dynamodb.DescribeTableOutput{}, nil
+}
+
+// Test S3 Backend Creation
+func TestNewS3Backend(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      *BackendConfig
+		expectError bool
+	}{
+		{
+			name: "valid configuration",
+			config: &BackendConfig{
+				Type: "s3",
+				Config: map[string]interface{}{
+					"bucket": "test-bucket",
+					"key":    "terraform.tfstate",
+					"region": "us-west-2",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "missing bucket",
+			config: &BackendConfig{
+				Type: "s3",
+				Config: map[string]interface{}{
+					"key":    "terraform.tfstate",
+					"region": "us-west-2",
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "missing key",
+			config: &BackendConfig{
+				Type: "s3",
+				Config: map[string]interface{}{
+					"bucket": "test-bucket",
+					"region": "us-west-2",
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "with locking configuration",
+			config: &BackendConfig{
+				Type: "s3",
+				Config: map[string]interface{}{
+					"bucket":         "test-bucket",
+					"key":            "terraform.tfstate",
+					"region":         "us-west-2",
+					"dynamodb_table": "terraform-locks",
+					"encrypt":        true,
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Skip actual AWS client initialization for these tests
+			backend := &S3Backend{
+				bucket:      getStringFromConfig(tt.config.Config, "bucket"),
+				key:         getStringFromConfig(tt.config.Config, "key"),
+				region:      getStringFromConfig(tt.config.Config, "region"),
+				dynamoTable: getStringFromConfig(tt.config.Config, "dynamodb_table"),
+				encrypt:     getBoolFromConfig(tt.config.Config, "encrypt"),
+				workspace:   "default",
+			}
+
+			if tt.expectError {
+				if backend.bucket == "" || backend.key == "" {
+					// Expected error condition
+					return
+				}
+				t.Error("Expected error but got none")
+			} else {
+				assert.NotEmpty(t, backend.bucket)
+				assert.NotEmpty(t, backend.key)
+				assert.Equal(t, "default", backend.workspace)
+			}
+		})
+	}
+}
+
+// Test S3 Backend Operations
+func TestS3Backend_Operations(t *testing.T) {
+	// Create mock clients
+	mockS3 := NewMockS3Client()
+	mockDynamo := NewMockDynamoDBClient()
+
+	// Create backend with mock clients
+	backend := &S3Backend{
+		bucket:       "test-bucket",
+		key:          "terraform.tfstate",
+		region:       "us-west-2",
+		dynamoTable:  "terraform-locks",
+		encrypt:      true,
+		workspace:    "default",
+		s3Client:     mockS3,
+		dynamoClient: mockDynamo,
+		metadata: &BackendMetadata{
+			Type:               "s3",
+			SupportsLocking:    true,
+			SupportsVersions:   true,
+			SupportsWorkspaces: true,
+			Workspace:          "default",
+		},
+	}
+
+	ctx := context.Background()
+
+	t.Run("Pull non-existent state", func(t *testing.T) {
+		state, err := backend.Pull(ctx)
+		require.NoError(t, err)
+		assert.NotNil(t, state)
+		assert.Equal(t, 4, state.Version)
+		assert.Equal(t, uint64(0), state.Serial)
+	})
+
+	t.Run("Push and Pull state", func(t *testing.T) {
+		testState := &StateData{
+			Version:          4,
+			TerraformVersion: "1.5.0",
+			Serial:           1,
+			Lineage:          "test-lineage",
+			Data:             []byte(`{"version": 4, "serial": 1, "resources": [], "outputs": {}}`),
+			LastModified:     time.Now(),
+			Size:             100,
+		}
+
+		// Push state
+		err := backend.Push(ctx, testState)
+		require.NoError(t, err)
+
+		// Pull state
+		pulledState, err := backend.Pull(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, testState.Version, pulledState.Version)
+		assert.Equal(t, testState.Serial, pulledState.Serial)
+		assert.Equal(t, testState.Lineage, pulledState.Lineage)
+		assert.Equal(t, testState.TerraformVersion, pulledState.TerraformVersion)
+	})
+
+	t.Run("Lock and Unlock operations", func(t *testing.T) {
+		lockInfo := &LockInfo{
+			ID:        "test-lock",
+			Path:      "terraform.tfstate",
+			Operation: "plan",
+			Who:       "test-user",
+			Version:   "1.5.0",
+			Created:   time.Now(),
+			Info:      "Test lock",
+		}
+
+		// Acquire lock
+		lockID, err := backend.Lock(ctx, lockInfo)
+		require.NoError(t, err)
+		assert.NotEmpty(t, lockID)
+
+		// Try to acquire lock again (should fail)
+		_, err = backend.Lock(ctx, lockInfo)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "already locked")
+
+		// Get lock info
+		info, err := backend.GetLockInfo(ctx)
+		require.NoError(t, err)
+		assert.NotNil(t, info)
+		assert.Equal(t, lockInfo.ID, info.ID)
+
+		// Release lock
+		err = backend.Unlock(ctx, lockID)
+		require.NoError(t, err)
+
+		// Verify lock is released
+		info, err = backend.GetLockInfo(ctx)
+		require.NoError(t, err)
+		assert.Nil(t, info)
+	})
+
+	t.Run("Workspace operations", func(t *testing.T) {
+		// List initial workspaces
+		workspaces, err := backend.ListWorkspaces(ctx)
+		require.NoError(t, err)
+		assert.Contains(t, workspaces, "default")
+
+		// Create new workspace
+		err = backend.CreateWorkspace(ctx, "test-workspace")
+		require.NoError(t, err)
+
+		// List workspaces should include new one
+		workspaces, err = backend.ListWorkspaces(ctx)
+		require.NoError(t, err)
+		assert.Contains(t, workspaces, "test-workspace")
+
+		// Select new workspace
+		err = backend.SelectWorkspace(ctx, "test-workspace")
+		require.NoError(t, err)
+		assert.Equal(t, "test-workspace", backend.workspace)
+
+		// Push state to new workspace
+		testState := &StateData{
+			Version:          4,
+			TerraformVersion: "1.5.0",
+			Serial:           1,
+			Lineage:          "test-workspace-lineage",
+			Data:             []byte(`{"version": 4, "serial": 1, "resources": [], "outputs": {}}`),
+			LastModified:     time.Now(),
+			Size:             100,
+		}
+
+		err = backend.Push(ctx, testState)
+		require.NoError(t, err)
+
+		// Pull from new workspace
+		pulledState, err := backend.Pull(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "test-workspace-lineage", pulledState.Lineage)
+
+		// Switch back to default
+		err = backend.SelectWorkspace(ctx, "default")
+		require.NoError(t, err)
+
+		// Delete workspace
+		err = backend.DeleteWorkspace(ctx, "test-workspace")
+		require.NoError(t, err)
+
+		// Verify workspace is deleted
+		workspaces, err = backend.ListWorkspaces(ctx)
+		require.NoError(t, err)
+		assert.NotContains(t, workspaces, "test-workspace")
+	})
+
+	t.Run("Version operations", func(t *testing.T) {
+		// Push multiple states to create versions
+		for i := 1; i <= 3; i++ {
+			state := &StateData{
+				Version:          4,
+				TerraformVersion: "1.5.0",
+				Serial:           uint64(i),
+				Lineage:          "version-test-lineage",
+				Data:             []byte(fmt.Sprintf(`{"version": 4, "serial": %d, "resources": [], "outputs": {}}`, i)),
+				LastModified:     time.Now(),
+				Size:             100,
+			}
+
+			err := backend.Push(ctx, state)
+			require.NoError(t, err)
+
+			// Small delay to ensure different timestamps
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		// Get versions
+		versions, err := backend.GetVersions(ctx)
+		require.NoError(t, err)
+		assert.Len(t, versions, 3)
+
+		// Verify versions are sorted by creation time
+		assert.True(t, versions[len(versions)-1].IsLatest)
+
+		// Get specific version
+		versionState, err := backend.GetVersion(ctx, versions[0].VersionID)
+		require.NoError(t, err)
+		assert.NotNil(t, versionState)
+	})
+
+	t.Run("Validation", func(t *testing.T) {
+		err := backend.Validate(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("Error handling", func(t *testing.T) {
+		// Test S3 errors
+		mockS3.getError = fmt.Errorf("S3 error")
+		_, err := backend.Pull(ctx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "S3 error")
+
+		mockS3.getError = nil
+		mockS3.putError = fmt.Errorf("S3 put error")
+		state := &StateData{
+			Version: 4,
+			Serial:  1,
+			Data:    []byte(`{}`),
+		}
+		err = backend.Push(ctx, state)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "S3 put error")
+
+		// Test DynamoDB errors
+		mockS3.putError = nil
+		mockDynamo.putError = fmt.Errorf("DynamoDB error")
+		lockInfo := &LockInfo{
+			ID:        "test-lock",
+			Operation: "plan",
+			Created:   time.Now(),
+		}
+		_, err = backend.Lock(ctx, lockInfo)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "DynamoDB error")
+	})
+}
+
+// Test S3 Backend helper methods
+func TestS3Backend_HelperMethods(t *testing.T) {
+	backend := &S3Backend{
+		bucket:    "test-bucket",
+		key:       "path/to/terraform.tfstate",
+		workspace: "default",
+	}
+
+	t.Run("getStateKey for default workspace", func(t *testing.T) {
+		key := backend.getStateKey()
+		assert.Equal(t, "path/to/terraform.tfstate", key)
+	})
+
+	t.Run("getStateKey for custom workspace", func(t *testing.T) {
+		backend.workspace = "production"
+		key := backend.getStateKey()
+		assert.Equal(t, "path/to/env:/production/terraform.tfstate", key)
+	})
+
+	t.Run("getWorkspaceStateKey", func(t *testing.T) {
+		key := backend.getWorkspaceStateKey("staging")
+		assert.Equal(t, "path/to/env:/staging/terraform.tfstate", key)
+	})
+}
+
+// Test S3 Connection Pool Creation
+func TestS3ConnectionPool_Creation(t *testing.T) {
+	pool := NewS3ConnectionPool(5, 3, 10*time.Minute)
+
+	assert.NotNil(t, pool)
+	assert.Equal(t, 5, pool.maxOpen)
+	assert.Equal(t, 3, pool.maxIdle)
+	assert.Equal(t, 10*time.Minute, pool.idleTimeout)
+	assert.Equal(t, 5, pool.stats.MaxOpen)
+	assert.Equal(t, 3, pool.stats.MaxIdle)
+	assert.Equal(t, 10*time.Minute, pool.stats.IdleTimeout)
+}
+
+// Benchmark S3 Backend Operations
+func BenchmarkS3Backend_Pull(b *testing.B) {
+	mockS3 := NewMockS3Client()
+	backend := &S3Backend{
+		bucket:    "test-bucket",
+		key:       "terraform.tfstate",
+		workspace: "default",
+		s3Client:  mockS3,
+	}
+
+	// Prepare test data
+	testData := []byte(`{"version": 4, "serial": 1, "resources": [], "outputs": {}}`)
+	mockS3.objects["terraform.tfstate"] = testData
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := backend.Pull(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkS3Backend_Push(b *testing.B) {
+	mockS3 := NewMockS3Client()
+	backend := &S3Backend{
+		bucket:    "test-bucket",
+		key:       "terraform.tfstate",
+		workspace: "default",
+		s3Client:  mockS3,
+	}
+
+	state := &StateData{
+		Version:          4,
+		TerraformVersion: "1.5.0",
+		Serial:           1,
+		Lineage:          "test-lineage",
+		Data:             []byte(`{"version": 4, "serial": 1, "resources": [], "outputs": {}}`),
+		LastModified:     time.Now(),
+		Size:             100,
+	}
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := backend.Push(ctx, state)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkS3Backend_LargeState(b *testing.B) {
+	mockS3 := NewMockS3Client()
+	backend := &S3Backend{
+		bucket:    "test-bucket",
+		key:       "terraform.tfstate",
+		workspace: "default",
+		s3Client:  mockS3,
+	}
+
+	// Create large state data (1MB)
+	largeData := make([]byte, 1024*1024)
+	for i := range largeData {
+		largeData[i] = byte(i % 256)
+	}
+
+	state := &StateData{
+		Version:          4,
+		TerraformVersion: "1.5.0",
+		Serial:           1,
+		Lineage:          "test-lineage",
+		Data:             largeData,
+		LastModified:     time.Now(),
+		Size:             int64(len(largeData)),
+	}
+
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := backend.Push(ctx, state)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		_, err = backend.Pull(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}

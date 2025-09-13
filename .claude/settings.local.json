@@ -119,7 +119,10 @@
       "Bash(awk:*)",
       "Bash(if [ -f coverage.out ])",
       "Bash(then echo \"Coverage file exists\")",
-      "Bash(else echo \"No coverage file\")"
+      "Bash(else echo \"No coverage file\")",
+      "Bash(while read dir)",
+      "Bash(do test -d \"internal/$dir\")",
+      "Read(//c/c/Users/cathe/OneDrive/Desktop/github/driftmgr/**)"
     ],
     "deny": [],
     "ask": [],

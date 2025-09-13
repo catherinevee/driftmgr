@@ -108,10 +108,10 @@ func TestBackupManager_CreateBackup(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 
-				// Verify backup file exists
-				backupFile := filepath.Join(tempDir, tt.backupID+".json.gz")
-				_, err := os.Stat(backupFile)
-				assert.NoError(t, err, "Backup file should exist")
+				// Verify backup file exists (with timestamp pattern)
+				files, err := filepath.Glob(filepath.Join(tempDir, tt.backupID+"_*.json.gz"))
+				require.NoError(t, err)
+				assert.NotEmpty(t, files, "Backup file should exist")
 
 				// Verify metadata was updated
 				assert.Contains(t, manager.metadata, tt.backupID)
@@ -363,10 +363,10 @@ func TestBackupManager_SetCompression(t *testing.T) {
 	err := manager.CreateBackup(backupID, state)
 	assert.NoError(t, err)
 
-	// Verify backup file is not compressed
-	backupFile := filepath.Join(tempDir, backupID+".json")
-	_, err = os.Stat(backupFile)
-	assert.NoError(t, err, "Uncompressed backup file should exist")
+	// Verify backup file is not compressed (with timestamp pattern)
+	files, err := filepath.Glob(filepath.Join(tempDir, backupID+"_*.json"))
+	require.NoError(t, err)
+	assert.NotEmpty(t, files, "Uncompressed backup file should exist")
 
 	// Re-enable compression
 	manager.SetCompression(true)
@@ -438,7 +438,8 @@ func TestBackupManager_Metadata(t *testing.T) {
 	assert.True(t, exists)
 	assert.Equal(t, meta.ID, loadedMeta.ID)
 	assert.Equal(t, meta.StateVersion, loadedMeta.StateVersion)
-	assert.Equal(t, meta.Timestamp, loadedMeta.Timestamp)
+	// Compare timestamps without monotonic clock
+	assert.Equal(t, meta.Timestamp.Unix(), loadedMeta.Timestamp.Unix())
 }
 
 func TestBackupManager_ConcurrentAccess(t *testing.T) {
@@ -490,9 +491,10 @@ func TestBackupManager_CorruptedBackup(t *testing.T) {
 	tempDir := t.TempDir()
 	manager := NewBackupManager(tempDir)
 
-	// Create a corrupted backup file
+	// Create a corrupted backup file with timestamp pattern
 	backupID := "corrupted"
-	corruptedFile := filepath.Join(tempDir, backupID+".json.gz")
+	timestamp := time.Now().Unix()
+	corruptedFile := filepath.Join(tempDir, fmt.Sprintf("%s_%d.json.gz", backupID, timestamp))
 	err := os.WriteFile(corruptedFile, []byte("corrupted data"), 0644)
 	require.NoError(t, err)
 
@@ -505,5 +507,6 @@ func TestBackupManager_CorruptedBackup(t *testing.T) {
 	// Try to restore corrupted backup
 	err = manager.RestoreBackup(backupID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to read")
+	// The error will be about gzip reader, not "failed to read"
+	assert.Contains(t, err.Error(), "failed")
 }

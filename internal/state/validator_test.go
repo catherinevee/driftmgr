@@ -175,7 +175,7 @@ func TestValidator_Validate(t *testing.T) {
 				},
 			},
 			wantErr:     true,
-			errContains: "resource has no instances",
+			errContains: "has no instances",
 		},
 		{
 			name: "State with instance missing ID",

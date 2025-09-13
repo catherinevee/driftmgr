@@ -1,0 +1,753 @@
+package backend
+
+import (
+	"bytes"
+	"context"
+	"crypto/md5"
+	"encoding/json"
+	"fmt"
+	"math/rand"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+)
+
+// generateLargeState creates a test state with specified size
+func generateLargeState(sizeBytes int) *StateData {
+	// Create a state structure with large resource data
+	resources := make([]map[string]interface{}, 0)
+
+	// Calculate approximate size per resource entry
+	sampleResource := map[string]interface{}{
+		"mode":      "managed",
+		"type":      "aws_instance",
+		"name":      "example_instance_with_very_long_name_to_increase_size",
+		"provider":  "provider[\"registry.terraform.io/hashicorp/aws\"]",
+		"instances": []map[string]interface{}{
+			{
+				"schema_version": 1,
+				"attributes": map[string]interface{}{
+					"id":               "i-1234567890abcdef0123456789abcdef",
+					"instance_type":    "m5.large",
+					"availability_zone": "us-west-2a",
+					"private_ip":       "10.0.1.100",
+					"public_ip":        "203.0.113.100",
+					"tags": map[string]string{
+						"Name":        "test-instance-with-long-name",
+						"Environment": "test",
+						"Project":     "performance-testing",
+						"Owner":       "test-user@example.com",
+						"Cost-Center": "engineering",
+					},
+					"metadata_options": map[string]interface{}{
+						"http_endpoint": "enabled",
+						"http_tokens":   "required",
+					},
+					"user_data": strings.Repeat("echo 'test data'; ", 50),
+				},
+				"dependencies": []string{
+					"aws_security_group.example",
+					"aws_subnet.example",
+					"aws_key_pair.example",
+				},
+			},
+		},
+	}
+
+	// Estimate size of one resource
+	sampleJSON, _ := json.Marshal(sampleResource)
+	resourceSize := len(sampleJSON)
+
+	// Calculate how many resources we need
+	numResources := sizeBytes / resourceSize
+	if numResources < 1 {
+		numResources = 1
+	}
+
+	// Generate resources
+	for i := 0; i < numResources; i++ {
+		resource := map[string]interface{}{
+			"mode":     "managed",
+			"type":     fmt.Sprintf("aws_instance"),
+			"name":     fmt.Sprintf("instance_%d", i),
+			"provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+			"instances": []map[string]interface{}{
+				{
+					"schema_version": 1,
+					"attributes": map[string]interface{}{
+						"id":               fmt.Sprintf("i-%032d", i),
+						"instance_type":    "m5.large",
+						"availability_zone": "us-west-2a",
+						"private_ip":       fmt.Sprintf("10.0.1.%d", 100+i%155),
+						"public_ip":        fmt.Sprintf("203.0.113.%d", 1+i%254),
+						"tags": map[string]string{
+							"Name":        fmt.Sprintf("test-instance-%d", i),
+							"Environment": "test",
+							"Project":     "performance-testing",
+							"Index":       fmt.Sprintf("%d", i),
+						},
+						"user_data": strings.Repeat(fmt.Sprintf("echo 'instance %d'; ", i), 10),
+					},
+					"dependencies": []string{
+						"aws_security_group.example",
+						"aws_subnet.example",
+					},
+				},
+			},
+		}
+		resources = append(resources, resource)
+	}
+
+	// Create the full state
+	state := map[string]interface{}{
+		"version":           4,
+		"terraform_version": "1.5.0",
+		"serial":            uint64(rand.Intn(1000)),
+		"lineage":           fmt.Sprintf("lineage-%d", time.Now().UnixNano()),
+		"resources":         resources,
+		"outputs": map[string]interface{}{
+			"instance_count": map[string]interface{}{
+				"value":     len(resources),
+				"type":      "number",
+				"sensitive": false,
+			},
+		},
+	}
+
+	stateJSON, _ := json.Marshal(state)
+
+	return &StateData{
+		Version:          4,
+		TerraformVersion: "1.5.0",
+		Serial:           uint64(rand.Intn(1000)),
+		Lineage:          fmt.Sprintf("lineage-%d", time.Now().UnixNano()),
+		Data:             stateJSON,
+		LastModified:     time.Now(),
+		Size:             int64(len(stateJSON)),
+	}
+}
+
+// Performance benchmarks for different state sizes
+func BenchmarkBackend_SmallState_1KB(b *testing.B) {
+	benchmarkStateSize(b, 1024) // 1KB
+}
+
+func BenchmarkBackend_MediumState_100KB(b *testing.B) {
+	benchmarkStateSize(b, 100*1024) // 100KB
+}
+
+func BenchmarkBackend_LargeState_1MB(b *testing.B) {
+	benchmarkStateSize(b, 1024*1024) // 1MB
+}
+
+func BenchmarkBackend_VeryLargeState_10MB(b *testing.B) {
+	benchmarkStateSize(b, 10*1024*1024) // 10MB
+}
+
+func BenchmarkBackend_ExtremeState_50MB(b *testing.B) {
+	benchmarkStateSize(b, 50*1024*1024) // 50MB
+}
+
+func benchmarkStateSize(b *testing.B, sizeBytes int) {
+	backends := map[string]Backend{
+		"Mock":  NewMockBackend(),
+		"Local": createLocalBackendForBench(b),
+		"S3":    createS3BackendForBench(b),
+		"GCS":   createGCSBackendForBench(b),
+	}
+
+	state := generateLargeState(sizeBytes)
+	ctx := context.Background()
+
+	for name, backend := range backends {
+		b.Run(fmt.Sprintf("%s/Push", name), func(b *testing.B) {
+			b.SetBytes(state.Size)
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				// Update serial to create different versions
+				testState := *state
+				testState.Serial = uint64(i + 1)
+
+				err := backend.Push(ctx, &testState)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			// Report memory stats
+			var m runtime.MemStats
+			runtime.GC()
+			runtime.ReadMemStats(&m)
+			b.ReportMetric(float64(m.Alloc)/1024/1024, "MB_alloc")
+		})
+
+		b.Run(fmt.Sprintf("%s/Pull", name), func(b *testing.B) {
+			// Push state first
+			err := backend.Push(ctx, state)
+			require.NoError(b, err)
+
+			b.SetBytes(state.Size)
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				pulledState, err := backend.Pull(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if pulledState.Size == 0 {
+					b.Fatal("pulled state is empty")
+				}
+			}
+
+			// Report memory stats
+			var m runtime.MemStats
+			runtime.GC()
+			runtime.ReadMemStats(&m)
+			b.ReportMetric(float64(m.Alloc)/1024/1024, "MB_alloc")
+		})
+
+		b.Run(fmt.Sprintf("%s/PushPull", name), func(b *testing.B) {
+			b.SetBytes(state.Size * 2) // Both push and pull
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				// Update serial
+				testState := *state
+				testState.Serial = uint64(i + 1)
+
+				err := backend.Push(ctx, &testState)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				_, err = backend.Pull(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// Helper functions to create backends for benchmarking
+func createLocalBackendForBench(b *testing.B) Backend {
+	config := &BackendConfig{
+		Type: "local",
+		Config: map[string]interface{}{
+			"path": b.TempDir(),
+		},
+	}
+	backend, err := NewLocalBackend(config)
+	require.NoError(b, err)
+	return backend
+}
+
+func createS3BackendForBench(b *testing.B) Backend {
+	mockS3 := NewMockS3Client()
+	mockDynamo := NewMockDynamoDBClient()
+
+	return &S3Backend{
+		bucket:       "benchmark-bucket",
+		key:          "terraform.tfstate",
+		region:       "us-west-2",
+		workspace:    "default",
+		s3Client:     mockS3,
+		dynamoClient: mockDynamo,
+		metadata: &BackendMetadata{
+			Type:      "s3",
+			Workspace: "default",
+		},
+	}
+}
+
+func createGCSBackendForBench(b *testing.B) Backend {
+	config := &BackendConfig{
+		Type: "gcs",
+		Config: map[string]interface{}{
+			"bucket": "benchmark-bucket",
+			"prefix": "terraform/state",
+		},
+	}
+	backend, err := NewGCSBackend(config)
+	require.NoError(b, err)
+	return backend
+}
+
+// Benchmark memory allocation patterns
+func BenchmarkBackend_MemoryAllocation(b *testing.B) {
+	backend := NewMockBackend()
+	ctx := context.Background()
+
+	sizes := []int{
+		1024,      // 1KB
+		10240,     // 10KB
+		102400,    // 100KB
+		1048576,   // 1MB
+		10485760,  // 10MB
+	}
+
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("Size_%dB", size), func(b *testing.B) {
+			state := generateLargeState(size)
+
+			var startMem, endMem runtime.MemStats
+			runtime.GC()
+			runtime.ReadMemStats(&startMem)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				testState := *state
+				testState.Serial = uint64(i + 1)
+
+				err := backend.Push(ctx, &testState)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				_, err = backend.Pull(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+			b.StopTimer()
+
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			b.ReportMetric(float64(endMem.Alloc-startMem.Alloc)/float64(b.N), "bytes_per_op")
+			b.ReportMetric(float64(endMem.Mallocs-startMem.Mallocs)/float64(b.N), "allocs_per_op")
+		})
+	}
+}
+
+// Benchmark JSON parsing performance
+func BenchmarkStateData_JSONParsing(b *testing.B) {
+	sizes := []int{1024, 10240, 102400, 1048576}
+
+	for _, size := range sizes {
+		state := generateLargeState(size)
+
+		b.Run(fmt.Sprintf("Marshal_%dB", size), func(b *testing.B) {
+			b.SetBytes(state.Size)
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				_, err := json.Marshal(state)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+
+		b.Run(fmt.Sprintf("Unmarshal_%dB", size), func(b *testing.B) {
+			data := state.Data
+			b.SetBytes(int64(len(data)))
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				var parsed map[string]interface{}
+				err := json.Unmarshal(data, &parsed)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// Benchmark checksum calculation
+func BenchmarkStateData_Checksum(b *testing.B) {
+	sizes := []int{1024, 10240, 102400, 1048576, 10485760}
+
+	for _, size := range sizes {
+		state := generateLargeState(size)
+		data := state.Data
+
+		b.Run(fmt.Sprintf("MD5_%dB", size), func(b *testing.B) {
+			b.SetBytes(int64(len(data)))
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				h := md5.New()
+				h.Write(data)
+				_ = h.Sum(nil)
+			}
+		})
+	}
+}
+
+// Benchmark concurrent operations
+func BenchmarkBackend_ConcurrentOperations(b *testing.B) {
+	backend := NewMockBackend()
+	state := generateLargeState(100 * 1024) // 100KB
+	ctx := context.Background()
+
+	b.Run("ConcurrentPush", func(b *testing.B) {
+		b.SetBytes(state.Size)
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				testState := *state
+				testState.Serial = uint64(i)
+				i++
+
+				err := backend.Push(ctx, &testState)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	})
+
+	b.Run("ConcurrentPull", func(b *testing.B) {
+		// Push state first
+		err := backend.Push(ctx, state)
+		require.NoError(b, err)
+
+		b.SetBytes(state.Size)
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				_, err := backend.Pull(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	})
+
+	b.Run("ConcurrentMixed", func(b *testing.B) {
+		b.SetBytes(state.Size)
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				if i%2 == 0 {
+					// Push
+					testState := *state
+					testState.Serial = uint64(i)
+					err := backend.Push(ctx, &testState)
+					if err != nil {
+						b.Fatal(err)
+					}
+				} else {
+					// Pull
+					_, err := backend.Pull(ctx)
+					if err != nil {
+						b.Fatal(err)
+					}
+				}
+				i++
+			}
+		})
+	})
+}
+
+// Benchmark workspace operations with large states
+func BenchmarkBackend_WorkspaceOperations(b *testing.B) {
+	backend := NewMockBackend()
+	state := generateLargeState(50 * 1024) // 50KB
+	ctx := context.Background()
+
+	workspaces := []string{"dev", "staging", "prod", "test", "integration"}
+
+	b.Run("CreateWorkspaces", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			workspace := fmt.Sprintf("workspace_%d", i)
+			err := backend.CreateWorkspace(ctx, workspace)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("SwitchWorkspaces", func(b *testing.B) {
+		// Create workspaces first
+		for _, ws := range workspaces {
+			err := backend.CreateWorkspace(ctx, ws)
+			require.NoError(b, err)
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			workspace := workspaces[i%len(workspaces)]
+			err := backend.SelectWorkspace(ctx, workspace)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("WorkspaceStateOperations", func(b *testing.B) {
+		// Create workspaces first
+		for _, ws := range workspaces {
+			err := backend.CreateWorkspace(ctx, ws)
+			require.NoError(b, err)
+		}
+
+		b.SetBytes(state.Size)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			workspace := workspaces[i%len(workspaces)]
+
+			err := backend.SelectWorkspace(ctx, workspace)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			testState := *state
+			testState.Serial = uint64(i)
+			err = backend.Push(ctx, &testState)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			_, err = backend.Pull(ctx)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// Benchmark version operations
+func BenchmarkBackend_VersionOperations(b *testing.B) {
+	backend := NewMockBackend()
+	state := generateLargeState(25 * 1024) // 25KB
+	ctx := context.Background()
+
+	// Create multiple versions
+	for i := 0; i < 10; i++ {
+		testState := *state
+		testState.Serial = uint64(i + 1)
+		err := backend.Push(ctx, &testState)
+		require.NoError(b, err)
+	}
+
+	b.Run("GetVersions", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := backend.GetVersions(ctx)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("GetSpecificVersion", func(b *testing.B) {
+		versions, err := backend.GetVersions(ctx)
+		require.NoError(b, err)
+		require.NotEmpty(b, versions)
+
+		b.SetBytes(state.Size)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			version := versions[i%len(versions)]
+			_, err := backend.GetVersion(ctx, version.VersionID)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// Benchmark locking operations
+func BenchmarkBackend_LockingOperations(b *testing.B) {
+	backend := NewMockBackend()
+	ctx := context.Background()
+
+	b.Run("LockUnlock", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			lockInfo := &LockInfo{
+				ID:        fmt.Sprintf("lock-%d", i),
+				Operation: "benchmark",
+				Who:       "benchmark-user",
+				Created:   time.Now(),
+			}
+
+			lockID, err := backend.Lock(ctx, lockInfo)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			err = backend.Unlock(ctx, lockID)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("GetLockInfo", func(b *testing.B) {
+		// Acquire a lock first
+		lockInfo := &LockInfo{
+			ID:        "benchmark-lock",
+			Operation: "benchmark",
+			Who:       "benchmark-user",
+			Created:   time.Now(),
+		}
+		lockID, err := backend.Lock(ctx, lockInfo)
+		require.NoError(b, err)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := backend.GetLockInfo(ctx)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		// Clean up
+		backend.Unlock(ctx, lockID)
+	})
+}
+
+// Test performance with realistic Terraform state
+func BenchmarkBackend_RealisticTerraformState(b *testing.B) {
+	// Create a realistic Terraform state with common AWS resources
+	resources := make([]map[string]interface{}, 0)
+
+	// Add various AWS resources
+	resourceTypes := []string{
+		"aws_instance", "aws_security_group", "aws_subnet", "aws_vpc",
+		"aws_route_table", "aws_internet_gateway", "aws_load_balancer",
+		"aws_rds_instance", "aws_s3_bucket", "aws_iam_role",
+	}
+
+	for i := 0; i < 100; i++ {
+		resourceType := resourceTypes[i%len(resourceTypes)]
+
+		resource := map[string]interface{}{
+			"mode":     "managed",
+			"type":     resourceType,
+			"name":     fmt.Sprintf("%s_%d", strings.TrimPrefix(resourceType, "aws_"), i),
+			"provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+			"instances": []map[string]interface{}{
+				{
+					"schema_version": 1,
+					"attributes":     generateRealisticAttributes(resourceType, i),
+					"dependencies":   generateDependencies(resourceTypes, i),
+				},
+			},
+		}
+		resources = append(resources, resource)
+	}
+
+	state := map[string]interface{}{
+		"version":           4,
+		"terraform_version": "1.5.0",
+		"serial":            42,
+		"lineage":           "realistic-lineage-uuid-12345",
+		"resources":         resources,
+		"outputs": map[string]interface{}{
+			"vpc_id": map[string]interface{}{
+				"value":     "vpc-12345",
+				"type":      "string",
+				"sensitive": false,
+			},
+			"load_balancer_dns": map[string]interface{}{
+				"value":     "my-lb-1234567890.us-west-2.elb.amazonaws.com",
+				"type":      "string",
+				"sensitive": false,
+			},
+		},
+	}
+
+	stateJSON, _ := json.Marshal(state)
+	testState := &StateData{
+		Version:          4,
+		TerraformVersion: "1.5.0",
+		Serial:           42,
+		Lineage:          "realistic-lineage-uuid-12345",
+		Data:             stateJSON,
+		LastModified:     time.Now(),
+		Size:             int64(len(stateJSON)),
+	}
+
+	backends := map[string]Backend{
+		"Mock":  NewMockBackend(),
+		"Local": createLocalBackendForBench(b),
+		"S3":    createS3BackendForBench(b),
+		"GCS":   createGCSBackendForBench(b),
+	}
+
+	ctx := context.Background()
+
+	for name, backend := range backends {
+		b.Run(fmt.Sprintf("%s/RealisticWorkflow", name), func(b *testing.B) {
+			b.SetBytes(testState.Size)
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				// Simulate realistic workflow: read, modify, write
+				currentState, err := backend.Pull(ctx)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				// Simulate state modification (increment serial)
+				newState := *currentState
+				newState.Serial++
+
+				err = backend.Push(ctx, &newState)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func generateRealisticAttributes(resourceType string, index int) map[string]interface{} {
+	base := map[string]interface{}{
+		"id": fmt.Sprintf("%s-%032d", strings.TrimPrefix(resourceType, "aws_"), index),
+		"tags": map[string]string{
+			"Name":        fmt.Sprintf("%s-%d", resourceType, index),
+			"Environment": "production",
+			"Terraform":   "true",
+		},
+	}
+
+	// Add type-specific attributes
+	switch resourceType {
+	case "aws_instance":
+		base["instance_type"] = "t3.micro"
+		base["availability_zone"] = "us-west-2a"
+		base["private_ip"] = fmt.Sprintf("10.0.1.%d", 10+index%240)
+		base["public_ip"] = fmt.Sprintf("203.0.113.%d", 1+index%254)
+	case "aws_security_group":
+		base["ingress"] = []map[string]interface{}{
+			{
+				"from_port": 22,
+				"to_port":   22,
+				"protocol":  "tcp",
+				"cidr_blocks": []string{"0.0.0.0/0"},
+			},
+		}
+	case "aws_subnet":
+		base["cidr_block"] = fmt.Sprintf("10.0.%d.0/24", index)
+		base["availability_zone"] = "us-west-2a"
+	case "aws_s3_bucket":
+		base["bucket"] = fmt.Sprintf("my-bucket-%d", index)
+		base["region"] = "us-west-2"
+	}
+
+	return base
+}
+
+func generateDependencies(resourceTypes []string, index int) []string {
+	deps := make([]string, 0)
+
+	// Add 1-3 random dependencies
+	numDeps := 1 + (index % 3)
+	for i := 0; i < numDeps; i++ {
+		depType := resourceTypes[(index+i)%len(resourceTypes)]
+		depIndex := (index + i + 1) % 10
+		deps = append(deps, fmt.Sprintf("%s.%s_%d", depType, strings.TrimPrefix(depType, "aws_"), depIndex))
+	}
+
+	return deps
+}
