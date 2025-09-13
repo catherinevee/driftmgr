@@ -541,9 +541,9 @@ func TestStateManager_CompareStates(t *testing.T) {
 			state1: state1,
 			state2: state1,
 			expected: &StateComparison{
-				AreEqual:      true,
-				AddedResources:   []Resource{},
-				RemovedResources: []Resource{},
+				AreEqual:          true,
+				AddedResources:    []Resource{},
+				RemovedResources:  []Resource{},
 				ModifiedResources: []Resource{},
 			},
 		},
@@ -552,8 +552,8 @@ func TestStateManager_CompareStates(t *testing.T) {
 			state1: state1,
 			state2: state2,
 			expected: &StateComparison{
-				AreEqual:      false,
-				SerialDiff:    1,
+				AreEqual:   false,
+				SerialDiff: 1,
 				AddedResources: []Resource{
 					state2.Resources[1],
 				},
@@ -566,9 +566,9 @@ func TestStateManager_CompareStates(t *testing.T) {
 			state1: state2,
 			state2: state1,
 			expected: &StateComparison{
-				AreEqual:      false,
-				SerialDiff:    -1,
-				AddedResources:   []Resource{},
+				AreEqual:       false,
+				SerialDiff:     -1,
+				AddedResources: []Resource{},
 				RemovedResources: []Resource{
 					state2.Resources[1],
 				},

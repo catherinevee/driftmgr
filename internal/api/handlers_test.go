@@ -160,8 +160,8 @@ func TestRemediationHandler(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			name:       "POST create remediation",
-			method:     "POST",
+			name:   "POST create remediation",
+			method: "POST",
 			body: map[string]interface{}{
 				"resource_id": "i-123",
 				"action":      "update",
@@ -238,8 +238,8 @@ func TestConfigHandler(t *testing.T) {
 			wantStatus: http.StatusOK,
 		},
 		{
-			name:       "PUT update config",
-			method:     "PUT",
+			name:   "PUT update config",
+			method: "PUT",
 			body: map[string]interface{}{
 				"auto_discovery": true,
 				"max_workers":    10,
@@ -326,7 +326,7 @@ func TestJSONResponse(t *testing.T) {
 			wantCode: http.StatusOK,
 		},
 		{
-			name:     "Complex object",
+			name: "Complex object",
 			data: models.Resource{
 				ID:       "resource-1",
 				Type:     "aws_instance",

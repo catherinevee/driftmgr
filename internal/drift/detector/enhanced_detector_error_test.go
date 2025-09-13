@@ -84,7 +84,7 @@ func TestEnhancedDetector_ErrorHandling(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				handledErr := tc.handler(tc.err)
 				require.Error(t, handledErr)
-				
+
 				// The handlers return different error types, but they should all implement error
 				assert.Contains(t, handledErr.Error(), tc.expectedError)
 			})

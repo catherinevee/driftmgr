@@ -45,8 +45,9 @@ type EnhancedDetector struct {
 // - A unique correlation ID
 //
 // Example:
-//   detector := NewEnhancedDetector()
-//   report, err := detector.DetectDriftWithContext(ctx, state)
+//
+//	detector := NewEnhancedDetector()
+//	report, err := detector.DetectDriftWithContext(ctx, state)
 func NewEnhancedDetector() *EnhancedDetector {
 	detector := &EnhancedDetector{
 		providers:    make(map[string]providers.CloudProvider),
@@ -155,10 +156,10 @@ func (d *EnhancedDetector) processResource(ctx context.Context, resource state.R
 			WithResource(resource.ID).
 			WithWrapped(err).
 			WithUserHelp("Ensure the provider is properly configured and credentials are valid")
-		
+
 		// Add context values
 		errBuilder = errBuilder.WithDetails("provider", resource.Provider)
-		
+
 		// Add recovery strategy
 		errBuilder = errBuilder.WithRecovery(errorspkg.RecoveryStrategy{
 			Strategy:    "fallback",
@@ -322,16 +323,16 @@ func (d *EnhancedDetector) compareResources(desired state.Resource, actual inter
 func (d *EnhancedDetector) logToMonitoring(err *errorspkg.DriftError) {
 	// Send to monitoring system
 	logData := map[string]interface{}{
-		"timestamp":    time.Now().Format(time.RFC3339),
-		"type":         string(err.Type),
-		"severity":     string(err.Severity),
-		"code":         err.Code,
-		"message":      err.Message,
-		"resource":     err.Resource,
-		"operation":    err.Operation,
-		"trace_id":     err.TraceID,
-		"retryable":    err.Retryable,
-		"retry_after":  err.RetryAfter,
+		"timestamp":   time.Now().Format(time.RFC3339),
+		"type":        string(err.Type),
+		"severity":    string(err.Severity),
+		"code":        err.Code,
+		"message":     err.Message,
+		"resource":    err.Resource,
+		"operation":   err.Operation,
+		"trace_id":    err.TraceID,
+		"retryable":   err.Retryable,
+		"retry_after": err.RetryAfter,
 	}
 
 	// Add details if any
@@ -347,12 +348,12 @@ func (d *EnhancedDetector) logToMonitoring(err *errorspkg.DriftError) {
 func (d *EnhancedDetector) logValidationError(err *errorspkg.DriftError) {
 	// Log validation errors for analysis
 	logData := map[string]interface{}{
-		"timestamp":    time.Now().Format(time.RFC3339),
-		"type":         "validation",
-		"severity":     string(err.Severity),
-		"resource":     err.Resource,
-		"operation":    err.Operation,
-		"message":      err.Message,
+		"timestamp": time.Now().Format(time.RFC3339),
+		"type":      "validation",
+		"severity":  string(err.Severity),
+		"resource":  err.Resource,
+		"operation": err.Operation,
+		"message":   err.Message,
 	}
 
 	// Add details if any

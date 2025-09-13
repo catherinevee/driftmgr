@@ -85,7 +85,7 @@ func TestMockServer(t *testing.T) {
 
 			if tt.expectedBody != "" {
 				t.Logf("Expected body: %s", tt.expectedBody)
-				
+
 				// For JSON responses, we need to compare the unmarshaled data
 				// to handle potential formatting differences
 				var expected, actual interface{}

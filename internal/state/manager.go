@@ -208,7 +208,6 @@ func (sm *StateManager) GetStateHistory(ctx context.Context, key string) ([]Stat
 	return sm.backend.ListStateVersions(ctx, key)
 }
 
-
 // ImportResource adds a new resource to the state
 func (sm *StateManager) ImportResource(ctx context.Context, key string, resource Resource) error {
 	sm.mu.Lock()
@@ -241,8 +240,6 @@ func (sm *StateManager) ImportResource(ctx context.Context, key string, resource
 	return sm.UpdateState(ctx, key, state)
 }
 
-
-
 // RefreshState updates the state with actual cloud resource data
 func (sm *StateManager) RefreshState(ctx context.Context, key string, actualResources map[string]interface{}) error {
 	sm.mu.Lock()
@@ -274,7 +271,6 @@ func (sm *StateManager) RefreshState(ctx context.Context, key string, actualReso
 	// Update state
 	return sm.UpdateState(ctx, key, state)
 }
-
 
 // StateDifference represents a difference between two states
 type StateDifference struct {

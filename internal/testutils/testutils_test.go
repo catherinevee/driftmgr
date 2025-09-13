@@ -11,7 +11,7 @@ import (
 
 func TestRunTestCases(t *testing.T) {
 	var testRuns []string
-	
+
 	testCases := []TestCase{
 		{
 			Name: "test case 1",

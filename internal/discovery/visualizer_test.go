@@ -64,8 +64,6 @@ func TestDiscoveryVisualizer_AddRelationship(t *testing.T) {
 	// Just verify the method completes without error
 }
 
-
-
 func TestDiscoveryVisualizer_GenerateJSON(t *testing.T) {
 	dv := NewDiscoveryVisualizer()
 
@@ -91,7 +89,6 @@ func TestDiscoveryVisualizer_GenerateJSON(t *testing.T) {
 		assert.NotNil(t, summary)
 	}
 }
-
 
 func TestDiscoveryVisualizer_GenerateCSV(t *testing.T) {
 	dv := NewDiscoveryVisualizer()
@@ -132,7 +129,6 @@ func TestDiscoveryVisualizer_GenerateCSV(t *testing.T) {
 	assert.Contains(t, csv, "vpc-1")
 	assert.Contains(t, csv, "subnet-1")
 }
-
 
 func TestDiscoveryVisualizer_GetStatistics(t *testing.T) {
 	dv := NewDiscoveryVisualizer()
@@ -201,7 +197,6 @@ func TestDiscoveryVisualizer_FilterResources(t *testing.T) {
 	awsVpcs := dv.FilterResources(FilterOptions{Type: "vpc", Provider: "aws"})
 	assert.Len(t, awsVpcs, 1)
 }
-
 
 // Benchmark tests
 func BenchmarkDiscoveryVisualizer_AddResource(b *testing.B) {

@@ -523,4 +523,3 @@ func (a *AdvancedQuery) Execute(query string, resources []models.Resource) []mod
 	}
 	return results
 }
-

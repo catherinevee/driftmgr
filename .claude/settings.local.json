@@ -114,7 +114,8 @@
       "Bash(git pull:*)",
       "Bash(CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags=\"-s -w\" -o dist/driftmgr-linux-amd64 ./cmd/driftmgr)",
       "WebFetch(domain:github.com)",
-      "Bash(while read pkg)"
+      "Bash(while read pkg)",
+      "WebFetch(domain:app.codecov.io)"
     ],
     "deny": [],
     "ask": [],

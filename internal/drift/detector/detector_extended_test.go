@@ -35,8 +35,8 @@ func TestSetConfig(t *testing.T) {
 		"test": testProvider,
 	})
 	config := &DetectorConfig{
-		MaxWorkers:     5,
-		Timeout:        30 * time.Second,
+		MaxWorkers:       5,
+		Timeout:          30 * time.Second,
 		IgnoreAttributes: []string{"ignore.me"},
 	}
 
@@ -256,8 +256,8 @@ func TestFieldClassification(t *testing.T) {
 			name: "Critical field - deletion_protection",
 			path: "deletion_protection",
 			expected: map[string]bool{
-				"isCriticalField": true,
-				"isSecurityField": false,
+				"isCriticalField":  true,
+				"isSecurityField":  false,
 				"isImportantField": false,
 			},
 		},
@@ -265,8 +265,8 @@ func TestFieldClassification(t *testing.T) {
 			name: "Security field - security_group",
 			path: "security_group_id",
 			expected: map[string]bool{
-				"isCriticalField": false,
-				"isSecurityField": true,
+				"isCriticalField":  false,
+				"isSecurityField":  true,
 				"isImportantField": false,
 			},
 		},
@@ -274,8 +274,8 @@ func TestFieldClassification(t *testing.T) {
 			name: "Important field - instance_type",
 			path: "instance_type",
 			expected: map[string]bool{
-				"isCriticalField": false,
-				"isSecurityField": false,
+				"isCriticalField":  false,
+				"isSecurityField":  false,
 				"isImportantField": true,
 			},
 		},
@@ -283,8 +283,8 @@ func TestFieldClassification(t *testing.T) {
 			name: "Regular field - tags",
 			path: "tags",
 			expected: map[string]bool{
-				"isCriticalField": false,
-				"isSecurityField": false,
+				"isCriticalField":  false,
+				"isSecurityField":  false,
 				"isImportantField": false,
 			},
 		},
@@ -292,8 +292,8 @@ func TestFieldClassification(t *testing.T) {
 			name: "Nested field - encryption.kms_key_id",
 			path: "encryption.kms_key_id",
 			expected: map[string]bool{
-				"isCriticalField": true,  // encryption is a critical field
-				"isSecurityField": false,
+				"isCriticalField":  true, // encryption is a critical field
+				"isSecurityField":  false,
 				"isImportantField": false,
 			},
 		},
@@ -305,21 +305,21 @@ func TestFieldClassification(t *testing.T) {
 			// Test isCriticalField
 			if _, ok := tt.expected["isCriticalField"]; ok {
 				actual := detector.isCriticalField(tt.path)
-				assert.Equal(t, tt.expected["isCriticalField"], actual, 
+				assert.Equal(t, tt.expected["isCriticalField"], actual,
 					"isCriticalField(%s) = %v, want %v", tt.path, actual, tt.expected["isCriticalField"])
 			}
 
 			// Test isSecurityField
 			if _, ok := tt.expected["isSecurityField"]; ok {
 				actual := detector.isSecurityField(tt.path)
-				assert.Equal(t, tt.expected["isSecurityField"], actual, 
+				assert.Equal(t, tt.expected["isSecurityField"], actual,
 					"isSecurityField(%s) = %v, want %v", tt.path, actual, tt.expected["isSecurityField"])
 			}
 
 			// Test isImportantField
 			if _, ok := tt.expected["isImportantField"]; ok {
 				actual := detector.isImportantField(tt.path)
-				assert.Equal(t, tt.expected["isImportantField"], actual, 
+				assert.Equal(t, tt.expected["isImportantField"], actual,
 					"isImportantField(%s) = %v, want %v", tt.path, actual, tt.expected["isImportantField"])
 			}
 		})

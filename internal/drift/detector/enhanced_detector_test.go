@@ -13,7 +13,7 @@ import (
 // TestNewEnhancedDetector tests the creation of a new EnhancedDetector
 func TestNewEnhancedDetector(t *testing.T) {
 	detector := NewEnhancedDetector()
-	
+
 	assert.NotNil(t, detector, "Expected a new EnhancedDetector instance")
 	assert.NotNil(t, detector.errorHandler, "Expected error handler to be initialized")
 	assert.NotNil(t, detector.recovery, "Expected recovery executor to be initialized")

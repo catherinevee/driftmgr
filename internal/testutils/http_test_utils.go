@@ -15,7 +15,7 @@ type MockServerConfig struct {
 	Path         string
 	Status       int
 	ResponseBody interface{}
-	Headers     map[string]string
+	Headers      map[string]string
 }
 
 // SetupMockServer creates a test HTTP server with the given configuration.

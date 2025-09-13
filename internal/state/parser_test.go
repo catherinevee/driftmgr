@@ -26,11 +26,11 @@ func TestStateParser_Parse(t *testing.T) {
 		{
 			name: "Valid Terraform state v4",
 			input: map[string]interface{}{
-				"version":          4,
+				"version":           4,
 				"terraform_version": "1.5.0",
-				"serial":           1,
-				"lineage":          "test-lineage",
-				"outputs":          map[string]interface{}{},
+				"serial":            1,
+				"lineage":           "test-lineage",
+				"outputs":           map[string]interface{}{},
 				"resources": []interface{}{
 					map[string]interface{}{
 						"mode":     "managed",
@@ -66,10 +66,10 @@ func TestStateParser_Parse(t *testing.T) {
 		{
 			name: "Valid Terraform state with multiple resources",
 			input: map[string]interface{}{
-				"version":          4,
+				"version":           4,
 				"terraform_version": "1.0.0",
-				"serial":           5,
-				"lineage":          "multi-resource",
+				"serial":            5,
+				"lineage":           "multi-resource",
 				"outputs": map[string]interface{}{
 					"instance_id": map[string]interface{}{
 						"value": "i-1234567890",
@@ -121,12 +121,12 @@ func TestStateParser_Parse(t *testing.T) {
 		{
 			name: "Empty state",
 			input: map[string]interface{}{
-				"version":          4,
+				"version":           4,
 				"terraform_version": "1.5.0",
-				"serial":           0,
-				"lineage":          "empty",
-				"outputs":          map[string]interface{}{},
-				"resources":        []interface{}{},
+				"serial":            0,
+				"lineage":           "empty",
+				"outputs":           map[string]interface{}{},
+				"resources":         []interface{}{},
 			},
 			wantErr: false,
 			validate: func(t *testing.T, state *StateFile) {
@@ -137,11 +137,11 @@ func TestStateParser_Parse(t *testing.T) {
 		{
 			name: "State with data resources",
 			input: map[string]interface{}{
-				"version":          4,
+				"version":           4,
 				"terraform_version": "1.5.0",
-				"serial":           1,
-				"lineage":          "data-resources",
-				"outputs":          map[string]interface{}{},
+				"serial":            1,
+				"lineage":           "data-resources",
+				"outputs":           map[string]interface{}{},
 				"resources": []interface{}{
 					map[string]interface{}{
 						"mode":     "data",
@@ -182,11 +182,11 @@ func TestStateParser_Parse(t *testing.T) {
 		{
 			name: "State with modules",
 			input: map[string]interface{}{
-				"version":          4,
+				"version":           4,
 				"terraform_version": "1.5.0",
-				"serial":           1,
-				"lineage":          "with-modules",
-				"outputs":          map[string]interface{}{},
+				"serial":            1,
+				"lineage":           "with-modules",
+				"outputs":           map[string]interface{}{},
 				"resources": []interface{}{
 					map[string]interface{}{
 						"module":   "module.vpc",
@@ -215,11 +215,11 @@ func TestStateParser_Parse(t *testing.T) {
 		{
 			name: "State with multiple instances",
 			input: map[string]interface{}{
-				"version":          4,
+				"version":           4,
 				"terraform_version": "1.5.0",
-				"serial":           1,
-				"lineage":          "multi-instance",
-				"outputs":          map[string]interface{}{},
+				"serial":            1,
+				"lineage":           "multi-instance",
+				"outputs":           map[string]interface{}{},
 				"resources": []interface{}{
 					map[string]interface{}{
 						"mode":     "managed",
@@ -264,11 +264,11 @@ func TestStateParser_Parse(t *testing.T) {
 		{
 			name: "State with sensitive attributes",
 			input: map[string]interface{}{
-				"version":          4,
+				"version":           4,
 				"terraform_version": "1.5.0",
-				"serial":           1,
-				"lineage":          "sensitive",
-				"outputs":          map[string]interface{}{},
+				"serial":            1,
+				"lineage":           "sensitive",
+				"outputs":           map[string]interface{}{},
 				"resources": []interface{}{
 					map[string]interface{}{
 						"mode":     "managed",
@@ -349,12 +349,12 @@ func TestStateParser_ParseFile(t *testing.T) {
 			setupFile: func() string {
 				filePath := filepath.Join(tempDir, "valid.tfstate")
 				content := map[string]interface{}{
-					"version":          4,
+					"version":           4,
 					"terraform_version": "1.5.0",
-					"serial":           1,
-					"lineage":          "test",
-					"outputs":          map[string]interface{}{},
-					"resources":        []interface{}{},
+					"serial":            1,
+					"lineage":           "test",
+					"outputs":           map[string]interface{}{},
+					"resources":         []interface{}{},
 				}
 				data, _ := json.Marshal(content)
 				err := os.WriteFile(filePath, data, 0644)
@@ -555,33 +555,33 @@ func TestStateParser_FilterResourcesByType(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		resourceType string
-		expectedLen  int
+		name          string
+		resourceType  string
+		expectedLen   int
 		expectedNames []string
 	}{
 		{
-			name:         "Filter AWS instances",
-			resourceType: "aws_instance",
-			expectedLen:  2,
+			name:          "Filter AWS instances",
+			resourceType:  "aws_instance",
+			expectedLen:   2,
 			expectedNames: []string{"web", "app"},
 		},
 		{
-			name:         "Filter security groups",
-			resourceType: "aws_security_group",
-			expectedLen:  2,
+			name:          "Filter security groups",
+			resourceType:  "aws_security_group",
+			expectedLen:   2,
 			expectedNames: []string{"sg1", "sg2"},
 		},
 		{
-			name:         "Filter S3 buckets",
-			resourceType: "aws_s3_bucket",
-			expectedLen:  1,
+			name:          "Filter S3 buckets",
+			resourceType:  "aws_s3_bucket",
+			expectedLen:   1,
 			expectedNames: []string{"bucket"},
 		},
 		{
-			name:         "Filter non-existent type",
-			resourceType: "aws_rds_instance",
-			expectedLen:  0,
+			name:          "Filter non-existent type",
+			resourceType:  "aws_rds_instance",
+			expectedLen:   0,
 			expectedNames: []string{},
 		},
 	}

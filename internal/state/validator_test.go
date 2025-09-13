@@ -52,9 +52,9 @@ func TestValidator_Validate(t *testing.T) {
 		{
 			name: "State with invalid version",
 			state: &TerraformState{
-				Version:  0,
-				Lineage:  "test",
-				Serial:   1,
+				Version:   0,
+				Lineage:   "test",
+				Serial:    1,
 				Resources: []Resource{},
 			},
 			wantErr:     true,
@@ -79,7 +79,7 @@ func TestValidator_Validate(t *testing.T) {
 				Serial:    -1,
 				Resources: []Resource{},
 			},
-			wantErr:     false, // Validator doesn't check for negative serial
+			wantErr: false, // Validator doesn't check for negative serial
 		},
 		{
 			name: "State with invalid resource name",
@@ -99,7 +99,7 @@ func TestValidator_Validate(t *testing.T) {
 					},
 				},
 			},
-			wantErr:     false, // Validator allows dashes in resource names
+			wantErr: false, // Validator allows dashes in resource names
 		},
 		{
 			name: "State with empty resource type",
@@ -199,7 +199,7 @@ func TestValidator_Validate(t *testing.T) {
 					},
 				},
 			},
-			wantErr:     false,
+			wantErr: false,
 		},
 		{
 			name: "State with multiple resources",
@@ -523,10 +523,10 @@ func TestValidator_ComplexStateValidation(t *testing.T) {
 					{
 						SchemaVersion: 1,
 						Attributes: map[string]interface{}{
-							"id":                       "vpc-12345",
-							"cidr_block":               "10.0.0.0/16",
-							"enable_dns_hostnames":     true,
-							"enable_dns_support":       true,
+							"id":                   "vpc-12345",
+							"cidr_block":           "10.0.0.0/16",
+							"enable_dns_hostnames": true,
+							"enable_dns_support":   true,
 							"tags": map[string]interface{}{
 								"Name":        "main-vpc",
 								"Environment": "production",
@@ -664,15 +664,15 @@ func TestValidator_CustomRuleExecution(t *testing.T) {
 func TestValidator_MultipleValidationErrors(t *testing.T) {
 	// Create a state with multiple validation issues
 	state := &TerraformState{
-		Version:   0,     // Invalid version
-		Lineage:   "",    // Empty lineage
-		Serial:    -1,    // Negative serial
+		Version: 0,  // Invalid version
+		Lineage: "", // Empty lineage
+		Serial:  -1, // Negative serial
 		Resources: []Resource{
 			{
 				Mode:      "managed",
-				Type:      "",    // Empty type
-				Name:      "",    // Empty name
-				Provider:  "",    // Empty provider
+				Type:      "",           // Empty type
+				Name:      "",           // Empty name
+				Provider:  "",           // Empty provider
 				Instances: []Instance{}, // No instances
 			},
 		},
