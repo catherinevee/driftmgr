@@ -23,10 +23,10 @@ import (
 
 // PerformanceTestSuite provides comprehensive performance testing
 type PerformanceTestSuite struct {
-	config       *config.Config
+	// config       *config.Config // Package removed
 	discoverer   *discovery.EnhancedDiscoverer
-	stateManager *state.RemoteStateManager
-	visualizer   *visualization.DiagramGenerator
+	// stateManager *state.RemoteStateManager // Type not found
+	// visualizer   *visualization.DiagramGenerator // Package removed
 	tempDir      string
 	testData     *PerformanceTestData
 }
@@ -110,10 +110,10 @@ func SetupPerformanceTest(t *testing.T) *PerformanceTestSuite {
 
 	// Initialize components
 	suite := &PerformanceTestSuite{
-		config:       config,
-		discoverer:   discovery.NewEnhancedDiscoverer(config),
-		stateManager: state.NewRemoteStateManager(config),
-		visualizer:   visualization.NewDiagramGenerator(config),
+		// config:       config, // Package removed
+		discoverer:   discovery.NewEnhancedDiscoverer(nil), // Pass nil for now
+		// stateManager: state.NewRemoteStateManager(config), // Type not found
+		// visualizer:   visualization.NewDiagramGenerator(config), // Package removed
 		tempDir:      tempDir,
 	}
 
