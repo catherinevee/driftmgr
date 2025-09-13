@@ -387,26 +387,33 @@ func (c *DiscoveryCache) Put(resource interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	id := getResourceID(resource)
-	cached := &CachedResource{
-		ID:          id,
-		Type:        getResourceType(resource),
-		LastChecked: time.Now(),
-		TTL:         5 * time.Minute,
+	var cached *CachedResource
+
+	// Handle CachedResource directly
+	if cr, ok := resource.(*CachedResource); ok {
+		cached = cr
+	} else {
+		id := getResourceID(resource)
+		cached = &CachedResource{
+			ID:          id,
+			Type:        getResourceType(resource),
+			LastChecked: time.Now(),
+			TTL:         5 * time.Minute,
+		}
+
+		// Extract additional metadata
+		if resMap, ok := resource.(map[string]interface{}); ok {
+			cached.Attributes = resMap
+			if etag, ok := resMap["etag"].(string); ok {
+				cached.ETag = etag
+			}
+			if modified, ok := resMap["last_modified"].(time.Time); ok {
+				cached.LastModified = modified
+			}
+		}
 	}
 
-	// Extract additional metadata
-	if resMap, ok := resource.(map[string]interface{}); ok {
-		cached.Attributes = resMap
-		if etag, ok := resMap["etag"].(string); ok {
-			cached.ETag = etag
-		}
-		if modified, ok := resMap["last_modified"].(time.Time); ok {
-			cached.LastModified = modified
-		}
-	}
-
-	c.resources[id] = cached
+	c.resources[cached.ID] = cached
 }
 
 // Delete removes a resource from cache
@@ -462,6 +469,10 @@ func (t *ChangeTracker) GetETag(resourceID string) string {
 // Helper functions
 
 func getResourceID(resource interface{}) string {
+	// Handle CachedResource directly
+	if cached, ok := resource.(*CachedResource); ok {
+		return cached.ID
+	}
 	if resMap, ok := resource.(map[string]interface{}); ok {
 		if id, ok := resMap["id"].(string); ok {
 			return id

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -334,14 +335,15 @@ resource "aws_instance" "example" {
 			tempFile := filepath.Join(t.TempDir(), "test.tf")
 			require.NoError(t, os.WriteFile(tempFile, []byte(tt.content), 0644))
 
-			backend, err := scanner.parseBackendConfig(tempFile)
+			parser := hclparse.NewParser()
+			backends, err := scanner.parseBackendsFromFile(tempFile, parser)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				// Backend might be nil if no backend config found
-				if backend != nil {
-					assert.NotEmpty(t, backend.FilePath)
+				// Backends might be empty if no backend config found
+				if len(backends) > 0 {
+					assert.NotEmpty(t, backends[0].FilePath)
 				}
 			}
 		})
@@ -398,9 +400,11 @@ terraform {
 			tempFile := filepath.Join(t.TempDir(), "test.tf")
 			require.NoError(t, os.WriteFile(tempFile, []byte(tt.content), 0644))
 
-			backend, err := scanner.parseBackendConfig(tempFile)
+			parser := hclparse.NewParser()
+			backends, err := scanner.parseBackendsFromFile(tempFile, parser)
 			assert.NoError(t, err)
-			if backend != nil && tt.expected != nil {
+			if len(backends) > 0 && tt.expected != nil {
+				backend := backends[0]
 				for key, expectedVal := range tt.expected {
 					// Check if key exists in attributes
 					if val, ok := backend.Attributes[key]; ok {
@@ -539,7 +543,8 @@ terraform {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		scanner.parseBackendConfig(tempFile)
+		parser := hclparse.NewParser()
+		scanner.parseBackendsFromFile(tempFile, parser)
 	}
 }
 

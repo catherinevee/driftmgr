@@ -2,6 +2,10 @@ package discovery
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -96,10 +100,8 @@ func TestDiscoveryCache_Operations(t *testing.T) {
 	// Get existing resource
 	retrieved := cache.Get("resource-1")
 	if retrieved != nil {
-		if cached, ok := retrieved.(*CachedResource); ok {
-			assert.Equal(t, resource.ID, cached.ID)
-			assert.Equal(t, resource.Type, cached.Type)
-		}
+		assert.Equal(t, resource.ID, retrieved.ID)
+		assert.Equal(t, resource.Type, retrieved.Type)
 	}
 
 	// Test Clear
@@ -123,10 +125,8 @@ func TestDiscoveryCache_Expiration(t *testing.T) {
 	// Check if expired
 	retrieved := cache.Get("resource-1")
 	if retrieved != nil {
-		if cached, ok := retrieved.(*CachedResource); ok {
-			isExpired := cache.IsExpired(cached)
-			assert.True(t, isExpired)
-		}
+		isExpired := cache.IsExpired(retrieved)
+		assert.True(t, isExpired)
 	}
 }
 
@@ -227,7 +227,7 @@ func TestIncrementalDiscovery_DifferentialSync(t *testing.T) {
 
 	// Add some resources to cache
 	cache := discovery.cache
-	cache.Put("resource-1", &CachedResource{
+	cache.Put(&CachedResource{
 		ID:          "resource-1",
 		Checksum:    "checksum-1",
 		LastChecked: time.Now(),
@@ -313,7 +313,7 @@ func TestIncrementalDiscovery_ResourceTags(t *testing.T) {
 		UseResourceTags: true,
 	}
 
-	discovery := createTestIncrementalDiscovery(config)
+	_ = createTestIncrementalDiscovery(config)
 
 	// Test tag-based filtering
 	resource := map[string]interface{}{
@@ -358,18 +358,16 @@ func BenchmarkBloomFilter_Test(b *testing.B) {
 func BenchmarkCache_Operations(b *testing.B) {
 	cache := NewDiscoveryCache()
 
-	resource := &CachedResource{
-		ID:          "resource-1",
-		Type:        "instance",
-		LastChecked: time.Now(),
-		TTL:         5 * time.Minute,
-	}
-
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		key := fmt.Sprintf("resource-%d", i)
-		cache.Put(key, resource)
-		cache.Get(key)
+		resourceCopy := &CachedResource{
+			ID:          fmt.Sprintf("resource-%d", i),
+			Type:        "instance",
+			LastChecked: time.Now(),
+			TTL:         5 * time.Minute,
+		}
+		cache.Put(resourceCopy)
+		cache.Get(resourceCopy.ID)
 	}
 }
 
@@ -402,16 +400,19 @@ func (id *IncrementalDiscovery) MightExist(resourceID string) bool {
 func (id *IncrementalDiscovery) Discover(ctx context.Context, provider, region string) (*DiscoveryResult, error) {
 	// Simplified discovery for testing
 	return &DiscoveryResult{
-		TotalResources: 0,
-		NewResources:   0,
-		UpdatedResources: 0,
-		DeletedResources: 0,
+		NewResources:     []interface{}{},
+		UpdatedResources: []interface{}{},
+		DeletedResources: []string{},
+		UnchangedCount:   0,
+		DiscoveryTime:    0,
+		CacheHits:        0,
+		CacheMisses:      0,
 	}, nil
 }
 
 func (id *IncrementalDiscovery) NeedsSync(resourceID, checksum string) bool {
-	cached, found := id.cache.Get(resourceID)
-	if !found {
+	cached := id.cache.Get(resourceID)
+	if cached == nil {
 		return true
 	}
 	return cached.Checksum != checksum
