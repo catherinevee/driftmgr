@@ -18,18 +18,18 @@ type MockBackend struct {
 	metadata   *BackendMetadata
 
 	// Control behavior for testing
-	pullError      error
-	pushError      error
-	lockError      error
-	unlockError    error
-	validateError  error
+	pullError     error
+	pushError     error
+	lockError     error
+	unlockError   error
+	validateError error
 
 	// Track method calls
-	pullCalls      int
-	pushCalls      int
-	lockCalls      int
-	unlockCalls    int
-	validateCalls  int
+	pullCalls     int
+	pushCalls     int
+	lockCalls     int
+	unlockCalls   int
+	validateCalls int
 }
 
 func NewMockBackend() *MockBackend {

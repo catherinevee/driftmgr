@@ -47,7 +47,7 @@ func (p *Prompt) Confirm(message string, defaultYes bool) bool {
 
 // ConfirmWithDetails asks for confirmation with additional details
 func (p *Prompt) ConfirmWithDetails(message string, details []string) bool {
-	p.formatter.Warning(message)
+	p.formatter.Warning("%s", message)
 
 	if len(details) > 0 {
 		fmt.Println("\nDetails:")

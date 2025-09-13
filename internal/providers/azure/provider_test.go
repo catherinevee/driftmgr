@@ -90,21 +90,21 @@ func TestAzureProviderComplete_Connect_ManagedIdentity(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			if strings.Contains(req.URL.String(), "169.254.169.254") {
-				tokenResp := struct {
-					AccessToken string `json:"access_token"`
-					ExpiresOn   string `json:"expires_on"`
-				}{
-					AccessToken: "mi-access-token",
-					ExpiresOn:   "1234567890",
+				if strings.Contains(req.URL.String(), "169.254.169.254") {
+					tokenResp := struct {
+						AccessToken string `json:"access_token"`
+						ExpiresOn   string `json:"expires_on"`
+					}{
+						AccessToken: "mi-access-token",
+						ExpiresOn:   "1234567890",
+					}
+					body, _ := json.Marshal(tokenResp)
+					return &http.Response{
+						StatusCode: 200,
+						Body:       io.NopCloser(bytes.NewReader(body)),
+					}, nil
 				}
-				body, _ := json.Marshal(tokenResp)
-				return &http.Response{
-					StatusCode: 200,
-					Body:       io.NopCloser(bytes.NewReader(body)),
-				}, nil
-			}
-			return nil, fmt.Errorf("unexpected request")
+				return nil, fmt.Errorf("unexpected request")
 			},
 		},
 	}
@@ -161,14 +161,14 @@ func TestAzureProviderComplete_makeAPIRequest(t *testing.T) {
 			provider.httpClient = &http.Client{
 				Transport: &MockRoundTripper{
 					RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-					// Verify authorization header
-					assert.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
-					assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
+						// Verify authorization header
+						assert.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
+						assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
 
-					return &http.Response{
-						StatusCode: tt.mockStatus,
-						Body:       io.NopCloser(strings.NewReader(tt.mockBody)),
-					}, nil
+						return &http.Response{
+							StatusCode: tt.mockStatus,
+							Body:       io.NopCloser(strings.NewReader(tt.mockBody)),
+						}, nil
 					},
 				},
 			}
@@ -234,50 +234,50 @@ func TestAzureProviderComplete_GetResource(t *testing.T) {
 			provider.httpClient = &http.Client{
 				Transport: &MockRoundTripper{
 					RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-					var mockResponse map[string]interface{}
-					if strings.Contains(tt.resourceID, "virtualMachines") {
-						mockResponse = map[string]interface{}{
-							"name":     "vm1",
-							"location": "eastus",
-							"properties": map[string]interface{}{
-								"hardwareProfile": map[string]interface{}{
-									"vmSize": "Standard_B2s",
+						var mockResponse map[string]interface{}
+						if strings.Contains(tt.resourceID, "virtualMachines") {
+							mockResponse = map[string]interface{}{
+								"name":     "vm1",
+								"location": "eastus",
+								"properties": map[string]interface{}{
+									"hardwareProfile": map[string]interface{}{
+										"vmSize": "Standard_B2s",
+									},
+									"provisioningState": "Succeeded",
 								},
-								"provisioningState": "Succeeded",
-							},
-						}
-					} else if strings.Contains(tt.resourceID, "virtualNetworks") {
-						mockResponse = map[string]interface{}{
-							"name":     "vnet1",
-							"location": "eastus",
-							"properties": map[string]interface{}{
-								"addressSpace": map[string]interface{}{
-									"addressPrefixes": []string{"10.0.0.0/16"},
+							}
+						} else if strings.Contains(tt.resourceID, "virtualNetworks") {
+							mockResponse = map[string]interface{}{
+								"name":     "vnet1",
+								"location": "eastus",
+								"properties": map[string]interface{}{
+									"addressSpace": map[string]interface{}{
+										"addressPrefixes": []string{"10.0.0.0/16"},
+									},
+									"provisioningState": "Succeeded",
 								},
-								"provisioningState": "Succeeded",
-							},
+							}
+						} else if strings.Contains(tt.resourceID, "storageAccounts") {
+							mockResponse = map[string]interface{}{
+								"name":     "storage1",
+								"location": "eastus",
+								"kind":     "StorageV2",
+								"sku": map[string]interface{}{
+									"name": "Standard_LRS",
+									"tier": "Standard",
+								},
+								"properties": map[string]interface{}{
+									"provisioningState": "Succeeded",
+									"primaryEndpoints":  map[string]interface{}{},
+								},
+							}
 						}
-					} else if strings.Contains(tt.resourceID, "storageAccounts") {
-						mockResponse = map[string]interface{}{
-							"name":     "storage1",
-							"location": "eastus",
-							"kind":     "StorageV2",
-							"sku": map[string]interface{}{
-								"name": "Standard_LRS",
-								"tier": "Standard",
-							},
-							"properties": map[string]interface{}{
-								"provisioningState": "Succeeded",
-								"primaryEndpoints":  map[string]interface{}{},
-							},
-						}
-					}
 
-					body, _ := json.Marshal(mockResponse)
-					return &http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(bytes.NewReader(body)),
-					}, nil
+						body, _ := json.Marshal(mockResponse)
+						return &http.Response{
+							StatusCode: 200,
+							Body:       io.NopCloser(bytes.NewReader(body)),
+						}, nil
 					},
 				},
 			}
@@ -325,46 +325,46 @@ func TestAzureProviderComplete_GetResourceByType(t *testing.T) {
 			provider.httpClient = &http.Client{
 				Transport: &MockRoundTripper{
 					RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-					var mockResponse map[string]interface{}
+						var mockResponse map[string]interface{}
 
-					switch tt.resourceType {
-					case "azurerm_virtual_machine":
-						mockResponse = map[string]interface{}{
-							"name":     tt.resourceID,
-							"location": "eastus",
-							"properties": map[string]interface{}{
-								"hardwareProfile": map[string]interface{}{
-									"vmSize": "Standard_B2s",
+						switch tt.resourceType {
+						case "azurerm_virtual_machine":
+							mockResponse = map[string]interface{}{
+								"name":     tt.resourceID,
+								"location": "eastus",
+								"properties": map[string]interface{}{
+									"hardwareProfile": map[string]interface{}{
+										"vmSize": "Standard_B2s",
+									},
+									"provisioningState": "Succeeded",
 								},
-								"provisioningState": "Succeeded",
-							},
+							}
+						case "azurerm_storage_account":
+							mockResponse = map[string]interface{}{
+								"name":     tt.resourceID,
+								"location": "eastus",
+								"kind":     "StorageV2",
+								"sku": map[string]interface{}{
+									"name": "Standard_LRS",
+									"tier": "Standard",
+								},
+								"properties": map[string]interface{}{
+									"provisioningState": "Succeeded",
+									"primaryEndpoints":  map[string]interface{}{},
+								},
+							}
+						default:
+							return &http.Response{
+								StatusCode: 404,
+								Body:       io.NopCloser(strings.NewReader(`{"error":"not found"}`)),
+							}, nil
 						}
-					case "azurerm_storage_account":
-						mockResponse = map[string]interface{}{
-							"name":     tt.resourceID,
-							"location": "eastus",
-							"kind":     "StorageV2",
-							"sku": map[string]interface{}{
-								"name": "Standard_LRS",
-								"tier": "Standard",
-							},
-							"properties": map[string]interface{}{
-								"provisioningState": "Succeeded",
-								"primaryEndpoints":  map[string]interface{}{},
-							},
-						}
-					default:
-						return &http.Response{
-							StatusCode: 404,
-							Body:       io.NopCloser(strings.NewReader(`{"error":"not found"}`)),
-						}, nil
-					}
 
-					body, _ := json.Marshal(mockResponse)
-					return &http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(bytes.NewReader(body)),
-					}, nil
+						body, _ := json.Marshal(mockResponse)
+						return &http.Response{
+							StatusCode: 200,
+							Body:       io.NopCloser(bytes.NewReader(body)),
+						}, nil
 					},
 				},
 			}
@@ -446,11 +446,11 @@ func TestAzureProviderComplete_ListResources(t *testing.T) {
 			provider.httpClient = &http.Client{
 				Transport: &MockRoundTripper{
 					RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-					body, _ := json.Marshal(tt.mockResponse)
-					return &http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(bytes.NewReader(body)),
-					}, nil
+						body, _ := json.Marshal(tt.mockResponse)
+						return &http.Response{
+							StatusCode: 200,
+							Body:       io.NopCloser(bytes.NewReader(body)),
+						}, nil
 					},
 				},
 			}
@@ -497,27 +497,27 @@ func TestAzureProviderComplete_ResourceExists(t *testing.T) {
 			provider.httpClient = &http.Client{
 				Transport: &MockRoundTripper{
 					RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-					if tt.mockStatus == 200 {
-						mockResponse := map[string]interface{}{
-							"name":     tt.resourceID,
-							"location": "eastus",
-							"properties": map[string]interface{}{
-								"hardwareProfile": map[string]interface{}{
-									"vmSize": "Standard_B2s",
+						if tt.mockStatus == 200 {
+							mockResponse := map[string]interface{}{
+								"name":     tt.resourceID,
+								"location": "eastus",
+								"properties": map[string]interface{}{
+									"hardwareProfile": map[string]interface{}{
+										"vmSize": "Standard_B2s",
+									},
+									"provisioningState": "Succeeded",
 								},
-								"provisioningState": "Succeeded",
-							},
+							}
+							body, _ := json.Marshal(mockResponse)
+							return &http.Response{
+								StatusCode: tt.mockStatus,
+								Body:       io.NopCloser(bytes.NewReader(body)),
+							}, nil
 						}
-						body, _ := json.Marshal(mockResponse)
 						return &http.Response{
 							StatusCode: tt.mockStatus,
-							Body:       io.NopCloser(bytes.NewReader(body)),
+							Body:       io.NopCloser(strings.NewReader(`{"error":{"code":"NotFound"}}`)),
 						}, nil
-					}
-					return &http.Response{
-						StatusCode: tt.mockStatus,
-						Body:       io.NopCloser(strings.NewReader(`{"error":{"code":"NotFound"}}`)),
-					}, nil
 					},
 				},
 			}
@@ -548,16 +548,16 @@ func TestAzureProviderComplete_ValidateCredentials(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			tokenResp := AzureTokenResponse{
-				TokenType:   "Bearer",
-				AccessToken: "valid-token",
-				ExpiresIn:   "3600",
-			}
-			body, _ := json.Marshal(tokenResp)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+				tokenResp := AzureTokenResponse{
+					TokenType:   "Bearer",
+					AccessToken: "valid-token",
+					ExpiresIn:   "3600",
+				}
+				body, _ := json.Marshal(tokenResp)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -583,26 +583,26 @@ func TestAzureProviderComplete_getVirtualMachine(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.Path, "virtualMachines")
-			mockVM := map[string]interface{}{
-				"name":     "test-vm",
-				"location": "eastus",
-				"tags": map[string]string{
-					"Environment": "Test",
-				},
-				"zones": []string{"1"},
-				"properties": map[string]interface{}{
-					"hardwareProfile": map[string]interface{}{
-						"vmSize": "Standard_B2s",
+				assert.Contains(t, req.URL.Path, "virtualMachines")
+				mockVM := map[string]interface{}{
+					"name":     "test-vm",
+					"location": "eastus",
+					"tags": map[string]string{
+						"Environment": "Test",
 					},
-					"provisioningState": "Succeeded",
-				},
-			}
-			body, _ := json.Marshal(mockVM)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+					"zones": []string{"1"},
+					"properties": map[string]interface{}{
+						"hardwareProfile": map[string]interface{}{
+							"vmSize": "Standard_B2s",
+						},
+						"provisioningState": "Succeeded",
+					},
+				}
+				body, _ := json.Marshal(mockVM)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -622,27 +622,27 @@ func TestAzureProviderComplete_getStorageAccount(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.Path, "storageAccounts")
-			mockStorage := map[string]interface{}{
-				"name":     "teststorage123",
-				"location": "eastus",
-				"kind":     "StorageV2",
-				"sku": map[string]interface{}{
-					"name": "Standard_LRS",
-					"tier": "Standard",
-				},
-				"properties": map[string]interface{}{
-					"provisioningState": "Succeeded",
-					"primaryEndpoints": map[string]interface{}{
-						"blob": "https://teststorage123.blob.core.windows.net/",
+				assert.Contains(t, req.URL.Path, "storageAccounts")
+				mockStorage := map[string]interface{}{
+					"name":     "teststorage123",
+					"location": "eastus",
+					"kind":     "StorageV2",
+					"sku": map[string]interface{}{
+						"name": "Standard_LRS",
+						"tier": "Standard",
 					},
-				},
-			}
-			body, _ := json.Marshal(mockStorage)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+					"properties": map[string]interface{}{
+						"provisioningState": "Succeeded",
+						"primaryEndpoints": map[string]interface{}{
+							"blob": "https://teststorage123.blob.core.windows.net/",
+						},
+					},
+				}
+				body, _ := json.Marshal(mockStorage)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -663,24 +663,24 @@ func TestAzureProviderComplete_getKubernetesCluster(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.Path, "managedClusters")
-			mockAKS := map[string]interface{}{
-				"name":     "test-aks",
-				"location": "eastus",
-				"properties": map[string]interface{}{
-					"kubernetesVersion": "1.27.3",
-					"dnsPrefix":         "test-aks-dns",
-					"fqdn":              "test-aks-dns.hcp.eastus.azmk8s.io",
-					"nodeResourceGroup": "MC_test-rg_test-aks_eastus",
-					"enableRBAC":        true,
-					"provisioningState": "Succeeded",
-				},
-			}
-			body, _ := json.Marshal(mockAKS)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+				assert.Contains(t, req.URL.Path, "managedClusters")
+				mockAKS := map[string]interface{}{
+					"name":     "test-aks",
+					"location": "eastus",
+					"properties": map[string]interface{}{
+						"kubernetesVersion": "1.27.3",
+						"dnsPrefix":         "test-aks-dns",
+						"fqdn":              "test-aks-dns.hcp.eastus.azmk8s.io",
+						"nodeResourceGroup": "MC_test-rg_test-aks_eastus",
+						"enableRBAC":        true,
+						"provisioningState": "Succeeded",
+					},
+				}
+				body, _ := json.Marshal(mockAKS)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -702,10 +702,10 @@ func BenchmarkAzureProviderComplete_makeAPIRequest(b *testing.B) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(strings.NewReader(`{"status":"ok"}`)),
-			}, nil
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(`{"status":"ok"}`)),
+				}, nil
 			},
 		},
 	}
@@ -723,21 +723,21 @@ func BenchmarkAzureProviderComplete_GetResource(b *testing.B) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			mockVM := map[string]interface{}{
-				"name":     "test-vm",
-				"location": "eastus",
-				"properties": map[string]interface{}{
-					"hardwareProfile": map[string]interface{}{
-						"vmSize": "Standard_B2s",
+				mockVM := map[string]interface{}{
+					"name":     "test-vm",
+					"location": "eastus",
+					"properties": map[string]interface{}{
+						"hardwareProfile": map[string]interface{}{
+							"vmSize": "Standard_B2s",
+						},
+						"provisioningState": "Succeeded",
 					},
-					"provisioningState": "Succeeded",
-				},
-			}
-			body, _ := json.Marshal(mockVM)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+				}
+				body, _ := json.Marshal(mockVM)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}

@@ -21,10 +21,10 @@ type GCSBackend struct {
 	workspace   string
 
 	// Mock storage for testing
-	objects   map[string][]byte
-	metadata  map[string]map[string]string
-	versions  map[string][]*GCSVersion
-	locks     map[string]*LockInfo
+	objects  map[string][]byte
+	metadata map[string]map[string]string
+	versions map[string][]*GCSVersion
+	locks    map[string]*LockInfo
 
 	mu          sync.RWMutex
 	backendMeta *BackendMetadata
@@ -471,7 +471,7 @@ func (g *GCSBackend) getLockKey() string {
 
 func (g *GCSBackend) isWorkspaceObject(objectName string) bool {
 	return objectName == g.getObjectName() ||
-		   (objectName != g.getObjectName() && objectName[len(objectName)-8:] == ".tfstate")
+		(objectName != g.getObjectName() && objectName[len(objectName)-8:] == ".tfstate")
 }
 
 func (g *GCSBackend) extractWorkspaceFromObject(objectName string) string {

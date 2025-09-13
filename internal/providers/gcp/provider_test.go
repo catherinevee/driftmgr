@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -14,9 +17,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/oauth2"
 )
 
 // MockRoundTripper for testing HTTP requests
@@ -243,11 +243,11 @@ func TestGCPProviderComplete_GetResource(t *testing.T) {
 			provider.httpClient = &http.Client{
 				Transport: &MockRoundTripper{
 					RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-					body, _ := json.Marshal(tt.mockResponse)
-					return &http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(bytes.NewReader(body)),
-					}, nil
+						body, _ := json.Marshal(tt.mockResponse)
+						return &http.Response{
+							StatusCode: 200,
+							Body:       io.NopCloser(bytes.NewReader(body)),
+						}, nil
 					},
 				},
 			}
@@ -331,11 +331,11 @@ func TestGCPProviderComplete_GetResourceByType(t *testing.T) {
 				provider.httpClient = &http.Client{
 					Transport: &MockRoundTripper{
 						RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-						body, _ := json.Marshal(tt.mockResponse)
-						return &http.Response{
-							StatusCode: 200,
-							Body:       io.NopCloser(bytes.NewReader(body)),
-						}, nil
+							body, _ := json.Marshal(tt.mockResponse)
+							return &http.Response{
+								StatusCode: 200,
+								Body:       io.NopCloser(bytes.NewReader(body)),
+							}, nil
 						},
 					},
 				}
@@ -389,39 +389,39 @@ func TestGCPProviderComplete_getComputeInstance(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.Path, "instances")
-			mockInstance := map[string]interface{}{
-				"name":        "test-instance",
-				"machineType": "zones/us-central1-a/machineTypes/n1-standard-1",
-				"status":      "RUNNING",
-				"zone":        "us-central1-a",
-				"networkInterfaces": []interface{}{
-					map[string]interface{}{
-						"network":       "global/networks/default",
-						"networkIP":     "10.0.0.2",
-						"accessConfigs": []interface{}{},
+				assert.Contains(t, req.URL.Path, "instances")
+				mockInstance := map[string]interface{}{
+					"name":        "test-instance",
+					"machineType": "zones/us-central1-a/machineTypes/n1-standard-1",
+					"status":      "RUNNING",
+					"zone":        "us-central1-a",
+					"networkInterfaces": []interface{}{
+						map[string]interface{}{
+							"network":       "global/networks/default",
+							"networkIP":     "10.0.0.2",
+							"accessConfigs": []interface{}{},
+						},
 					},
-				},
-				"disks": []interface{}{
-					map[string]interface{}{
-						"source":    "zones/us-central1-a/disks/test-disk",
-						"boot":      true,
-						"autoDelete": true,
+					"disks": []interface{}{
+						map[string]interface{}{
+							"source":     "zones/us-central1-a/disks/test-disk",
+							"boot":       true,
+							"autoDelete": true,
+						},
 					},
-				},
-				"labels": map[string]string{
-					"environment": "test",
-				},
-				"tags": map[string]interface{}{
-					"items": []string{"http-server", "https-server"},
-				},
-				"creationTimestamp": "2024-01-01T00:00:00.000-07:00",
-			}
-			body, _ := json.Marshal(mockInstance)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+					"labels": map[string]string{
+						"environment": "test",
+					},
+					"tags": map[string]interface{}{
+						"items": []string{"http-server", "https-server"},
+					},
+					"creationTimestamp": "2024-01-01T00:00:00.000-07:00",
+				}
+				body, _ := json.Marshal(mockInstance)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -442,45 +442,45 @@ func TestGCPProviderComplete_getStorageBucket(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.Path, "/b/")
-			mockBucket := map[string]interface{}{
-				"name":         "test-bucket",
-				"location":     "US",
-				"storageClass": "STANDARD",
-				"versioning": map[string]interface{}{
-					"enabled": true,
-				},
-				"lifecycle": map[string]interface{}{
-					"rule": []interface{}{
-						map[string]interface{}{
-							"action": map[string]interface{}{
-								"type": "Delete",
-							},
-							"condition": map[string]interface{}{
-								"age": 30,
+				assert.Contains(t, req.URL.Path, "/b/")
+				mockBucket := map[string]interface{}{
+					"name":         "test-bucket",
+					"location":     "US",
+					"storageClass": "STANDARD",
+					"versioning": map[string]interface{}{
+						"enabled": true,
+					},
+					"lifecycle": map[string]interface{}{
+						"rule": []interface{}{
+							map[string]interface{}{
+								"action": map[string]interface{}{
+									"type": "Delete",
+								},
+								"condition": map[string]interface{}{
+									"age": 30,
+								},
 							},
 						},
 					},
-				},
-				"labels": map[string]string{
-					"environment": "test",
-					"project":     "test-project",
-				},
-				"encryption": map[string]interface{}{
-					"defaultKmsKeyName": "projects/test/locations/us/keyRings/test/cryptoKeys/test",
-				},
-				"iamConfiguration": map[string]interface{}{
-					"uniformBucketLevelAccess": map[string]interface{}{
-						"enabled": true,
+					"labels": map[string]string{
+						"environment": "test",
+						"project":     "test-project",
 					},
-				},
-				"timeCreated": "2024-01-01T00:00:00.000Z",
-			}
-			body, _ := json.Marshal(mockBucket)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+					"encryption": map[string]interface{}{
+						"defaultKmsKeyName": "projects/test/locations/us/keyRings/test/cryptoKeys/test",
+					},
+					"iamConfiguration": map[string]interface{}{
+						"uniformBucketLevelAccess": map[string]interface{}{
+							"enabled": true,
+						},
+					},
+					"timeCreated": "2024-01-01T00:00:00.000Z",
+				}
+				body, _ := json.Marshal(mockBucket)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -502,35 +502,35 @@ func TestGCPProviderComplete_getGKECluster(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.Path, "clusters")
-			mockCluster := map[string]interface{}{
-				"name":             "test-cluster",
-				"location":         "us-central1",
-				"initialNodeCount": 3,
-				"nodeConfig": map[string]interface{}{
-					"machineType": "n1-standard-2",
-					"diskSizeGb":  100,
-					"diskType":    "pd-standard",
-				},
-				"masterAuth": map[string]interface{}{
-					"clusterCaCertificate": "LS0tLS1CRUdJTi...",
-				},
-				"network":                "default",
-				"subnetwork":             "default",
-				"clusterIpv4Cidr":        "10.4.0.0/14",
-				"servicesIpv4Cidr":       "10.8.0.0/20",
-				"status":                 "RUNNING",
-				"currentMasterVersion":   "1.27.3-gke.100",
-				"currentNodeVersion":     "1.27.3-gke.100",
-				"resourceLabels": map[string]string{
-					"environment": "test",
-				},
-			}
-			body, _ := json.Marshal(mockCluster)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+				assert.Contains(t, req.URL.Path, "clusters")
+				mockCluster := map[string]interface{}{
+					"name":             "test-cluster",
+					"location":         "us-central1",
+					"initialNodeCount": 3,
+					"nodeConfig": map[string]interface{}{
+						"machineType": "n1-standard-2",
+						"diskSizeGb":  100,
+						"diskType":    "pd-standard",
+					},
+					"masterAuth": map[string]interface{}{
+						"clusterCaCertificate": "LS0tLS1CRUdJTi...",
+					},
+					"network":              "default",
+					"subnetwork":           "default",
+					"clusterIpv4Cidr":      "10.4.0.0/14",
+					"servicesIpv4Cidr":     "10.8.0.0/20",
+					"status":               "RUNNING",
+					"currentMasterVersion": "1.27.3-gke.100",
+					"currentNodeVersion":   "1.27.3-gke.100",
+					"resourceLabels": map[string]string{
+						"environment": "test",
+					},
+				}
+				body, _ := json.Marshal(mockCluster)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -552,31 +552,31 @@ func TestGCPProviderComplete_getSQLInstance(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.Path, "instances")
-			mockSQL := map[string]interface{}{
-				"name":            "test-sql",
-				"databaseVersion": "MYSQL_8_0",
-				"region":          "us-central1",
-				"state":           "RUNNABLE",
-				"settings": map[string]interface{}{
-					"tier":            "db-n1-standard-1",
-					"dataDiskSizeGb":  "100",
-					"dataDiskType":    "PD_SSD",
-					"availabilityType": "ZONAL",
-					"backupConfiguration": map[string]interface{}{
-						"enabled":   true,
-						"startTime": "03:00",
+				assert.Contains(t, req.URL.Path, "instances")
+				mockSQL := map[string]interface{}{
+					"name":            "test-sql",
+					"databaseVersion": "MYSQL_8_0",
+					"region":          "us-central1",
+					"state":           "RUNNABLE",
+					"settings": map[string]interface{}{
+						"tier":             "db-n1-standard-1",
+						"dataDiskSizeGb":   "100",
+						"dataDiskType":     "PD_SSD",
+						"availabilityType": "ZONAL",
+						"backupConfiguration": map[string]interface{}{
+							"enabled":   true,
+							"startTime": "03:00",
+						},
+						"ipConfiguration": map[string]interface{}{
+							"ipv4Enabled": true,
+						},
 					},
-					"ipConfiguration": map[string]interface{}{
-						"ipv4Enabled": true,
-					},
-				},
-			}
-			body, _ := json.Marshal(mockSQL)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+				}
+				body, _ := json.Marshal(mockSQL)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -598,20 +598,20 @@ func TestGCPProviderComplete_getPubSubTopic(t *testing.T) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			assert.Contains(t, req.URL.Path, "topics")
-			mockTopic := map[string]interface{}{
-				"name": "projects/test-project/topics/test-topic",
-				"labels": map[string]string{
-					"environment": "test",
-				},
-				"messageRetentionDuration": "604800s",
-				"kmsKeyName":               "projects/test/locations/us/keyRings/test/cryptoKeys/test",
-			}
-			body, _ := json.Marshal(mockTopic)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+				assert.Contains(t, req.URL.Path, "topics")
+				mockTopic := map[string]interface{}{
+					"name": "projects/test-project/topics/test-topic",
+					"labels": map[string]string{
+						"environment": "test",
+					},
+					"messageRetentionDuration": "604800s",
+					"kmsKeyName":               "projects/test/locations/us/keyRings/test/cryptoKeys/test",
+				}
+				body, _ := json.Marshal(mockTopic)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -632,10 +632,10 @@ func BenchmarkGCPProviderComplete_makeAPIRequest(b *testing.B) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(strings.NewReader(`{"status":"ok"}`)),
-			}, nil
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(`{"status":"ok"}`)),
+				}, nil
 			},
 		},
 	}
@@ -654,22 +654,22 @@ func BenchmarkGCPProviderComplete_GetResource(b *testing.B) {
 	provider.httpClient = &http.Client{
 		Transport: &MockRoundTripper{
 			RoundTripFunc: func(req *http.Request) (*http.Response, error) {
-			mockInstance := map[string]interface{}{
-				"name":        "test-instance",
-				"machineType": "zones/us-central1-a/machineTypes/n1-standard-1",
-				"status":      "RUNNING",
-				"networkInterfaces": []interface{}{
-					map[string]interface{}{
-						"network": "global/networks/default",
+				mockInstance := map[string]interface{}{
+					"name":        "test-instance",
+					"machineType": "zones/us-central1-a/machineTypes/n1-standard-1",
+					"status":      "RUNNING",
+					"networkInterfaces": []interface{}{
+						map[string]interface{}{
+							"network": "global/networks/default",
+						},
 					},
-				},
-				"disks": []interface{}{},
-			}
-			body, _ := json.Marshal(mockInstance)
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewReader(body)),
-			}, nil
+					"disks": []interface{}{},
+				}
+				body, _ := json.Marshal(mockInstance)
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewReader(body)),
+				}, nil
 			},
 		},
 	}
@@ -679,6 +679,7 @@ func BenchmarkGCPProviderComplete_GetResource(b *testing.B) {
 		_, _ = provider.GetResource(context.Background(), "test-instance")
 	}
 }
+
 // Additional comprehensive tests for better coverage
 
 func TestGCPProviderComplete_ListResources(t *testing.T) {
@@ -795,10 +796,10 @@ func TestGCPProviderComplete_ErrorHandling(t *testing.T) {
 	provider.tokenSource = &MockTokenSource{}
 
 	tests := []struct {
-		name        string
-		setupMock   func() *http.Client
-		operation   func() error
-		wantErrMsg  string
+		name       string
+		setupMock  func() *http.Client
+		operation  func() error
+		wantErrMsg string
 	}{
 		{
 			name: "Network error",

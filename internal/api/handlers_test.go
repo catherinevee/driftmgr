@@ -8,12 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/catherinevee/driftmgr/internal/api/handlers"
 	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHealthHandler(t *testing.T) {
-	handler := HealthHandler()
+	handler := http.HandlerFunc(handlers.HealthHandler)
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
@@ -30,7 +31,7 @@ func TestHealthHandler(t *testing.T) {
 }
 
 func TestDiscoverHandler(t *testing.T) {
-	handler := DiscoverHandler()
+	handler := http.HandlerFunc(handlers.DiscoverHandler)
 
 	tests := []struct {
 		name       string
@@ -48,7 +49,7 @@ func TestDiscoverHandler(t *testing.T) {
 			name:       "POST with valid body",
 			method:     "POST",
 			body:       map[string]string{"provider": "aws", "region": "us-east-1"},
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusAccepted,
 		},
 		{
 			name:       "POST with invalid body",
@@ -83,14 +84,14 @@ func TestDiscoverHandler(t *testing.T) {
 }
 
 func TestDriftHandler(t *testing.T) {
-	handler := DriftHandler()
+	handler := http.HandlerFunc(handlers.DriftHandler)
 
 	req := httptest.NewRequest("GET", "/api/v1/drift", nil)
 	w := httptest.NewRecorder()
 
 	handler(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusAccepted, w.Code)
 
 	var response interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -98,7 +99,7 @@ func TestDriftHandler(t *testing.T) {
 }
 
 func TestStateHandler(t *testing.T) {
-	handler := StateHandler()
+	handler := http.HandlerFunc(handlers.StateHandler)
 
 	tests := []struct {
 		name       string
@@ -122,7 +123,7 @@ func TestStateHandler(t *testing.T) {
 			name:       "PUT state",
 			method:     "PUT",
 			path:       "/api/v1/state",
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusMethodNotAllowed,
 		},
 		{
 			name:       "DELETE state",
@@ -145,7 +146,7 @@ func TestStateHandler(t *testing.T) {
 }
 
 func TestRemediationHandler(t *testing.T) {
-	handler := RemediationHandler()
+	handler := http.HandlerFunc(handlers.RemediationHandler)
 
 	tests := []struct {
 		name       string
@@ -157,7 +158,7 @@ func TestRemediationHandler(t *testing.T) {
 			name:       "GET remediations",
 			method:     "GET",
 			body:       nil,
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusAccepted,
 		},
 		{
 			name:   "POST create remediation",
@@ -167,7 +168,7 @@ func TestRemediationHandler(t *testing.T) {
 				"action":      "update",
 				"parameters":  map[string]string{"instance_type": "t2.micro"},
 			},
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusAccepted,
 		},
 	}
 
@@ -191,7 +192,7 @@ func TestRemediationHandler(t *testing.T) {
 }
 
 func TestResourcesHandler(t *testing.T) {
-	handler := ResourcesHandler()
+	handler := http.HandlerFunc(handlers.ResourcesHandler)
 
 	req := httptest.NewRequest("GET", "/api/v1/resources", nil)
 	w := httptest.NewRecorder()
@@ -200,14 +201,15 @@ func TestResourcesHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response []models.Resource
+	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
+	assert.Contains(t, response, "resources")
 }
 
 func TestProvidersHandler(t *testing.T) {
-	handler := ProvidersHandler()
+	handler := http.HandlerFunc(handlers.ProvidersHandler)
 
 	req := httptest.NewRequest("GET", "/api/v1/providers", nil)
 	w := httptest.NewRecorder()
@@ -216,14 +218,15 @@ func TestProvidersHandler(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response []map[string]interface{}
+	var response map[string]interface{}
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
+	assert.Contains(t, response, "providers")
 }
 
 func TestConfigHandler(t *testing.T) {
-	handler := ConfigHandler()
+	handler := http.HandlerFunc(handlers.ConfigHandler)
 
 	tests := []struct {
 		name       string

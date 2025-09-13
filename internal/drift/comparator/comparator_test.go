@@ -38,11 +38,11 @@ func TestResourceComparator_Compare(t *testing.T) {
 		{
 			name: "No differences",
 			expected: map[string]interface{}{
-				"name": "test",
+				"name":  "test",
 				"value": 123,
 			},
 			actual: map[string]interface{}{
-				"name": "test",
+				"name":  "test",
 				"value": 123,
 			},
 			wantDiffs: 0,
@@ -50,11 +50,11 @@ func TestResourceComparator_Compare(t *testing.T) {
 		{
 			name: "Simple modification",
 			expected: map[string]interface{}{
-				"name": "test",
+				"name":  "test",
 				"value": 123,
 			},
 			actual: map[string]interface{}{
-				"name": "test",
+				"name":  "test",
 				"value": 456,
 			},
 			wantDiffs: 1,
@@ -72,7 +72,7 @@ func TestResourceComparator_Compare(t *testing.T) {
 			},
 			actual: map[string]interface{}{
 				"name": "test",
-				"new": "field",
+				"new":  "field",
 			},
 			wantDiffs: 1,
 			checkDiffs: func(t *testing.T, diffs []Difference) {
@@ -86,7 +86,7 @@ func TestResourceComparator_Compare(t *testing.T) {
 			name: "Removed field",
 			expected: map[string]interface{}{
 				"name": "test",
-				"old": "field",
+				"old":  "field",
 			},
 			actual: map[string]interface{}{
 				"name": "test",
@@ -105,14 +105,14 @@ func TestResourceComparator_Compare(t *testing.T) {
 				"name": "test",
 				"config": map[string]interface{}{
 					"enabled": true,
-					"value": 100,
+					"value":   100,
 				},
 			},
 			actual: map[string]interface{}{
 				"name": "test",
 				"config": map[string]interface{}{
 					"enabled": false,
-					"value": 100,
+					"value":   100,
 				},
 			},
 			wantDiffs: 1,
@@ -154,11 +154,11 @@ func TestResourceComparator_Compare(t *testing.T) {
 		{
 			name: "Ignore computed fields",
 			expected: map[string]interface{}{
-				"name": "test",
+				"name":           "test",
 				"computed_field": "value1",
 			},
 			actual: map[string]interface{}{
-				"name": "test",
+				"name":           "test",
 				"computed_field": "value2",
 			},
 			setupConfig: func(c *ResourceComparator) {
@@ -371,18 +371,18 @@ func TestResourceComparator_ComplexNested(t *testing.T) {
 				"enabled": true,
 				"options": []interface{}{
 					map[string]interface{}{
-						"key": "option1",
+						"key":   "option1",
 						"value": "value1",
 					},
 					map[string]interface{}{
-						"key": "option2",
+						"key":   "option2",
 						"value": "value2",
 					},
 				},
 			},
 		},
 		"tags": map[string]interface{}{
-			"env": "production",
+			"env":  "production",
 			"team": "engineering",
 		},
 	}
@@ -394,18 +394,18 @@ func TestResourceComparator_ComplexNested(t *testing.T) {
 				"enabled": false, // Changed
 				"options": []interface{}{
 					map[string]interface{}{
-						"key": "option1",
+						"key":   "option1",
 						"value": "value1",
 					},
 					map[string]interface{}{
-						"key": "option2",
+						"key":   "option2",
 						"value": "modified", // Changed
 					},
 				},
 			},
 		},
 		"tags": map[string]interface{}{
-			"env": "production",
+			"env":  "production",
 			"team": "devops", // Changed
 		},
 	}

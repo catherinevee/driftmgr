@@ -99,22 +99,22 @@ func isNonRetryableError(err error) bool {
 	// Add logic to determine if error is retryable
 	errStr := err.Error()
 	return contains(errStr, "already locked") ||
-		   contains(errStr, "does not exist") ||
-		   contains(errStr, "invalid")
+		contains(errStr, "does not exist") ||
+		contains(errStr, "invalid")
 }
 
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr ||
-	       len(s) > len(substr) && s[:len(substr)] == substr ||
-	       (len(s) > len(substr) && len(substr) > 0 &&
-	        func() bool {
-	            for i := 0; i <= len(s)-len(substr); i++ {
-	                if s[i:i+len(substr)] == substr {
-	                    return true
-	                }
-	            }
-	            return false
-	        }())
+		len(s) > len(substr) && s[:len(substr)] == substr ||
+		(len(s) > len(substr) && len(substr) > 0 &&
+			func() bool {
+				for i := 0; i <= len(s)-len(substr); i++ {
+					if s[i:i+len(substr)] == substr {
+						return true
+					}
+				}
+				return false
+			}())
 }
 
 // Delegate remaining methods to the wrapped backend
@@ -177,7 +177,7 @@ func NewErrorSimulatingBackend(backend Backend, failureRate float64, errorTypes 
 func (e *ErrorSimulatingBackend) simulateNetworkDelay() {
 	if e.networkDelay > 0 {
 		// Add some jitter
-		jitter := time.Duration(rand.Intn(int(e.networkDelay/2)))
+		jitter := time.Duration(rand.Intn(int(e.networkDelay / 2)))
 		time.Sleep(e.networkDelay + jitter)
 	}
 }
