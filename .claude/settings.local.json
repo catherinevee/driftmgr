@@ -122,7 +122,9 @@
       "Bash(else echo \"No coverage file\")",
       "Bash(while read dir)",
       "Bash(do test -d \"internal/$dir\")",
-      "Read(//c/c/Users/cathe/OneDrive/Desktop/github/driftmgr/**)"
+      "Read(//c/c/Users/cathe/OneDrive/Desktop/github/driftmgr/**)",
+      "Bash(codecov:*)",
+      "Bash(sort:*)"
     ],
     "deny": [],
     "ask": [],

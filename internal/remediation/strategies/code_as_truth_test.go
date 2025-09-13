@@ -37,14 +37,14 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 	t.Run("Validate", func(t *testing.T) {
 		// Test with no drift
 		noDrift := &detector.DriftResult{
-			HasDrift: false,
+			DriftType: detector.NoDrift,
 		}
 		err := strategy.Validate(noDrift)
 		assert.Error(t, err, "Should error when no drift detected")
 
 		// Test with drift
 		withDrift := &detector.DriftResult{
-			HasDrift: true,
+			DriftType: detector.ConfigurationDrift,
 			Differences: []comparator.Difference{
 				{
 					Path:       "aws_instance.test",
@@ -62,20 +62,21 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 
 	t.Run("Plan", func(t *testing.T) {
 		drift := &detector.DriftResult{
-			HasDrift: true,
-			Summary:  "1 resource drifted",
+			DriftType: detector.ConfigurationDrift,
 			Differences: []comparator.Difference{
 				{
 					Path:       "aws_instance.test",
 					Type:       comparator.DiffTypeModified,
 					Importance: comparator.ImportanceCritical,
-					Details:    "Instance type changed",
+					Expected: "t2.micro",
+					Actual:   "t2.small",
 				},
 				{
 					Path:       "aws_s3_bucket.backup",
 					Type:       comparator.DiffTypeRemoved,
 					Importance: comparator.ImportanceHigh,
-					Details:    "Bucket missing in cloud",
+					Expected: map[string]interface{}{"name": "backup"},
+					Actual:   nil,
 				},
 			},
 		}
@@ -125,7 +126,7 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 
 	t.Run("Execute_DryRun", func(t *testing.T) {
 		drift := &detector.DriftResult{
-			HasDrift: true,
+			DriftType: detector.ConfigurationDrift,
 			Differences: []comparator.Difference{
 				{
 					Path:       "aws_instance.test",
@@ -175,7 +176,7 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 		autoStrategy := NewCodeAsTruthStrategy(autoApproveConfig)
 
 		drift := &detector.DriftResult{
-			HasDrift: true,
+			DriftType: detector.ConfigurationDrift,
 			Differences: []comparator.Difference{
 				{
 					Path:       "aws_instance.critical",
@@ -216,7 +217,7 @@ func TestDriftSummaryCreation(t *testing.T) {
 	strategy := NewCodeAsTruthStrategy(nil)
 
 	drift := &detector.DriftResult{
-		HasDrift: true,
+		DriftType: detector.ConfigurationDrift,
 		Differences: []comparator.Difference{
 			{
 				Path:       "aws_instance.web",

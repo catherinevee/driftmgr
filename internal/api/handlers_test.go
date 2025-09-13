@@ -8,12 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/catherinevee/driftmgr/internal/api/handlers"
 	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHealthHandler(t *testing.T) {
-	handler := HealthHandler()
+	handler := http.HandlerFunc(handlers.HealthHandler)
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
@@ -30,7 +31,7 @@ func TestHealthHandler(t *testing.T) {
 }
 
 func TestDiscoverHandler(t *testing.T) {
-	handler := DiscoverHandler()
+	handler := http.HandlerFunc(handlers.DiscoverHandler)
 
 	tests := []struct {
 		name       string
@@ -83,7 +84,7 @@ func TestDiscoverHandler(t *testing.T) {
 }
 
 func TestDriftHandler(t *testing.T) {
-	handler := DriftHandler()
+	handler := http.HandlerFunc(handlers.DriftHandler)
 
 	req := httptest.NewRequest("GET", "/api/v1/drift", nil)
 	w := httptest.NewRecorder()
@@ -98,7 +99,7 @@ func TestDriftHandler(t *testing.T) {
 }
 
 func TestStateHandler(t *testing.T) {
-	handler := StateHandler()
+	handler := http.HandlerFunc(handlers.StateHandler)
 
 	tests := []struct {
 		name       string
@@ -145,7 +146,7 @@ func TestStateHandler(t *testing.T) {
 }
 
 func TestRemediationHandler(t *testing.T) {
-	handler := RemediationHandler()
+	handler := http.HandlerFunc(handlers.RemediationHandler)
 
 	tests := []struct {
 		name       string
@@ -191,7 +192,7 @@ func TestRemediationHandler(t *testing.T) {
 }
 
 func TestResourcesHandler(t *testing.T) {
-	handler := ResourcesHandler()
+	handler := http.HandlerFunc(handlers.ResourcesHandler)
 
 	req := httptest.NewRequest("GET", "/api/v1/resources", nil)
 	w := httptest.NewRecorder()
@@ -207,7 +208,7 @@ func TestResourcesHandler(t *testing.T) {
 }
 
 func TestProvidersHandler(t *testing.T) {
-	handler := ProvidersHandler()
+	handler := http.HandlerFunc(handlers.ProvidersHandler)
 
 	req := httptest.NewRequest("GET", "/api/v1/providers", nil)
 	w := httptest.NewRecorder()
@@ -223,7 +224,7 @@ func TestProvidersHandler(t *testing.T) {
 }
 
 func TestConfigHandler(t *testing.T) {
-	handler := ConfigHandler()
+	handler := http.HandlerFunc(handlers.ConfigHandler)
 
 	tests := []struct {
 		name       string
