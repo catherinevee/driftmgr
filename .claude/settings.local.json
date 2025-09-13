@@ -130,7 +130,9 @@
       "Bash(xargs:*)",
       "Bash(if [ -f test_coverage.out ])",
       "Bash(else echo \"Coverage file not found\")",
-      "WebSearch"
+      "WebSearch",
+      "Bash(./scripts/codecov-test.bat)",
+      "Bash(start test_badges.html)"
     ],
     "deny": [],
     "ask": [],

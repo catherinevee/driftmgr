@@ -277,36 +277,36 @@ func TestMockCostProvider(t *testing.T) {
 
 func TestCostCalculations(t *testing.T) {
 	tests := []struct {
-		name           string
-		hourlyCost     float64
-		expectedDaily  float64
-		expectedWeekly float64
+		name            string
+		hourlyCost      float64
+		expectedDaily   float64
+		expectedWeekly  float64
 		expectedMonthly float64
-		expectedAnnual float64
+		expectedAnnual  float64
 	}{
 		{
-			name:           "small instance",
-			hourlyCost:     0.05,
-			expectedDaily:  1.20,
-			expectedWeekly: 8.40,
+			name:            "small instance",
+			hourlyCost:      0.05,
+			expectedDaily:   1.20,
+			expectedWeekly:  8.40,
 			expectedMonthly: 36.0,
-			expectedAnnual: 438.0,
+			expectedAnnual:  438.0,
 		},
 		{
-			name:           "medium instance",
-			hourlyCost:     0.10,
-			expectedDaily:  2.40,
-			expectedWeekly: 16.80,
+			name:            "medium instance",
+			hourlyCost:      0.10,
+			expectedDaily:   2.40,
+			expectedWeekly:  16.80,
 			expectedMonthly: 72.0,
-			expectedAnnual: 876.0,
+			expectedAnnual:  876.0,
 		},
 		{
-			name:           "large instance",
-			hourlyCost:     0.25,
-			expectedDaily:  6.00,
-			expectedWeekly: 42.00,
+			name:            "large instance",
+			hourlyCost:      0.25,
+			expectedDaily:   6.00,
+			expectedWeekly:  42.00,
 			expectedMonthly: 180.0,
-			expectedAnnual: 2190.0,
+			expectedAnnual:  2190.0,
 		},
 	}
 
@@ -314,8 +314,8 @@ func TestCostCalculations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dailyCost := tt.hourlyCost * 24
 			weeklyCost := tt.hourlyCost * 24 * 7
-			monthlyCost := tt.hourlyCost * 720   // 30 days
-			annualCost := tt.hourlyCost * 8760    // 365 days
+			monthlyCost := tt.hourlyCost * 720 // 30 days
+			annualCost := tt.hourlyCost * 8760 // 365 days
 
 			assert.InDelta(t, tt.expectedDaily, dailyCost, 0.01)
 			assert.InDelta(t, tt.expectedWeekly, weeklyCost, 0.01)

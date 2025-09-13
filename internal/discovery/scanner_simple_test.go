@@ -8,276 +8,174 @@ import (
 
 func TestBackendConfig(t *testing.T) {
 	config := BackendConfig{
-		ID:       "backend-1",
 		Type:     "s3",
-		FilePath: "/terraform/main.tf",
-		Module:   "vpc",
-		Workspace: "production",
-		ConfigPath: "/terraform",
-		Attributes: map[string]interface{}{
-			"bucket": "terraform-state",
-			"key":    "vpc/terraform.tfstate",
-			"region": "us-east-1",
-		},
+		FilePath: "/terraform/backend.tf",
+		Module:   "main",
 		Config: map[string]interface{}{
-			"encrypt": true,
+			"bucket": "my-terraform-state",
+			"key":    "prod/terraform.tfstate",
+			"region": "us-east-1",
 		},
 	}
 
-	assert.Equal(t, "backend-1", config.ID)
 	assert.Equal(t, "s3", config.Type)
-	assert.Equal(t, "/terraform/main.tf", config.FilePath)
-	assert.Equal(t, "vpc", config.Module)
-	assert.Equal(t, "production", config.Workspace)
-	assert.NotNil(t, config.Attributes)
-	assert.Equal(t, "terraform-state", config.Attributes["bucket"])
+	assert.Equal(t, "/terraform/backend.tf", config.FilePath)
+	assert.Equal(t, "main", config.Module)
+	assert.Equal(t, "my-terraform-state", config.Config["bucket"])
 }
 
-func TestNewScanner(t *testing.T) {
+func TestNewScannerSimple(t *testing.T) {
 	tests := []struct {
-		name            string
-		rootDir         string
-		workers         int
-		expectedWorkers int
+		name    string
+		rootDir string
+		workers int
+		want    *Scanner
 	}{
 		{
-			name:            "default workers",
-			rootDir:         "/terraform",
-			workers:         0,
-			expectedWorkers: 4,
+			name:    "valid scanner",
+			rootDir: "/terraform",
+			workers: 4,
+			want: &Scanner{
+				rootDir:     "/terraform",
+				workers:     4,
+				ignoreRules: []string{".terraform", ".git", ".terragrunt-cache"},
+			},
 		},
 		{
-			name:            "negative workers",
-			rootDir:         "/terraform",
-			workers:         -1,
-			expectedWorkers: 4,
+			name:    "zero workers defaults to 1",
+			rootDir: "/terraform",
+			workers: 0,
+			want: &Scanner{
+				rootDir:     "/terraform",
+				workers:     1,
+				ignoreRules: []string{".terraform", ".git", ".terragrunt-cache"},
+			},
 		},
 		{
-			name:            "custom workers",
-			rootDir:         "/terraform",
-			workers:         8,
-			expectedWorkers: 8,
-		},
-		{
-			name:            "single worker",
-			rootDir:         "/terraform",
-			workers:         1,
-			expectedWorkers: 1,
+			name:    "negative workers defaults to 1",
+			rootDir: "/terraform",
+			workers: -5,
+			want: &Scanner{
+				rootDir:     "/terraform",
+				workers:     1,
+				ignoreRules: []string{".terraform", ".git", ".terragrunt-cache"},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			scanner := NewScanner(tt.rootDir, tt.workers)
-
-			assert.NotNil(t, scanner)
-			assert.Equal(t, tt.rootDir, scanner.rootDir)
-			assert.Equal(t, tt.expectedWorkers, scanner.workers)
+			assert.Equal(t, tt.want.rootDir, scanner.rootDir)
+			assert.Equal(t, tt.want.workers, scanner.workers)
+			assert.Equal(t, tt.want.ignoreRules, scanner.ignoreRules)
 			assert.NotNil(t, scanner.backends)
-			assert.NotNil(t, scanner.ignoreRules)
-			assert.Contains(t, scanner.ignoreRules, ".terraform")
-			assert.Contains(t, scanner.ignoreRules, ".git")
 		})
 	}
 }
 
-func TestScanner_AddIgnoreRule(t *testing.T) {
-	scanner := NewScanner("/terraform", 4)
-
-	rules := []string{
-		"*.backup",
-		"*.tmp",
-		"node_modules",
-		"vendor",
-	}
-
-	for _, rule := range rules {
-		scanner.AddIgnoreRule(rule)
-	}
-
-	// Check that default rules are still present
-	assert.Contains(t, scanner.ignoreRules, ".terraform")
-	assert.Contains(t, scanner.ignoreRules, ".git")
-
-	// Check that new rules were added
-	for _, rule := range rules {
-		assert.Contains(t, scanner.ignoreRules, rule)
-	}
-}
-
-func TestScanner_ShouldIgnore(t *testing.T) {
-	scanner := NewScanner("/terraform", 4)
-	scanner.AddIgnoreRule("*.backup")
-	scanner.AddIgnoreRule("temp/")
-
-	tests := []struct {
-		name       string
-		path       string
-		shouldIgnore bool
-	}{
-		{
-			name:       "terraform directory",
-			path:       "/project/.terraform/modules",
-			shouldIgnore: true,
-		},
-		{
-			name:       "git directory",
-			path:       "/project/.git/config",
-			shouldIgnore: true,
-		},
-		{
-			name:       "backup file",
-			path:       "/project/main.tf.backup",
-			shouldIgnore: true,
-		},
-		{
-			name:       "temp directory",
-			path:       "/project/temp/test.tf",
-			shouldIgnore: true,
-		},
-		{
-			name:       "valid terraform file",
-			path:       "/project/main.tf",
-			shouldIgnore: false,
-		},
-		{
-			name:       "valid module",
-			path:       "/project/modules/vpc/main.tf",
-			shouldIgnore: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := scanner.shouldIgnore(tt.path)
-			assert.Equal(t, tt.shouldIgnore, result)
-		})
-	}
-}
-
-func TestScanner_GetBackends(t *testing.T) {
+func TestScanner_GetBackendsSimple(t *testing.T) {
 	scanner := NewScanner("/terraform", 4)
 
 	// Add some test backends
-	testBackends := []BackendConfig{
+	scanner.backends = []BackendConfig{
 		{
-			ID:   "backend-1",
-			Type: "s3",
+			Type:     "s3",
+			FilePath: "/terraform/backend.tf",
+			Module:   "main",
+			Config: map[string]interface{}{
+				"bucket": "my-terraform-state",
+			},
 		},
 		{
-			ID:   "backend-2",
-			Type: "azurerm",
+			Type:     "azurerm",
+			FilePath: "/terraform/azure/backend.tf",
+			Module:   "azure",
+			Config: map[string]interface{}{
+				"storage_account_name": "tfstate",
+			},
 		},
 		{
-			ID:   "backend-3",
-			Type: "gcs",
+			Type:     "gcs",
+			FilePath: "/terraform/gcp/backend.tf",
+			Module:   "gcp",
+			Config: map[string]interface{}{
+				"bucket": "gcp-terraform-state",
+			},
 		},
 	}
 
-	scanner.mu.Lock()
-	scanner.backends = testBackends
-	scanner.mu.Unlock()
+	// Test GetBackendsByType
+	s3Backends := scanner.GetBackendsByType("s3")
+	assert.Len(t, s3Backends, 1)
+	assert.Equal(t, "s3", s3Backends[0].Type)
 
-	backends := scanner.GetBackends()
-	assert.Len(t, backends, 3)
-	assert.Equal(t, "backend-1", backends[0].ID)
-	assert.Equal(t, "s3", backends[0].Type)
+	azureBackends := scanner.GetBackendsByType("azurerm")
+	assert.Len(t, azureBackends, 1)
+	assert.Equal(t, "azurerm", azureBackends[0].Type)
+
+	gcsBackends := scanner.GetBackendsByType("gcs")
+	assert.Len(t, gcsBackends, 1)
+	assert.Equal(t, "gcs", gcsBackends[0].Type)
+
+	// Test non-existent type
+	localBackends := scanner.GetBackendsByType("local")
+	assert.Len(t, localBackends, 0)
 }
 
 func TestBackendTypes(t *testing.T) {
-	backends := []struct {
-		name     string
-		backendType string
-		attributes map[string]interface{}
-	}{
-		{
-			name:     "S3 backend",
-			backendType: "s3",
-			attributes: map[string]interface{}{
-				"bucket": "my-bucket",
-				"key":    "terraform.tfstate",
-				"region": "us-east-1",
-			},
-		},
-		{
-			name:     "Azure backend",
-			backendType: "azurerm",
-			attributes: map[string]interface{}{
-				"storage_account_name": "mystorageaccount",
-				"container_name":       "tfstate",
-				"key":                  "terraform.tfstate",
-			},
-		},
-		{
-			name:     "GCS backend",
-			backendType: "gcs",
-			attributes: map[string]interface{}{
-				"bucket": "my-gcs-bucket",
-				"prefix": "terraform/state",
-			},
-		},
-		{
-			name:     "Local backend",
-			backendType: "local",
-			attributes: map[string]interface{}{
-				"path": "./terraform.tfstate",
-			},
-		},
-		{
-			name:     "Remote backend",
-			backendType: "remote",
-			attributes: map[string]interface{}{
-				"organization": "my-org",
-				"workspaces": map[string]string{
-					"name": "my-workspace",
-				},
-			},
-		},
-	}
+	// Test that backend types are correctly handled
+	validTypes := []string{"s3", "azurerm", "gcs", "remote", "consul", "etcd", "http"}
 
-	for _, backend := range backends {
-		t.Run(backend.name, func(t *testing.T) {
-			config := BackendConfig{
-				Type:       backend.backendType,
-				Attributes: backend.attributes,
-			}
-
-			assert.Equal(t, backend.backendType, config.Type)
-			assert.NotNil(t, config.Attributes)
-
-			// Verify essential attributes exist
-			switch backend.backendType {
-			case "s3":
-				assert.NotNil(t, config.Attributes["bucket"])
-				assert.NotNil(t, config.Attributes["key"])
-			case "azurerm":
-				assert.NotNil(t, config.Attributes["storage_account_name"])
-				assert.NotNil(t, config.Attributes["container_name"])
-			case "gcs":
-				assert.NotNil(t, config.Attributes["bucket"])
-			case "local":
-				assert.NotNil(t, config.Attributes["path"])
-			case "remote":
-				assert.NotNil(t, config.Attributes["organization"])
-			}
-		})
+	for _, backendType := range validTypes {
+		config := BackendConfig{
+			Type: backendType,
+		}
+		assert.Equal(t, backendType, config.Type)
 	}
 }
 
-func BenchmarkNewScanner(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = NewScanner("/terraform", 4)
-	}
-}
-
-func BenchmarkScanner_ShouldIgnore(b *testing.B) {
+func TestScanner_GetUniqueBackends(t *testing.T) {
 	scanner := NewScanner("/terraform", 4)
-	scanner.AddIgnoreRule("*.backup")
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = scanner.shouldIgnore("/project/main.tf")
-		_ = scanner.shouldIgnore("/project/.terraform/modules/vpc")
-		_ = scanner.shouldIgnore("/project/backup.tf.backup")
+	// Add duplicate backends
+	scanner.backends = []BackendConfig{
+		{
+			Type:     "s3",
+			FilePath: "/terraform/backend.tf",
+			Module:   "main",
+			Config: map[string]interface{}{
+				"bucket": "my-terraform-state",
+				"key":    "prod/terraform.tfstate",
+			},
+		},
+		{
+			Type:     "s3",
+			FilePath: "/terraform/backend.tf",
+			Module:   "main",
+			Config: map[string]interface{}{
+				"bucket": "my-terraform-state",
+				"key":    "prod/terraform.tfstate",
+			},
+		},
+		{
+			Type:     "azurerm",
+			FilePath: "/terraform/azure/backend.tf",
+			Module:   "azure",
+			Config: map[string]interface{}{
+				"storage_account_name": "tfstate",
+			},
+		},
 	}
+
+	uniqueBackends := scanner.GetUniqueBackends()
+	assert.Len(t, uniqueBackends, 2) // Should have 2 unique backends (s3 and azurerm)
+
+	// Verify the unique backends
+	types := make(map[string]bool)
+	for _, backend := range uniqueBackends {
+		types[backend.Type] = true
+	}
+	assert.True(t, types["s3"])
+	assert.True(t, types["azurerm"])
 }

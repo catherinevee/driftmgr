@@ -11,22 +11,22 @@ import (
 
 // MockProvider is a mock implementation of CloudProvider for testing
 type MockProvider struct {
-	name                   string
-	resources              []models.Resource
-	regions                []string
-	supportedTypes         []string
-	discoverError          error
-	getResourceError       error
-	validateError          error
-	listRegionsError       error
-	discoverCallCount      int
-	getResourceCallCount   int
-	validateCallCount      int
-	listRegionsCallCount   int
-	mu                     sync.Mutex
-	resourceMap            map[string]*models.Resource
-	discoverDelay          bool
-	returnEmptyResources   bool
+	name                 string
+	resources            []models.Resource
+	regions              []string
+	supportedTypes       []string
+	discoverError        error
+	getResourceError     error
+	validateError        error
+	listRegionsError     error
+	discoverCallCount    int
+	getResourceCallCount int
+	validateCallCount    int
+	listRegionsCallCount int
+	mu                   sync.Mutex
+	resourceMap          map[string]*models.Resource
+	discoverDelay        bool
+	returnEmptyResources bool
 }
 
 // NewMockProvider creates a new mock provider

@@ -235,20 +235,20 @@ func TestHealthIssue(t *testing.T) {
 func TestSecurityRule(t *testing.T) {
 	rules := []SecurityRule{
 		{
-			ID:          "rule-001",
-			Name:        "No public S3 buckets",
-			Description: "S3 buckets should not be publicly accessible",
+			ID:            "rule-001",
+			Name:          "No public S3 buckets",
+			Description:   "S3 buckets should not be publicly accessible",
 			ResourceTypes: []string{"aws_s3_bucket"},
-			Severity:    SeverityHigh,
-			Category:    "Storage Security",
+			Severity:      SeverityHigh,
+			Category:      "Storage Security",
 		},
 		{
-			ID:          "rule-002",
-			Name:        "RDS encryption required",
-			Description: "RDS instances must have encryption enabled",
+			ID:            "rule-002",
+			Name:          "RDS encryption required",
+			Description:   "RDS instances must have encryption enabled",
 			ResourceTypes: []string{"aws_rds_instance", "aws_rds_cluster"},
-			Severity:    SeverityCritical,
-			Category:    "Data Protection",
+			Severity:      SeverityCritical,
+			Category:      "Data Protection",
 		},
 	}
 
@@ -264,13 +264,13 @@ func TestSecurityRule(t *testing.T) {
 
 func TestHealthCheck(t *testing.T) {
 	check := HealthCheck{
-		ID:          "check-001",
-		Name:        "Instance health check",
-		Type:        "availability",
-		Enabled:     true,
-		Interval:    5 * time.Minute,
-		Timeout:     30 * time.Second,
-		RetryCount:  3,
+		ID:         "check-001",
+		Name:       "Instance health check",
+		Type:       "availability",
+		Enabled:    true,
+		Interval:   5 * time.Minute,
+		Timeout:    30 * time.Second,
+		RetryCount: 3,
 		Parameters: map[string]interface{}{
 			"endpoint": "http://example.com/health",
 			"method":   "GET",
@@ -289,9 +289,9 @@ func TestHealthCheck(t *testing.T) {
 
 func TestHealthAnalyzer(t *testing.T) {
 	analyzer := &HealthAnalyzer{
-		graph:          graph.NewDependencyGraph(),
-		providers:      make(map[string]ProviderHealthChecker),
-		customChecks:   []HealthCheck{},
+		graph:        graph.NewDependencyGraph(),
+		providers:    make(map[string]ProviderHealthChecker),
+		customChecks: []HealthCheck{},
 		severityLevels: map[string]Severity{
 			"low":      SeverityLow,
 			"medium":   SeverityMedium,

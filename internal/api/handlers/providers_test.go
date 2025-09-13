@@ -202,8 +202,8 @@ func TestProvidersHandler_ConfigValidation(t *testing.T) {
 			name:     "GCP valid config",
 			provider: "gcp",
 			config: map[string]interface{}{
-				"project_id":   "my-project",
-				"credentials":  map[string]string{"type": "service_account"},
+				"project_id":  "my-project",
+				"credentials": map[string]string{"type": "service_account"},
 			},
 			expectedStatus: http.StatusAccepted,
 		},
@@ -216,9 +216,9 @@ func TestProvidersHandler_ConfigValidation(t *testing.T) {
 			expectedStatus: http.StatusAccepted,
 		},
 		{
-			name:     "Empty config",
-			provider: "aws",
-			config:   map[string]interface{}{},
+			name:           "Empty config",
+			provider:       "aws",
+			config:         map[string]interface{}{},
 			expectedStatus: http.StatusAccepted,
 		},
 	}
@@ -249,7 +249,7 @@ func BenchmarkProvidersHandler_GET(b *testing.B) {
 
 func BenchmarkProvidersHandler_POST(b *testing.B) {
 	body := map[string]interface{}{
-		"region": "us-east-1",
+		"region":  "us-east-1",
 		"enabled": true,
 	}
 	bodyBytes, _ := json.Marshal(body)

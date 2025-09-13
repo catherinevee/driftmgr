@@ -249,11 +249,11 @@ func TestHealthCheckMetadata(t *testing.T) {
 		ID:   "check-metadata",
 		Name: "Metadata Test",
 		Metadata: map[string]interface{}{
-			"string_value":  "test",
-			"int_value":     42,
-			"float_value":   3.14,
-			"bool_value":    true,
-			"array_value":   []string{"a", "b", "c"},
+			"string_value": "test",
+			"int_value":    42,
+			"float_value":  3.14,
+			"bool_value":   true,
+			"array_value":  []string{"a", "b", "c"},
 			"nested_object": map[string]interface{}{
 				"key": "value",
 			},

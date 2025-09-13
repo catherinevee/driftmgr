@@ -99,7 +99,7 @@ func TestNewProvider(t *testing.T) {
 func TestNewProvider_ConfigExtraction(t *testing.T) {
 	t.Run("AWS region extraction", func(t *testing.T) {
 		config := map[string]interface{}{
-			"region": "eu-west-1",
+			"region":  "eu-west-1",
 			"profile": "default",
 		}
 		provider, err := NewProvider("aws", config)
@@ -110,8 +110,8 @@ func TestNewProvider_ConfigExtraction(t *testing.T) {
 	t.Run("Azure subscription extraction", func(t *testing.T) {
 		config := map[string]interface{}{
 			"subscription_id": "sub-12345",
-			"resource_group": "test-rg",
-			"tenant_id": "tenant-123",
+			"resource_group":  "test-rg",
+			"tenant_id":       "tenant-123",
 		}
 		provider, err := NewProvider("azure", config)
 		require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestNewProvider_ConfigExtraction(t *testing.T) {
 	t.Run("GCP project extraction", func(t *testing.T) {
 		config := map[string]interface{}{
 			"project_id": "gcp-project-123",
-			"zone": "us-central1-a",
+			"zone":       "us-central1-a",
 		}
 		provider, err := NewProvider("gcp", config)
 		require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestNewProvider_ConfigExtraction(t *testing.T) {
 	t.Run("DigitalOcean region extraction", func(t *testing.T) {
 		config := map[string]interface{}{
 			"region": "sfo3",
-			"token": "do-token",
+			"token":  "do-token",
 		}
 		provider, err := NewProvider("digitalocean", config)
 		require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestNewProvider_CaseInsensitive(t *testing.T) {
 
 			// These should all succeed (not be unsupported)
 			if strings.ToLower(name) == "aws" || strings.ToLower(name) == "azure" ||
-			   strings.ToLower(name) == "gcp" || strings.ToLower(name) == "digitalocean" {
+				strings.ToLower(name) == "gcp" || strings.ToLower(name) == "digitalocean" {
 				assert.NoError(t, err)
 				assert.NotNil(t, provider)
 			}

@@ -11,12 +11,21 @@
 
 Advanced Terraform drift detection and remediation for multi-cloud environments.
 
+<!-- Build Status -->
 [![CI/CD Pipeline](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml)
-[![Test Coverage](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
+[![Test Coverage](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml)
 [![Security Scan](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml)
+
+<!-- Code Quality -->
+[![codecov](https://codecov.io/gh/catherinevee/driftmgr/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
+[![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
 [![Go Format Check](https://github.com/catherinevee/driftmgr/actions/workflows/gofmt.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/gofmt.yml)
 [![Go Linting](https://github.com/catherinevee/driftmgr/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/golangci-lint.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
+
+<!-- Project Info -->
+[![Go Version](https://img.shields.io/github/go-mod/go-version/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/go.mod)
+[![License](https://img.shields.io/github/license/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/releases)
 
 ## Table of Contents
 

@@ -32,9 +32,9 @@ func TestWebhookConfig(t *testing.T) {
 
 func TestWebhookResult(t *testing.T) {
 	result := &WebhookResult{
-		ID:        "webhook-123",
-		Status:    "success",
-		Message:   "Webhook processed successfully",
+		ID:      "webhook-123",
+		Status:  "success",
+		Message: "Webhook processed successfully",
 		Data: map[string]interface{}{
 			"resources": 10,
 			"severity":  "high",

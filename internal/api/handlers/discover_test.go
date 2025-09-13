@@ -150,7 +150,7 @@ func TestDiscoverHandler_LargeRequest(t *testing.T) {
 
 func TestDiscoverHandler_MalformedJSON(t *testing.T) {
 	malformedJSONs := []string{
-		`{"provider": "aws"`,           // Missing closing brace
+		`{"provider": "aws"`,            // Missing closing brace
 		`{"provider": aws}`,             // Unquoted value
 		`{'provider': 'aws'}`,           // Single quotes
 		`{"provider": "aws", "regions"`, // Incomplete
