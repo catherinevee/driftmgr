@@ -20,6 +20,7 @@ type Config struct {
 	Credentials map[string]string         `yaml:"credentials,omitempty"`
 	Settings    Settings                  `yaml:"settings"`
 	Providers   map[string]ProviderConfig `yaml:"providers,omitempty"`
+	Discovery   DiscoveryConfig           `yaml:"discovery,omitempty"`
 }
 
 // Settings represents application settings
@@ -91,6 +92,9 @@ type SlackSettings struct {
 
 // ProviderConfig represents provider-specific configuration
 type ProviderConfig struct {
+	Type          string            `yaml:"type,omitempty"`
+	Region        string            `yaml:"region,omitempty"`
+	Enabled       bool              `yaml:"enabled,omitempty"`
 	Regions       []string          `yaml:"regions"`
 	Credentials   map[string]string `yaml:"credentials,omitempty"`
 	ResourceTypes []string          `yaml:"resource_types,omitempty"`

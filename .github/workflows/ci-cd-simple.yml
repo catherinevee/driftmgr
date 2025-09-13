@@ -1,0 +1,107 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.23'
+
+jobs:
+  # Basic validation
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Verify dependencies
+      run: go mod verify
+    
+    - name: Check Go formatting
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "The following files are not formatted:"
+          gofmt -s -l .
+          exit 1
+        fi
+        echo "All Go files are properly formatted"
+    
+    - name: Run go vet
+      run: go vet ./...
+    
+    - name: Build application
+      run: go build ./cmd/driftmgr/...
+    
+    - name: Run tests
+      run: go test -v ./internal/drift/... -timeout 30s
+
+  # Security scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      continue-on-error: true
+      with:
+        args: '-fmt sarif -out gosec.sarif -severity high -timeout 5m ./...'
+    
+    - name: Upload Gosec results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && github.event_name != 'pull_request'
+      continue-on-error: true
+      with:
+        sarif_file: gosec.sarif
+
+  # Docker build
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64
+        push: false
+        tags: driftmgr:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

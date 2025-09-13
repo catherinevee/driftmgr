@@ -31,24 +31,19 @@ jobs:
     - name: Run tests with coverage
       run: |
         echo "Running tests with coverage..."
-        go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/drift/... -timeout 30s
-        go test -v -race -coverprofile=coverage-additional.out -covermode=atomic ./cmd/driftmgr/... -timeout 30s
-        
-        # Combine coverage files
-        echo "mode: atomic" > coverage-combined.out
-        tail -n +2 coverage.out >> coverage-combined.out
-        tail -n +2 coverage-additional.out >> coverage-combined.out
+        go test -v -race -coverprofile=coverage.out -covermode=atomic ./... -timeout 60s
     
     - name: Generate coverage report
       run: |
         echo "Generating coverage report..."
-        go tool cover -html=coverage-combined.out -o coverage.html
-        go tool cover -func=coverage-combined.out
-    
+        go tool cover -html=coverage.out -o coverage.html
+        go tool cover -func=coverage.out
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
-        file: ./coverage-combined.out
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.out
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
@@ -59,5 +54,5 @@ jobs:
       with:
         name: coverage-report
         path: |
-          coverage-combined.out
+          coverage.out
           coverage.html

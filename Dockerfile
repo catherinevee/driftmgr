@@ -16,6 +16,11 @@ RUN go mod download
 # Copy all source code
 COPY . .
 
+# Fix line endings and validate syntax
+RUN find . -name "*.go" -exec dos2unix {} \; 2>/dev/null || true
+RUN go fmt ./...
+RUN go vet ./...
+
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o driftmgr ./cmd/driftmgr
 

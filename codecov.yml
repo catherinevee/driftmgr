@@ -11,42 +11,42 @@ codecov:
 coverage:
   precision: 2
   round: down
-  range: "60...100"
-  
+  range: "30...80"  # Updated range from current ~30% to target 80%
+
   status:
     project:
       default:
         # Basic project coverage settings
-        target: 70%
+        target: 80%  # Updated target to 80%
         threshold: 2%
         base: auto
         if_not_found: success
         if_ci_failed: error
         only_pulls: false
         
-      # Specific coverage for different components
+      # Specific coverage for different components (phased targets)
       unit:
-        target: 75%
+        target: 80%  # Overall unit test target
         flags:
           - unittests
-          
+
       integration:
-        target: 60%
+        target: 70%  # Integration test target
         flags:
           - integration
-          
+
       api:
-        target: 70%
+        target: 75%  # API coverage target
         paths:
           - "internal/api/**"
-          
+
       providers:
-        target: 65%
+        target: 75%  # Cloud provider coverage
         paths:
           - "internal/providers/**"
-          
+
       core:
-        target: 80%
+        target: 85%  # Core business logic needs highest coverage
         paths:
           - "internal/drift/**"
           - "internal/state/**"
@@ -55,7 +55,7 @@ coverage:
     patch:
       default:
         # Coverage for new/modified code
-        target: 70%
+        target: 80%  # New code should meet our 80% target
         threshold: 5%
         base: auto
         if_not_found: success

@@ -88,7 +88,7 @@ type Instance struct {
 	SchemaVersion       int                    `json:"schema_version"`
 	Attributes          map[string]interface{} `json:"attributes,omitempty"`
 	AttributesFlat      map[string]string      `json:"attributes_flat,omitempty"`
-	SensitiveAttributes []string               `json:"sensitive_attributes,omitempty"`
+	SensitiveAttributes []interface{}          `json:"sensitive_attributes,omitempty"`
 	Private             string                 `json:"private,omitempty"`
 	Dependencies        []string               `json:"dependencies,omitempty"`
 	CreateBeforeDestroy bool                   `json:"create_before_destroy,omitempty"`
@@ -431,4 +431,96 @@ func (p *Parser) MergeStates(states ...*TerraformState) (*TerraformState, error)
 	}
 
 	return merged, nil
+}
+
+// ExtractResourceID extracts the ID from a resource
+func (sp *StateParser) ExtractResourceID(resource Resource) string {
+	if len(resource.Instances) == 0 {
+		return ""
+	}
+
+	if id, ok := resource.Instances[0].Attributes["id"]; ok {
+		if idStr, ok := id.(string); ok {
+			return idStr
+		}
+	}
+
+	return ""
+}
+
+// ExtractProviderFromResource extracts the provider name from a resource
+func (sp *StateParser) ExtractProviderFromResource(resource Resource) string {
+	provider := resource.Provider
+
+	// Empty provider
+	if provider == "" {
+		return ""
+	}
+
+	// Handle full provider path like: provider["registry.terraform.io/hashicorp/aws"]
+	if strings.Contains(provider, "registry.terraform.io") {
+		// Extract the provider name from the URL
+		if start := strings.LastIndex(provider, "/"); start != -1 {
+			end := strings.Index(provider[start:], "\"")
+			if end != -1 {
+				provider = provider[start+1 : start+end]
+			} else if end := strings.Index(provider[start:], "]"); end != -1 {
+				provider = provider[start+1 : start+end]
+			} else {
+				provider = provider[start+1:]
+			}
+		}
+	}
+
+	// Handle provider with alias like: provider["..."].west
+	if idx := strings.Index(provider, "]."); idx != -1 {
+		// Find the provider name before the alias
+		if strings.Contains(provider[:idx], "/") {
+			parts := strings.Split(provider[:idx], "/")
+			provider = parts[len(parts)-1]
+			provider = strings.TrimSuffix(provider, "\"")
+		}
+	}
+
+	// Simple provider name
+	if !strings.Contains(provider, "[") && !strings.Contains(provider, "/") {
+		return provider
+	}
+
+	// Remove any remaining brackets or quotes
+	provider = strings.Trim(provider, "[]\"")
+
+	return provider
+}
+
+// FilterResourcesByType filters resources by type
+func (sp *StateParser) FilterResourcesByType(state *StateFile, resourceType string) []Resource {
+	var filtered []Resource
+
+	for _, resource := range state.Resources {
+		if resource.Type == resourceType {
+			filtered = append(filtered, resource)
+		}
+	}
+
+	return filtered
+}
+
+// CountResources counts resources by type
+func (sp *StateParser) CountResources(state *StateFile) map[string]int {
+	counts := make(map[string]int)
+
+	for _, resource := range state.Resources {
+		counts[resource.Type]++
+	}
+
+	return counts
+}
+
+// ValidateStateVersion validates the state version
+func (sp *StateParser) ValidateStateVersion(state *StateFile) error {
+	if state.Version < 3 || state.Version > 4 {
+		return fmt.Errorf("unsupported state version: %d", state.Version)
+	}
+	return nil
 }

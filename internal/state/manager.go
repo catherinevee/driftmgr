@@ -143,7 +143,7 @@ func (sm *StateManager) DeleteState(ctx context.Context, key string) error {
 
 	// Lock state
 	if err := sm.backend.Lock(ctx, key); err != nil {
-		return fmt.Errorf("failed to lock state: %w", err)
+		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
 	defer sm.backend.Unlock(ctx, key)
 
@@ -160,7 +160,11 @@ func (sm *StateManager) DeleteState(ctx context.Context, key string) error {
 
 // ListStates lists all available states
 func (sm *StateManager) ListStates(ctx context.Context) ([]string, error) {
-	return sm.backend.ListStates(ctx)
+	states, err := sm.backend.ListStates(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list states: %w", err)
+	}
+	return states, nil
 }
 
 // GetStateMetadata retrieves metadata about a state without parsing the full state
@@ -204,47 +208,6 @@ func (sm *StateManager) GetStateHistory(ctx context.Context, key string) ([]Stat
 	return sm.backend.ListStateVersions(ctx, key)
 }
 
-// RestoreStateVersion restores a specific version of a state
-func (sm *StateManager) RestoreStateVersion(ctx context.Context, key string, version int) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-
-	// Get the specific version
-	data, err := sm.backend.GetStateVersion(ctx, key, version)
-	if err != nil {
-		return fmt.Errorf("failed to get state version: %w", err)
-	}
-
-	// Parse to verify it's valid
-	state, err := sm.parser.Parse(data)
-	if err != nil {
-		return fmt.Errorf("failed to parse historical state: %w", err)
-	}
-
-	// Increment serial for the restore
-	state.Serial++
-
-	// Lock state
-	if err := sm.backend.Lock(ctx, key); err != nil {
-		return fmt.Errorf("failed to lock state: %w", err)
-	}
-	defer sm.backend.Unlock(ctx, key)
-
-	// Serialize and upload
-	newData, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to serialize state: %w", err)
-	}
-
-	if err := sm.backend.Put(ctx, key, newData); err != nil {
-		return fmt.Errorf("failed to restore state: %w", err)
-	}
-
-	// Invalidate cache
-	sm.cache.Delete(key)
-
-	return nil
-}
 
 // ImportResource adds a new resource to the state
 func (sm *StateManager) ImportResource(ctx context.Context, key string, resource Resource) error {
@@ -278,85 +241,7 @@ func (sm *StateManager) ImportResource(ctx context.Context, key string, resource
 	return sm.UpdateState(ctx, key, state)
 }
 
-// RemoveResource removes a resource from the state
-func (sm *StateManager) RemoveResource(ctx context.Context, key string, resourceAddress string) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
 
-	// Get current state
-	state, err := sm.GetState(ctx, key)
-	if err != nil {
-		return fmt.Errorf("failed to get state: %w", err)
-	}
-
-	// Find and remove resource
-	found := false
-	newResources := make([]Resource, 0, len(state.Resources)-1)
-
-	for _, resource := range state.Resources {
-		address := fmt.Sprintf("%s.%s", resource.Type, resource.Name)
-		if address == resourceAddress {
-			found = true
-			continue
-		}
-		newResources = append(newResources, resource)
-	}
-
-	if !found {
-		return fmt.Errorf("resource %s not found in state", resourceAddress)
-	}
-
-	state.Resources = newResources
-
-	// Update state
-	return sm.UpdateState(ctx, key, state)
-}
-
-// MoveResource moves a resource within the state
-func (sm *StateManager) MoveResource(ctx context.Context, key string, fromAddress, toAddress string) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-
-	// Get current state
-	state, err := sm.GetState(ctx, key)
-	if err != nil {
-		return fmt.Errorf("failed to get state: %w", err)
-	}
-
-	// Find source resource
-	var sourceResource *Resource
-	newResources := make([]Resource, 0, len(state.Resources))
-
-	for _, resource := range state.Resources {
-		address := fmt.Sprintf("%s.%s", resource.Type, resource.Name)
-		if address == fromAddress {
-			sourceResource = &resource
-			continue
-		}
-		newResources = append(newResources, resource)
-	}
-
-	if sourceResource == nil {
-		return fmt.Errorf("source resource %s not found", fromAddress)
-	}
-
-	// Parse new address
-	parts := strings.Split(toAddress, ".")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid destination address: %s", toAddress)
-	}
-
-	// Update resource with new type and name
-	sourceResource.Type = parts[0]
-	sourceResource.Name = parts[1]
-
-	// Add back to resources
-	newResources = append(newResources, *sourceResource)
-	state.Resources = newResources
-
-	// Update state
-	return sm.UpdateState(ctx, key, state)
-}
 
 // RefreshState updates the state with actual cloud resource data
 func (sm *StateManager) RefreshState(ctx context.Context, key string, actualResources map[string]interface{}) error {
@@ -390,20 +275,6 @@ func (sm *StateManager) RefreshState(ctx context.Context, key string, actualReso
 	return sm.UpdateState(ctx, key, state)
 }
 
-// CompareStates compares two states and returns differences
-func (sm *StateManager) CompareStates(ctx context.Context, key1, key2 string) ([]StateDifference, error) {
-	state1, err := sm.GetState(ctx, key1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get first state: %w", err)
-	}
-
-	state2, err := sm.GetState(ctx, key2)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get second state: %w", err)
-	}
-
-	return sm.compareStateObjects(state1, state2), nil
-}
 
 // StateDifference represents a difference between two states
 type StateDifference struct {
@@ -475,4 +346,246 @@ func generateLineage() string {
 	h := sha256.New()
 	h.Write([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
 	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// PutState saves a state file (alias for UpdateState with proper locking)
+func (sm *StateManager) PutState(ctx context.Context, key string, state *TerraformState) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	// Validate before saving
+	if err := sm.validator.Validate(state); err != nil {
+		return fmt.Errorf("state validation failed: %w", err)
+	}
+
+	// Lock state
+	if err := sm.backend.Lock(ctx, key); err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer sm.backend.Unlock(ctx, key)
+
+	// Serialize state
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to serialize state: %w", err)
+	}
+
+	// Upload to backend
+	if err := sm.backend.Put(ctx, key, data); err != nil {
+		return fmt.Errorf("failed to put state: %w", err)
+	}
+
+	// Update cache
+	sm.cache.Set(key, state)
+
+	return nil
+}
+
+// ListStateVersions lists all versions of a state
+func (sm *StateManager) ListStateVersions(ctx context.Context, key string) ([]StateVersion, error) {
+	versions, err := sm.backend.ListStateVersions(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list state versions: %w", err)
+	}
+	return versions, nil
+}
+
+// RestoreStateVersion restores a specific version and returns the restored state
+func (sm *StateManager) RestoreStateVersion(ctx context.Context, key string, version int) (*TerraformState, error) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	// Get the specific version
+	data, err := sm.backend.GetStateVersion(ctx, key, version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state version: %w", err)
+	}
+
+	// Parse to verify it's valid
+	state, err := sm.parser.Parse(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse historical state: %w", err)
+	}
+
+	// Increment serial for the restore
+	state.Serial++
+
+	// Lock state
+	if err := sm.backend.Lock(ctx, key); err != nil {
+		return nil, fmt.Errorf("failed to lock state: %w", err)
+	}
+	defer sm.backend.Unlock(ctx, key)
+
+	// Serialize and upload
+	newData, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize state: %w", err)
+	}
+
+	if err := sm.backend.Put(ctx, key, newData); err != nil {
+		return nil, fmt.Errorf("failed to restore state: %w", err)
+	}
+
+	// Update cache
+	sm.cache.Set(key, state)
+
+	return state, nil
+}
+
+// StateComparison represents the comparison between two states
+type StateComparison struct {
+	AreEqual          bool       `json:"are_equal"`
+	SerialDiff        int        `json:"serial_diff"`
+	AddedResources    []Resource `json:"added_resources"`
+	RemovedResources  []Resource `json:"removed_resources"`
+	ModifiedResources []Resource `json:"modified_resources"`
+}
+
+// CompareStates compares two state objects and returns their differences
+func (sm *StateManager) CompareStates(state1, state2 *TerraformState) *StateComparison {
+	comparison := &StateComparison{
+		AreEqual:          true,
+		SerialDiff:        state2.Serial - state1.Serial,
+		AddedResources:    []Resource{},
+		RemovedResources:  []Resource{},
+		ModifiedResources: []Resource{},
+	}
+
+	// Build resource maps
+	resources1 := make(map[string]Resource)
+	resources2 := make(map[string]Resource)
+
+	for _, r := range state1.Resources {
+		key := fmt.Sprintf("%s.%s", r.Type, r.Name)
+		resources1[key] = r
+	}
+
+	for _, r := range state2.Resources {
+		key := fmt.Sprintf("%s.%s", r.Type, r.Name)
+		resources2[key] = r
+	}
+
+	// Check for removed resources
+	for key, r1 := range resources1 {
+		if _, exists := resources2[key]; !exists {
+			comparison.RemovedResources = append(comparison.RemovedResources, r1)
+			comparison.AreEqual = false
+		}
+	}
+
+	// Check for added resources
+	for key, r2 := range resources2 {
+		if _, exists := resources1[key]; !exists {
+			comparison.AddedResources = append(comparison.AddedResources, r2)
+			comparison.AreEqual = false
+		}
+	}
+
+	// Check serial difference
+	if state1.Serial != state2.Serial {
+		comparison.AreEqual = false
+	}
+
+	return comparison
+}
+
+// MoveResource moves a resource within a single state
+func (sm *StateManager) MoveResource(state *TerraformState, fromAddress, toAddress string) error {
+	// Parse addresses
+	fromParts := strings.Split(fromAddress, ".")
+	toParts := strings.Split(toAddress, ".")
+
+	if len(fromParts) != 2 || len(toParts) != 2 {
+		return fmt.Errorf("invalid resource address format")
+	}
+
+	// Find source resource
+	var sourceResource *Resource
+	sourceIndex := -1
+
+	for i, resource := range state.Resources {
+		if resource.Type == fromParts[0] && resource.Name == fromParts[1] {
+			sourceResource = &state.Resources[i]
+			sourceIndex = i
+			break
+		}
+	}
+
+	if sourceResource == nil {
+		return fmt.Errorf("resource not found: %s", fromAddress)
+	}
+
+	// Check if target already exists
+	for _, resource := range state.Resources {
+		if resource.Type == toParts[0] && resource.Name == toParts[1] {
+			return fmt.Errorf("target resource already exists: %s", toAddress)
+		}
+	}
+
+	// Update resource
+	state.Resources[sourceIndex].Type = toParts[0]
+	state.Resources[sourceIndex].Name = toParts[1]
+
+	return nil
+}
+
+// RemoveResource removes a resource from a state
+func (sm *StateManager) RemoveResource(state *TerraformState, address string) error {
+	// Check if address contains index
+	var resourceType, resourceName string
+	var instanceIndex int = -1
+
+	if strings.Contains(address, "[") {
+		// Parse indexed address like aws_instance.cluster[1]
+		parts := strings.Split(address, ".")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid resource address: %s", address)
+		}
+		resourceType = parts[0]
+
+		// Parse name and index
+		nameParts := strings.Split(parts[1], "[")
+		resourceName = nameParts[0]
+		if len(nameParts) > 1 {
+			indexStr := strings.TrimSuffix(nameParts[1], "]")
+			fmt.Sscanf(indexStr, "%d", &instanceIndex)
+		}
+	} else {
+		// Parse simple address like aws_instance.test
+		parts := strings.Split(address, ".")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid resource address: %s", address)
+		}
+		resourceType = parts[0]
+		resourceName = parts[1]
+	}
+
+	// Find and remove resource or instance
+	for i, resource := range state.Resources {
+		if resource.Type == resourceType && resource.Name == resourceName {
+			if instanceIndex >= 0 {
+				// Remove specific instance
+				if instanceIndex >= len(resource.Instances) {
+					return fmt.Errorf("instance index out of range: %d", instanceIndex)
+				}
+
+				// Remove the instance
+				state.Resources[i].Instances = append(
+					resource.Instances[:instanceIndex],
+					resource.Instances[instanceIndex+1:]...,
+				)
+
+				// If no instances left, remove the entire resource
+				if len(state.Resources[i].Instances) == 0 {
+					state.Resources = append(state.Resources[:i], state.Resources[i+1:]...)
+				}
+			} else {
+				// Remove entire resource
+				state.Resources = append(state.Resources[:i], state.Resources[i+1:]...)
+			}
+			return nil
+		}
+	}
+
+	return fmt.Errorf("resource not found: %s", address)
 }

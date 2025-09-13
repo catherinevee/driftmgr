@@ -78,41 +78,41 @@ linters:
 issues:
   uniq-by-line: true
   exclude-dirs:
-    - tests/
+  - tests/
   exclude-files:
-    - ".*_test\\.go$"
+  - ".*_test\\.go$"
   exclude-rules:
-    - path: _test\.go
-      linters:
-        - mnd
-        - gocyclo
-        - goconst
-        - typecheck
-        - unused
-        - ineffassign
-    - path: cmd/
-      linters:
-        - mnd
-    - path: tests/
-      linters:
-        - typecheck
-        - unused
-        - ineffassign
-        - goconst
-        - gocyclo
-        - mnd
-    - path: internal/providers/aws/provider_test.go
-      linters:
-        - typecheck
-    - path: internal/remediation/strategies/code_as_truth_test.go
-      linters:
-        - typecheck
-    - text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv) is not checked"
-      linters:
-        - errcheck
-    - text: "exported (function|method|type|var|const) .* should have comment"
-      linters:
-        - revive
-    - text: "should have a package comment"
-      linters:
-        - revive
+  - path: _test\.go
+    linters:
+    - mnd
+    - gocyclo
+    - goconst
+    - typecheck
+    - unused
+    - ineffassign
+  - path: cmd/
+    linters:
+    - mnd
+  - path: tests/
+    linters:
+    - typecheck
+    - unused
+    - ineffassign
+    - goconst
+    - gocyclo
+    - mnd
+  - path: internal/providers/aws/provider_test.go
+    linters:
+    - typecheck
+  - path: internal/remediation/strategies/code_as_truth_test.go
+    linters:
+    - typecheck
+  - text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv) is not checked"
+    linters:
+    - errcheck
+  - text: "exported (function|method|type|var|const) .* should have comment"
+    linters:
+    - revive
+  - text: "should have a package comment"
+    linters:
+    - revive
