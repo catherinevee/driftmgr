@@ -26,39 +26,35 @@ func TestEndToEndWorkflow(t *testing.T) {
 
 	// Initialize configuration
 	cfg := &config.Config{
-		Discovery: config.DiscoveryConfig{
-			EnableCaching:        true,
-			CacheTTL:             5 * time.Minute,
-			ConcurrencyLimit:     5,
-			MaxConcurrentRegions: 3,
-			Regions:              []string{"us-east-1", "us-west-2"},
-			AWSProfile:           "default",
-		},
-		Database: config.DatabaseConfig{
-			Type: "sqlite",
-			Host: filepath.Join(tempDir, "test.db"),
+		Provider: "aws",
+		Regions:  []string{"us-east-1", "us-west-2"},
+		Settings: config.Settings{
+			AutoDiscovery:   true,
+			ParallelWorkers: 5,
+			CacheTTL:        "5m",
+			Database: config.DatabaseSettings{
+				Enabled: true,
+				Path:    filepath.Join(tempDir, "test.db"),
+				Backup:  true,
+			},
 		},
 	}
 
 	t.Run("Complete Discovery and Drift Detection Workflow", func(t *testing.T) {
-		// Step 1: Initialize cloud discoverer
-		discoverer := discovery.NewCloudDiscoverer()
+		// Step 1: Initialize enhanced discoverer
+		discoverer := discovery.NewEnhancedDiscoverer(cfg)
 
 		// Add AWS provider
-		awsProvider, err := awsprovider.NewAWSProvider()
-		if err != nil {
-			t.Skipf("AWS provider not available: %v", err)
+		awsProvider := awsprovider.NewAWSProvider("us-east-1")
+		if awsProvider == nil {
+			t.Skip("AWS provider not available")
 			return
 		}
-		discoverer.AddProvider("aws", awsProvider)
 
 		// Step 2: Perform discovery
 		t.Log("Step 2: Performing resource discovery...")
-		discoveryConfig := discovery.Config{
-			Regions: cfg.Discovery.Regions,
-		}
-
-		resources, err := discoverer.DiscoverProvider(ctx, "aws", discoveryConfig)
+		// Use the regions from the config
+		resources, err := discoverer.Discover(ctx)
 		if err != nil {
 			t.Skipf("AWS discovery failed (likely missing credentials): %v", err)
 			return
