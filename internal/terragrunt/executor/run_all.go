@@ -289,7 +289,7 @@ func (e *RunAllExecutor) executeModule(module *resolver.Module) *ModuleExecResul
 
 	cmd = exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
 	cmd.Dir = module.Path
-	cmd.Env = cmd.Env
+	cmd.Env = os.Environ()
 
 	// Capture output
 	output, err := cmd.CombinedOutput()

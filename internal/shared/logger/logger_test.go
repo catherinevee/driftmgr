@@ -1,4 +1,4 @@
-package monitoring
+package logger
 
 import (
 	"bytes"
@@ -41,13 +41,13 @@ func TestNewLogger(t *testing.T) {
 	assert.NotZero(t, logger.startTime)
 }
 
-func TestLogger_SetLevel(t *testing.T) {
+func TestLogger_SetLogLevel(t *testing.T) {
 	logger := NewLogger()
 
-	logger.SetLevel(DEBUG)
+	logger.SetLogLevel(DEBUG)
 	assert.Equal(t, DEBUG, logger.currentLevel)
 
-	logger.SetLevel(ERROR)
+	logger.SetLogLevel(ERROR)
 	assert.Equal(t, ERROR, logger.currentLevel)
 }
 
@@ -58,7 +58,7 @@ func TestLogger_Methods(t *testing.T) {
 	logger.errorLogger = log.New(&buf, "[ERROR] ", 0)
 	logger.warningLogger = log.New(&buf, "[WARNING] ", 0)
 	logger.debugLogger = log.New(&buf, "[DEBUG] ", 0)
-	logger.SetLevel(DEBUG)
+	logger.SetLogLevel(DEBUG)
 
 	// Test Info
 	buf.Reset()
@@ -91,7 +91,7 @@ func TestLogger_Infof(t *testing.T) {
 	logger.infoLogger = log.New(&buf, "[INFO] ", 0)
 
 	buf.Reset()
-	logger.Infof("formatted %s %d", "message", 123)
+	logger.Info("formatted %s %d", "message", 123)
 	assert.Contains(t, buf.String(), "formatted message 123")
 }
 
@@ -101,7 +101,7 @@ func TestLogger_Errorf(t *testing.T) {
 	logger.errorLogger = log.New(&buf, "[ERROR] ", 0)
 
 	buf.Reset()
-	logger.Errorf("error: %s", "something went wrong")
+	logger.Error("error: %s", "something went wrong")
 	assert.Contains(t, buf.String(), "error: something went wrong")
 }
 
@@ -111,7 +111,7 @@ func TestLogger_Warningf(t *testing.T) {
 	logger.warningLogger = log.New(&buf, "[WARNING] ", 0)
 
 	buf.Reset()
-	logger.Warningf("warning: %s", "be careful")
+	logger.Warning("warning: %s", "be careful")
 	assert.Contains(t, buf.String(), "warning: be careful")
 }
 
@@ -119,10 +119,10 @@ func TestLogger_Debugf(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger()
 	logger.debugLogger = log.New(&buf, "[DEBUG] ", 0)
-	logger.SetLevel(DEBUG)
+	logger.SetLogLevel(DEBUG)
 
 	buf.Reset()
-	logger.Debugf("debug: %v", map[string]int{"count": 5})
+	logger.Debug("debug: %v", map[string]int{"count": 5})
 	assert.Contains(t, buf.String(), "debug: map[count:5]")
 }
 
@@ -135,7 +135,7 @@ func TestLogger_FilterByLevel(t *testing.T) {
 	logger.debugLogger = log.New(&debugBuf, "[DEBUG] ", 0)
 
 	// Set to WARNING level
-	logger.SetLevel(WARNING)
+	logger.SetLogLevel(WARNING)
 
 	// Debug should not log
 	debugBuf.Reset()
@@ -159,21 +159,21 @@ func TestLogger_FilterByLevel(t *testing.T) {
 }
 
 func TestGetLogger(t *testing.T) {
-	logger1 := GetLogger()
-	logger2 := GetLogger()
+	logger1 := GetGlobalLogger()
+	logger2 := GetGlobalLogger()
 
 	// Should return the same instance
 	assert.Equal(t, logger1, logger2)
 	assert.NotNil(t, logger1)
 }
 
-func TestLogger_ElapsedTime(t *testing.T) {
+func TestLogger_GetUptime(t *testing.T) {
 	logger := NewLogger()
 	logger.startTime = time.Now().Add(-5 * time.Second)
 
-	elapsed := logger.ElapsedTime()
-	assert.True(t, elapsed >= 5*time.Second)
-	assert.True(t, elapsed < 6*time.Second)
+	uptime := logger.GetUptime()
+	assert.True(t, uptime >= 5*time.Second)
+	assert.True(t, uptime < 6*time.Second)
 }
 
 func BenchmarkLogger_Info(b *testing.B) {
@@ -194,6 +194,6 @@ func BenchmarkLogger_Infof(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Infof("benchmark %s %d", "message", i)
+		logger.Info("benchmark %s %d", "message", i)
 	}
 }
