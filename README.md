@@ -12,15 +12,15 @@
 Advanced Terraform drift detection and remediation for multi-cloud environments.
 
 <!-- Build Status -->
-[![CI/CD Pipeline](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml)
-[![Test Coverage](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml)
-[![Security Scan](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml)
+[![CI/CD Pipeline](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml)
+[![Test Coverage](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml)
+[![Security Scan](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml)
 
 <!-- Code Quality -->
 [![codecov](https://codecov.io/gh/catherinevee/driftmgr/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
 [![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
-[![Go Format Check](https://github.com/catherinevee/driftmgr/actions/workflows/gofmt.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/gofmt.yml)
-[![Go Linting](https://github.com/catherinevee/driftmgr/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/catherinevee/driftmgr/actions/workflows/golangci-lint.yml)
+[![Go Format Check](https://github.com/catherinevee/driftmgr/actions/workflows/gofmt.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/gofmt.yml)
+[![Go Linting](https://github.com/catherinevee/driftmgr/actions/workflows/golangci-lint.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/golangci-lint.yml)
 
 <!-- Project Info -->
 [![Go Version](https://img.shields.io/github/go-mod/go-version/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/go.mod)
