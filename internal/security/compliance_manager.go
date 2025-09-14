@@ -210,7 +210,7 @@ func (cm *ComplianceManager) CreatePolicy(ctx context.Context, policy *Complianc
 				"rule_count":  len(policy.Rules),
 			},
 		}
-		cm.eventBus.PublishComplianceEvent(event)
+		_ = cm.eventBus.PublishComplianceEvent(event)
 	}
 
 	return nil
@@ -296,7 +296,7 @@ func (cm *ComplianceManager) RunComplianceCheck(ctx context.Context, checkID str
 				"check_status": result.Status,
 			},
 		}
-		cm.eventBus.PublishComplianceEvent(event)
+		_ = cm.eventBus.PublishComplianceEvent(event)
 	}
 
 	return result, nil

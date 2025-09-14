@@ -135,7 +135,7 @@ func (pe *PolicyEngine) CreatePolicy(ctx context.Context, policy *SecurityPolicy
 				"priority":    policy.Priority,
 			},
 		}
-		pe.eventBus.PublishComplianceEvent(event)
+		_ = pe.eventBus.PublishComplianceEvent(event)
 	}
 
 	return nil
@@ -174,7 +174,7 @@ func (pe *PolicyEngine) CreateRule(ctx context.Context, rule *SecurityRule) erro
 				"category":  rule.Category,
 			},
 		}
-		pe.eventBus.PublishComplianceEvent(event)
+		_ = pe.eventBus.PublishComplianceEvent(event)
 	}
 
 	return nil
@@ -275,7 +275,7 @@ func (pe *PolicyEngine) EvaluatePolicy(ctx context.Context, policyID string, res
 				"violation_count":   len(evaluation.Violations),
 			},
 		}
-		pe.eventBus.PublishComplianceEvent(event)
+		_ = pe.eventBus.PublishComplianceEvent(event)
 	}
 
 	return evaluation, nil

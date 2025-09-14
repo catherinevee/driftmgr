@@ -282,7 +282,7 @@ func (hm *HealthMonitor) checkMetricAlert(resourceID string, metric HealthMetric
 			}
 
 			if hm.eventBus != nil {
-				hm.eventBus.PublishHealthEvent(event)
+				_ = hm.eventBus.PublishHealthEvent(event)
 			}
 		}
 	}
@@ -308,7 +308,7 @@ func (hm *HealthMonitor) publishHealthEvent(report *HealthReport) {
 		},
 	}
 
-	hm.eventBus.PublishHealthEvent(event)
+	_ = hm.eventBus.PublishHealthEvent(event)
 }
 
 // GetHealthSummary returns a summary of all resource health

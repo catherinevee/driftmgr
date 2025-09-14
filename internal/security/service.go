@@ -70,7 +70,7 @@ func (ss *SecurityService) Start(ctx context.Context) error {
 			Severity:  "info",
 			Timestamp: time.Now(),
 		}
-		ss.eventBus.PublishComplianceEvent(event)
+		_ = ss.eventBus.PublishComplianceEvent(event)
 	}
 
 	return nil
@@ -86,7 +86,7 @@ func (ss *SecurityService) Stop(ctx context.Context) error {
 			Severity:  "info",
 			Timestamp: time.Now(),
 		}
-		ss.eventBus.PublishComplianceEvent(event)
+		_ = ss.eventBus.PublishComplianceEvent(event)
 	}
 
 	return nil
@@ -163,7 +163,7 @@ func (ss *SecurityService) ScanResources(ctx context.Context, resources []*model
 				"duration":        result.Duration,
 			},
 		}
-		ss.eventBus.PublishComplianceEvent(event)
+		_ = ss.eventBus.PublishComplianceEvent(event)
 	}
 
 	return result, nil
@@ -188,7 +188,7 @@ func (ss *SecurityService) GenerateComplianceReport(ctx context.Context, standar
 				"standard":  standard,
 			},
 		}
-		ss.eventBus.PublishComplianceEvent(event)
+		_ = ss.eventBus.PublishComplianceEvent(event)
 	}
 
 	return report, nil
