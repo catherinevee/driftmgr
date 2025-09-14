@@ -11,17 +11,16 @@
 
 Advanced Terraform drift detection and remediation for multi-cloud environments.
 
-<!-- Build & Quality -->
+<!-- CI/CD & Quality -->
 [![CI/CD Pipeline](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml)
-[![Test Coverage](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml)
-[![Security](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml)
-[![codecov](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
+[![Drift Detection](https://github.com/catherinevee/driftmgr/actions/workflows/drift-detection.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/drift-detection.yml)
+[![codecov](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/catherinevee/driftmgr)
 [![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
 
-<!-- Security & Compliance -->
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/catherinevee/driftmgr/badge)](https://scorecard.dev/viewer/?uri=github.com/catherinevee/driftmgr)
+<!-- Project Info -->
 [![License](https://img.shields.io/github/license/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/go.mod)
+[![Release](https://img.shields.io/github/v/release/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/releases)
 
 ## Table of Contents
 
