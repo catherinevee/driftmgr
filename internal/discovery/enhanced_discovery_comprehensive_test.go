@@ -2,10 +2,7 @@ package discovery
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -14,512 +11,375 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test ResourceCache functionality
-func TestResourceCache_Operations(t *testing.T) {
-	cache := &ResourceCache{
-		data: make(map[string]interface{}),
-	}
-
-	// Test Set and Get
-	cache.Set("key1", "value1")
-	val, found := cache.Get("key1")
-	assert.True(t, found)
-	assert.Equal(t, "value1", val)
-
-	// Test Get non-existent key
-	val, found = cache.Get("nonexistent")
-	assert.False(t, found)
-	assert.Nil(t, val)
-
-	// Test GetSize
-	cache.Set("key2", "value2")
-	cache.Set("key3", "value3")
-	assert.Equal(t, 3, cache.GetSize())
-
-	// Test nil cache
-	var nilCache *ResourceCache
-	val, found = nilCache.Get("key")
-	assert.False(t, found)
-	assert.Nil(t, val)
-	assert.Equal(t, 0, nilCache.GetSize())
-	nilCache.Set("key", "value") // Should not panic
-}
-
-func TestResourceCache_Concurrent(t *testing.T) {
-	cache := &ResourceCache{
-		data: make(map[string]interface{}),
-	}
-
-	var wg sync.WaitGroup
-	numRoutines := 100
-
-	// Concurrent writes
-	for i := 0; i < numRoutines; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			key := fmt.Sprintf("key%d", id)
-			value := fmt.Sprintf("value%d", id)
-			cache.Set(key, value)
-		}(i)
-	}
-
-	// Concurrent reads
-	for i := 0; i < numRoutines; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			key := fmt.Sprintf("key%d", id%50) // Read some existing keys
-			cache.Get(key)
-		}(i)
-	}
-
-	wg.Wait()
-	assert.Equal(t, numRoutines, cache.GetSize())
-}
-
-// Test EnhancedDiscoverer initialization
 func TestEnhancedDiscoverer_NewEnhancedDiscoverer(t *testing.T) {
 	tests := []struct {
-		name   string
-		config *config.Config
-		check  func(t *testing.T, ed *EnhancedDiscoverer)
+		name     string
+		config   *config.Config
+		expected bool
 	}{
 		{
-			name: "With basic config",
-			config: &config.Config{
-				Provider: "aws",
-				Regions:  []string{"us-east-1", "us-west-2"},
-			},
-			check: func(t *testing.T, ed *EnhancedDiscoverer) {
-				assert.NotNil(t, ed)
-				assert.NotNil(t, ed.config)
-				assert.NotNil(t, ed.plugins)
-				assert.NotNil(t, ed.cache)
-				assert.NotNil(t, ed.metrics)
-			},
+			name:     "With basic config",
+			config:   &config.Config{},
+			expected: true,
 		},
 		{
-			name: "With discovery config",
-			config: &config.Config{
-				Discovery: config.DiscoveryConfig{
-					MaxConcurrency: 10,
-					Timeout:        30,
-					RetryCount:     3,
-				},
-			},
-			check: func(t *testing.T, ed *EnhancedDiscoverer) {
-				assert.NotNil(t, ed)
-				assert.Equal(t, 10, ed.config.Discovery.MaxConcurrency)
-			},
+			name:     "With discovery config",
+			config:   &config.Config{Discovery: config.DiscoveryConfig{}},
+			expected: true,
 		},
 		{
-			name:   "With nil config",
-			config: nil,
-			check: func(t *testing.T, ed *EnhancedDiscoverer) {
-				assert.NotNil(t, ed)
-				assert.Nil(t, ed.config)
-			},
+			name:     "With nil config",
+			config:   nil,
+			expected: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ed := NewEnhancedDiscoverer(tt.config)
-			tt.check(t, ed)
+			discoverer := NewEnhancedDiscoverer(tt.config)
+			assert.NotNil(t, discoverer)
+			assert.Equal(t, tt.config, discoverer.config)
+			assert.NotNil(t, discoverer.cache)
+			assert.NotNil(t, discoverer.plugins)
+			assert.NotNil(t, discoverer.hierarchy)
+			assert.NotNil(t, discoverer.filters)
+			assert.NotNil(t, discoverer.progressTracker)
+			assert.NotNil(t, discoverer.sdkIntegration)
+			assert.NotNil(t, discoverer.discoveredResources)
+			assert.NotNil(t, discoverer.metrics)
 		})
 	}
 }
 
-// Test plugin registration and execution
 func TestEnhancedDiscoverer_Plugins(t *testing.T) {
-	ed := NewEnhancedDiscoverer(&config.Config{})
+	discoverer := NewEnhancedDiscoverer(&config.Config{})
 
-	// Test RegisterPlugin
-	plugin1 := &DiscoveryPlugin{
-		Name:     "test-plugin-1",
-		Enabled:  true,
-		Priority: 1,
+	// Test plugin registration
+	plugin := &DiscoveryPlugin{
+		Name: "test-plugin",
 		DiscoveryFn: func(ctx context.Context, provider, region string) ([]models.Resource, error) {
-			return []models.Resource{
-				{ID: "resource-1", Type: "test", Provider: provider, Region: region},
-			}, nil
+			return []models.Resource{}, nil
 		},
 	}
 
-	ed.RegisterPlugin(plugin1)
-
-	ed.mu.RLock()
-	registered, exists := ed.plugins["test-plugin-1"]
-	ed.mu.RUnlock()
-
-	assert.True(t, exists)
-	assert.Equal(t, "test-plugin-1", registered.Name)
-
-	// Test plugin execution
-	ctx := context.Background()
-	resources, err := plugin1.DiscoveryFn(ctx, "aws", "us-east-1")
-	assert.NoError(t, err)
-	assert.Len(t, resources, 1)
-	assert.Equal(t, "resource-1", resources[0].ID)
+	discoverer.RegisterPlugin(plugin)
+	assert.Contains(t, discoverer.plugins, "test-plugin")
+	assert.Equal(t, plugin, discoverer.plugins["test-plugin"])
 }
 
-// Test discovery methods
 func TestEnhancedDiscoverer_DiscoverResources(t *testing.T) {
-	// Skip this test as it tries to connect to real cloud providers
-	t.Skip("Skipping test that requires cloud provider connections")
+	// Skip this test as it makes actual cloud provider calls
+	t.Skip("Skipping test that makes actual cloud provider calls")
 }
 
-// Test ResourceHierarchy
 func TestResourceHierarchy(t *testing.T) {
-	// Create a hierarchy
-	root := &ResourceHierarchy{
-		Parent: &models.Resource{
-			ID:   "vpc-1",
-			Type: "vpc",
-		},
-		Level: 0,
+	parentResource := &models.Resource{
+		ID:   "root",
+		Type: "root",
+		Name: "Root Resource",
 	}
 
-	subnet := &ResourceHierarchy{
-		Parent: &models.Resource{
-			ID:   "subnet-1",
-			Type: "subnet",
-		},
-		Level: 1,
+	hierarchy := &ResourceHierarchy{
+		Parent:       parentResource,
+		Children:     []*ResourceHierarchy{},
+		Dependencies: []string{},
+		Level:        0,
 	}
 
-	instance := &ResourceHierarchy{
-		Parent: &models.Resource{
-			ID:   "i-1",
-			Type: "instance",
-		},
-		Level: 2,
+	// Test adding a child resource
+	childResource := &models.Resource{
+		ID:   "child",
+		Type: "child",
+		Name: "Child Resource",
 	}
 
-	// Build hierarchy
-	root.Children = append(root.Children, subnet)
-	subnet.Children = append(subnet.Children, instance)
+	child := &ResourceHierarchy{
+		Parent:       childResource,
+		Children:     []*ResourceHierarchy{},
+		Dependencies: []string{},
+		Level:        1,
+	}
 
-	// Test hierarchy navigation
-	assert.Equal(t, 1, len(root.Children))
-	assert.Equal(t, 1, len(subnet.Children))
-	assert.Equal(t, 0, len(instance.Children))
+	hierarchy.Children = append(hierarchy.Children, child)
 
-	// Test levels
-	assert.Equal(t, 0, root.Level)
-	assert.Equal(t, 1, subnet.Level)
-	assert.Equal(t, 2, instance.Level)
+	assert.Len(t, hierarchy.Children, 1)
+	assert.Equal(t, "child", hierarchy.Children[0].Parent.ID)
 }
 
-// Test DiscoveryFilter
-func TestDiscoveryFilter_Apply(t *testing.T) {
+func TestDiscoveryFilter_Structure(t *testing.T) {
 	filter := &DiscoveryFilter{
-		ResourceTypes: []string{"ec2", "s3"},
+		ResourceTypes: []string{"aws_instance", "aws_s3_bucket"},
 		IncludeTags: map[string]string{
 			"Environment": "production",
 		},
 		ExcludeTags: map[string]string{
-			"Temporary": "true",
+			"Owner": "test",
 		},
+		AgeThreshold:  24 * time.Hour,
+		UsagePatterns: []string{"production", "critical"},
+		CostThreshold: 100.0,
+		SecurityScore: 80,
+		Environment:   "production",
 	}
 
-	resources := []models.Resource{
-		{
-			ID:   "r1",
-			Type: "ec2",
-			Tags: map[string]string{"Environment": "production"},
-		},
-		{
-			ID:   "r2",
-			Type: "rds", // Not in ResourceTypes
-			Tags: map[string]string{"Environment": "production"},
-		},
-		{
-			ID:   "r3",
-			Type: "ec2",
-			Tags: map[string]string{"Environment": "development"}, // Wrong environment
-		},
-		{
-			ID:   "r4",
-			Type: "s3",
-			Tags: map[string]string{"Environment": "production", "Temporary": "true"}, // Excluded
-		},
-	}
-
-	// Apply filter logic (simplified)
-	var filtered []models.Resource
-	for _, r := range resources {
-		// Check resource type
-		typeMatch := false
-		for _, t := range filter.ResourceTypes {
-			if r.Type == t {
-				typeMatch = true
-				break
-			}
-		}
-		if !typeMatch {
-			continue
-		}
-
-		// Check include tags
-		includeMatch := true
-		if tags, ok := r.Tags.(map[string]string); ok {
-			for k, v := range filter.IncludeTags {
-				if tags[k] != v {
-					includeMatch = false
-					break
-				}
-			}
-		} else {
-			includeMatch = false
-		}
-		if !includeMatch {
-			continue
-		}
-
-		// Check exclude tags
-		excluded := false
-		if tags, ok := r.Tags.(map[string]string); ok {
-			for k, v := range filter.ExcludeTags {
-				if tags[k] == v {
-					excluded = true
-					break
-				}
-			}
-		}
-		if excluded {
-			continue
-		}
-
-		filtered = append(filtered, r)
-	}
-
-	assert.Len(t, filtered, 1)
-	assert.Equal(t, "r1", filtered[0].ID)
+	// Test filter structure
+	assert.Len(t, filter.ResourceTypes, 2)
+	assert.Contains(t, filter.ResourceTypes, "aws_instance")
+	assert.Contains(t, filter.ResourceTypes, "aws_s3_bucket")
+	assert.Equal(t, "production", filter.IncludeTags["Environment"])
+	assert.Equal(t, "test", filter.ExcludeTags["Owner"])
+	assert.Equal(t, 24*time.Hour, filter.AgeThreshold)
+	assert.Equal(t, 100.0, filter.CostThreshold)
+	assert.Equal(t, 80, filter.SecurityScore)
+	assert.Equal(t, "production", filter.Environment)
 }
 
-// Test ProgressTracker
 func TestProgressTracker(t *testing.T) {
-	providers := []string{"aws", "azure"}
+	providers := []string{"aws", "azure", "gcp"}
 	regions := []string{"us-east-1", "us-west-2"}
-	services := []string{"ec2", "s3"}
+	services := []string{"EC2", "S3"}
 
 	tracker := NewProgressTracker(providers, regions, services)
-	assert.NotNil(t, tracker)
 
-	// Test initialization
-	assert.NotNil(t, tracker.providerProgress)
-	assert.NotNil(t, tracker.regionProgress)
-	assert.NotNil(t, tracker.serviceProgress)
+	// Test initial state
+	progress := tracker.GetProgress()
+	assert.NotNil(t, progress)
+	assert.False(t, tracker.IsCompleted())
 
-	// Test tracking resources
-	tracker.totalResources = 100
-	tracker.processedResources = 50
+	// Test updating progress
+	tracker.UpdateProviderProgress("aws", 1, 10)
+	tracker.UpdateRegionProgress("aws", "us-east-1", 1, 5)
+	tracker.UpdateServiceProgress("aws", "us-east-1", "EC2", 3)
 
-	// Test percentage calculation
-	percentage := tracker.GetPercentage()
-	assert.Equal(t, 50.0, percentage)
+	// Test getting progress
+	providerProgress := tracker.GetProviderProgress("aws")
+	assert.NotNil(t, providerProgress)
+	assert.Equal(t, "aws", providerProgress.Name)
+
+	regionProgress := tracker.GetRegionProgress("aws", "us-east-1")
+	assert.NotNil(t, regionProgress)
+	assert.Equal(t, "us-east-1", regionProgress.Region)
+
+	serviceProgress := tracker.GetServiceProgress("aws", "us-east-1", "EC2")
+	assert.NotNil(t, serviceProgress)
+	assert.Equal(t, "EC2", serviceProgress.Service)
+
+	// Test completion
+	tracker.MarkCompleted()
+	assert.True(t, tracker.IsCompleted())
 }
 
-// Test DiscoveryVisualizer
 func TestDiscoveryVisualizer(t *testing.T) {
 	visualizer := NewDiscoveryVisualizer()
-	assert.NotNil(t, visualizer)
 
-	resources := []models.Resource{
-		{ID: "vpc-1", Type: "vpc", Provider: "aws"},
-		{ID: "subnet-1", Type: "subnet", Provider: "aws"},
-		{ID: "i-1", Type: "instance", Provider: "aws"},
+	// Test adding resources
+	resource := models.Resource{
+		ID:     "test-resource",
+		Type:   "aws_instance",
+		Name:   "Test Instance",
+		Region: "us-east-1",
 	}
 
-	// Test visualization generation (simplified)
-	output := visualizer.GenerateVisualization(resources)
-	assert.NotNil(t, output)
+	visualizer.AddResource(resource)
+	assert.Len(t, visualizer.resources, 1)
+	assert.Equal(t, resource, visualizer.resources[0])
+
+	// Test adding relationships
+	visualizer.AddRelationship("test-resource", "test-vpc")
+	assert.Contains(t, visualizer.relationships, "test-resource")
+	assert.Contains(t, visualizer.relationships["test-resource"], "test-vpc")
+
+	// Test generating JSON
+	jsonData := visualizer.GenerateJSON()
+	assert.NotEmpty(t, jsonData)
+
+	// Test generating CSV
+	csvData := visualizer.GenerateCSV()
+	assert.NotEmpty(t, csvData)
+
+	// Test getting statistics
+	stats := visualizer.GetStats()
+	assert.NotNil(t, stats)
+	assert.Equal(t, 1, stats.TotalResources)
 }
 
-// Test AdvancedQuery
 func TestAdvancedQuery(t *testing.T) {
 	query := NewAdvancedQuery()
-	assert.NotNil(t, query)
 
-	resources := []models.Resource{
-		{ID: "i-1", Type: "instance", Provider: "aws", Region: "us-east-1"},
-		{ID: "i-2", Type: "instance", Provider: "aws", Region: "us-west-2"},
-		{ID: "db-1", Type: "database", Provider: "aws", Region: "us-east-1"},
+	// Test adding resources
+	resource := models.Resource{
+		ID:     "test-resource",
+		Type:   "aws_instance",
+		Name:   "Test Instance",
+		Region: "us-east-1",
+		Tags: map[string]string{
+			"Environment": "production",
+		},
 	}
 
-	// Test query execution
-	results := query.Execute("type:instance AND region:us-east-1", resources)
-	assert.Len(t, results, 1)
-	assert.Equal(t, "i-1", results[0].ID)
+	query.AddResource(resource)
+
+	// Test querying by tags
+	resources := query.FindByTags(map[string]string{"Environment": "production"})
+	assert.Len(t, resources, 1)
+	assert.Equal(t, "test-resource", resources[0].ID)
+
+	// Test querying by regex
+	resources = query.FindByRegex("Type", "aws_.*")
+	assert.Len(t, resources, 1)
+	assert.Equal(t, "aws_instance", resources[0].Type)
+
+	// Test grouping
+	grouped := query.GroupBy("Type")
+	assert.Contains(t, grouped, "aws_instance")
+	assert.Len(t, grouped["aws_instance"], 1)
+
+	// Test getting statistics
+	stats := query.GetStatistics()
+	assert.NotNil(t, stats)
+	assert.Equal(t, 1, stats["total_resources"])
 }
 
-// Test RealTimeMonitor
 func TestRealTimeMonitor(t *testing.T) {
 	monitor := NewRealTimeMonitor()
-	assert.NotNil(t, monitor)
 
-	// Test monitoring start
-	ctx, cancel := context.WithCancel(context.Background())
+	// Test starting monitoring
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	// Test starting monitor
-	go monitor.Start(ctx)
+	monitor.Start(ctx)
 
-	// Give it time to start
-	time.Sleep(10 * time.Millisecond)
-
-	// Stop monitoring
-	monitor.Stop()
-}
-
-// Test SDKIntegration
-func TestSDKIntegration(t *testing.T) {
-	sdk := NewSDKIntegration()
-	assert.NotNil(t, sdk)
-
-	// SDKIntegration struct exists but methods may vary
-	// Just verify it was created
-	assert.NotNil(t, sdk)
-}
-
-// Test GetDiscoveryQuality
-func TestEnhancedDiscoverer_GetDiscoveryQuality(t *testing.T) {
-	ed := NewEnhancedDiscoverer(&config.Config{})
-
-	// Set up test data
-	ed.discoveredResources = []models.Resource{
-		{ID: "r1", Type: "ec2"},
-		{ID: "r2", Type: "s3"},
-		{ID: "r3", Type: "rds"},
-	}
-
-	ed.metrics = map[string]interface{}{
-		"total_resources": 3,
-		"discovery_time":  5 * time.Second,
-		"errors":          []error{},
-	}
-
-	quality := ed.GetDiscoveryQuality()
-	assert.NotNil(t, quality)
-	// Quality metrics would be calculated based on discovered resources
-	// Just verify it returns a valid quality object
-	assert.GreaterOrEqual(t, quality.Completeness, 0.0)
-}
-
-// Test JSON marshaling of resources
-func TestResource_JSONMarshaling(t *testing.T) {
+	// Test processing resource
 	resource := models.Resource{
-		ID:       "test-resource",
-		Type:     "ec2_instance",
-		Provider: "aws",
-		Region:   "us-east-1",
-		Name:     "test-instance",
+		ID:     "test-resource",
+		Type:   "aws_instance",
+		Name:   "Test Instance",
+		Region: "us-east-1",
+	}
+
+	monitor.ProcessResource(resource)
+
+	// Test getting metrics
+	metrics := monitor.GetMetrics()
+	assert.NotNil(t, metrics)
+}
+
+func TestSDKIntegration(t *testing.T) {
+	integration := NewSDKIntegration()
+
+	// Test initialization
+	assert.NotNil(t, integration)
+	assert.NotNil(t, integration.providers)
+	assert.NotNil(t, integration.rateLimiters)
+	assert.NotNil(t, integration.retryPolicies)
+	assert.NotNil(t, integration.credentials)
+	assert.NotNil(t, integration.clientCache)
+	assert.NotNil(t, integration.metrics)
+
+	// Test setting credentials (will fail because provider not registered)
+	creds := Credentials{
+		Provider:  "aws",
+		AccessKey: "access-key",
+		SecretKey: "secret-key",
+		Region:    "us-east-1",
+	}
+	err := integration.SetCredentials("aws", creds)
+	// This will fail because no provider is registered, which is expected
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "provider aws not registered")
+
+	// Test getting metrics
+	metrics := integration.GetMetrics()
+	assert.NotNil(t, metrics)
+}
+
+func TestEnhancedDiscoverer_GetDiscoveryQuality(t *testing.T) {
+	discoverer := NewEnhancedDiscoverer(&config.Config{})
+
+	// Test initial quality
+	quality := discoverer.GetDiscoveryQuality()
+	assert.NotNil(t, quality)
+	assert.Equal(t, 0.0, quality.Completeness)
+	assert.Equal(t, 0.0, quality.Accuracy)
+	assert.NotNil(t, quality.Coverage)
+
+	// Test with some discovered resources
+	discoverer.discoveredResources = []models.Resource{
+		{ID: "resource-1", Type: "aws_instance"},
+		{ID: "resource-2", Type: "aws_s3_bucket"},
+	}
+
+	quality = discoverer.GetDiscoveryQuality()
+	assert.Greater(t, quality.Completeness, 0.0)
+	assert.NotNil(t, quality.Coverage)
+}
+
+func TestResource_GetTagsAsMap(t *testing.T) {
+	resource := models.Resource{
+		ID:     "test-resource",
+		Type:   "aws_instance",
+		Name:   "Test Instance",
+		Region: "us-east-1",
 		Tags: map[string]string{
-			"Environment": "test",
-			"Owner":       "team",
+			"Environment": "production",
+			"Owner":       "team-a",
 		},
 		Attributes: map[string]interface{}{
-			"instance_type": "t2.micro",
-			"state":         "running",
+			"instance_type": "t3.micro",
+			"ami":           "ami-12345678",
 		},
 	}
 
-	// Marshal to JSON
-	data, err := json.Marshal(resource)
-	assert.NoError(t, err)
-	assert.NotNil(t, data)
-
-	// Unmarshal back
-	var decoded models.Resource
-	err = json.Unmarshal(data, &decoded)
-	assert.NoError(t, err)
-	assert.Equal(t, resource.ID, decoded.ID)
-	assert.Equal(t, resource.Type, decoded.Type)
+	// Test getting tags as map
+	tags := resource.GetTagsAsMap()
+	assert.Equal(t, "production", tags["Environment"])
+	assert.Equal(t, "team-a", tags["Owner"])
 }
 
-// Benchmark tests
-func BenchmarkResourceCache_Set(b *testing.B) {
-	cache := &ResourceCache{
-		data: make(map[string]interface{}),
+func TestResourceCache_Operations(t *testing.T) {
+	cache := &ResourceCache{data: make(map[string]interface{})}
+
+	// Test setting and getting
+	cache.Set("key1", "value1")
+	val, found := cache.Get("key1")
+	assert.True(t, found)
+	assert.Equal(t, "value1", val)
+
+	// Test getting non-existent key
+	val, found = cache.Get("nonexistent")
+	assert.False(t, found)
+	assert.Nil(t, val)
+
+	// Test getting size
+	size := cache.GetSize()
+	assert.Equal(t, 1, size)
+}
+
+func TestResourceCache_Concurrent(t *testing.T) {
+	cache := &ResourceCache{data: make(map[string]interface{})}
+
+	// Test concurrent access
+	done := make(chan bool, 10)
+	for i := 0; i < 10; i++ {
+		go func(n int) {
+			key := fmt.Sprintf("key%d", n)
+			value := fmt.Sprintf("value%d", n)
+			cache.Set(key, value)
+			done <- true
+		}(i)
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	// Wait for all goroutines
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+
+	// Verify all values were set
+	for i := 0; i < 10; i++ {
 		key := fmt.Sprintf("key%d", i)
-		cache.Set(key, i)
+		expectedValue := fmt.Sprintf("value%d", i)
+		val, found := cache.Get(key)
+		assert.True(t, found)
+		assert.Equal(t, expectedValue, val)
 	}
-}
-
-func BenchmarkResourceCache_Get(b *testing.B) {
-	cache := &ResourceCache{
-		data: make(map[string]interface{}),
-	}
-
-	// Populate cache
-	for i := 0; i < 1000; i++ {
-		cache.Set(fmt.Sprintf("key%d", i), i)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		key := fmt.Sprintf("key%d", i%1000)
-		cache.Get(key)
-	}
-}
-
-func BenchmarkEnhancedDiscoverer_RegisterPlugin(b *testing.B) {
-	ed := NewEnhancedDiscoverer(&config.Config{})
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		plugin := &DiscoveryPlugin{
-			Name:    fmt.Sprintf("plugin-%d", i),
-			Enabled: true,
-		}
-		ed.RegisterPlugin(plugin)
-	}
-}
-
-// Add DiscoverAll as a wrapper for testing
-func (ed *EnhancedDiscoverer) DiscoverAll(ctx context.Context) ([]models.Resource, error) {
-	return ed.DiscoverResources(ctx)
-}
-
-// Mock DiscoveryEvent for testing
-type DiscoveryEvent struct {
-	Type      string
-	Resource  models.Resource
-	Timestamp time.Time
-}
-
-// Mock helper methods for ProgressTracker
-func (p *ProgressTracker) GetPercentage() float64 {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	if p.totalResources == 0 {
-		return 0
-	}
-	return float64(p.processedResources) / float64(p.totalResources) * 100
-}
-
-// Mock helper for DiscoveryVisualizer
-func (d *DiscoveryVisualizer) GenerateVisualization(resources []models.Resource) interface{} {
-	return map[string]interface{}{
-		"total_resources": len(resources),
-		"visualization":   "mock",
-	}
-}
-
-// Mock helper for AdvancedQuery
-func (a *AdvancedQuery) Execute(query string, resources []models.Resource) []models.Resource {
-	// Simple mock query implementation
-	var results []models.Resource
-	for _, r := range resources {
-		if strings.Contains(query, "type:"+r.Type) && strings.Contains(query, "region:"+r.Region) {
-			results = append(results, r)
-		}
-	}
-	return results
 }

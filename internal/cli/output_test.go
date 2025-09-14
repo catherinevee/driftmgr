@@ -241,6 +241,6 @@ func TestFormattingWithSpecialCharacters(t *testing.T) {
 	// Test with long strings
 	buf.Reset()
 	longString := strings.Repeat("a", 200)
-	formatter.Info(longString)
+	formatter.Info("%s", longString)
 	assert.Contains(t, buf.String(), longString)
 }

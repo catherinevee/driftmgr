@@ -37,14 +37,15 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 	t.Run("Validate", func(t *testing.T) {
 		// Test with no drift
 		noDrift := &detector.DriftResult{
-			HasDrift: false,
+			Differences: []comparator.Difference{},
 		}
 		err := strategy.Validate(noDrift)
 		assert.Error(t, err, "Should error when no drift detected")
+		assert.Contains(t, err.Error(), "no drift detected")
 
 		// Test with drift
 		withDrift := &detector.DriftResult{
-			HasDrift: true,
+			DriftType: detector.ConfigurationDrift,
 			Differences: []comparator.Difference{
 				{
 					Path:       "aws_instance.test",
@@ -62,20 +63,18 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 
 	t.Run("Plan", func(t *testing.T) {
 		drift := &detector.DriftResult{
-			HasDrift: true,
-			Summary:  "1 resource drifted",
 			Differences: []comparator.Difference{
 				{
 					Path:       "aws_instance.test",
 					Type:       comparator.DiffTypeModified,
 					Importance: comparator.ImportanceCritical,
-					Details:    "Instance type changed",
+					Message:    "Instance type changed",
 				},
 				{
 					Path:       "aws_s3_bucket.backup",
 					Type:       comparator.DiffTypeRemoved,
 					Importance: comparator.ImportanceHigh,
-					Details:    "Bucket missing in cloud",
+					Message:    "Bucket missing in cloud",
 				},
 			},
 		}
@@ -125,7 +124,6 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 
 	t.Run("Execute_DryRun", func(t *testing.T) {
 		drift := &detector.DriftResult{
-			HasDrift: true,
 			Differences: []comparator.Difference{
 				{
 					Path:       "aws_instance.test",
@@ -175,7 +173,6 @@ func TestCodeAsTruthStrategy(t *testing.T) {
 		autoStrategy := NewCodeAsTruthStrategy(autoApproveConfig)
 
 		drift := &detector.DriftResult{
-			HasDrift: true,
 			Differences: []comparator.Difference{
 				{
 					Path:       "aws_instance.critical",
@@ -216,7 +213,6 @@ func TestDriftSummaryCreation(t *testing.T) {
 	strategy := NewCodeAsTruthStrategy(nil)
 
 	drift := &detector.DriftResult{
-		HasDrift: true,
 		Differences: []comparator.Difference{
 			{
 				Path:       "aws_instance.web",

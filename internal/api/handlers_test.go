@@ -3,494 +3,636 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
-	"github.com/catherinevee/driftmgr/pkg/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+// TestServerMethods tests the server helper methods
+func TestServerMethods(t *testing.T) {
+	server := &Server{}
+
+	t.Run("handleCORS", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		w := httptest.NewRecorder()
+
+		server.handleCORS(w, req)
+
+		assert.Equal(t, "*", w.Header().Get("Access-Control-Allow-Origin"))
+		assert.Equal(t, "GET, POST, PUT, DELETE, OPTIONS", w.Header().Get("Access-Control-Allow-Methods"))
+		assert.Equal(t, "Content-Type, Authorization", w.Header().Get("Access-Control-Allow-Headers"))
+	})
+
+	t.Run("handleCORS_OPTIONS", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/test", nil)
+		w := httptest.NewRecorder()
+
+		server.handleCORS(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("handleRateLimit", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		w := httptest.NewRecorder()
+
+		allowed := server.handleRateLimit(w, req)
+		assert.True(t, allowed)
+	})
+
+	t.Run("handleAuth", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		w := httptest.NewRecorder()
+
+		authenticated := server.handleAuth(w, req)
+		assert.True(t, authenticated)
+		_ = w // Use w to avoid unused variable
+	})
+
+	t.Run("logRequest", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test", nil)
+		w := httptest.NewRecorder()
+
+		// Should not panic
+		assert.NotPanics(t, func() {
+			server.logRequest(req)
+		})
+		_ = w // Use w to avoid unused variable
+	})
+
+	t.Run("writeJSON", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		data := map[string]string{"test": "value"}
+
+		server.writeJSON(w, http.StatusOK, data)
+
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var result map[string]string
+		err := json.Unmarshal(w.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.Equal(t, "value", result["test"])
+	})
+
+	t.Run("writeError", func(t *testing.T) {
+		w := httptest.NewRecorder()
+
+		server.writeError(w, http.StatusBadRequest, "test error")
+
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var result map[string]string
+		err := json.Unmarshal(w.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.Equal(t, "test error", result["error"])
+	})
+
+	t.Run("parseID", func(t *testing.T) {
+		tests := []struct {
+			path     string
+			expected string
+			hasError bool
+		}{
+			{"/api/v1/resources/123", "123", false},
+			{"/api/v1/resources/abc", "abc", false},
+			{"/api/v1/resources/", "", true},
+			{"/api", "", true},
+		}
+
+		for _, tt := range tests {
+			req := httptest.NewRequest("GET", tt.path, nil)
+			id, err := server.parseID(req)
+
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, id)
+			}
+		}
+	})
+
+	t.Run("parseQueryParams", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/test?param1=value1&param2=value2&param3=value3a&param3=value3b", nil)
+		params := server.parseQueryParams(req)
+
+		assert.Equal(t, "value1", params["param1"])
+		assert.Equal(t, "value2", params["param2"])
+		assert.Equal(t, "value3a", params["param3"]) // First value
+	})
+
+	t.Run("parsePagination", func(t *testing.T) {
+		tests := []struct {
+			url           string
+			expectedPage  int
+			expectedLimit int
+		}{
+			{"/test", 1, 10},
+			{"/test?page=5", 5, 10},
+			{"/test?limit=25", 1, 25},
+			{"/test?page=3&limit=50", 3, 50},
+			{"/test?page=0", 1, 10},    // Invalid page
+			{"/test?limit=200", 1, 10}, // Limit too high
+			{"/test?page=abc", 1, 10},  // Invalid page
+			{"/test?limit=xyz", 1, 10}, // Invalid limit
+		}
+
+		for _, tt := range tests {
+			req := httptest.NewRequest("GET", tt.url, nil)
+			page, limit := server.parsePagination(req)
+
+			assert.Equal(t, tt.expectedPage, page)
+			assert.Equal(t, tt.expectedLimit, limit)
+		}
+	})
+}
+
+// TestHealthHandler tests the health check handler
 func TestHealthHandler(t *testing.T) {
 	handler := HealthHandler()
 
-	req := httptest.NewRequest("GET", "/health", nil)
-	w := httptest.NewRecorder()
+	t.Run("health_check", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/health", nil)
+		w := httptest.NewRecorder()
 
-	handler(w, req)
+		handler(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response["status"])
-	assert.NotNil(t, response["timestamp"])
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "healthy", response["status"])
+		assert.NotNil(t, response["timestamp"])
+		assert.Equal(t, "1.0.0", response["version"])
+	})
 }
 
+// TestDiscoverHandler tests the discovery handler
 func TestDiscoverHandler(t *testing.T) {
 	handler := DiscoverHandler()
 
-	tests := []struct {
-		name       string
-		method     string
-		body       interface{}
-		wantStatus int
-	}{
-		{
-			name:       "GET request",
-			method:     "GET",
-			body:       nil,
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "POST with valid body",
-			method:     "POST",
-			body:       map[string]string{"provider": "aws", "region": "us-east-1"},
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "POST with invalid body",
-			method:     "POST",
-			body:       "invalid json",
-			wantStatus: http.StatusBadRequest,
-		},
-	}
+	t.Run("discover_POST_success", func(t *testing.T) {
+		requestBody := map[string]interface{}{
+			"providers": []string{"aws", "azure"},
+			"regions":   []string{"us-east-1", "us-west-2"},
+		}
+		jsonBody, _ := json.Marshal(requestBody)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var req *http.Request
-			if tt.body != nil {
-				var bodyBytes []byte
-				if str, ok := tt.body.(string); ok {
-					bodyBytes = []byte(str)
-				} else {
-					bodyBytes, _ = json.Marshal(tt.body)
-				}
-				req = httptest.NewRequest(tt.method, "/api/v1/discover", bytes.NewBuffer(bodyBytes))
-				req.Header.Set("Content-Type", "application/json")
-			} else {
-				req = httptest.NewRequest(tt.method, "/api/v1/discover", nil)
-			}
+		req := httptest.NewRequest("POST", "/discover", bytes.NewBuffer(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
 
-			w := httptest.NewRecorder()
-			handler(w, req)
+		handler(w, req)
 
-			assert.Equal(t, tt.wantStatus, w.Code)
-		})
-	}
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "discovery_started", response["status"])
+		assert.NotNil(t, response["timestamp"])
+		assert.Equal(t, []interface{}{"aws", "azure"}, response["providers"])
+		assert.Equal(t, []interface{}{"us-east-1", "us-west-2"}, response["regions"])
+	})
+
+	t.Run("discover_wrong_method", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/discover", nil)
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
+		assert.Contains(t, w.Body.String(), "Method not allowed")
+	})
+
+	t.Run("discover_invalid_json", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/discover", strings.NewReader("invalid json"))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Invalid JSON")
+	})
 }
 
+// TestDriftHandler tests the drift detection handler
 func TestDriftHandler(t *testing.T) {
 	handler := DriftHandler()
 
-	req := httptest.NewRequest("GET", "/api/v1/drift", nil)
-	w := httptest.NewRecorder()
+	t.Run("drift_POST_success", func(t *testing.T) {
+		requestBody := map[string]interface{}{
+			"state_file": "terraform.tfstate",
+			"provider":   "aws",
+		}
+		jsonBody, _ := json.Marshal(requestBody)
 
-	handler(w, req)
+		req := httptest.NewRequest("POST", "/drift", bytes.NewBuffer(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
 
-	assert.Equal(t, http.StatusOK, w.Code)
+		handler(w, req)
 
-	var response interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "drift_detection_started", response["status"])
+		assert.NotNil(t, response["timestamp"])
+	})
+
+	t.Run("drift_wrong_method", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/drift", nil)
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
+	})
+
+	t.Run("drift_invalid_json", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/drift", strings.NewReader("invalid json"))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
 }
 
-func TestStateHandler(t *testing.T) {
-	handler := StateHandler()
-
-	tests := []struct {
-		name       string
-		method     string
-		path       string
-		wantStatus int
-	}{
-		{
-			name:       "GET state",
-			method:     "GET",
-			path:       "/api/v1/state",
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "POST state",
-			method:     "POST",
-			path:       "/api/v1/state",
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "PUT state",
-			method:     "PUT",
-			path:       "/api/v1/state",
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:       "DELETE state",
-			method:     "DELETE",
-			path:       "/api/v1/state",
-			wantStatus: http.StatusMethodNotAllowed,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
-			w := httptest.NewRecorder()
-
-			handler(w, req)
-
-			assert.Equal(t, tt.wantStatus, w.Code)
-		})
-	}
-}
-
+// TestRemediationHandler tests the remediation handler
 func TestRemediationHandler(t *testing.T) {
 	handler := RemediationHandler()
 
-	tests := []struct {
-		name       string
-		method     string
-		body       interface{}
-		wantStatus int
-	}{
-		{
-			name:       "GET remediations",
-			method:     "GET",
-			body:       nil,
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:   "POST create remediation",
-			method: "POST",
-			body: map[string]interface{}{
-				"resource_id": "i-123",
-				"action":      "update",
-				"parameters":  map[string]string{"instance_type": "t2.micro"},
-			},
-			wantStatus: http.StatusOK,
-		},
-	}
+	t.Run("remediate_POST_success", func(t *testing.T) {
+		requestBody := map[string]interface{}{
+			"plan_file": "drift-plan.json",
+			"apply":     false,
+		}
+		jsonBody, _ := json.Marshal(requestBody)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var req *http.Request
-			if tt.body != nil {
-				jsonBody, _ := json.Marshal(tt.body)
-				req = httptest.NewRequest(tt.method, "/api/v1/remediation", bytes.NewBuffer(jsonBody))
-				req.Header.Set("Content-Type", "application/json")
-			} else {
-				req = httptest.NewRequest(tt.method, "/api/v1/remediation", nil)
-			}
+		req := httptest.NewRequest("POST", "/remediate", bytes.NewBuffer(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
 
-			w := httptest.NewRecorder()
-			handler(w, req)
+		handler(w, req)
 
-			assert.Equal(t, tt.wantStatus, w.Code)
-		})
-	}
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "remediation_started", response["status"])
+		assert.NotNil(t, response["timestamp"])
+	})
+
+	t.Run("remediate_wrong_method", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/remediate", nil)
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
+	})
 }
 
+// TestStateHandler tests the state management handler
+func TestStateHandler(t *testing.T) {
+	handler := StateHandler()
+
+	t.Run("state_GET_list", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/state", nil)
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		assert.NotNil(t, response["states"])
+	})
+
+	t.Run("state_POST_push", func(t *testing.T) {
+		requestBody := map[string]interface{}{
+			"state_file": "terraform.tfstate",
+			"backend":    "s3",
+		}
+		jsonBody, _ := json.Marshal(requestBody)
+
+		req := httptest.NewRequest("POST", "/state", bytes.NewBuffer(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		assert.Equal(t, "state_pushed", response["message"])
+	})
+}
+
+// TestResourcesHandler tests the resources handler
 func TestResourcesHandler(t *testing.T) {
 	handler := ResourcesHandler()
 
-	req := httptest.NewRequest("GET", "/api/v1/resources", nil)
-	w := httptest.NewRecorder()
+	t.Run("resources_GET_list", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/resources", nil)
+		w := httptest.NewRecorder()
 
-	handler(w, req)
+		handler(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-	var response []models.Resource
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		assert.NotNil(t, response["resources"])
+	})
 }
 
+// TestProvidersHandler tests the providers handler
 func TestProvidersHandler(t *testing.T) {
 	handler := ProvidersHandler()
 
-	req := httptest.NewRequest("GET", "/api/v1/providers", nil)
-	w := httptest.NewRecorder()
+	t.Run("providers_GET_list", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/providers", nil)
+		w := httptest.NewRecorder()
 
-	handler(w, req)
+		handler(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-	var response []map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		assert.NotNil(t, response["providers"])
+	})
 }
 
+// TestConfigHandler tests the configuration handler
 func TestConfigHandler(t *testing.T) {
 	handler := ConfigHandler()
 
-	tests := []struct {
-		name       string
-		method     string
-		body       interface{}
-		wantStatus int
+	t.Run("config_GET", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/config", nil)
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		assert.NotNil(t, response["config"])
+	})
+
+	t.Run("config_POST", func(t *testing.T) {
+		requestBody := map[string]interface{}{
+			"setting1": "value1",
+			"setting2": "value2",
+		}
+		jsonBody, _ := json.Marshal(requestBody)
+
+		req := httptest.NewRequest("POST", "/config", bytes.NewBuffer(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		assert.Equal(t, "config_updated", response["message"])
+	})
+}
+
+// TestErrorHandling tests error handling scenarios
+func TestErrorHandling(t *testing.T) {
+	t.Run("malformed_json", func(t *testing.T) {
+		handler := DiscoverHandler()
+		req := httptest.NewRequest("POST", "/discover", strings.NewReader("{invalid json"))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, w.Body.String(), "Invalid JSON")
+	})
+
+	t.Run("empty_request_body", func(t *testing.T) {
+		handler := DiscoverHandler()
+		req := httptest.NewRequest("POST", "/discover", nil)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("unsupported_content_type", func(t *testing.T) {
+		handler := DiscoverHandler()
+		req := httptest.NewRequest("POST", "/discover", strings.NewReader("test"))
+		req.Header.Set("Content-Type", "text/plain")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}
+
+// TestConcurrency tests concurrent handler execution
+func TestConcurrency(t *testing.T) {
+	handler := HealthHandler()
+
+	t.Run("concurrent_requests", func(t *testing.T) {
+		const numRequests = 10
+		results := make(chan int, numRequests)
+
+		for i := 0; i < numRequests; i++ {
+			go func() {
+				req := httptest.NewRequest("GET", "/health", nil)
+				w := httptest.NewRecorder()
+				handler(w, req)
+				results <- w.Code
+			}()
+		}
+
+		// Collect results
+		for i := 0; i < numRequests; i++ {
+			code := <-results
+			assert.Equal(t, http.StatusOK, code)
+		}
+	})
+}
+
+// TestPerformance tests handler performance
+func TestPerformance(t *testing.T) {
+	handler := HealthHandler()
+
+	t.Run("response_time", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/health", nil)
+		w := httptest.NewRecorder()
+
+		start := time.Now()
+		handler(w, req)
+		duration := time.Since(start)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Less(t, duration, 100*time.Millisecond, "Handler should respond quickly")
+	})
+}
+
+// TestMiddlewareIntegration tests middleware integration
+func TestMiddlewareIntegration(t *testing.T) {
+	server := &Server{}
+
+	t.Run("cors_and_auth_chain", func(t *testing.T) {
+		req := httptest.NewRequest("OPTIONS", "/test", nil)
+		w := httptest.NewRecorder()
+
+		// Test CORS handling
+		server.handleCORS(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Test auth handling
+		req = httptest.NewRequest("GET", "/test", nil)
+		w = httptest.NewRecorder()
+		authenticated := server.handleAuth(w, req)
+		assert.True(t, authenticated)
+	})
+}
+
+// TestDataValidation tests data validation
+func TestDataValidation(t *testing.T) {
+	t.Run("discover_request_validation", func(t *testing.T) {
+		handler := DiscoverHandler()
+
+		// Test with empty providers
+		requestBody := map[string]interface{}{
+			"providers": []string{},
+			"regions":   []string{"us-east-1"},
+		}
+		jsonBody, _ := json.Marshal(requestBody)
+
+		req := httptest.NewRequest("POST", "/discover", bytes.NewBuffer(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code) // Should still work with empty providers
+	})
+
+	t.Run("drift_request_validation", func(t *testing.T) {
+		handler := DriftHandler()
+
+		// Test with missing required fields
+		requestBody := map[string]interface{}{
+			"state_file": "terraform.tfstate",
+			// Missing provider
+		}
+		jsonBody, _ := json.Marshal(requestBody)
+
+		req := httptest.NewRequest("POST", "/drift", bytes.NewBuffer(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code) // Should handle missing fields gracefully
+	})
+}
+
+// TestResponseFormat tests response format consistency
+func TestResponseFormat(t *testing.T) {
+	handlers := []struct {
+		name    string
+		handler http.HandlerFunc
+		method  string
+		path    string
+		body    string
 	}{
-		{
-			name:       "GET config",
-			method:     "GET",
-			body:       nil,
-			wantStatus: http.StatusOK,
-		},
-		{
-			name:   "PUT update config",
-			method: "PUT",
-			body: map[string]interface{}{
-				"auto_discovery": true,
-				"max_workers":    10,
-			},
-			wantStatus: http.StatusOK,
-		},
+		{"HealthHandler", HealthHandler(), "GET", "/health", ""},
+		{"DiscoverHandler", DiscoverHandler(), "POST", "/discover", `{"providers":["aws"],"regions":["us-east-1"]}`},
+		{"DriftHandler", DriftHandler(), "POST", "/drift", `{"state_file":"test.tfstate","provider":"aws"}`},
+		{"RemediationHandler", RemediationHandler(), "POST", "/remediation", `{"plan_file":"test.json"}`},
+		{"StateHandler", StateHandler(), "GET", "/state", ""},
+		{"ResourcesHandler", ResourcesHandler(), "GET", "/resources", ""},
+		{"ProvidersHandler", ProvidersHandler(), "GET", "/providers", ""},
+		{"ConfigHandler", ConfigHandler(), "GET", "/config", ""},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, h := range handlers {
+		t.Run(h.name, func(t *testing.T) {
 			var req *http.Request
-			if tt.body != nil {
-				jsonBody, _ := json.Marshal(tt.body)
-				req = httptest.NewRequest(tt.method, "/api/v1/config", bytes.NewBuffer(jsonBody))
+			if h.body != "" {
+				req = httptest.NewRequest(h.method, h.path, strings.NewReader(h.body))
 				req.Header.Set("Content-Type", "application/json")
 			} else {
-				req = httptest.NewRequest(tt.method, "/api/v1/config", nil)
+				req = httptest.NewRequest(h.method, h.path, nil)
 			}
-
 			w := httptest.NewRecorder()
-			handler(w, req)
 
-			assert.Equal(t, tt.wantStatus, w.Code)
-		})
-	}
-}
+			h.handler(w, req)
 
-func TestErrorResponse(t *testing.T) {
-	tests := []struct {
-		name     string
-		status   int
-		message  string
-		wantCode int
-	}{
-		{
-			name:     "Bad Request",
-			status:   http.StatusBadRequest,
-			message:  "Invalid input",
-			wantCode: http.StatusBadRequest,
-		},
-		{
-			name:     "Internal Server Error",
-			status:   http.StatusInternalServerError,
-			message:  "Something went wrong",
-			wantCode: http.StatusInternalServerError,
-		},
-		{
-			name:     "Not Found",
-			status:   http.StatusNotFound,
-			message:  "Resource not found",
-			wantCode: http.StatusNotFound,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			writeErrorResponse(w, tt.status, tt.message)
-
-			assert.Equal(t, tt.wantCode, w.Code)
-
-			var response map[string]interface{}
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.message, response["error"])
-		})
-	}
-}
-
-func TestJSONResponse(t *testing.T) {
-	tests := []struct {
-		name     string
-		data     interface{}
-		wantCode int
-	}{
-		{
-			name:     "Simple object",
-			data:     map[string]string{"key": "value"},
-			wantCode: http.StatusOK,
-		},
-		{
-			name:     "Array",
-			data:     []string{"item1", "item2", "item3"},
-			wantCode: http.StatusOK,
-		},
-		{
-			name: "Complex object",
-			data: models.Resource{
-				ID:       "resource-1",
-				Type:     "aws_instance",
-				Provider: "aws",
-				Region:   "us-east-1",
-			},
-			wantCode: http.StatusOK,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			writeJSONResponse(w, tt.wantCode, tt.data)
-
-			assert.Equal(t, tt.wantCode, w.Code)
+			// All handlers should return JSON
 			assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-			// Verify JSON is valid
-			var result interface{}
-			err := json.Unmarshal(w.Body.Bytes(), &result)
-			assert.NoError(t, err)
+			// Response should be valid JSON
+			var response map[string]interface{}
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			require.NoError(t, err, "Response should be valid JSON for %s", h.name)
+
+			// Response should have status field
+			assert.Contains(t, response, "status", "Response should have status field for %s", h.name)
 		})
 	}
-}
-
-func TestPaginationParams(t *testing.T) {
-	tests := []struct {
-		name       string
-		query      string
-		wantPage   int
-		wantLimit  int
-		wantOffset int
-	}{
-		{
-			name:       "Default values",
-			query:      "",
-			wantPage:   1,
-			wantLimit:  20,
-			wantOffset: 0,
-		},
-		{
-			name:       "Custom page and limit",
-			query:      "page=3&limit=50",
-			wantPage:   3,
-			wantLimit:  50,
-			wantOffset: 100,
-		},
-		{
-			name:       "Invalid values use defaults",
-			query:      "page=invalid&limit=invalid",
-			wantPage:   1,
-			wantLimit:  20,
-			wantOffset: 0,
-		},
-		{
-			name:       "Negative values use defaults",
-			query:      "page=-1&limit=-10",
-			wantPage:   1,
-			wantLimit:  20,
-			wantOffset: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/test?"+tt.query, nil)
-			page, limit, offset := getPaginationParams(req)
-
-			assert.Equal(t, tt.wantPage, page)
-			assert.Equal(t, tt.wantLimit, limit)
-			assert.Equal(t, tt.wantOffset, offset)
-		})
-	}
-}
-
-func TestFilterParams(t *testing.T) {
-	tests := []struct {
-		name        string
-		query       string
-		wantFilters map[string]string
-	}{
-		{
-			name:        "No filters",
-			query:       "",
-			wantFilters: map[string]string{},
-		},
-		{
-			name:  "Single filter",
-			query: "provider=aws",
-			wantFilters: map[string]string{
-				"provider": "aws",
-			},
-		},
-		{
-			name:  "Multiple filters",
-			query: "provider=aws&region=us-east-1&type=ec2",
-			wantFilters: map[string]string{
-				"provider": "aws",
-				"region":   "us-east-1",
-				"type":     "ec2",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/test?"+tt.query, nil)
-			filters := getFilterParams(req)
-
-			assert.Equal(t, len(tt.wantFilters), len(filters))
-			for k, v := range tt.wantFilters {
-				assert.Equal(t, v, filters[k])
-			}
-		})
-	}
-}
-
-// Helper functions that might be needed
-func writeErrorResponse(w http.ResponseWriter, status int, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
-}
-
-func writeJSONResponse(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-func getPaginationParams(r *http.Request) (page, limit, offset int) {
-	page = 1
-	limit = 20
-
-	// Parse query parameters
-	if p := r.URL.Query().Get("page"); p != "" {
-		if parsed, err := parseInt(p); err == nil && parsed > 0 {
-			page = parsed
-		}
-	}
-
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if parsed, err := parseInt(l); err == nil && parsed > 0 {
-			limit = parsed
-		}
-	}
-
-	offset = (page - 1) * limit
-	return
-}
-
-func getFilterParams(r *http.Request) map[string]string {
-	filters := make(map[string]string)
-	for k, v := range r.URL.Query() {
-		if k != "page" && k != "limit" && len(v) > 0 {
-			filters[k] = v[0]
-		}
-	}
-	return filters
-}
-
-func parseInt(s string) (int, error) {
-	var i int
-	_, err := fmt.Sscanf(s, "%d", &i)
-	return i, err
 }

@@ -23,6 +23,7 @@ type Server struct {
 	router     *Router
 	services   *Services
 	config     *Config
+	address    string
 	mu         sync.RWMutex
 }
 
@@ -56,6 +57,48 @@ type Config struct {
 type Router struct {
 	routes map[string]map[string]http.HandlerFunc
 	mu     sync.RWMutex
+}
+
+// NewAPIServer creates a new API server with default configuration
+func NewAPIServer(address string) *Server {
+	config := &Config{
+		Host:             "0.0.0.0",
+		Port:             8080,
+		ReadTimeout:      30 * time.Second,
+		WriteTimeout:     30 * time.Second,
+		IdleTimeout:      120 * time.Second,
+		MaxHeaderBytes:   1 << 20, // 1MB
+		CORSEnabled:      true,
+		AuthEnabled:      false,
+		RateLimitEnabled: true,
+		RateLimitRPS:     100,
+		LoggingEnabled:   true,
+	}
+
+	router := &Router{
+		routes: make(map[string]map[string]http.HandlerFunc),
+	}
+
+	server := &Server{
+		router:  router,
+		config:  config,
+		address: address,
+	}
+
+	// Setup routes
+	server.setupRoutes()
+
+	// Create HTTP server
+	server.httpServer = &http.Server{
+		Addr:           address,
+		Handler:        server,
+		ReadTimeout:    config.ReadTimeout,
+		WriteTimeout:   config.WriteTimeout,
+		IdleTimeout:    config.IdleTimeout,
+		MaxHeaderBytes: config.MaxHeaderBytes,
+	}
+
+	return server
 }
 
 // NewServer creates a new API server

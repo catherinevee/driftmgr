@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -408,7 +409,10 @@ terraform {
 				for key, expectedVal := range tt.expected {
 					// Check if key exists in attributes
 					if val, ok := backend.Attributes[key]; ok {
-						assert.Contains(t, val, expectedVal)
+						// Convert val to string for comparison
+						valStr := fmt.Sprintf("%v", val)
+						expectedStr := fmt.Sprintf("%v", expectedVal)
+						assert.Equal(t, expectedStr, valStr)
 					}
 				}
 			}

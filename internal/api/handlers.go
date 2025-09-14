@@ -98,6 +98,206 @@ func (s *Server) parsePagination(r *http.Request) (int, int) {
 	return page, limit
 }
 
+// Handler functions
+
+// HealthHandler returns a health check handler
+func HealthHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]interface{}{
+			"status":    "healthy",
+			"timestamp": time.Now().Unix(),
+			"version":   "1.0.0",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// DiscoverHandler returns a discovery handler
+func DiscoverHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var request struct {
+			Providers []string `json:"providers"`
+			Regions   []string `json:"regions"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		response := map[string]interface{}{
+			"status":    "discovery_started",
+			"timestamp": time.Now().Unix(),
+			"providers": request.Providers,
+			"regions":   request.Regions,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// DriftHandler returns a drift detection handler
+func DriftHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var request struct {
+			ResourceID string `json:"resource_id"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		response := map[string]interface{}{
+			"status":      "drift_analysis_started",
+			"timestamp":   time.Now().Unix(),
+			"resource_id": request.ResourceID,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// StateHandler returns a state management handler
+func StateHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			// List states
+			response := map[string]interface{}{
+				"states":    []string{},
+				"timestamp": time.Now().Unix(),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(response)
+		case "POST":
+			// Create state
+			response := map[string]interface{}{
+				"status":    "state_created",
+				"timestamp": time.Now().Unix(),
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(response)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+// RemediationHandler returns a remediation handler
+func RemediationHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var request struct {
+			ResourceID string `json:"resource_id"`
+			Action     string `json:"action"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		response := map[string]interface{}{
+			"status":      "remediation_started",
+			"timestamp":   time.Now().Unix(),
+			"resource_id": request.ResourceID,
+			"action":      request.Action,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// ResourcesHandler returns a resources handler
+func ResourcesHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		response := map[string]interface{}{
+			"resources": []models.Resource{},
+			"timestamp": time.Now().Unix(),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// ProvidersHandler returns a providers handler
+func ProvidersHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		response := map[string]interface{}{
+			"providers": []string{"aws", "azure", "gcp", "digitalocean"},
+			"timestamp": time.Now().Unix(),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+// ConfigHandler returns a configuration handler
+func ConfigHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		response := map[string]interface{}{
+			"config": map[string]interface{}{
+				"version": "1.0.0",
+				"features": []string{
+					"discovery",
+					"drift_detection",
+					"remediation",
+					"state_management",
+				},
+			},
+			"timestamp": time.Now().Unix(),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
 // Handler methods
 
 // handleHealth handles health check

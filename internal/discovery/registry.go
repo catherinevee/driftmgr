@@ -92,7 +92,12 @@ func (b *LocalBackend) DeleteState(ctx context.Context, key string) error {
 	if key != "" {
 		path = filepath.Join(filepath.Dir(b.path), key)
 	}
-	return os.Remove(path)
+	err := os.Remove(path)
+	if err != nil && os.IsNotExist(err) {
+		// File doesn't exist, which is fine for delete operations
+		return nil
+	}
+	return err
 }
 
 // ListStates lists all state files
@@ -145,6 +150,12 @@ func (b *LocalBackend) LockState(ctx context.Context, key string) (string, error
 
 // UnlockState removes the lock file
 func (b *LocalBackend) UnlockState(ctx context.Context, key string, lockID string) error {
+	// Check if lock file exists
+	if _, err := os.Stat(b.lockFile); os.IsNotExist(err) {
+		// Lock file doesn't exist, consider it already unlocked
+		return nil
+	}
+
 	// Verify lock ID matches
 	data, err := os.ReadFile(b.lockFile)
 	if err != nil {

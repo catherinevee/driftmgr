@@ -253,7 +253,7 @@ func (s *Scanner) extractModuleName(filePath string) string {
 // shouldIgnoreDir checks if a directory should be ignored
 func (s *Scanner) shouldIgnoreDir(name string) bool {
 	for _, rule := range s.ignoreRules {
-		if name == rule || strings.HasPrefix(name, rule) {
+		if name == rule || (strings.HasPrefix(name, rule) && (len(name) == len(rule) || name[len(rule)] == '/')) {
 			return true
 		}
 	}
@@ -263,7 +263,11 @@ func (s *Scanner) shouldIgnoreDir(name string) bool {
 // isTerraformFile checks if a file is a Terraform configuration file
 func (s *Scanner) isTerraformFile(path string) bool {
 	ext := filepath.Ext(path)
-	return ext == ".tf" || ext == ".tf.json"
+	// Handle .tf.json files (filepath.Ext only returns the last extension)
+	if ext == ".json" && strings.HasSuffix(path, ".tf.json") {
+		return true
+	}
+	return ext == ".tf"
 }
 
 // GetBackendsByType returns all backends of a specific type
