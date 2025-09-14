@@ -1,4 +1,4 @@
-﻿name: Checkov Security Badge
+name: Checkov Security Badge
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
+    # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
   workflow_dispatch:
 
@@ -30,13 +31,3 @@ jobs:
     - name: Run Checkov analysis and generate badge
       run: |
         python scripts/checkov-badge.py
-        
-    - name: Commit and push badge updates
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add docs/badges/
-        git diff --staged --quiet || git commit -m "Update Checkov security badge [skip ci]"
-        git push
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
