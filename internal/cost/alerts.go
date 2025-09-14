@@ -124,7 +124,7 @@ func (cam *CostAlertManager) CreateAlertRule(rule *AlertRule) error {
 				"threshold": rule.Threshold,
 			},
 		}
-		cam.eventBus.PublishCostEvent(event)
+		_ = cam.eventBus.PublishCostEvent(event)
 	}
 
 	return nil
@@ -173,7 +173,7 @@ func (cam *CostAlertManager) UpdateAlertRule(ruleID string, updates *AlertRule) 
 				"rule_name": rule.Name,
 			},
 		}
-		cam.eventBus.PublishCostEvent(event)
+		_ = cam.eventBus.PublishCostEvent(event)
 	}
 
 	return nil
@@ -202,7 +202,7 @@ func (cam *CostAlertManager) DeleteAlertRule(ruleID string) error {
 				"rule_name": rule.Name,
 			},
 		}
-		cam.eventBus.PublishCostEvent(event)
+		_ = cam.eventBus.PublishCostEvent(event)
 	}
 
 	return nil
@@ -370,7 +370,7 @@ func (cam *CostAlertManager) createAlert(rule *AlertRule, currentValue float64) 
 				"threshold": rule.Threshold,
 			},
 		}
-		cam.eventBus.PublishCostEvent(event)
+		_ = cam.eventBus.PublishCostEvent(event)
 	}
 
 	return nil
@@ -432,7 +432,7 @@ func (cam *CostAlertManager) ResolveAlert(alertID string) error {
 				"rule_id":  alert.RuleID,
 			},
 		}
-		cam.eventBus.PublishCostEvent(event)
+		_ = cam.eventBus.PublishCostEvent(event)
 	}
 
 	return nil

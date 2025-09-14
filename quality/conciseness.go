@@ -319,6 +319,6 @@ func (r *conciseRefactorer) simplifyRange(stmt *ast.RangeStmt) {
 // Helper function to format AST node as string
 func formatNode(fset *token.FileSet, node ast.Node) string {
 	var buf strings.Builder
-	format.Node(&buf, fset, node)
+	_ = format.Node(&buf, fset, node)
 	return buf.String()
 }

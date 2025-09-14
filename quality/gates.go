@@ -306,7 +306,7 @@ func findDuplicates(projectPath string) []DuplicationResult {
 
 	files := make(map[string][]string)
 
-	filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
 		if strings.HasSuffix(path, ".go") && !strings.Contains(path, "test") {
 			content, _ := os.ReadFile(path)
 			lines := strings.Split(string(content), "\n")

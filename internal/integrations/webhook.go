@@ -139,7 +139,7 @@ func (wh *WebhookHandler) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Write response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 // Built-in webhook processors

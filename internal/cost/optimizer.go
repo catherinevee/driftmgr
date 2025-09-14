@@ -156,7 +156,7 @@ func (co *CostOptimizer) AnalyzeCostOptimization(ctx context.Context, resources 
 				"potential_savings": report.PotentialSavings,
 			},
 		}
-		co.eventBus.PublishCostEvent(event)
+		_ = co.eventBus.PublishCostEvent(event)
 	}
 
 	return report, nil

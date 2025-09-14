@@ -20,7 +20,7 @@ type LocalBackend struct {
 
 // NewLocalBackend creates a new local file backend
 func NewLocalBackend(basePath string) Backend {
-	os.MkdirAll(basePath, 0755)
+	_ = os.MkdirAll(basePath, 0755)
 	return &LocalBackend{
 		basePath: basePath,
 		locks:    make(map[string]bool),

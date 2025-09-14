@@ -57,7 +57,7 @@ func NewGlobalCache(maxSize int64, defaultTTL time.Duration, persistPath string)
 
 	// Load persisted cache if available
 	if persistPath != "" {
-		gc.loadFromDisk()
+		_ = gc.loadFromDisk()
 	}
 
 	// Start cleanup goroutine
@@ -111,7 +111,7 @@ func (gc *GlobalCache) Set(key string, value interface{}, ttl ...time.Duration) 
 
 	// Persist to disk if enabled
 	if gc.persistPath != "" {
-		go gc.saveToDisk()
+		go func() { _ = gc.saveToDisk() }()
 	}
 
 	return nil
@@ -210,7 +210,7 @@ func (gc *GlobalCache) Delete(key string) bool {
 
 	// Persist to disk if enabled
 	if gc.persistPath != "" {
-		go gc.saveToDisk()
+		go func() { _ = gc.saveToDisk() }()
 	}
 
 	return true
@@ -269,7 +269,7 @@ func (gc *GlobalCache) Close() {
 	close(gc.stopCleaner)
 
 	if gc.persistPath != "" {
-		gc.saveToDisk()
+		_ = gc.saveToDisk()
 	}
 }
 

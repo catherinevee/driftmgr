@@ -169,7 +169,7 @@ func (eb *EventBridge) handleDiscoveryEvent(event events.Event) {
 				updates["error"] = event.Data["error"]
 			}
 
-			eb.wsServer.jobManager.UpdateJob(jobID, updates)
+			_ = eb.wsServer.jobManager.UpdateJob(jobID, updates)
 			wsMessage["job"] = job
 		}
 	}
