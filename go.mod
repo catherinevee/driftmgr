@@ -1,6 +1,8 @@
 module github.com/catherinevee/driftmgr
 
-go 1.23
+go 1.24.0
+
+toolchain go1.24.4
 
 require (
 	cloud.google.com/go/bigquery v1.65.0

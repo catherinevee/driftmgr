@@ -122,7 +122,14 @@
       "Bash(else echo \"No coverage file\")",
       "Bash(while read dir)",
       "Bash(do test -d \"internal/$dir\")",
-      "Read(//c/c/Users/cathe/OneDrive/Desktop/github/driftmgr/**)"
+      "Read(//c/c/Users/cathe/OneDrive/Desktop/github/driftmgr/**)",
+      "Bash(git branch:*)",
+      "Bash(git remote:*)",
+      "Bash(git stash:*)",
+      "Bash(xargs:*)",
+      "Bash(do basename \"$f\")",
+      "Bash(while read f)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": [],
