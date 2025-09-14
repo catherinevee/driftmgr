@@ -11,29 +11,32 @@ on:
 
 env:
   GO_VERSION: '1.23'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Basic validation
-  validate:
-    name: Validate
+  # Build and test
+  build-test:
+    name: Build and Test
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    
+        cache-dependency-path: go.sum
+
     - name: Download dependencies
       run: go mod download
-    
+
     - name: Verify dependencies
       run: go mod verify
-    
+
     - name: Check Go formatting
       run: |
         if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
@@ -42,45 +45,64 @@ jobs:
           exit 1
         fi
         echo "All Go files are properly formatted"
-    
-    - name: Run go vet (main packages only)
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout=10m
+        skip-cache: true
+
+    - name: Build main application
       run: |
-        # Run go vet only on main application packages
-        go vet ./cmd/driftmgr/... ./internal/drift/detector/... ./internal/automation/... ./internal/shared/... || echo "go vet completed with some issues"
-    
-    - name: Build application
-      run: go build ./cmd/driftmgr/...
-    
+        go build -v ./cmd/driftmgr
+        go build -v ./cmd/driftmgr-server
+        go build -v ./cmd/server
+        go build -v ./cmd/validate
+
     - name: Run tests
-      run: go test -v ./internal/drift/... -timeout 30s
+      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./... -timeout 60s
+
+    - name: Upload coverage to Codecov
+      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
 
   # Security scanning
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    
+    permissions:
+      security-events: write
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    
-    - name: Download dependencies
-      run: go mod download
-    
+        cache-dependency-path: go.sum
+
     - name: Run Gosec Security Scanner
       uses: securego/gosec@master
       continue-on-error: true
       with:
-        args: '-fmt sarif -out gosec.sarif -severity high -timeout 5m ./...'
-    
+        args: '-fmt sarif -out gosec.sarif -severity medium ./...'
+
     - name: Upload Gosec results
       uses: github/codeql-action/upload-sarif@v3
-      if: always() && github.event_name != 'pull_request'
+      if: always()
       continue-on-error: true
       with:
         sarif_file: gosec.sarif
@@ -89,21 +111,66 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
-    
+    needs: [build-test]
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-    
-    - name: Build Docker image
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64
-        push: false
-        tags: driftmgr:test
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        build-args: |
+          VERSION=${{ github.sha }}
+          BUILD_DATE=${{ github.event.repository.updated_at }}
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      continue-on-error: true
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      continue-on-error: true
+      with:
+        sarif_file: 'trivy-results.sarif'

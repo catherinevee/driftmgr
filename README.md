@@ -11,21 +11,17 @@
 
 Advanced Terraform drift detection and remediation for multi-cloud environments.
 
-<!-- Build Status -->
+<!-- Build & Quality -->
 [![CI/CD Pipeline](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/ci-cd.yml)
 [![Test Coverage](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/test-coverage.yml)
 [![Security](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/security-compliance.yml)
-[![Docker](https://github.com/catherinevee/driftmgr/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/docker.yml)
-
-<!-- Code Quality -->
-[![Go Format](https://github.com/catherinevee/driftmgr/actions/workflows/gofmt.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/gofmt.yml)
-[![Go Lint](https://github.com/catherinevee/driftmgr/actions/workflows/golangci-lint.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/golangci-lint.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
 [![codecov](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
+[![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
 
-<!-- Security -->
+<!-- Security & Compliance -->
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/catherinevee/driftmgr/badge)](https://scorecard.dev/viewer/?uri=github.com/catherinevee/driftmgr)
 [![License](https://img.shields.io/github/license/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/go.mod)
 
 ## Table of Contents
 
