@@ -16,6 +16,7 @@ Advanced Terraform drift detection and remediation for multi-cloud environments.
 [![Drift Detection](https://github.com/catherinevee/driftmgr/actions/workflows/drift-detection.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/drift-detection.yml)
 [![Checkov Security](https://github.com/catherinevee/driftmgr/actions/workflows/checkov-badge.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/checkov-badge.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
+[![Release](https://img.shields.io/badge/Release-v1.1.0-blue?style=flat-square&logo=github&logoColor=white)](https://github.com/catherinevee/driftmgr/releases)
 
 <!-- Project Info -->
 [![License](https://img.shields.io/github/license/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/LICENSE)
