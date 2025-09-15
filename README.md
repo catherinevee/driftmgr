@@ -21,7 +21,7 @@ Advanced Terraform drift detection and remediation for multi-cloud environments.
 <!-- Project Info -->
 [![License](https://img.shields.io/github/license/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/go.mod)
-[![Release](https://img.shields.io/github/v/release/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/releases)
+
 
 ## Table of Contents
 
