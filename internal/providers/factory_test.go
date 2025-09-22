@@ -12,13 +12,13 @@ import (
 // TestNewProvider tests creating new cloud providers
 func TestNewProvider(t *testing.T) {
 	tests := []struct {
-		name        string
+		name         string
 		providerType string
-		config      map[string]interface{}
-		expectError bool
+		config       map[string]interface{}
+		expectError  bool
 	}{
 		{
-			name:        "AWS Provider",
+			name:         "AWS Provider",
 			providerType: "aws",
 			config: map[string]interface{}{
 				"region": "us-east-1",
@@ -26,7 +26,7 @@ func TestNewProvider(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Azure Provider",
+			name:         "Azure Provider",
 			providerType: "azure",
 			config: map[string]interface{}{
 				"region": "eastus",
@@ -34,7 +34,7 @@ func TestNewProvider(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "GCP Provider",
+			name:         "GCP Provider",
 			providerType: "gcp",
 			config: map[string]interface{}{
 				"region": "us-central1",
@@ -42,7 +42,7 @@ func TestNewProvider(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "DigitalOcean Provider",
+			name:         "DigitalOcean Provider",
 			providerType: "digitalocean",
 			config: map[string]interface{}{
 				"region": "nyc1",
@@ -50,7 +50,7 @@ func TestNewProvider(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Unknown Provider",
+			name:         "Unknown Provider",
 			providerType: "unknown",
 			config: map[string]interface{}{
 				"region": "us-east-1",
@@ -58,7 +58,7 @@ func TestNewProvider(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "Empty Provider Type",
+			name:         "Empty Provider Type",
 			providerType: "",
 			config: map[string]interface{}{
 				"region": "us-east-1",
@@ -86,13 +86,13 @@ func TestNewProvider(t *testing.T) {
 // TestProviderValidation tests provider validation
 func TestProviderValidation(t *testing.T) {
 	tests := []struct {
-		name        string
+		name         string
 		providerType string
-		config      map[string]interface{}
-		expectError bool
+		config       map[string]interface{}
+		expectError  bool
 	}{
 		{
-			name:        "Valid AWS Config",
+			name:         "Valid AWS Config",
 			providerType: "aws",
 			config: map[string]interface{}{
 				"region": "us-east-1",
@@ -100,7 +100,7 @@ func TestProviderValidation(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Valid Azure Config",
+			name:         "Valid Azure Config",
 			providerType: "azure",
 			config: map[string]interface{}{
 				"region": "eastus",
@@ -108,7 +108,7 @@ func TestProviderValidation(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Valid GCP Config",
+			name:         "Valid GCP Config",
 			providerType: "gcp",
 			config: map[string]interface{}{
 				"region": "us-central1",
@@ -116,7 +116,7 @@ func TestProviderValidation(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Valid DigitalOcean Config",
+			name:         "Valid DigitalOcean Config",
 			providerType: "digitalocean",
 			config: map[string]interface{}{
 				"region": "nyc1",
@@ -124,7 +124,7 @@ func TestProviderValidation(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "Missing Region",
+			name:         "Missing Region",
 			providerType: "aws",
 			config: map[string]interface{}{
 				"other": "value",
@@ -132,16 +132,16 @@ func TestProviderValidation(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name:        "Empty Config",
+			name:         "Empty Config",
 			providerType: "aws",
-			config: map[string]interface{}{},
-			expectError: true,
+			config:       map[string]interface{}{},
+			expectError:  true,
 		},
 		{
-			name:        "Nil Config",
+			name:         "Nil Config",
 			providerType: "aws",
-			config: nil,
-			expectError: true,
+			config:       nil,
+			expectError:  true,
 		},
 	}
 
@@ -155,7 +155,7 @@ func TestProviderValidation(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, provider)
-				
+
 				// Test validation
 				err = provider.ValidateCredentials(context.Background())
 				assert.NoError(t, err)
@@ -302,7 +302,7 @@ func TestProviderInterfaceCompliance(t *testing.T) {
 // TestProviderConfigurationPersistence tests that configuration is properly stored
 func TestProviderConfigurationPersistence(t *testing.T) {
 	config := map[string]interface{}{
-		"region": "us-west-2",
+		"region":  "us-west-2",
 		"profile": "test-profile",
 		"timeout": 30,
 	}
@@ -312,7 +312,7 @@ func TestProviderConfigurationPersistence(t *testing.T) {
 
 	// Provider should maintain its configuration
 	assert.Equal(t, "aws", provider.Name())
-	
+
 	// Test that provider can be used with the configuration
 	ctx := context.Background()
 	resources, err := provider.DiscoverResources(ctx, "us-west-2")

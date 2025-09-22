@@ -14,8 +14,8 @@ import (
 
 // MockCloudProvider implements providers.CloudProvider for testing
 type MockCloudProvider struct {
-	name      string
-	resources []models.Resource
+	name          string
+	resources     []models.Resource
 	discoverError error
 }
 
@@ -58,16 +58,16 @@ func TestDetectDrift(t *testing.T) {
 		name: "aws",
 		resources: []models.Resource{
 			{
-				ID:         "i-1234567890abcdef0",
-				Name:       "test-instance",
-				Type:       "aws_instance",
-				Provider:   "aws",
-				Region:     "us-east-1",
-				AccountID:  "123456789012",
-				Tags:       map[string]string{"Environment": "test"},
+				ID:        "i-1234567890abcdef0",
+				Name:      "test-instance",
+				Type:      "aws_instance",
+				Provider:  "aws",
+				Region:    "us-east-1",
+				AccountID: "123456789012",
+				Tags:      map[string]string{"Environment": "test"},
 				Properties: map[string]interface{}{
 					"instance_type": "t3.micro",
-					"ami":          "ami-0c02fb55956c7d316",
+					"ami":           "ami-0c02fb55956c7d316",
 				},
 				CreatedAt: time.Now().Add(-24 * time.Hour),
 				Updated:   time.Now().Add(-1 * time.Hour),
@@ -91,9 +91,9 @@ func TestDetectDrift(t *testing.T) {
 				Instances: []state.Instance{
 					{
 						Attributes: map[string]interface{}{
-							"id":           "i-1234567890abcdef0",
+							"id":            "i-1234567890abcdef0",
 							"instance_type": "t3.small", // Different from discovered
-							"ami":          "ami-0c02fb55956c7d316",
+							"ami":           "ami-0c02fb55956c7d316",
 						},
 					},
 				},
@@ -116,7 +116,7 @@ func TestDetectDrift(t *testing.T) {
 func TestDetectDriftWithTimeout(t *testing.T) {
 	// Create provider that takes too long
 	mockProvider := &MockCloudProvider{
-		name: "aws",
+		name:          "aws",
 		discoverError: context.DeadlineExceeded,
 	}
 
@@ -183,7 +183,7 @@ func TestDetectDriftEmptyState(t *testing.T) {
 // TestDetectDriftProviderError tests drift detection with provider errors
 func TestDetectDriftProviderError(t *testing.T) {
 	mockProvider := &MockCloudProvider{
-		name:         "aws",
+		name:          "aws",
 		discoverError: assert.AnError,
 	}
 

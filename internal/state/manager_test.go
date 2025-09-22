@@ -12,15 +12,15 @@ import (
 
 // MockBackend implements Backend interface for testing
 type MockBackend struct {
-	stateData    []byte
-	versions     []StateVersion
-	states       []string
-	lockError    error
-	unlockError  error
-	getError     error
-	putError     error
-	deleteError  error
-	listError    error
+	stateData   []byte
+	versions    []StateVersion
+	states      []string
+	lockError   error
+	unlockError error
+	getError    error
+	putError    error
+	deleteError error
+	listError   error
 }
 
 func (m *MockBackend) Get(ctx context.Context, key string) ([]byte, error) {
