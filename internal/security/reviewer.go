@@ -30,14 +30,14 @@ type SecurityReviewRule struct {
 // SecurityViolation represents a security violation found in code
 type SecurityViolation struct {
 	Rule       SecurityReviewRule `json:"rule"`
-	File       string       `json:"file"`
-	Line       int          `json:"line"`
-	Column     int          `json:"column"`
-	Code       string       `json:"code"`
-	Message    string       `json:"message"`
-	Severity   string       `json:"severity"`
-	Confidence float64      `json:"confidence"` // 0.0 to 1.0
-	Fix        string       `json:"fix"`
+	File       string             `json:"file"`
+	Line       int                `json:"line"`
+	Column     int                `json:"column"`
+	Code       string             `json:"code"`
+	Message    string             `json:"message"`
+	Severity   string             `json:"severity"`
+	Confidence float64            `json:"confidence"` // 0.0 to 1.0
+	Fix        string             `json:"fix"`
 }
 
 // SecurityReviewResult contains the results of a security review
