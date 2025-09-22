@@ -160,6 +160,46 @@ driftmgr/
 - NO EMOJI in code or comments unless explicitly requested
 - Minimal comments - code should be self-documenting
 
+## Critical Security Rules (MUST FOLLOW)
+- **SEC-1 (MUST)** All database queries use parameterized statements
+- **SEC-2 (MUST)** Input validation on all external data with whitelist patterns
+- **SEC-3 (MUST)** Generic error messages for users, detailed logs for debugging
+- **SEC-4 (MUST)** Authentication required for all state modifications
+- **SEC-5 (MUST)** Use secure cryptographic functions (SHA-256+, AES, Argon2)
+- **SEC-6 (MUST)** Validate file paths to prevent directory traversal
+- **SEC-7 (MUST)** Include security headers in HTTP responses
+- **SEC-8 (MUST)** Sanitize logs to remove sensitive information
+- **SEC-9 (MUST)** Implement rate limiting on all API endpoints
+- **SEC-10 (MUST)** Use specific origins for CORS, never wildcard
+
+## Implementation Workflow
+### QPLAN
+Analyze codebase for consistency, minimal changes, code reuse
+
+### QCODE
+Implement with TDD: stub → failing test → implementation → prettier
+
+### QTEST
+Ensure 80% coverage, security scan passes, performance benchmarks met
+
+## Tech Stack Constraints
+- Go 1.24+ with strict mode
+- No external dependencies without security review
+- All APIs must have OpenAPI specifications
+- Database operations through ORM only
+
+## Function Size Limits
+- Maximum 50 lines per function
+- Maximum 3 levels of nesting
+- Maximum 5 parameters per function
+- Single responsibility principle enforced
+
+## Error Handling Standards
+- Use structured errors with error codes
+- Log errors with context, never log secrets
+- Provide user-friendly error messages
+- Include recovery suggestions in errors
+
 ### Testing Requirements
 Before marking any feature as complete:
 1. Run tests: `go test ./...`

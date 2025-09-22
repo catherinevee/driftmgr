@@ -156,14 +156,14 @@ func (p *GCPProviderComplete) DiscoverResources(ctx context.Context, region stri
 	// GCP uses zones within regions, update zone if region is provided
 	if region != "" {
 		p.zone = region + "-a" // Default to zone a in the region
+		p.region = region
 	}
 
-	resources := []models.Resource{}
+	// Create resource discovery service
+	discoveryService := NewResourceDiscoveryService(p.projectID, p.zone, p.region)
 
-	// TODO: Implement actual resource discovery
-	// This would involve listing various resource types from GCP
-
-	return resources, nil
+	// Discover all resources in the project
+	return discoveryService.DiscoverResourcesByProject(ctx)
 }
 
 // GetResource retrieves a specific resource by ID (implements CloudProvider interface)

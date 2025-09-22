@@ -1,0 +1,117 @@
+name: Security Scan
+on: 
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Install security tools
+      run: |
+        # Install gosec for SAST
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        
+        # Install govulncheck for vulnerability scanning
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        
+        # Install semgrep
+        pip install semgrep
+
+    - name: SAST Scan with gosec
+      run: |
+        echo "Running gosec SAST scan..."
+        gosec -fmt json -out gosec-report.json ./...
+        gosec -fmt sarif -out gosec-report.sarif ./...
+        
+        # Check for high/critical issues
+        if grep -q '"severity":"HIGH"' gosec-report.json || grep -q '"severity":"CRITICAL"' gosec-report.json; then
+          echo "High or critical security issues found!"
+          cat gosec-report.json
+          exit 1
+        fi
+        
+        echo "SAST scan passed - no high/critical issues found"
+
+    - name: Semgrep SAST Scan
+      run: |
+        echo "Running semgrep SAST scan..."
+        semgrep --config=auto --json --output=semgrep-report.json ./...
+        
+        # Check for high/critical findings
+        if jq -e '.results[] | select(.extra.severity == "ERROR" or .extra.severity == "WARNING")' semgrep-report.json > /dev/null; then
+          echo "High severity semgrep findings detected!"
+          jq '.results[] | select(.extra.severity == "ERROR" or .extra.severity == "WARNING")' semgrep-report.json
+          exit 1
+        fi
+        
+        echo "Semgrep scan passed - no high severity issues found"
+
+    - name: Dependency Vulnerability Check
+      run: |
+        echo "Running dependency vulnerability scan..."
+        govulncheck ./...
+        
+        # Check for vulnerabilities
+        if govulncheck ./... 2>&1 | grep -q "Found"; then
+          echo "Vulnerable dependencies found!"
+          govulncheck ./...
+          exit 1
+        fi
+        
+        echo "Dependency scan passed - no vulnerabilities found"
+
+    - name: Secret Detection
+      run: |
+        echo "Running secret detection scan..."
+        
+        # Install trufflehog
+        wget https://github.com/trufflesecurity/trufflehog/releases/latest/download/trufflehog_3.63.7_linux_amd64.tar.gz
+        tar -xzf trufflehog_3.63.7_linux_amd64.tar.gz
+        chmod +x trufflehog
+        
+        # Run secret detection
+        ./trufflehog filesystem . --no-verification --json > trufflehog-report.json
+        
+        # Check for secrets
+        if [ -s trufflehog-report.json ]; then
+          echo "Potential secrets detected!"
+          cat trufflehog-report.json
+          exit 1
+        fi
+        
+        echo "Secret detection passed - no secrets found"
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          gosec-report.json
+          gosec-report.sarif
+          semgrep-report.json
+          trufflehog-report.json
+
+    - name: Security scan summary
+      run: |
+        echo "=== Security Scan Summary ==="
+        echo "✅ SAST scan (gosec): PASSED"
+        echo "✅ SAST scan (semgrep): PASSED" 
+        echo "✅ Dependency scan: PASSED"
+        echo "✅ Secret detection: PASSED"
+        echo "🎉 All security checks passed!"

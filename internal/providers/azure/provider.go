@@ -200,14 +200,16 @@ func (p *AzureProviderComplete) makeAPIRequest(ctx context.Context, method, path
 
 // DiscoverResources discovers resources in the specified region (implements CloudProvider interface)
 func (p *AzureProviderComplete) DiscoverResources(ctx context.Context, region string) ([]models.Resource, error) {
-	// Azure doesn't use regions in the same way as AWS, but we can use resource groups
-	// For now, return empty list or implement actual discovery logic
-	resources := []models.Resource{}
+	// Create resource discovery service
+	discoveryService := NewResourceDiscoveryService(p.subscriptionID, p.resourceGroup)
 
-	// TODO: Implement actual resource discovery
-	// This would involve listing various resource types from Azure
+	// If region is specified, treat it as a resource group
+	if region != "" {
+		return discoveryService.DiscoverResourcesByResourceGroup(ctx, region)
+	}
 
-	return resources, nil
+	// Otherwise, discover all resources in the subscription
+	return discoveryService.DiscoverResourcesBySubscription(ctx)
 }
 
 // GetResource retrieves a specific resource by ID (implements CloudProvider interface)

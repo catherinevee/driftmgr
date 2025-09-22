@@ -284,12 +284,10 @@ func CreateBackendAdapter(config *BackendConfig) (statePkg.Backend, error) {
 		return nil, fmt.Errorf("Azure backend temporarily disabled due to SDK compatibility issues")
 
 	case "gcs":
-		// TODO: Implement GCS backend
-		return nil, fmt.Errorf("GCS backend not yet implemented")
+		backend, err = NewGCSBackend(config)
 
 	case "remote":
-		// TODO: Implement Terraform Cloud backend
-		return nil, fmt.Errorf("Terraform Cloud backend not yet implemented")
+		backend, err = NewTerraformCloudBackend(config)
 
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %s", config.Type)

@@ -286,8 +286,11 @@ function driftMgrV3App() {
         
         configureBackend() {
             // Open backend configuration modal
-            console.log('Configure backend');
-            // TODO: Implement backend configuration UI
+            if (!this.backendConfigUI) {
+                this.backendConfigUI = new BackendConfigurationUI(this);
+                this.backendConfigUI.init();
+            }
+            this.backendConfigUI.open();
         },
         
         async testConnections() {
@@ -463,13 +466,19 @@ function driftMgrV3App() {
         },
         
         moveResource() {
-            console.log('Move resource operation');
-            // TODO: Implement resource move UI
+            if (!this.resourceMoveUI) {
+                this.resourceMoveUI = new ResourceMoveUI(this);
+                this.resourceMoveUI.init();
+            }
+            this.resourceMoveUI.open();
         },
         
         removeResource() {
-            console.log('Remove resource operation');
-            // TODO: Implement resource removal UI
+            if (!this.resourceRemovalUI) {
+                this.resourceRemovalUI = new ResourceRemovalUI(this);
+                this.resourceRemovalUI.init();
+            }
+            this.resourceRemovalUI.open();
         },
         
         importResource() {
@@ -478,8 +487,11 @@ function driftMgrV3App() {
         },
         
         openImportWizard() {
-            // TODO: Implement import wizard UI
-            console.log('Opening import wizard');
+            if (!this.importWizardUI) {
+                this.importWizardUI = new ImportWizardUI(this);
+                this.importWizardUI.init();
+            }
+            this.importWizardUI.open();
         },
         
         // Terragrunt Functions (v3.0 feature)

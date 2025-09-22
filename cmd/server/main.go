@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/api"
+	"github.com/catherinevee/driftmgr/internal/config"
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 
 	// Create server configuration
 	portInt, _ := strconv.Atoi(*port)
-	config := &api.Config{
+	apiConfig := &api.Config{
 		Host:        *host,
 		Port:        portInt,
 		AuthEnabled: *enableAuth,
@@ -40,15 +41,27 @@ func main() {
 
 	// Load configuration file if provided
 	if *configPath != "" {
-		// TODO: Load configuration from file
 		log.Printf("Loading configuration from %s", *configPath)
+
+		// Load configuration using the config manager
+		loadedConfig, err := config.LoadConfigFromFile(*configPath)
+		if err != nil {
+			log.Fatalf("Failed to load configuration: %v", err)
+		}
+
+		// Update the config with loaded values
+		apiConfig.Host = loadedConfig.Server.Host
+		apiConfig.Port = loadedConfig.Server.Port
+		apiConfig.AuthEnabled = loadedConfig.Server.AuthEnabled
+
+		log.Printf("Configuration loaded successfully")
 	}
 
 	// Create services (empty for now)
 	services := &api.Services{}
 
 	// Create API server
-	apiServer := api.NewServer(config, services)
+	apiServer := api.NewServer(apiConfig, services)
 
 	// Setup routes
 	setupRoutes(apiServer)
