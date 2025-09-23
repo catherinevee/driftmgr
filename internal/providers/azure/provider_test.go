@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestNewAzureProvider tests creating a new Azure provider
-func TestNewAzureProvider(t *testing.T) {
+// TestNewAzureProviderComplete tests creating a new Azure provider
+func TestNewAzureProviderComplete(t *testing.T) {
 	tests := []struct {
 		name           string
 		subscriptionID string
@@ -45,7 +45,7 @@ func TestNewAzureProvider(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			provider := NewAzureProvider(tt.subscriptionID, tt.resourceGroup)
+			provider := NewAzureProviderComplete(tt.subscriptionID, tt.resourceGroup)
 			assert.NotNil(t, provider)
 			assert.Equal(t, "azure", provider.Name())
 		})
@@ -54,13 +54,13 @@ func TestNewAzureProvider(t *testing.T) {
 
 // TestAzureProviderName tests the provider name
 func TestAzureProviderName(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	assert.Equal(t, "azure", provider.Name())
 }
 
 // TestAzureProviderSupportedResourceTypes tests supported resource types
 func TestAzureProviderSupportedResourceTypes(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	resourceTypes := provider.SupportedResourceTypes()
 
 	assert.NotEmpty(t, resourceTypes)
@@ -73,7 +73,7 @@ func TestAzureProviderSupportedResourceTypes(t *testing.T) {
 
 // TestAzureProviderListRegions tests listing available regions
 func TestAzureProviderListRegions(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	ctx := context.Background()
 
 	regions, err := provider.ListRegions(ctx)
@@ -91,7 +91,7 @@ func TestAzureProviderListRegions(t *testing.T) {
 
 // TestAzureProviderValidateCredentials tests credential validation
 func TestAzureProviderValidateCredentials(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	ctx := context.Background()
 
 	err := provider.ValidateCredentials(ctx)
@@ -103,7 +103,7 @@ func TestAzureProviderValidateCredentials(t *testing.T) {
 
 // TestAzureProviderDiscoverResources tests resource discovery
 func TestAzureProviderDiscoverResources(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	ctx := context.Background()
 
 	resources, err := provider.DiscoverResources(ctx, "eastus")
@@ -121,7 +121,7 @@ func TestAzureProviderDiscoverResources(t *testing.T) {
 
 // TestAzureProviderGetResource tests getting a specific resource
 func TestAzureProviderGetResource(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	ctx := context.Background()
 
 	resource, err := provider.GetResource(ctx, "test-resource-id")
@@ -133,7 +133,7 @@ func TestAzureProviderGetResource(t *testing.T) {
 
 // TestAzureProviderConcurrentAccess tests concurrent access
 func TestAzureProviderConcurrentAccess(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	ctx := context.Background()
 
 	// Test concurrent calls
@@ -165,7 +165,7 @@ func TestAzureProviderConcurrentAccess(t *testing.T) {
 
 // TestAzureProviderErrorHandling tests error handling scenarios
 func TestAzureProviderErrorHandling(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	ctx := context.Background()
 
 	t.Run("InvalidRegion", func(t *testing.T) {
@@ -190,7 +190,7 @@ func TestAzureProviderErrorHandling(t *testing.T) {
 
 // TestAzureProviderInterfaceCompliance tests that the provider implements the interface correctly
 func TestAzureProviderInterfaceCompliance(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	ctx := context.Background()
 
 	// Test all interface methods exist and return expected types
@@ -250,7 +250,7 @@ func TestAzureProviderConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			provider := NewAzureProvider(tt.subscriptionID, tt.resourceGroup)
+			provider := NewAzureProviderComplete(tt.subscriptionID, tt.resourceGroup)
 			assert.NotNil(t, provider)
 			assert.Equal(t, "azure", provider.Name())
 		})
@@ -259,7 +259,7 @@ func TestAzureProviderConfiguration(t *testing.T) {
 
 // TestAzureProviderResourceTypesCompleteness tests that all expected resource types are supported
 func TestAzureProviderResourceTypesCompleteness(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 	resourceTypes := provider.SupportedResourceTypes()
 
 	expectedTypes := []string{
@@ -297,7 +297,7 @@ func TestAzureProviderResourceTypesCompleteness(t *testing.T) {
 
 // TestAzureProviderPerformance tests basic performance characteristics
 func TestAzureProviderPerformance(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 
 	// Test that getting supported resource types is fast
 	start := time.Now()
@@ -310,7 +310,7 @@ func TestAzureProviderPerformance(t *testing.T) {
 
 // TestAzureProviderThreadSafety tests thread safety
 func TestAzureProviderThreadSafety(t *testing.T) {
-	provider := NewAzureProvider("12345678-1234-1234-1234-123456789012", "test-rg")
+	provider := NewAzureProviderComplete("12345678-1234-1234-1234-123456789012", "test-rg")
 
 	// Test concurrent access to read-only methods
 	var wg sync.WaitGroup
@@ -364,7 +364,7 @@ func TestAzureProviderSubscriptionIDValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			provider := NewAzureProvider(tt.subscriptionID, "test-rg")
+			provider := NewAzureProviderComplete(tt.subscriptionID, "test-rg")
 			assert.NotNil(t, provider)
 			assert.Equal(t, "azure", provider.Name())
 		})

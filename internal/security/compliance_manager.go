@@ -3,6 +3,7 @@ package security
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -304,7 +305,7 @@ func (cm *ComplianceManager) RunComplianceCheck(ctx context.Context, checkID str
 
 // RunAllComplianceChecks runs all enabled compliance checks
 func (cm *ComplianceManager) RunAllComplianceChecks(ctx context.Context, resources []*models.Resource) ([]*ComplianceResult, error) {
-	var results []*ComplianceResult
+	results := make([]*ComplianceResult, 0)
 
 	cm.mu.RLock()
 	checks := make([]*ComplianceCheck, 0, len(cm.checks))
@@ -528,5 +529,5 @@ func (cm *ComplianceManager) GetConfig() *ComplianceConfig {
 
 // Helper function
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr
+	return strings.Contains(s, substr)
 }

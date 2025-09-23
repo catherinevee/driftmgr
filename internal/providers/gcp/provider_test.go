@@ -7,22 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestNewGCPProvider tests creating a new GCP provider
-func TestNewGCPProvider(t *testing.T) {
-	provider := NewGCPProvider("test-project-123", "us-central1")
+// TestNewGCPProviderComplete tests creating a new GCP provider
+func TestNewGCPProviderComplete(t *testing.T) {
+	provider := NewGCPProviderComplete("test-project-123")
 	assert.NotNil(t, provider)
 	assert.Equal(t, "gcp", provider.Name())
 }
 
 // TestGCPProviderName tests the provider name
 func TestGCPProviderName(t *testing.T) {
-	provider := NewGCPProvider("test-project-123", "us-central1")
+	provider := NewGCPProviderComplete("test-project-123")
 	assert.Equal(t, "gcp", provider.Name())
 }
 
 // TestGCPProviderSupportedResourceTypes tests supported resource types
 func TestGCPProviderSupportedResourceTypes(t *testing.T) {
-	provider := NewGCPProvider("test-project-123", "us-central1")
+	provider := NewGCPProviderComplete("test-project-123")
 	resourceTypes := provider.SupportedResourceTypes()
 
 	assert.NotEmpty(t, resourceTypes)
@@ -32,7 +32,7 @@ func TestGCPProviderSupportedResourceTypes(t *testing.T) {
 
 // TestGCPProviderListRegions tests listing available regions
 func TestGCPProviderListRegions(t *testing.T) {
-	provider := NewGCPProvider("test-project-123", "us-central1")
+	provider := NewGCPProviderComplete("test-project-123")
 	ctx := context.Background()
 
 	regions, err := provider.ListRegions(ctx)
@@ -48,7 +48,7 @@ func TestGCPProviderListRegions(t *testing.T) {
 
 // TestGCPProviderValidateCredentials tests credential validation
 func TestGCPProviderValidateCredentials(t *testing.T) {
-	provider := NewGCPProvider("test-project-123", "us-central1")
+	provider := NewGCPProviderComplete("test-project-123")
 	ctx := context.Background()
 
 	err := provider.ValidateCredentials(ctx)
@@ -57,7 +57,7 @@ func TestGCPProviderValidateCredentials(t *testing.T) {
 
 // TestGCPProviderDiscoverResources tests resource discovery
 func TestGCPProviderDiscoverResources(t *testing.T) {
-	provider := NewGCPProvider("test-project-123", "us-central1")
+	provider := NewGCPProviderComplete("test-project-123")
 	ctx := context.Background()
 
 	resources, err := provider.DiscoverResources(ctx, "us-central1")
@@ -72,7 +72,7 @@ func TestGCPProviderDiscoverResources(t *testing.T) {
 
 // TestGCPProviderGetResource tests getting a specific resource
 func TestGCPProviderGetResource(t *testing.T) {
-	provider := NewGCPProvider("test-project-123", "us-central1")
+	provider := NewGCPProviderComplete("test-project-123")
 	ctx := context.Background()
 
 	resource, err := provider.GetResource(ctx, "test-resource-id")

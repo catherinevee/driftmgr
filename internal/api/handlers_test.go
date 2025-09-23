@@ -103,7 +103,7 @@ func TestServerMethods(t *testing.T) {
 			{"/api/v1/resources/123", "123", false},
 			{"/api/v1/resources/abc", "abc", false},
 			{"/api/v1/resources/", "", false}, // Empty string is valid
-			{"/api", "api", false}, // Returns "api" as the last part
+			{"/api", "api", false},            // Returns "api" as the last part
 		}
 
 		for _, tt := range tests {

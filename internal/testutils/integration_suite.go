@@ -227,13 +227,13 @@ func (its *IntegrationTestSuite) CreateTestResources(providerName string, count 
 	var resources []models.Resource
 	for i := 0; i < count; i++ {
 		resource := models.Resource{
-			ID:         fmt.Sprintf("test-resource-%d", i),
-			Name:       fmt.Sprintf("test-resource-%d", i),
-			Type:       "test_resource",
-			Provider:   providerName,
-			Region:     "us-east-1",
-			AccountID:  "test-account",
-			Tags:       map[string]string{"test": "true"},
+			ID:        fmt.Sprintf("test-resource-%d", i),
+			Name:      fmt.Sprintf("test-resource-%d", i),
+			Type:      "test_resource",
+			Provider:  providerName,
+			Region:    "us-east-1",
+			AccountID: "test-account",
+			Tags:      map[string]string{"test": "true"},
 			Properties: map[string]interface{}{
 				"created_by": "integration_test",
 				"test_id":    i,
