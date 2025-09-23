@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestNewAzureProvider tests creating a new Azure provider
@@ -139,7 +138,7 @@ func TestAzureProviderConcurrentAccess(t *testing.T) {
 
 	// Test concurrent calls
 	done := make(chan bool, 3)
-	
+
 	go func() {
 		defer func() { done <- true }()
 		regions, _ := provider.ListRegions(ctx)
@@ -321,11 +320,11 @@ func TestAzureProviderThreadSafety(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			
+
 			// These should be safe to call concurrently
 			name := provider.Name()
 			assert.Equal(t, "azure", name)
-			
+
 			resourceTypes := provider.SupportedResourceTypes()
 			assert.NotEmpty(t, resourceTypes)
 		}()

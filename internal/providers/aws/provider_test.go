@@ -128,7 +128,7 @@ func TestAWSProviderConcurrentAccess(t *testing.T) {
 
 	// Test concurrent calls
 	done := make(chan bool, 3)
-	
+
 	go func() {
 		defer func() { done <- true }()
 		regions, _ := provider.ListRegions(ctx)
@@ -283,11 +283,11 @@ func TestAWSProviderThreadSafety(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			
+
 			// These should be safe to call concurrently
 			name := provider.Name()
 			assert.Equal(t, "aws", name)
-			
+
 			resourceTypes := provider.SupportedResourceTypes()
 			assert.NotEmpty(t, resourceTypes)
 		}()
