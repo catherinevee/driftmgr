@@ -2,6 +2,7 @@ package integrations
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -9,9 +10,10 @@ import (
 
 // IntegrationManager manages external integrations
 type IntegrationManager struct {
-	integrations map[string]Integration
-	mu           sync.RWMutex
-	config       *IntegrationConfig
+	integrations    map[string]Integration
+	webhookDelivery *WebhookDeliveryService
+	mu              sync.RWMutex
+	config          *IntegrationConfig
 }
 
 // Integration represents an external integration
@@ -66,8 +68,9 @@ func NewIntegrationManager() *IntegrationManager {
 	}
 
 	return &IntegrationManager{
-		integrations: make(map[string]Integration),
-		config:       config,
+		integrations:    make(map[string]Integration),
+		webhookDelivery: NewWebhookDeliveryService(),
+		config:          config,
 	}
 }
 
@@ -301,10 +304,86 @@ func (im *IntegrationManager) validateIntegration(integration *Integration) erro
 
 // sendWebhookEvent sends a webhook event
 func (im *IntegrationManager) sendWebhookEvent(ctx context.Context, integration *Integration, event *IntegrationEvent) error {
-	// Simplified webhook implementation
-	// In a real system, you would make an HTTP POST request
-	_ = integration // Use the integration variable to avoid linting error
-	fmt.Printf("Sending webhook event to %s: %s\n", integration.Name, event.Type)
+	// Get webhook URL from integration config
+	url, ok := integration.Config["url"].(string)
+	if !ok {
+		return fmt.Errorf("webhook URL not found in integration config")
+	}
+
+	// Prepare payload
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+
+	// Prepare headers
+	headers := make(map[string]string)
+	if integration.Config["headers"] != nil {
+		if headerMap, ok := integration.Config["headers"].(map[string]interface{}); ok {
+			for k, v := range headerMap {
+				if str, ok := v.(string); ok {
+					headers[k] = str
+				}
+			}
+		}
+	}
+
+	// Prepare authentication
+	var auth *WebhookAuth
+	if integration.Config["auth"] != nil {
+		if authMap, ok := integration.Config["auth"].(map[string]interface{}); ok {
+			auth = &WebhookAuth{}
+			if authType, ok := authMap["type"].(string); ok {
+				auth.Type = authType
+			}
+			if secret, ok := authMap["secret"].(string); ok {
+				auth.Secret = secret
+			}
+			if token, ok := authMap["token"].(string); ok {
+				auth.Token = token
+			}
+			if username, ok := authMap["username"].(string); ok {
+				auth.Username = username
+			}
+			if password, ok := authMap["password"].(string); ok {
+				auth.Password = password
+			}
+			if signatureHeader, ok := authMap["signature_header"].(string); ok {
+				auth.SignatureHeader = signatureHeader
+			}
+			if algorithm, ok := authMap["algorithm"].(string); ok {
+				auth.Algorithm = algorithm
+			}
+			if authHeaders, ok := authMap["headers"].(map[string]interface{}); ok {
+				auth.Headers = make(map[string]string)
+				for k, v := range authHeaders {
+					if str, ok := v.(string); ok {
+						auth.Headers[k] = str
+					}
+				}
+			}
+		}
+	}
+
+	// Deliver webhook
+	delivery, err := im.webhookDelivery.DeliverWebhook(ctx, url, payload, headers, auth)
+	if err != nil {
+		return fmt.Errorf("failed to deliver webhook: %w", err)
+	}
+
+	// Update integration last sync time
+	im.mu.Lock()
+	if storedIntegration, exists := im.integrations[integration.ID]; exists {
+		storedIntegration.LastSync = time.Now()
+		if delivery.Status == DeliveryStatusDelivered {
+			storedIntegration.Status = "active"
+		} else if delivery.Status == DeliveryStatusFailed {
+			storedIntegration.Status = "error"
+		}
+		im.integrations[integration.ID] = storedIntegration
+	}
+	im.mu.Unlock()
+
 	return nil
 }
 

@@ -5,8 +5,14 @@ Write-Host "Generating DriftMgr architecture diagrams..." -ForegroundColor Green
 New-Item -ItemType Directory -Force -Path "output" | Out-Null
 
 # Generate DOT files
-Write-Host "Generating architecture diagram..." -ForegroundColor Yellow
+Write-Host "Generating production architecture diagram..." -ForegroundColor Yellow
 go run architecture_diagram.go
+
+Write-Host "Generating real-time architecture diagram..." -ForegroundColor Yellow
+go run realtime_architecture.go
+
+Write-Host "Generating API architecture diagram..." -ForegroundColor Yellow
+go run api_architecture.go
 
 Write-Host "Generating drift detection flow diagram..." -ForegroundColor Yellow
 go run drift_detection_flow.go
@@ -16,7 +22,7 @@ go run remediation_workflow.go
 
 # Convert DOT files to PNG (if Graphviz is available)
 Write-Host "Converting DOT files to PNG..." -ForegroundColor Yellow
-$dotFiles = @("driftmgr_architecture.dot", "drift_detection_flow.dot", "remediation_workflow.dot")
+$dotFiles = @("driftmgr_production_architecture.dot", "driftmgr_realtime_architecture.dot", "driftmgr_api_architecture.dot", "drift_detection_flow.dot", "remediation_workflow.dot")
 
 foreach ($dotFile in $dotFiles) {
     if (Test-Path $dotFile) {

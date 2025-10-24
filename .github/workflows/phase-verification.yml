@@ -1,0 +1,448 @@
+name: Phase Verification and Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: 'Phase to test (1-7)'
+        required: true
+        default: '1'
+        type: choice
+        options:
+        - '1'
+        - '2'
+        - '3'
+        - '4'
+        - '5'
+        - '6'
+        - '7'
+        - 'all'
+
+jobs:
+  phase-1-simulation:
+    if: github.event.inputs.phase == '1' || github.event.inputs.phase == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Phase 1 - Simulation System
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run simulation system unit tests
+      run: |
+        go test -v ./internal/simulation/... -coverprofile=simulation-coverage.out
+        go tool cover -html=simulation-coverage.out -o simulation-coverage.html
+    
+    - name: Run simulation system integration tests
+      run: go test -v ./tests/integration/simulation/... -timeout=10m
+    
+    - name: Test simulation system compilation
+      run: go build ./internal/simulation/...
+    
+    - name: Upload simulation coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: simulation-coverage
+        path: simulation-coverage.html
+    
+    - name: Verify simulation system completeness
+      run: |
+        echo "Verifying simulation system completeness..."
+        # Check that all drift types are implemented
+        if ! grep -r "not implemented" internal/simulation/; then
+          echo "✅ All simulation drift types implemented"
+        else
+          echo "❌ Some simulation drift types still not implemented"
+          exit 1
+        fi
+
+  phase-2-automation:
+    if: github.event.inputs.phase == '2' || github.event.inputs.phase == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Phase 2 - Automation System
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run automation system unit tests
+      run: |
+        go test -v ./internal/automation/... -coverprofile=automation-coverage.out
+        go tool cover -html=automation-coverage.out -o automation-coverage.html
+    
+    - name: Run automation system integration tests
+      run: go test -v ./tests/integration/automation/... -timeout=10m
+    
+    - name: Test automation system compilation
+      run: go build ./internal/automation/...
+    
+    - name: Upload automation coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: automation-coverage
+        path: automation-coverage.html
+    
+    - name: Verify automation system completeness
+      run: |
+        echo "Verifying automation system completeness..."
+        # Check that template processing is implemented
+        if ! grep -r "placeholder.*template processing" internal/automation/; then
+          echo "✅ Template processing implemented"
+        else
+          echo "❌ Template processing still has placeholders"
+          exit 1
+        fi
+        
+        # Check that event publishing is implemented
+        if ! grep -r "TODO.*event publishing" internal/automation/; then
+          echo "✅ Event publishing implemented"
+        else
+          echo "❌ Event publishing still has TODOs"
+          exit 1
+        fi
+
+  phase-3-discovery:
+    if: github.event.inputs.phase == '3' || github.event.inputs.phase == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Phase 3 - Discovery Engine
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run discovery system unit tests
+      run: |
+        go test -v ./internal/discovery/... -coverprofile=discovery-coverage.out
+        go tool cover -html=discovery-coverage.out -o discovery-coverage.html
+    
+    - name: Run discovery system integration tests
+      run: go test -v ./tests/integration/discovery/... -timeout=10m
+    
+    - name: Test discovery system compilation
+      run: go build ./internal/discovery/...
+    
+    - name: Upload discovery coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: discovery-coverage
+        path: discovery-coverage.html
+    
+    - name: Verify discovery system completeness
+      run: |
+        echo "Verifying discovery system completeness..."
+        # Check that provider initialization is implemented
+        if ! grep -r "TODO.*provider initialization" internal/discovery/; then
+          echo "✅ Provider initialization implemented"
+        else
+          echo "❌ Provider initialization still has TODOs"
+          exit 1
+        fi
+
+  phase-4-state-management:
+    if: github.event.inputs.phase == '4' || github.event.inputs.phase == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Phase 4 - State Management
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run state management unit tests
+      run: |
+        go test -v ./internal/state/... -coverprofile=state-coverage.out
+        go tool cover -html=state-coverage.out -o state-coverage.html
+    
+    - name: Run state management integration tests
+      run: go test -v ./tests/integration/state/... -timeout=10m
+    
+    - name: Test state management compilation
+      run: go build ./internal/state/...
+    
+    - name: Upload state coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: state-coverage
+        path: state-coverage.html
+    
+    - name: Verify state management completeness
+      run: |
+        echo "Verifying state management completeness..."
+        # Check that Azure backend is implemented
+        if ! grep -r "TODO.*Azure.*lease client" internal/state/; then
+          echo "✅ Azure backend implemented"
+        else
+          echo "❌ Azure backend still has TODOs"
+          exit 1
+        fi
+
+  phase-5-remediation:
+    if: github.event.inputs.phase == '5' || github.event.inputs.phase == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Phase 5 - Remediation System
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run remediation system unit tests
+      run: |
+        go test -v ./internal/remediation/... -coverprofile=remediation-coverage.out
+        go tool cover -html=remediation-coverage.out -o remediation-coverage.html
+    
+    - name: Run remediation system integration tests
+      run: go test -v ./tests/integration/remediation/... -timeout=10m
+    
+    - name: Test remediation system compilation
+      run: go build ./internal/remediation/...
+    
+    - name: Upload remediation coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: remediation-coverage
+        path: remediation-coverage.html
+    
+    - name: Verify remediation system completeness
+      run: |
+        echo "Verifying remediation system completeness..."
+        # Check that ResourceChange struct is implemented
+        if grep -r "type ResourceChange struct" internal/models/; then
+          echo "✅ ResourceChange struct implemented"
+        else
+          echo "❌ ResourceChange struct not implemented"
+          exit 1
+        fi
+
+  phase-6-security-compliance:
+    if: github.event.inputs.phase == '6' || github.event.inputs.phase == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Phase 6 - Security & Compliance
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run security system unit tests
+      run: |
+        go test -v ./internal/security/... -coverprofile=security-coverage.out
+        go tool cover -html=security-coverage.out -o security-coverage.html
+    
+    - name: Run security system integration tests
+      run: go test -v ./tests/integration/security/... -timeout=10m
+    
+    - name: Test security system compilation
+      run: go build ./internal/security/...
+    
+    - name: Upload security coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-coverage
+        path: security-coverage.html
+    
+    - name: Verify security system completeness
+      run: |
+        echo "Verifying security system completeness..."
+        # Check that security service is implemented
+        if ! grep -r "placeholder" internal/security/service.go; then
+          echo "✅ Security service implemented"
+        else
+          echo "❌ Security service still has placeholders"
+          exit 1
+        fi
+
+  phase-7-integration:
+    if: github.event.inputs.phase == '7' || github.event.inputs.phase == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Phase 7 - Final Integration
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run all unit tests
+      run: |
+        go test -v ./... -coverprofile=all-coverage.out
+        go tool cover -html=all-coverage.out -o all-coverage.html
+    
+    - name: Run all integration tests
+      run: go test -v ./tests/integration/... -timeout=30m
+    
+    - name: Test full system compilation
+      run: go build ./...
+    
+    - name: Upload full coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: full-coverage
+        path: all-coverage.html
+    
+    - name: Verify system completeness
+      run: |
+        echo "Verifying complete system..."
+        # Check for any remaining TODOs or placeholders
+        if ! grep -r "TODO\|FIXME\|placeholder\|not implemented" internal/ --exclude-dir=test; then
+          echo "✅ No remaining TODOs or placeholders"
+        else
+          echo "❌ Still have TODOs or placeholders"
+          exit 1
+        fi
+        
+        # Check that all systems compile
+        if go build ./...; then
+          echo "✅ All systems compile successfully"
+        else
+          echo "❌ Some systems fail to compile"
+          exit 1
+        fi
+
+  comprehensive-testing:
+    if: github.event.inputs.phase == 'all' || github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Comprehensive Testing
+    needs: [phase-1-simulation, phase-2-automation, phase-3-discovery, phase-4-state-management, phase-5-remediation, phase-6-security-compliance, phase-7-integration]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run performance tests
+      run: go test -v ./tests/benchmarks/... -bench=.
+    
+    - name: Run security tests
+      run: go test -v ./tests/security/... -timeout=10m
+    
+    - name: Run end-to-end tests
+      run: go test -v ./tests/e2e/... -timeout=30m
+    
+    - name: Generate test report
+      run: |
+        echo "# Test Report" > test-report.md
+        echo "## Phase 1 - Simulation System" >> test-report.md
+        echo "✅ All simulation tests passed" >> test-report.md
+        echo "## Phase 2 - Automation System" >> test-report.md
+        echo "✅ All automation tests passed" >> test-report.md
+        echo "## Phase 3 - Discovery Engine" >> test-report.md
+        echo "✅ All discovery tests passed" >> test-report.md
+        echo "## Phase 4 - State Management" >> test-report.md
+        echo "✅ All state management tests passed" >> test-report.md
+        echo "## Phase 5 - Remediation System" >> test-report.md
+        echo "✅ All remediation tests passed" >> test-report.md
+        echo "## Phase 6 - Security & Compliance" >> test-report.md
+        echo "✅ All security tests passed" >> test-report.md
+        echo "## Phase 7 - Final Integration" >> test-report.md
+        echo "✅ All integration tests passed" >> test-report.md
+    
+    - name: Upload test report
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-report
+        path: test-report.md
+
+

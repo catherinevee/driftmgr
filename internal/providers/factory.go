@@ -94,6 +94,25 @@ func NewAzureProviderComplete(subscriptionID, resourceGroup, tenantID, clientID,
 	return provider
 }
 
+// NewAzureSDKProvider creates a new Azure provider using Azure SDK
+func NewAzureSDKProvider(subscriptionID, resourceGroup string) (*azure.AzureSDKProviderSimple, error) {
+	// Auto-detect subscription ID if not provided
+	if subscriptionID == "" {
+		subscriptionID = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	}
+	if resourceGroup == "" {
+		resourceGroup = os.Getenv("AZURE_RESOURCE_GROUP")
+	}
+
+	// Create provider using Azure SDK
+	provider, err := azure.NewAzureSDKProviderSimple(subscriptionID, resourceGroup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure SDK provider: %w", err)
+	}
+
+	return provider, nil
+}
+
 // NewGCPProviderComplete creates a new GCP provider with full API implementation
 func NewGCPProviderComplete(projectID, region, credentialsPath string) *gcp.GCPProviderComplete {
 	// Auto-detect project ID if not provided

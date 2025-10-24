@@ -1,0 +1,246 @@
+<!-- Remediation Strategy Form Modal -->
+<div id="remediation-form-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="remediation-form-title">Create Remediation Strategy</h2>
+            <button class="modal-close" onclick="closeRemediationForm()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="remediation-form" class="form">
+            <div class="form-group">
+                <label for="remediation-name">Strategy Name *</label>
+                <input type="text" id="remediation-name" name="name" required 
+                       placeholder="Enter strategy name">
+                <span class="form-error" id="remediation-name-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="remediation-description">Description</label>
+                <textarea id="remediation-description" name="description" 
+                          placeholder="Enter strategy description"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="remediation-type">Strategy Type *</label>
+                <select id="remediation-type" name="type" required onchange="toggleRemediationConfig()">
+                    <option value="">Select strategy type</option>
+                    <option value="terraform_apply">Terraform Apply</option>
+                    <option value="terraform_import">Terraform Import</option>
+                    <option value="terraform_remove">Terraform Remove</option>
+                    <option value="terraform_move">Terraform Move</option>
+                    <option value="manual">Manual Action</option>
+                    <option value="script">Custom Script</option>
+                </select>
+                <span class="form-error" id="remediation-type-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="remediation-priority">Priority</label>
+                <select id="remediation-priority" name="priority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="remediation-approval">Requires Approval</label>
+                <input type="checkbox" id="remediation-approval" name="requires_approval">
+                <span class="checkbox-label">Require manual approval before execution</span>
+            </div>
+
+            <!-- Terraform Apply Configuration -->
+            <div id="terraform-apply-config" class="remediation-config" style="display: none;">
+                <h3>Terraform Apply Configuration</h3>
+                <div class="form-group">
+                    <label for="tf-plan-file">Plan File Path</label>
+                    <input type="text" id="tf-plan-file" name="config.plan_file" 
+                           placeholder="path/to/terraform.tfplan">
+                </div>
+                <div class="form-group">
+                    <label for="tf-auto-approve">Auto Approve</label>
+                    <input type="checkbox" id="tf-auto-approve" name="config.auto_approve">
+                    <span class="checkbox-label">Skip interactive approval</span>
+                </div>
+                <div class="form-group">
+                    <label for="tf-parallelism">Parallelism</label>
+                    <input type="number" id="tf-parallelism" name="config.parallelism" 
+                           value="10" min="1" max="50">
+                </div>
+            </div>
+
+            <!-- Terraform Import Configuration -->
+            <div id="terraform-import-config" class="remediation-config" style="display: none;">
+                <h3>Terraform Import Configuration</h3>
+                <div class="form-group">
+                    <label for="import-resource-address">Resource Address *</label>
+                    <input type="text" id="import-resource-address" name="config.resource_address" 
+                           placeholder="aws_instance.web">
+                </div>
+                <div class="form-group">
+                    <label for="import-resource-id">Resource ID *</label>
+                    <input type="text" id="import-resource-id" name="config.resource_id" 
+                           placeholder="i-1234567890abcdef0">
+                </div>
+            </div>
+
+            <!-- Terraform Remove Configuration -->
+            <div id="terraform-remove-config" class="remediation-config" style="display: none;">
+                <h3>Terraform Remove Configuration</h3>
+                <div class="form-group">
+                    <label for="remove-resource-address">Resource Address *</label>
+                    <input type="text" id="remove-resource-address" name="config.resource_address" 
+                           placeholder="aws_instance.web">
+                </div>
+                <div class="form-group">
+                    <label for="remove-target">Target Resources</label>
+                    <textarea id="remove-target" name="config.target" 
+                              placeholder="List of resources to remove (one per line)"></textarea>
+                </div>
+            </div>
+
+            <!-- Terraform Move Configuration -->
+            <div id="terraform-move-config" class="remediation-config" style="display: none;">
+                <h3>Terraform Move Configuration</h3>
+                <div class="form-group">
+                    <label for="move-from-address">From Address *</label>
+                    <input type="text" id="move-from-address" name="config.from_address" 
+                           placeholder="aws_instance.old_name">
+                </div>
+                <div class="form-group">
+                    <label for="move-to-address">To Address *</label>
+                    <input type="text" id="move-to-address" name="config.to_address" 
+                           placeholder="aws_instance.new_name">
+                </div>
+            </div>
+
+            <!-- Manual Action Configuration -->
+            <div id="manual-config" class="remediation-config" style="display: none;">
+                <h3>Manual Action Configuration</h3>
+                <div class="form-group">
+                    <label for="manual-instructions">Instructions *</label>
+                    <textarea id="manual-instructions" name="config.instructions" required 
+                              placeholder="Enter detailed instructions for manual remediation"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="manual-estimated-time">Estimated Time (minutes)</label>
+                    <input type="number" id="manual-estimated-time" name="config.estimated_time" 
+                           min="1" max="1440">
+                </div>
+            </div>
+
+            <!-- Custom Script Configuration -->
+            <div id="script-config" class="remediation-config" style="display: none;">
+                <h3>Custom Script Configuration</h3>
+                <div class="form-group">
+                    <label for="script-path">Script Path *</label>
+                    <input type="text" id="script-path" name="config.script_path" 
+                           placeholder="/path/to/remediation-script.sh">
+                </div>
+                <div class="form-group">
+                    <label for="script-args">Script Arguments</label>
+                    <input type="text" id="script-args" name="config.script_args" 
+                           placeholder="--dry-run --verbose">
+                </div>
+                <div class="form-group">
+                    <label for="script-timeout">Timeout (seconds)</label>
+                    <input type="number" id="script-timeout" name="config.timeout" 
+                           value="300" min="30" max="3600">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="remediation-tags">Tags</label>
+                <div class="tags-input">
+                    <input type="text" id="remediation-tags" placeholder="Add tags (press Enter)">
+                    <div class="tags-list" id="remediation-tags-list"></div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeRemediationForm()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Strategy
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Remediation Job Form Modal -->
+<div id="remediation-job-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Create Remediation Job</h2>
+            <button class="modal-close" onclick="closeRemediationJobForm()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="remediation-job-form" class="form">
+            <div class="form-group">
+                <label for="job-name">Job Name *</label>
+                <input type="text" id="job-name" name="name" required 
+                       placeholder="Enter job name">
+                <span class="form-error" id="job-name-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="job-strategy">Remediation Strategy *</label>
+                <select id="job-strategy" name="strategy_id" required>
+                    <option value="">Select strategy</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <span class="form-error" id="job-strategy-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="job-resources">Target Resources *</label>
+                <div class="resource-selector">
+                    <div class="resource-filters">
+                        <input type="text" id="resource-filter" placeholder="Filter resources...">
+                        <button type="button" class="btn btn-sm" onclick="selectAllResources()">Select All</button>
+                        <button type="button" class="btn btn-sm" onclick="clearAllResources()">Clear All</button>
+                    </div>
+                    <div class="resource-list" id="job-resource-list">
+                        <!-- Resources will be populated dynamically -->
+                    </div>
+                </div>
+                <span class="form-error" id="job-resources-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="job-schedule">Schedule</label>
+                <select id="job-schedule" name="schedule">
+                    <option value="immediate">Run Immediately</option>
+                    <option value="scheduled">Schedule for Later</option>
+                </select>
+            </div>
+
+            <div id="schedule-config" class="form-group" style="display: none;">
+                <label for="job-schedule-time">Scheduled Time</label>
+                <input type="datetime-local" id="job-schedule-time" name="scheduled_time">
+            </div>
+
+            <div class="form-group">
+                <label for="job-description">Description</label>
+                <textarea id="job-description" name="description" 
+                          placeholder="Enter job description"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeRemediationJobForm()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-play"></i> Create Job
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

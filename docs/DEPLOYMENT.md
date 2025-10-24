@@ -1,69 +1,447 @@
-# DriftMgr Production Deployment Guide
+# DriftMgr Deployment Guide
 
-Comprehensive guide for deploying DriftMgr in production environments.
+This guide covers various deployment scenarios for DriftMgr, from simple single-server deployments to complex multi-node production environments.
 
-## Table of Contents
-- [Deployment Options](#deployment-options)
+## 📋 Table of Contents
+
+- [Overview](#overview)
 - [Prerequisites](#prerequisites)
-- [Kubernetes Deployment](#kubernetes-deployment)
+- [Single Server Deployment](#single-server-deployment)
 - [Docker Deployment](#docker-deployment)
-- [VM/Bare Metal Deployment](#vmbare-metal-deployment)
-- [Cloud-Specific Deployments](#cloud-specific-deployments)
-- [High Availability Setup](#high-availability-setup)
-- [Security Configuration](#security-configuration)
-- [Monitoring Setup](#monitoring-setup)
-- [Backup and Disaster Recovery](#backup-and-disaster-recovery)
-- [Maintenance](#maintenance)
+- [Kubernetes Deployment](#kubernetes-deployment)
+- [Production Considerations](#production-considerations)
+- [Monitoring & Logging](#monitoring--logging)
+- [Backup & Recovery](#backup--recovery)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
 
-## Deployment Options
+## 🌟 Overview
 
-### Comparison Matrix
+DriftMgr can be deployed in various configurations depending on your requirements:
 
-| Option | Scalability | Complexity | Cost | Best For |
-|--------|------------|------------|------|----------|
-| Kubernetes | High | High | Medium-High | Large enterprises, multi-team |
-| Docker Swarm | Medium | Medium | Medium | Medium organizations |
-| Docker Compose | Low | Low | Low | Small teams, POC |
-| VM/Bare Metal | Medium | Medium | Variable | On-premise requirements |
-| Serverless | High | Low | Pay-per-use | Periodic scans |
-| Managed Service | High | Low | High | Zero maintenance |
+- **Development**: Single server with local database
+- **Staging**: Docker containers with external database
+- **Production**: Kubernetes cluster with high availability
+- **Enterprise**: Multi-region deployment with load balancing
 
-## Prerequisites
+## 📋 Prerequisites
 
 ### System Requirements
 
-#### Minimum (up to 1000 resources)
-- CPU: 2 cores
-- RAM: 4 GB
-- Storage: 20 GB SSD
-- Network: 10 Mbps
+#### Minimum Requirements
+- **CPU**: 2 cores
+- **RAM**: 4 GB
+- **Storage**: 20 GB
+- **OS**: Linux (Ubuntu 20.04+, CentOS 8+, RHEL 8+)
 
-#### Recommended (up to 10,000 resources)
-- CPU: 4 cores
-- RAM: 16 GB
-- Storage: 100 GB SSD
-- Network: 100 Mbps
+#### Recommended Requirements
+- **CPU**: 4+ cores
+- **RAM**: 8+ GB
+- **Storage**: 100+ GB SSD
+- **OS**: Linux (Ubuntu 22.04 LTS, RHEL 9+)
 
-#### Enterprise (10,000+ resources)
-- CPU: 8+ cores
-- RAM: 32+ GB
-- Storage: 500+ GB SSD
-- Network: 1 Gbps
+### Software Dependencies
 
-### Software Requirements
-- Container runtime: Docker 20.10+
-- Kubernetes: 1.24+ (if using K8s)
-- PostgreSQL: 14+
-- Redis: 7+
+- **Go**: 1.21 or later
+- **PostgreSQL**: 13 or later
+- **Docker**: 20.10+ (for containerized deployment)
+- **Kubernetes**: 1.24+ (for K8s deployment)
+- **Nginx**: 1.18+ (for reverse proxy)
 
 ### Network Requirements
-- Outbound HTTPS (443) to cloud provider APIs
-- Inbound access for web UI (configurable)
-- Database connectivity (PostgreSQL: 5432, Redis: 6379)
 
-## Kubernetes Deployment
+- **Ports**: 8080 (HTTP), 443 (HTTPS), 5432 (PostgreSQL)
+- **Firewall**: Configure appropriate rules
+- **SSL/TLS**: Certificates for HTTPS
 
-### 1. Create Namespace and Secrets
+## 🖥️ Single Server Deployment
+
+### Step 1: Prepare the Server
+
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Install required packages
+sudo apt install -y postgresql postgresql-contrib nginx certbot python3-certbot-nginx
+
+# Create driftmgr user
+sudo useradd -r -s /bin/false driftmgr
+sudo mkdir -p /opt/driftmgr
+sudo chown driftmgr:driftmgr /opt/driftmgr
+```
+
+### Step 2: Database Setup
+
+```bash
+# Switch to postgres user
+sudo -u postgres psql
+
+# Create database and user
+CREATE DATABASE driftmgr;
+CREATE USER driftmgr WITH PASSWORD 'secure-password';
+GRANT ALL PRIVILEGES ON DATABASE driftmgr TO driftmgr;
+ALTER USER driftmgr CREATEDB;
+\q
+```
+
+### Step 3: Install DriftMgr
+
+```bash
+# Download and extract DriftMgr
+cd /opt/driftmgr
+sudo wget https://github.com/catherinevee/driftmgr/releases/latest/download/driftmgr-linux-amd64.tar.gz
+sudo tar -xzf driftmgr-linux-amd64.tar.gz
+sudo chown -R driftmgr:driftmgr /opt/driftmgr
+```
+
+### Step 4: Configuration
+
+```bash
+# Create configuration file
+sudo tee /opt/driftmgr/config.yaml > /dev/null <<EOF
+server:
+  host: "0.0.0.0"
+  port: 8080
+  auth_enabled: true
+  cors_enabled: true
+  rate_limit_enabled: true
+  rate_limit_rps: 100
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "driftmgr"
+  user: "driftmgr"
+  password: "secure-password"
+  ssl_mode: "require"
+
+auth:
+  jwt_secret: "$(openssl rand -base64 32)"
+  jwt_issuer: "driftmgr"
+  jwt_audience: "driftmgr-api"
+  access_token_expiry: "15m"
+  refresh_token_expiry: "7d"
+
+logging:
+  level: "info"
+  format: "json"
+  output: "/var/log/driftmgr/driftmgr.log"
+EOF
+
+# Create log directory
+sudo mkdir -p /var/log/driftmgr
+sudo chown driftmgr:driftmgr /var/log/driftmgr
+```
+
+### Step 5: Systemd Service
+
+```bash
+# Create systemd service file
+sudo tee /etc/systemd/system/driftmgr.service > /dev/null <<EOF
+[Unit]
+Description=DriftMgr Server
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=driftmgr
+Group=driftmgr
+WorkingDirectory=/opt/driftmgr
+ExecStart=/opt/driftmgr/driftmgr-server --config=/opt/driftmgr/config.yaml
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=driftmgr
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/driftmgr
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable driftmgr
+sudo systemctl start driftmgr
+sudo systemctl status driftmgr
+```
+
+### Step 6: Nginx Configuration
+
+```bash
+# Create Nginx configuration
+sudo tee /etc/nginx/sites-available/driftmgr > /dev/null <<EOF
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    # Redirect HTTP to HTTPS
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+    
+    # SSL configuration
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # Security headers
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    
+    # Rate limiting
+    limit_req_zone \$binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone \$binary_remote_addr zone=login:10m rate=1r/s;
+    
+    # Main application
+    location / {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+    }
+    
+    # WebSocket support
+    location /ws {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400;
+    }
+    
+    # Login rate limiting
+    location /api/v1/auth/login {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+    
+    # Static files caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        proxy_pass http://127.0.0.1:8080;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+EOF
+
+# Enable site
+sudo ln -s /etc/nginx/sites-available/driftmgr /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Step 7: SSL Certificate
+
+```bash
+# Obtain SSL certificate
+sudo certbot --nginx -d your-domain.com
+
+# Test certificate renewal
+sudo certbot renew --dry-run
+```
+
+### Step 8: Firewall Configuration
+
+```bash
+# Configure UFW
+sudo ufw allow ssh
+sudo ufw allow 'Nginx Full'
+sudo ufw --force enable
+```
+
+## 🐳 Docker Deployment
+
+### Docker Compose Setup
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  driftmgr:
+    image: driftmgr/driftmgr:latest
+    container_name: driftmgr
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DRIFTMGR_DB_HOST=postgres
+      - DRIFTMGR_DB_PASSWORD=secure-password
+      - DRIFTMGR_JWT_SECRET=your-jwt-secret
+      - DRIFTMGR_LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - driftmgr_logs:/var/log/driftmgr
+    networks:
+      - driftmgr-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: driftmgr-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=driftmgr
+      - POSTGRES_USER=driftmgr
+      - POSTGRES_PASSWORD=secure-password
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - driftmgr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U driftmgr -d driftmgr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: driftmgr-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - driftmgr
+    networks:
+      - driftmgr-network
+
+volumes:
+  postgres_data:
+    driver: local
+  driftmgr_logs:
+    driver: local
+
+networks:
+  driftmgr-network:
+    driver: bridge
+```
+
+### Nginx Configuration for Docker
+
+```nginx
+# nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream driftmgr {
+        server driftmgr:8080;
+    }
+    
+    server {
+        listen 80;
+        server_name your-domain.com;
+        return 301 https://$server_name$request_uri;
+    }
+    
+    server {
+        listen 443 ssl http2;
+        server_name your-domain.com;
+        
+        ssl_certificate /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key /etc/nginx/ssl/key.pem;
+        
+        location / {
+            proxy_pass http://driftmgr;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        location /ws {
+            proxy_pass http://driftmgr;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+        }
+    }
+}
+```
+
+### Database Initialization
+
+```sql
+-- init.sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Create additional indexes for performance
+CREATE INDEX IF NOT EXISTS idx_resources_provider ON resources(provider);
+CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type);
+CREATE INDEX IF NOT EXISTS idx_resources_region ON resources(region);
+CREATE INDEX IF NOT EXISTS idx_drift_results_status ON drift_results(status);
+CREATE INDEX IF NOT EXISTS idx_drift_results_created_at ON drift_results(created_at);
+```
+
+### Deployment Commands
+
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f driftmgr
+
+# Scale DriftMgr instances
+docker-compose up -d --scale driftmgr=3
+
+# Update to latest version
+docker-compose pull driftmgr
+docker-compose up -d driftmgr
+
+# Backup database
+docker-compose exec postgres pg_dump -U driftmgr driftmgr > backup.sql
+```
+
+## ☸️ Kubernetes Deployment
+
+### Namespace and ConfigMap
+
 ```yaml
 # namespace.yaml
 apiVersion: v1
@@ -71,6 +449,43 @@ kind: Namespace
 metadata:
   name: driftmgr
 ---
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: driftmgr-config
+  namespace: driftmgr
+data:
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      auth_enabled: true
+      cors_enabled: true
+      rate_limit_enabled: true
+      rate_limit_rps: 100
+    
+    database:
+      host: "postgres-service"
+      port: 5432
+      name: "driftmgr"
+      user: "driftmgr"
+      ssl_mode: "require"
+    
+    auth:
+      jwt_issuer: "driftmgr"
+      jwt_audience: "driftmgr-api"
+      access_token_expiry: "15m"
+      refresh_token_expiry: "7d"
+    
+    logging:
+      level: "info"
+      format: "json"
+```
+
+### Secrets
+
+```yaml
 # secrets.yaml
 apiVersion: v1
 kind: Secret
@@ -78,37 +493,21 @@ metadata:
   name: driftmgr-secrets
   namespace: driftmgr
 type: Opaque
-stringData:
-  aws-access-key-id: "YOUR_AWS_KEY"
-  aws-secret-access-key: "YOUR_AWS_SECRET"
-  azure-client-id: "YOUR_AZURE_CLIENT_ID"
-  azure-client-secret: "YOUR_AZURE_SECRET"
-  gcp-credentials: |
-    {
-      "type": "service_account",
-      "project_id": "your-project"
-    }
-  db-password: "secure_password"
-  jwt-secret: "secure_jwt_secret"
-  encryption-key: "secure_encryption_key"
+data:
+  db-password: <base64-encoded-password>
+  jwt-secret: <base64-encoded-jwt-secret>
 ```
 
-Apply:
-```bash
-kubectl apply -f namespace.yaml
-kubectl apply -f secrets.yaml
-```
+### PostgreSQL Deployment
 
-### 2. Deploy PostgreSQL and Redis
 ```yaml
-# postgresql.yaml
+# postgres.yaml
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: postgres
   namespace: driftmgr
 spec:
-  serviceName: postgres
   replicas: 1
   selector:
     matchLabels:
@@ -123,58 +522,85 @@ spec:
         image: postgres:15-alpine
         env:
         - name: POSTGRES_DB
-          value: driftmgr
+          value: "driftmgr"
         - name: POSTGRES_USER
-          value: driftmgr
+          value: "driftmgr"
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: driftmgr-secrets
               key: db-password
+        ports:
+        - containerPort: 5432
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
-  - metadata:
-      name: postgres-storage
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 50Gi
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - driftmgr
+            - -d
+            - driftmgr
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - driftmgr
+            - -d
+            - driftmgr
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+      - name: init-script
+        configMap:
+          name: postgres-init
 ---
-# redis.yaml
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
-  name: redis
+  name: postgres-service
   namespace: driftmgr
 spec:
-  replicas: 1
   selector:
-    matchLabels:
-      app: redis
-  template:
-    metadata:
-      labels:
-        app: redis
-    spec:
-      containers:
-      - name: redis
-        image: redis:7-alpine
-        command: ["redis-server", "--appendonly", "yes"]
-        volumeMounts:
-        - name: redis-storage
-          mountPath: /data
-      volumes:
-      - name: redis-storage
-        persistentVolumeClaim:
-          claimName: redis-pvc
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: driftmgr
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
 ```
 
-### 3. Deploy DriftMgr
+### DriftMgr Deployment
+
 ```yaml
-# driftmgr-deployment.yaml
+# driftmgr.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -192,109 +618,115 @@ spec:
     spec:
       containers:
       - name: driftmgr
-        image: catherinevee/driftmgr:latest
+        image: driftmgr/driftmgr:latest
         ports:
         - containerPort: 8080
-          name: web
-        - containerPort: 9090
-          name: metrics
         env:
-        - name: DRIFTMGR_ENV
-          value: production
-        - name: DATABASE_URL
-          value: postgres://driftmgr:$(DB_PASSWORD)@postgres:5432/driftmgr?sslmode=require
-        - name: REDIS_URL
-          value: redis://redis:6379/0
-        - name: AWS_ACCESS_KEY_ID
+        - name: DRIFTMGR_DB_HOST
+          value: "postgres-service"
+        - name: DRIFTMGR_DB_PASSWORD
           valueFrom:
             secretKeyRef:
               name: driftmgr-secrets
-              key: aws-access-key-id
-        - name: AWS_SECRET_ACCESS_KEY
+              key: db-password
+        - name: DRIFTMGR_JWT_SECRET
           valueFrom:
             secretKeyRef:
               name: driftmgr-secrets
-              key: aws-secret-access-key
-        envFrom:
-        - secretRef:
-            name: driftmgr-secrets
+              key: jwt-secret
+        - name: DRIFTMGR_LOG_LEVEL
+          value: "info"
         volumeMounts:
         - name: config
-          mountPath: /app/configs
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
         livenessProbe:
           httpGet:
-            path: /health/live
+            path: /health
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health/ready
+            path: /health
             port: 8080
-          initialDelaySeconds: 15
+          initialDelaySeconds: 5
           periodSeconds: 5
-        resources:
-          requests:
-            cpu: 500m
-            memory: 512Mi
-          limits:
-            cpu: 2000m
-            memory: 2Gi
       volumes:
       - name: config
         configMap:
           name: driftmgr-config
 ---
-# service.yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: driftmgr
+  name: driftmgr-service
   namespace: driftmgr
 spec:
   selector:
     app: driftmgr
   ports:
-  - name: web
-    port: 8080
+  - port: 80
     targetPort: 8080
-  - name: metrics
-    port: 9090
-    targetPort: 9090
-  type: LoadBalancer
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: driftmgr-headless
+  namespace: driftmgr
+spec:
+  selector:
+    app: driftmgr
+  ports:
+  - port: 8080
+    targetPort: 8080
+  clusterIP: None
 ```
 
-### 4. Configure Ingress
+### Ingress Configuration
+
 ```yaml
 # ingress.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: driftmgr
+  name: driftmgr-ingress
   namespace: driftmgr
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/websocket-services: "driftmgr-service"
 spec:
   tls:
   - hosts:
-    - driftmgr.company.com
+    - your-domain.com
     secretName: driftmgr-tls
   rules:
-  - host: driftmgr.company.com
+  - host: your-domain.com
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: driftmgr
+            name: driftmgr-service
             port:
-              number: 8080
+              number: 80
 ```
 
-### 5. Horizontal Pod Autoscaler
+### Horizontal Pod Autoscaler
+
 ```yaml
 # hpa.yaml
 apiVersion: autoscaling/v2
@@ -307,7 +739,7 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: driftmgr
-  minReplicas: 2
+  minReplicas: 3
   maxReplicas: 10
   metrics:
   - type: Resource
@@ -324,548 +756,150 @@ spec:
         averageUtilization: 80
 ```
 
-## Docker Deployment
-
-### Single Host with Docker Compose
-
-```yaml
-# docker-compose.prod.yml
-version: '3.8'
-
-services:
-  driftmgr:
-    image: catherinevee/driftmgr:latest
-    container_name: driftmgr
-    restart: always
-    ports:
-      - "443:8080"
-    environment:
-      - DRIFTMGR_ENV=production
-      - SSL_ENABLED=true
-      - SSL_CERT=/certs/cert.pem
-      - SSL_KEY=/certs/key.pem
-    volumes:
-      - ./certs:/certs:ro
-      - ./configs:/app/configs:ro
-      - driftmgr-data:/app/data
-    networks:
-      - driftmgr-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-
-  postgres:
-    image: postgres:15-alpine
-    restart: always
-    environment:
-      - POSTGRES_DB=driftmgr
-      - POSTGRES_USER=driftmgr
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_INITDB_ARGS=--encoding=UTF8
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./backup:/backup
-    networks:
-      - driftmgr-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U driftmgr"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    restart: always
-    command: >
-      redis-server
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD}
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
-    networks:
-      - driftmgr-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  nginx:
-    image: nginx:alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certs:/etc/nginx/certs:ro
-      - nginx-cache:/var/cache/nginx
-    networks:
-      - driftmgr-net
-    depends_on:
-      - driftmgr
-
-networks:
-  driftmgr-net:
-    driver: bridge
-
-volumes:
-  driftmgr-data:
-  postgres-data:
-  redis-data:
-  nginx-cache:
-```
-
-### Docker Swarm Deployment
+### Deployment Commands
 
 ```bash
-# Initialize swarm
-docker swarm init
+# Apply all configurations
+kubectl apply -f namespace.yaml
+kubectl apply -f configmap.yaml
+kubectl apply -f secrets.yaml
+kubectl apply -f postgres.yaml
+kubectl apply -f driftmgr.yaml
+kubectl apply -f ingress.yaml
+kubectl apply -f hpa.yaml
 
-# Create overlay network
-docker network create --driver overlay driftmgr-net
+# Check deployment status
+kubectl get pods -n driftmgr
+kubectl get services -n driftmgr
+kubectl get ingress -n driftmgr
 
-# Create secrets
-echo "password" | docker secret create db_password -
-echo "redis_password" | docker secret create redis_password -
+# View logs
+kubectl logs -f deployment/driftmgr -n driftmgr
 
-# Deploy stack
-docker stack deploy -c docker-compose.prod.yml driftmgr
-
-# Scale service
-docker service scale driftmgr_driftmgr=3
-
-# Update service
-docker service update --image catherinevee/driftmgr:v2.0 driftmgr_driftmgr
+# Scale deployment
+kubectl scale deployment driftmgr --replicas=5 -n driftmgr
 ```
 
-## VM/Bare Metal Deployment
+## 🏭 Production Considerations
 
-### 1. System Preparation
+### High Availability
+
+#### Database Clustering
 ```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
+# PostgreSQL streaming replication
+# Primary server
+sudo -u postgres pg_basebackup -h primary-server -D /var/lib/postgresql/replica -U replicator -v -P -W
 
-# Install dependencies
-sudo apt install -y \
-  postgresql-14 \
-  redis-server \
-  nginx \
-  certbot \
-  python3-certbot-nginx \
-  supervisor
-
-# Create user
-sudo useradd -m -s /bin/bash driftmgr
-sudo usermod -aG sudo driftmgr
+# Configure replica
+echo "standby_mode = 'on'" >> /var/lib/postgresql/replica/recovery.conf
+echo "primary_conninfo = 'host=primary-server port=5432 user=replicator'" >> /var/lib/postgresql/replica/recovery.conf
 ```
 
-### 2. Install DriftMgr
-```bash
-# Download binary
-sudo curl -L https://github.com/catherinevee/driftmgr/releases/latest/download/driftmgr-linux-amd64 \
-  -o /usr/local/bin/driftmgr
-sudo chmod +x /usr/local/bin/driftmgr
-
-# Create directories
-sudo mkdir -p /etc/driftmgr /var/lib/driftmgr /var/log/driftmgr
-sudo chown -R driftmgr:driftmgr /etc/driftmgr /var/lib/driftmgr /var/log/driftmgr
-```
-
-### 3. Configure PostgreSQL
-```bash
-# Create database and user
-sudo -u postgres psql << EOF
-CREATE USER driftmgr WITH PASSWORD 'secure_password';
-CREATE DATABASE driftmgr OWNER driftmgr;
-GRANT ALL PRIVILEGES ON DATABASE driftmgr TO driftmgr;
-EOF
-
-# Configure PostgreSQL
-sudo nano /etc/postgresql/14/main/postgresql.conf
-# Set: listen_addresses = 'localhost'
-# Set: max_connections = 200
-
-sudo systemctl restart postgresql
-```
-
-### 4. Configure Systemd Service
-```ini
-# /etc/systemd/system/driftmgr.service
-[Unit]
-Description=DriftMgr Infrastructure Drift Detection
-After=network.target postgresql.service redis.service
-Wants=postgresql.service redis.service
-
-[Service]
-Type=simple
-User=driftmgr
-Group=driftmgr
-WorkingDirectory=/var/lib/driftmgr
-ExecStart=/usr/local/bin/driftmgr serve web --config /etc/driftmgr/config.yaml
-Restart=always
-RestartSec=10
-StandardOutput=append:/var/log/driftmgr/output.log
-StandardError=append:/var/log/driftmgr/error.log
-
-# Security
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/lib/driftmgr /var/log/driftmgr
-
-# Resource limits
-LimitNOFILE=65535
-LimitNPROC=4096
-MemoryLimit=2G
-CPUQuota=200%
-
-# Environment
-Environment="DRIFTMGR_ENV=production"
-Environment="DATABASE_URL=postgres://driftmgr:password@localhost/driftmgr"
-Environment="REDIS_URL=redis://localhost:6379/0"
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable driftmgr
-sudo systemctl start driftmgr
-sudo systemctl status driftmgr
-```
-
-### 5. Configure Nginx
+#### Load Balancing
 ```nginx
-# /etc/nginx/sites-available/driftmgr
-upstream driftmgr {
-    server 127.0.0.1:8080;
+# Nginx upstream configuration
+upstream driftmgr_backend {
+    least_conn;
+    server driftmgr-1:8080 max_fails=3 fail_timeout=30s;
+    server driftmgr-2:8080 max_fails=3 fail_timeout=30s;
+    server driftmgr-3:8080 max_fails=3 fail_timeout=30s;
     keepalive 32;
 }
-
-server {
-    listen 80;
-    server_name driftmgr.company.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name driftmgr.company.com;
-
-    ssl_certificate /etc/letsencrypt/live/driftmgr.company.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/driftmgr.company.com/privkey.pem;
-    
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:10m;
-
-    client_max_body_size 50M;
-    
-    location / {
-        proxy_pass http://driftmgr;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_read_timeout 86400;
-    }
-    
-    location /metrics {
-        deny all;
-        allow 10.0.0.0/8;
-        proxy_pass http://127.0.0.1:9090;
-    }
-}
 ```
 
-Enable site:
-```bash
-sudo ln -s /etc/nginx/sites-available/driftmgr /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
+### Performance Optimization
 
-## Cloud-Specific Deployments
-
-### AWS ECS Fargate
-
-```json
-{
-  "family": "driftmgr",
-  "networkMode": "awsvpc",
-  "requiresCompatibilities": ["FARGATE"],
-  "cpu": "1024",
-  "memory": "2048",
-  "containerDefinitions": [
-    {
-      "name": "driftmgr",
-      "image": "catherinevee/driftmgr:latest",
-      "portMappings": [
-        {
-          "containerPort": 8080,
-          "protocol": "tcp"
-        }
-      ],
-      "environment": [
-        {
-          "name": "DRIFTMGR_ENV",
-          "value": "production"
-        }
-      ],
-      "secrets": [
-        {
-          "name": "DATABASE_URL",
-          "valueFrom": "arn:aws:secretsmanager:region:account:secret:db-url"
-        }
-      ],
-      "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-          "awslogs-group": "/ecs/driftmgr",
-          "awslogs-region": "us-east-1",
-          "awslogs-stream-prefix": "ecs"
-        }
-      },
-      "healthCheck": {
-        "command": ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
-        "interval": 30,
-        "timeout": 10,
-        "retries": 3
-      }
-    }
-  ]
-}
-```
-
-### Azure Container Instances
-
-```yaml
-# azure-deployment.yaml
-apiVersion: '2019-12-01'
-location: eastus
-name: driftmgr
-properties:
-  containers:
-  - name: driftmgr
-    properties:
-      image: catherinevee/driftmgr:latest
-      resources:
-        requests:
-          cpu: 2
-          memoryInGb: 4
-      ports:
-      - port: 8080
-        protocol: TCP
-      environmentVariables:
-      - name: DRIFTMGR_ENV
-        value: production
-      - name: DATABASE_URL
-        secureValue: postgres://user:pass@host/db
-  osType: Linux
-  ipAddress:
-    type: Public
-    ports:
-    - protocol: tcp
-      port: 8080
-    dnsNameLabel: driftmgr
-```
-
-### Google Cloud Run
-
-```yaml
-# service.yaml
-apiVersion: serving.knative.dev/v1
-kind: Service
-metadata:
-  name: driftmgr
-spec:
-  template:
-    metadata:
-      annotations:
-        run.googleapis.com/execution-environment: gen2
-    spec:
-      containerConcurrency: 100
-      timeoutSeconds: 300
-      containers:
-      - image: catherinevee/driftmgr:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: DRIFTMGR_ENV
-          value: production
-        resources:
-          limits:
-            cpu: '2'
-            memory: 2Gi
-```
-
-Deploy:
-```bash
-gcloud run deploy driftmgr \
-  --image catherinevee/driftmgr:latest \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars="DRIFTMGR_ENV=production"
-```
-
-## High Availability Setup
-
-### Multi-Region Architecture
-
-```yaml
-# Primary Region (us-east-1)
-driftmgr-primary:
-  replicas: 3
-  database: 
-    type: RDS Aurora PostgreSQL
-    multi-az: true
-    read-replicas: 2
-  cache:
-    type: ElastiCache Redis
-    cluster-mode: enabled
-  load-balancer:
-    type: ALB
-    cross-zone: true
-
-# Secondary Region (us-west-2)  
-driftmgr-secondary:
-  replicas: 2
-  database:
-    type: RDS Aurora Read Replica
-    promote-on-failure: true
-  cache:
-    type: ElastiCache Redis
-    cluster-mode: enabled
-  load-balancer:
-    type: ALB
-    cross-zone: true
-
-# Global Load Balancer
-route53:
-  - record: driftmgr.company.com
-    type: A
-    routing-policy: geolocation
-    health-check: enabled
-    failover: automatic
-```
-
-### Database HA Configuration
-
+#### Database Tuning
 ```sql
--- PostgreSQL Streaming Replication
--- Primary server postgresql.conf
-wal_level = replica
-max_wal_senders = 10
-wal_keep_segments = 64
-synchronous_commit = on
-synchronous_standby_names = 'standby1,standby2'
-
--- Standby server recovery.conf
-standby_mode = 'on'
-primary_conninfo = 'host=primary port=5432 user=replicator'
-trigger_file = '/tmp/postgresql.trigger'
+-- PostgreSQL configuration optimizations
+ALTER SYSTEM SET shared_buffers = '256MB';
+ALTER SYSTEM SET effective_cache_size = '1GB';
+ALTER SYSTEM SET maintenance_work_mem = '64MB';
+ALTER SYSTEM SET checkpoint_completion_target = 0.9;
+ALTER SYSTEM SET wal_buffers = '16MB';
+ALTER SYSTEM SET default_statistics_target = 100;
+SELECT pg_reload_conf();
 ```
 
-## Security Configuration
-
-### SSL/TLS Setup
-```bash
-# Generate certificates with Let's Encrypt
-certbot certonly --standalone -d driftmgr.company.com
-
-# Or self-signed for testing
-openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
-```
-
-### Firewall Rules
-```bash
-# UFW rules
-sudo ufw allow 22/tcp
-sudo ufw allow 443/tcp
-sudo ufw allow from 10.0.0.0/8 to any port 5432
-sudo ufw allow from 10.0.0.0/8 to any port 6379
-sudo ufw enable
-```
-
-### Secrets Management
-```bash
-# HashiCorp Vault integration
-vault kv put secret/driftmgr \
-  db_password="secure_password" \
-  jwt_secret="secure_jwt" \
-  aws_access_key="KEY" \
-  aws_secret_key="SECRET"
-
-# Kubernetes secrets from Vault
-kubectl create secret generic driftmgr-secrets \
-  --from-literal=db-password="$(vault kv get -field=db_password secret/driftmgr)"
-```
-
-## Monitoring Setup
-
-### Prometheus Configuration
+#### Application Tuning
 ```yaml
-# prometheus.yml
+# config.yaml optimizations
+server:
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  max_header_bytes: 1048576  # 1MB
+
+database:
+  max_open_connections: 25
+  max_idle_connections: 5
+  connection_max_lifetime: "1h"
+```
+
+### Security Hardening
+
+#### Network Security
+```bash
+# Firewall rules
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow from 10.0.0.0/8 to any port 5432  # Database access
+```
+
+#### Application Security
+```yaml
+# Security headers in Nginx
+add_header X-Frame-Options DENY;
+add_header X-Content-Type-Options nosniff;
+add_header X-XSS-Protection "1; mode=block";
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'";
+```
+
+## 📊 Monitoring & Logging
+
+### Prometheus Metrics
+
+```yaml
+# prometheus-config.yaml
 global:
   scrape_interval: 15s
-  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'driftmgr'
     static_configs:
-      - targets: ['driftmgr:9090']
-    metrics_path: /metrics
-    
-  - job_name: 'postgres'
-    static_configs:
-      - targets: ['postgres-exporter:9187']
-      
-  - job_name: 'redis'
-    static_configs:
-      - targets: ['redis-exporter:9121']
+      - targets: ['driftmgr:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
 ```
 
 ### Grafana Dashboard
+
 ```json
 {
   "dashboard": {
-    "title": "DriftMgr Production",
+    "title": "DriftMgr Monitoring",
     "panels": [
       {
         "title": "Request Rate",
+        "type": "graph",
         "targets": [
           {
-            "expr": "rate(http_requests_total[5m])"
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
           }
         ]
       },
       {
-        "title": "Drift Detection Rate",
+        "title": "Response Time",
+        "type": "graph",
         "targets": [
           {
-            "expr": "rate(drift_detections_total[1h])"
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
           }
         ]
       }
@@ -874,173 +908,194 @@ scrape_configs:
 }
 ```
 
-## Backup and Disaster Recovery
+### Log Aggregation
 
-### Backup Strategy
+```yaml
+# fluentd-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+data:
+  fluent.conf: |
+    <source>
+      @type tail
+      path /var/log/driftmgr/*.log
+      pos_file /var/log/fluentd/driftmgr.log.pos
+      tag driftmgr.*
+      format json
+    </source>
+    
+    <match driftmgr.**>
+      @type elasticsearch
+      host elasticsearch.logging.svc.cluster.local
+      port 9200
+      index_name driftmgr
+    </match>
+```
+
+## 💾 Backup & Recovery
+
+### Database Backup
+
 ```bash
 #!/bin/bash
-# backup.sh - Run daily via cron
+# backup.sh
 
-# Database backup
-pg_dump -h localhost -U driftmgr -d driftmgr | gzip > /backup/db-$(date +%Y%m%d).sql.gz
+BACKUP_DIR="/opt/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="driftmgr_backup_${DATE}.sql"
 
-# Redis backup
-redis-cli --rdb /backup/redis-$(date +%Y%m%d).rdb
+# Create backup
+pg_dump -h localhost -U driftmgr -d driftmgr > "${BACKUP_DIR}/${BACKUP_FILE}"
 
-# Upload to S3
-aws s3 sync /backup s3://backup-bucket/driftmgr/
+# Compress backup
+gzip "${BACKUP_DIR}/${BACKUP_FILE}"
+
+# Upload to S3 (optional)
+aws s3 cp "${BACKUP_DIR}/${BACKUP_FILE}.gz" s3://your-backup-bucket/
 
 # Cleanup old backups (keep 30 days)
-find /backup -mtime +30 -delete
+find "${BACKUP_DIR}" -name "driftmgr_backup_*.sql.gz" -mtime +30 -delete
 ```
 
-### Disaster Recovery Plan
+### Application Backup
 
-1. **RTO Target**: 1 hour
-2. **RPO Target**: 15 minutes
-3. **Backup Schedule**: Every 6 hours
-4. **Recovery Steps**:
-   ```bash
-   # Restore database
-   gunzip < backup.sql.gz | psql -U driftmgr -d driftmgr
-   
-   # Restore Redis
-   cp redis-backup.rdb /var/lib/redis/dump.rdb
-   systemctl restart redis
-   
-   # Verify services
-   driftmgr health check
-   ```
-
-## Maintenance
-
-### Rolling Updates
 ```bash
-# Kubernetes
-kubectl set image deployment/driftmgr driftmgr=catherinevee/driftmgr:v2.0 -n driftmgr
-kubectl rollout status deployment/driftmgr -n driftmgr
+#!/bin/bash
+# app-backup.sh
 
-# Docker Swarm
-docker service update --image catherinevee/driftmgr:v2.0 driftmgr_driftmgr
+BACKUP_DIR="/opt/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
 
-# Systemd
-sudo systemctl stop driftmgr
-sudo curl -L https://github.com/catherinevee/driftmgr/releases/download/v2.0/driftmgr-linux-amd64 \
-  -o /usr/local/bin/driftmgr
-sudo systemctl start driftmgr
+# Backup configuration
+tar -czf "${BACKUP_DIR}/driftmgr_config_${DATE}.tar.gz" /opt/driftmgr/config.yaml
+
+# Backup logs
+tar -czf "${BACKUP_DIR}/driftmgr_logs_${DATE}.tar.gz" /var/log/driftmgr/
 ```
 
-### Health Checks
+### Recovery Procedures
+
 ```bash
-# Check application health
-curl https://driftmgr.company.com/health
+# Database recovery
+gunzip driftmgr_backup_20250924_100000.sql.gz
+psql -h localhost -U driftmgr -d driftmgr < driftmgr_backup_20250924_100000.sql
 
-# Check database
-psql -U driftmgr -d driftmgr -c "SELECT 1"
-
-# Check Redis
-redis-cli ping
-
-# Check metrics
-curl http://localhost:9090/metrics
+# Application recovery
+tar -xzf driftmgr_config_20250924_100000.tar.gz -C /
+systemctl restart driftmgr
 ```
 
-### Log Management
-```bash
-# Centralized logging with ELK
-filebeat.inputs:
-- type: log
-  enabled: true
-  paths:
-    - /var/log/driftmgr/*.log
-  multiline.pattern: '^\d{4}-\d{2}-\d{2}'
-  multiline.negate: true
-  multiline.match: after
+## 🔒 Security
 
-output.elasticsearch:
-  hosts: ["elasticsearch:9200"]
-  index: "driftmgr-%{+yyyy.MM.dd}"
+### SSL/TLS Configuration
+
+```nginx
+# Strong SSL configuration
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+ssl_prefer_server_ciphers off;
+ssl_session_cache shared:SSL:10m;
+ssl_session_timeout 10m;
+ssl_stapling on;
+ssl_stapling_verify on;
 ```
 
-## Performance Tuning
+### Authentication Security
 
-### Application Tuning
 ```yaml
-# config.yaml
-performance:
-  parallel_workers: 20
-  batch_size: 100
-  connection_pool_size: 50
-  cache_ttl: 3600
-  request_timeout: 30
+# Strong password policy
+auth:
+  password_min_length: 12
+  password_require_uppercase: true
+  password_require_lowercase: true
+  password_require_numbers: true
+  password_require_symbols: true
+  password_history: 5
+  account_lockout_threshold: 5
+  account_lockout_duration: "15m"
 ```
 
-### Database Tuning
-```sql
--- PostgreSQL optimization
-ALTER SYSTEM SET shared_buffers = '4GB';
-ALTER SYSTEM SET effective_cache_size = '12GB';
-ALTER SYSTEM SET maintenance_work_mem = '1GB';
-ALTER SYSTEM SET checkpoint_completion_target = 0.9;
-ALTER SYSTEM SET wal_buffers = '16MB';
-ALTER SYSTEM SET default_statistics_target = 100;
-ALTER SYSTEM SET random_page_cost = 1.1;
-```
+### Network Security
 
-### System Tuning
 ```bash
-# /etc/sysctl.conf
-net.core.somaxconn = 65535
-net.ipv4.tcp_max_syn_backlog = 65535
-net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.tcp_fin_timeout = 30
-net.ipv4.ip_local_port_range = 1024 65535
-fs.file-max = 65535
+# Fail2ban configuration
+[driftmgr]
+enabled = true
+port = 8080
+filter = driftmgr
+logpath = /var/log/driftmgr/driftmgr.log
+maxretry = 5
+bantime = 3600
 ```
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-1. **High Memory Usage**
-   ```bash
-   # Check memory usage
-   docker stats driftmgr
-   
-   # Analyze heap dump
-   curl http://localhost:6060/debug/pprof/heap > heap.prof
-   go tool pprof heap.prof
-   ```
+#### Service Won't Start
+```bash
+# Check service status
+sudo systemctl status driftmgr
 
-2. **Database Connection Errors**
-   ```bash
-   # Check connection pool
-   psql -U driftmgr -c "SELECT count(*) FROM pg_stat_activity;"
-   
-   # Reset connections
-   psql -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='driftmgr' AND state='idle';"
-   ```
+# Check logs
+sudo journalctl -u driftmgr -f
 
-3. **Slow Performance**
-   ```bash
-   # Enable profiling
-   export DRIFTMGR_ENABLE_PROFILING=true
-   
-   # Collect CPU profile
-   curl http://localhost:6060/debug/pprof/profile?seconds=30 > cpu.prof
-   go tool pprof -http=:8080 cpu.prof
-   ```
+# Check configuration
+sudo driftmgr-server --config=/opt/driftmgr/config.yaml --validate
+```
 
-## Security Checklist
+#### Database Connection Issues
+```bash
+# Test database connection
+psql -h localhost -U driftmgr -d driftmgr -c "SELECT 1;"
 
-- [ ] SSL/TLS configured
-- [ ] Firewall rules configured
-- [ ] Secrets in secure store
-- [ ] Regular security updates
-- [ ] Audit logging enabled
-- [ ] RBAC configured
-- [ ] Network segmentation
-- [ ] Encrypted backups
-- [ ] Vulnerability scanning
-- [ ] Penetration testing
+# Check PostgreSQL status
+sudo systemctl status postgresql
+
+# Check PostgreSQL logs
+sudo tail -f /var/log/postgresql/postgresql-15-main.log
+```
+
+#### Performance Issues
+```bash
+# Check system resources
+htop
+iostat -x 1
+free -h
+
+# Check database performance
+sudo -u postgres psql -c "SELECT * FROM pg_stat_activity;"
+sudo -u postgres psql -c "SELECT * FROM pg_stat_database;"
+```
+
+### Health Checks
+
+```bash
+# Application health
+curl -f http://localhost:8080/health
+
+# Database health
+curl -f http://localhost:8080/api/v1/health
+
+# WebSocket health
+curl -f http://localhost:8080/api/v1/ws/stats
+```
+
+### Log Analysis
+
+```bash
+# Search for errors
+grep -i error /var/log/driftmgr/driftmgr.log
+
+# Monitor real-time logs
+tail -f /var/log/driftmgr/driftmgr.log | grep -i "error\|warn"
+
+# Analyze access patterns
+awk '{print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -nr
+```
+
+---
+
+This deployment guide provides comprehensive instructions for deploying DriftMgr in various environments. Choose the deployment method that best fits your requirements and infrastructure setup.

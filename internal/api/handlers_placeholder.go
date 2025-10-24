@@ -30,30 +30,6 @@ func (s *Server) handleGetCostForecast(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, map[string]interface{}{})
 }
 
-func (s *Server) handleCreateRemediationPlan(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, http.StatusCreated, map[string]interface{}{})
-}
-
-func (s *Server) handleExecuteRemediation(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, http.StatusOK, map[string]interface{}{})
-}
-
-func (s *Server) handleGetRemediationPlans(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, http.StatusOK, []interface{}{})
-}
-
-func (s *Server) handleSecurityScan(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, http.StatusOK, map[string]interface{}{})
-}
-
-func (s *Server) handleGetCompliance(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, http.StatusOK, map[string]interface{}{})
-}
-
-func (s *Server) handleGetSecurityPolicies(w http.ResponseWriter, r *http.Request) {
-	s.writeJSON(w, http.StatusOK, []interface{}{})
-}
-
 func (s *Server) handleGetAnalyticsModels(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, []interface{}{})
 }

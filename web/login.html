@@ -79,29 +79,6 @@
                     </div>
                 </form>
                 
-                <div class="divider">OR</div>
-                
-                <!-- Demo Accounts -->
-                <div class="text-center">
-                    <p class="text-sm text-gray-500 mb-2">Demo Accounts:</p>
-                    <div class="flex flex-wrap gap-2 justify-center">
-                        <button @click="loginAs('root', 'admin')" 
-                                class="btn btn-xs btn-outline"
-                                :disabled="loading">
-                            Admin
-                        </button>
-                        <button @click="loginAs('operator', 'operator')" 
-                                class="btn btn-xs btn-outline"
-                                :disabled="loading">
-                            Operator
-                        </button>
-                        <button @click="loginAs('readonly', 'readonly')" 
-                                class="btn btn-xs btn-outline"
-                                :disabled="loading">
-                            Viewer
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

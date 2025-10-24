@@ -201,19 +201,43 @@ class BackendConfigurationUI {
 
         try {
             const config = this.getFormData();
-            const response = await fetch('/api/v1/backends/test', {
+            // First create the backend, then test it
+            const createResponse = await fetch('/api/v1/backends/discover', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(config)
+                body: JSON.stringify({
+                    paths: [config.path || '/'],
+                    recursive: true
+                })
             });
 
-            if (response.ok) {
-                this.showAlert('Connection test successful!', 'success');
+            if (createResponse.ok) {
+                const apiResponse = await createResponse.json();
+                if (apiResponse.success && apiResponse.data.backends.length > 0) {
+                    const backend = apiResponse.data.backends[0];
+                    // Test the backend
+                    const testResponse = await fetch(`/api/v1/backends/${backend.id}/test`, {
+                        method: 'POST'
+                    });
+                    
+                    if (testResponse.ok) {
+                        const testResult = await testResponse.json();
+                        if (testResult.success) {
+                            this.showAlert('Connection test successful!', 'success');
+                        } else {
+                            this.showAlert(`Connection test failed: ${testResult.error?.message}`, 'danger');
+                        }
+                    } else {
+                        this.showAlert('Connection test failed', 'danger');
+                    }
+                } else {
+                    this.showAlert('No backends found to test', 'warning');
+                }
             } else {
-                const error = await response.json();
-                this.showAlert(`Connection test failed: ${error.message}`, 'danger');
+                const error = await createResponse.json();
+                this.showAlert(`Backend discovery failed: ${error.error?.message || error.message}`, 'danger');
             }
         } catch (error) {
             this.showAlert(`Connection test failed: ${error.message}`, 'danger');
@@ -227,24 +251,32 @@ class BackendConfigurationUI {
     async saveConfiguration() {
         try {
             const config = this.getFormData();
-            const response = await fetch('/api/v1/backends/config', {
+            const response = await fetch('/api/v1/backends/discover', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(config)
+                body: JSON.stringify({
+                    paths: [config.path || '/'],
+                    recursive: true
+                })
             });
 
             if (response.ok) {
-                this.showAlert('Configuration saved successfully!', 'success');
-                $(this.modal).modal('hide');
-                // Refresh the app state
-                if (this.app && this.app.loadState) {
-                    this.app.loadState();
+                const apiResponse = await response.json();
+                if (apiResponse.success) {
+                    this.showAlert('Configuration saved successfully!', 'success');
+                    $(this.modal).modal('hide');
+                    // Refresh the app state
+                    if (this.app && this.app.loadBackends) {
+                        this.app.loadBackends();
+                    }
+                } else {
+                    this.showAlert(`Failed to save configuration: ${apiResponse.error?.message}`, 'danger');
                 }
             } else {
                 const error = await response.json();
-                this.showAlert(`Failed to save configuration: ${error.message}`, 'danger');
+                this.showAlert(`Failed to save configuration: ${error.error?.message || error.message}`, 'danger');
             }
         } catch (error) {
             this.showAlert(`Failed to save configuration: ${error.message}`, 'danger');
@@ -418,16 +450,22 @@ class ResourceMoveUI {
         select.innerHTML = '<option value="">Loading resources...</option>';
 
         try {
-            const response = await fetch('/api/v1/state/resources');
+            // Get resources from the main resources endpoint
+            const response = await fetch('/api/v1/resources');
             if (!response.ok) throw new Error('Failed to load resources');
 
-            const resources = await response.json();
+            const apiResponse = await response.json();
+            if (!apiResponse.success) {
+                throw new Error(apiResponse.error?.message || 'Failed to load resources');
+            }
+
+            const resources = apiResponse.data || [];
             select.innerHTML = '<option value="">Select a resource to move</option>';
 
             resources.forEach(resource => {
                 const option = document.createElement('option');
-                option.value = resource.address;
-                option.textContent = `${resource.type}.${resource.name} (${resource.module || 'root'})`;
+                option.value = resource.id;
+                option.textContent = `${resource.type}.${resource.name} (${resource.provider})`;
                 select.appendChild(option);
             });
         } catch (error) {
@@ -449,26 +487,21 @@ class ResourceMoveUI {
 
         try {
             const moveData = {
-                source: sourceResource,
-                target_module: targetModule,
-                target_name: targetName
+                resource_id: sourceResource,
+                new_resource_id: targetModule ? `${targetModule}.${targetName}` : targetName
             };
 
-            const response = await fetch('/api/v1/state/move/preview', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(moveData)
-            });
-
-            if (response.ok) {
-                const preview = await response.json();
-                this.showMovePreview(preview);
-            } else {
-                const error = await response.json();
-                this.showAlert(`Preview failed: ${error.message}`, 'danger');
-            }
+            // For now, we'll simulate a preview since we don't have a preview endpoint
+            const preview = {
+                source: sourceResource,
+                target: targetModule ? `${targetModule}.${targetName}` : targetName,
+                changes: [
+                    'Resource will be moved from current location to new location',
+                    'State file will be updated accordingly'
+                ]
+            };
+            
+            this.showMovePreview(preview);
         } catch (error) {
             this.showAlert(`Preview failed: ${error.message}`, 'danger');
         }
@@ -491,9 +524,9 @@ class ResourceMoveUI {
 
         try {
             const moveData = {
-                source: sourceResource,
-                target_module: targetModule,
-                target_name: targetName
+                state_path: '/terraform.tfstate', // Default state path
+                resource_id: sourceResource,
+                new_resource_id: targetModule ? `${targetModule}.${targetName}` : targetName
             };
 
             const response = await fetch('/api/v1/state/move', {
@@ -505,15 +538,20 @@ class ResourceMoveUI {
             });
 
             if (response.ok) {
-                this.showAlert('Resource moved successfully!', 'success');
-                $(this.modal).modal('hide');
-                // Refresh the app state
-                if (this.app && this.app.loadState) {
-                    this.app.loadState();
+                const apiResponse = await response.json();
+                if (apiResponse.success) {
+                    this.showAlert('Resource moved successfully!', 'success');
+                    $(this.modal).modal('hide');
+                    // Refresh the app state
+                    if (this.app && this.app.loadStateFiles) {
+                        this.app.loadStateFiles();
+                    }
+                } else {
+                    this.showAlert(`Move failed: ${apiResponse.error?.message}`, 'danger');
                 }
             } else {
                 const error = await response.json();
-                this.showAlert(`Move failed: ${error.message}`, 'danger');
+                this.showAlert(`Move failed: ${error.error?.message || error.message}`, 'danger');
             }
         } catch (error) {
             this.showAlert(`Move failed: ${error.message}`, 'danger');

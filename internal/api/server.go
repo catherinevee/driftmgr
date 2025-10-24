@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,12 +10,16 @@ import (
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/analytics"
+	"github.com/catherinevee/driftmgr/internal/auth"
 	"github.com/catherinevee/driftmgr/internal/automation"
 	"github.com/catherinevee/driftmgr/internal/bi"
 	"github.com/catherinevee/driftmgr/internal/cost"
 	"github.com/catherinevee/driftmgr/internal/remediation"
+	"github.com/catherinevee/driftmgr/internal/repositories"
 	"github.com/catherinevee/driftmgr/internal/security"
+	"github.com/catherinevee/driftmgr/internal/services"
 	"github.com/catherinevee/driftmgr/internal/tenant"
+	"github.com/catherinevee/driftmgr/internal/websocket"
 )
 
 // Server represents the API server
@@ -29,13 +34,19 @@ type Server struct {
 
 // Services represents all available services
 type Services struct {
-	Analytics   *analytics.AnalyticsService
-	Automation  *automation.AutomationService
-	BI          *bi.BIService
-	Cost        *cost.CostAnalyzer
-	Remediation *remediation.IntelligentRemediationService
-	Security    *security.SecurityService
-	Tenant      *tenant.TenantService
+	Auth           *auth.Service
+	Analytics      *analytics.AnalyticsService
+	Automation     *automation.AutomationService
+	BI             *bi.BIService
+	Cost           *cost.CostAnalyzer
+	Remediation    *remediation.IntelligentRemediationService
+	Security       *security.SecurityService
+	Tenant         *tenant.TenantService
+	WebSocket      *websocket.Service
+	BackendService *services.BackendService
+	StateService   *services.StateService
+	ResourceService *services.ResourceService
+	DriftService   *services.DriftService
 }
 
 // Config represents server configuration
@@ -51,6 +62,13 @@ type Config struct {
 	RateLimitEnabled bool          `json:"rate_limit_enabled"`
 	RateLimitRPS     int           `json:"rate_limit_rps"`
 	LoggingEnabled   bool          `json:"logging_enabled"`
+
+	// Authentication configuration
+	JWTSecret          string        `json:"jwt_secret"`
+	JWTIssuer          string        `json:"jwt_issuer"`
+	JWTAudience        string        `json:"jwt_audience"`
+	AccessTokenExpiry  time.Duration `json:"access_token_expiry"`
+	RefreshTokenExpiry time.Duration `json:"refresh_token_expiry"`
 }
 
 // Router represents the HTTP router
@@ -116,6 +134,13 @@ func NewServer(config *Config, services *Services) *Server {
 			RateLimitEnabled: true,
 			RateLimitRPS:     100,
 			LoggingEnabled:   true,
+
+			// Default authentication configuration
+			JWTSecret:          "driftmgr-secret-key-change-in-production",
+			JWTIssuer:          "driftmgr",
+			JWTAudience:        "driftmgr-api",
+			AccessTokenExpiry:  15 * time.Minute,
+			RefreshTokenExpiry: 7 * 24 * time.Hour,
 		}
 	}
 
@@ -128,6 +153,19 @@ func NewServer(config *Config, services *Services) *Server {
 		services: services,
 		config:   config,
 	}
+
+	// Initialize authentication services if enabled
+	if config.AuthEnabled && services.Auth == nil {
+		server.initializeAuth()
+	}
+
+	// Initialize WebSocket service
+	if services.WebSocket == nil {
+		server.initializeWebSocket()
+	}
+
+	// Initialize business logic services
+	server.initializeBusinessServices()
 
 	// Setup routes
 	server.setupRoutes()
@@ -143,6 +181,70 @@ func NewServer(config *Config, services *Services) *Server {
 	}
 
 	return server
+}
+
+// initializeAuth initializes authentication services
+func (s *Server) initializeAuth() {
+	// Create repositories
+	userRepo := auth.NewMemoryUserRepository()
+	roleRepo := auth.NewMemoryRoleRepository()
+	sessionRepo := auth.NewMemorySessionRepository()
+	apiKeyRepo := auth.NewMemoryAPIKeyRepository()
+
+	// Create JWT service
+	jwtService := auth.NewJWTService(
+		s.config.JWTSecret,
+		s.config.JWTIssuer,
+		s.config.JWTAudience,
+		s.config.AccessTokenExpiry,
+		s.config.RefreshTokenExpiry,
+	)
+
+	// Create password service
+	passwordService := auth.NewPasswordService()
+
+	// Create auth service
+	authService := auth.NewService(
+		userRepo,
+		roleRepo,
+		sessionRepo,
+		apiKeyRepo,
+		jwtService,
+		passwordService,
+	)
+
+	// Set auth service
+	s.services.Auth = authService
+}
+
+// initializeWebSocket initializes the WebSocket service
+func (s *Server) initializeWebSocket() {
+	// Create WebSocket service
+	wsService := websocket.NewService()
+
+	// Set WebSocket service
+	s.services.WebSocket = wsService
+}
+
+// initializeBusinessServices initializes the business logic services
+func (s *Server) initializeBusinessServices() {
+	// Create repositories
+	backendRepo := repositories.NewMemoryBackendRepository()
+	stateRepo := repositories.NewMemoryStateRepository()
+	resourceRepo := repositories.NewMemoryResourceRepository()
+	driftRepo := repositories.NewMemoryDriftRepository()
+
+	// Create services
+	backendService := services.NewBackendService(backendRepo)
+	stateService := services.NewStateService(stateRepo, backendService)
+	resourceService := services.NewResourceService(resourceRepo)
+	driftService := services.NewDriftService(driftRepo, stateService, resourceService)
+
+	// Set services
+	s.services.BackendService = backendService
+	s.services.StateService = stateService
+	s.services.ResourceService = resourceService
+	s.services.DriftService = driftService
 }
 
 // Start starts the API server
@@ -215,74 +317,128 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // setupRoutes sets up all API routes
 func (s *Server) setupRoutes() {
+	// Create enhanced handlers with real services
+	backendHandlers := NewBackendHandlers(s.services.BackendService)
+	stateHandlers := NewStateHandlers(s.services.StateService)
+	resourceHandlers := NewResourceHandlers(s.services.ResourceService)
+	driftHandlers := NewDriftHandlers(s.services.DriftService)
+
 	// Health check
 	s.router.GET("/health", s.handleHealth)
+	s.router.GET("/api/v1/health", s.handleHealth)
 
 	// API version
 	s.router.GET("/api/v1/version", s.handleVersion)
 
-	// Resources
-	s.router.GET("/api/v1/resources", s.handleGetResources)
-	s.router.GET("/api/v1/resources/{id}", s.handleGetResource)
-	s.router.POST("/api/v1/resources", s.handleCreateResource)
-	s.router.PUT("/api/v1/resources/{id}", s.handleUpdateResource)
-	s.router.DELETE("/api/v1/resources/{id}", s.handleDeleteResource)
+	// Authentication routes
+	if s.config.AuthEnabled && s.services.Auth != nil {
+		s.setupAuthRoutes()
+	}
 
-	// Drift detection
-	s.router.POST("/api/v1/drift/detect", s.handleDetectDrift)
-	s.router.GET("/api/v1/drift/reports", s.handleGetDriftReports)
-	s.router.GET("/api/v1/drift/reports/{id}", s.handleGetDriftReport)
+	// Backend Discovery Routes
+	s.router.GET("/api/v1/backends/list", backendHandlers.ListBackends)
+	s.router.POST("/api/v1/backends/discover", backendHandlers.DiscoverBackends)
+	s.router.GET("/api/v1/backends/{id}", backendHandlers.GetBackend)
+	s.router.PUT("/api/v1/backends/{id}", backendHandlers.UpdateBackend)
+	s.router.DELETE("/api/v1/backends/{id}", backendHandlers.DeleteBackend)
+	s.router.POST("/api/v1/backends/{id}/test", backendHandlers.TestBackend)
 
-	// Health monitoring
-	s.router.GET("/api/v1/health", s.handleGetHealthStatus)
-	s.router.GET("/api/v1/health/checks", s.handleGetHealthChecks)
-	s.router.POST("/api/v1/health/checks", s.handleCreateHealthCheck)
+	// State Management Routes
+	s.router.GET("/api/v1/state/list", stateHandlers.ListStateFiles)
+	s.router.GET("/api/v1/state/details", stateHandlers.GetStateDetails)
+	s.router.POST("/api/v1/state/import", stateHandlers.ImportResource)
+	s.router.DELETE("/api/v1/state/resources/{id}", stateHandlers.RemoveResource)
+	s.router.POST("/api/v1/state/move", stateHandlers.MoveResource)
+	s.router.POST("/api/v1/state/lock", stateHandlers.LockStateFile)
+	s.router.POST("/api/v1/state/unlock", stateHandlers.UnlockStateFile)
 
-	// Cost analysis
-	s.router.GET("/api/v1/cost/analysis", s.handleGetCostAnalysis)
-	s.router.GET("/api/v1/cost/optimization", s.handleGetCostOptimization)
-	s.router.GET("/api/v1/cost/forecast", s.handleGetCostForecast)
+	// Resource Management Routes
+	s.router.GET("/api/v1/resources", resourceHandlers.ListResources)
+	s.router.GET("/api/v1/resources/{id}", resourceHandlers.GetResource)
+	s.router.GET("/api/v1/resources/search", resourceHandlers.SearchResources)
+	s.router.PUT("/api/v1/resources/{id}/tags", resourceHandlers.UpdateResourceTags)
+	s.router.GET("/api/v1/resources/{id}/cost", resourceHandlers.GetResourceCost)
+	s.router.GET("/api/v1/resources/{id}/compliance", resourceHandlers.GetResourceCompliance)
 
-	// Remediation
-	s.router.POST("/api/v1/remediation/plan", s.handleCreateRemediationPlan)
-	s.router.POST("/api/v1/remediation/execute", s.handleExecuteRemediation)
-	s.router.GET("/api/v1/remediation/plans", s.handleGetRemediationPlans)
+	// Drift Detection Routes
+	s.router.POST("/api/v1/drift/detect", driftHandlers.DetectDrift)
+	s.router.GET("/api/v1/drift/results", driftHandlers.ListDriftResults)
+	s.router.GET("/api/v1/drift/results/{id}", driftHandlers.GetDriftResult)
+	s.router.DELETE("/api/v1/drift/results/{id}", driftHandlers.DeleteDriftResult)
+	s.router.GET("/api/v1/drift/history", driftHandlers.GetDriftHistory)
+	s.router.GET("/api/v1/drift/summary", driftHandlers.GetDriftSummary)
 
-	// Security
-	s.router.GET("/api/v1/security/scan", s.handleSecurityScan)
-	s.router.GET("/api/v1/security/compliance", s.handleGetCompliance)
-	s.router.GET("/api/v1/security/policies", s.handleGetSecurityPolicies)
+	// WebSocket routes
+	if s.services.WebSocket != nil {
+		wsHandlers := s.services.WebSocket.GetHandlers()
+		s.router.GET("/ws", wsHandlers.HandleWebSocket)
+		s.router.GET("/api/v1/ws", wsHandlers.HandleWebSocket)
+		s.router.GET("/api/v1/ws/stats", s.handleWebSocketStats)
+	}
 
-	// Analytics
-	s.router.GET("/api/v1/analytics/models", s.handleGetAnalyticsModels)
-	s.router.POST("/api/v1/analytics/forecast", s.handleGenerateForecast)
-	s.router.GET("/api/v1/analytics/trends", s.handleGetTrends)
-	s.router.GET("/api/v1/analytics/anomalies", s.handleGetAnomalies)
+	// Serve web interface
+	s.router.GET("/", s.handleLoginPage)
+	s.router.GET("/login", s.handleLoginPage)
+	s.router.GET("/dashboard", s.handleWebInterface)
+	s.router.GET("/js/*", s.handleStaticFiles)
+	s.router.GET("/css/*", s.handleStaticFiles)
+	s.router.GET("/assets/*", s.handleStaticFiles)
+}
 
-	// Automation
-	s.router.GET("/api/v1/automation/workflows", s.handleGetWorkflows)
-	s.router.POST("/api/v1/automation/workflows", s.handleCreateWorkflow)
-	s.router.POST("/api/v1/automation/workflows/{id}/execute", s.handleExecuteWorkflow)
-	s.router.GET("/api/v1/automation/rules", s.handleGetRules)
-	s.router.POST("/api/v1/automation/rules", s.handleCreateRule)
+// setupAuthRoutes sets up authentication routes
+func (s *Server) setupAuthRoutes() {
+	// Create auth handlers and middleware
+	authHandlers := auth.NewAuthHandlers(s.services.Auth)
+	authMiddleware := auth.NewAuthMiddleware(s.services.Auth, s.services.Auth.JWTService())
 
-	// Business Intelligence
-	s.router.GET("/api/v1/bi/dashboards", s.handleGetDashboards)
-	s.router.POST("/api/v1/bi/dashboards", s.handleCreateDashboard)
-	s.router.GET("/api/v1/bi/reports", s.handleGetReports)
-	s.router.POST("/api/v1/bi/reports", s.handleCreateReport)
-	s.router.GET("/api/v1/bi/queries", s.handleGetQueries)
-	s.router.POST("/api/v1/bi/queries", s.handleCreateQuery)
-	s.router.POST("/api/v1/bi/queries/{id}/execute", s.handleExecuteQuery)
+	// Public authentication routes
+	s.router.POST("/api/v1/auth/login", authHandlers.Login)
+	s.router.POST("/api/v1/auth/register", authHandlers.Register)
+	s.router.POST("/api/v1/auth/refresh", authHandlers.RefreshToken)
+	s.router.POST("/api/v1/auth/logout", authMiddleware.RequireAuth(authHandlers.Logout))
 
-	// Multi-tenant
-	s.router.GET("/api/v1/tenants", s.handleGetTenants)
-	s.router.POST("/api/v1/tenants", s.handleCreateTenant)
-	s.router.GET("/api/v1/tenants/{id}/accounts", s.handleGetTenantAccounts)
-	s.router.POST("/api/v1/tenants/{id}/accounts", s.handleAddTenantAccount)
+	// Protected user profile routes
+	s.router.GET("/api/v1/auth/profile", authMiddleware.RequireAuth(authHandlers.GetProfile))
+	s.router.PUT("/api/v1/auth/profile", authMiddleware.RequireAuth(authHandlers.UpdateProfile))
+	s.router.POST("/api/v1/auth/change-password", authMiddleware.RequireAuth(authHandlers.ChangePassword))
 
-	// WebSocket endpoints
-	s.router.GET("/ws/health", s.handleHealthWebSocket)
-	s.router.GET("/ws/drift", s.handleDriftWebSocket)
-	s.router.GET("/ws/automation", s.handleAutomationWebSocket)
+	// API key management routes
+	s.router.POST("/api/v1/auth/api-keys", authMiddleware.RequireAuth(authHandlers.CreateAPIKey))
+	s.router.GET("/api/v1/auth/api-keys", authMiddleware.RequireAuth(authHandlers.ListAPIKeys))
+	s.router.DELETE("/api/v1/auth/api-keys/{id}", authMiddleware.RequireAuth(authHandlers.DeleteAPIKey))
+
+	// OAuth2 routes
+	s.router.GET("/api/v1/auth/oauth2/providers", authHandlers.GetOAuth2Providers)
+	s.router.POST("/api/v1/auth/oauth2/{provider}/callback", authHandlers.OAuth2Callback)
+
+	// Health check for auth service
+	s.router.GET("/api/v1/auth/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"data":    map[string]string{"status": "healthy"},
+		})
+	})
+}
+
+// handleWebSocketStats handles WebSocket connection statistics
+func (s *Server) handleWebSocketStats(w http.ResponseWriter, r *http.Request) {
+	if s.services.WebSocket == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "WebSocket service not available",
+		})
+		return
+	}
+
+	stats := s.services.WebSocket.GetConnectionStats()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    stats,
+	})
 }

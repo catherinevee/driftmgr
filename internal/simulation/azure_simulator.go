@@ -72,6 +72,8 @@ func (s *AzureSimulator) SimulateDrift(ctx context.Context, driftType DriftType,
 		return s.simulateResourceCreation(ctx, resource, state)
 	case DriftTypeAttributeChange:
 		return s.simulateAttributeChange(ctx, resource)
+	case DriftTypeResourceDeletion:
+		return s.simulateResourceDeletion(ctx, resource)
 	default:
 		return nil, fmt.Errorf("drift type %s not implemented for Azure", driftType)
 	}
@@ -605,4 +607,104 @@ func (s *AzureSimulator) rollbackRuleRemoval(ctx context.Context, data *Rollback
 func (s *AzureSimulator) rollbackResourceDeletion(ctx context.Context, data *RollbackData) error {
 	apiURL := data.OriginalData["api_url"].(string)
 	return s.deleteResource(ctx, apiURL)
+}
+
+// simulateResourceDeletion simulates the deletion of an Azure resource
+func (s *AzureSimulator) simulateResourceDeletion(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
+	result := &SimulationResult{
+		Provider:     "azure",
+		ResourceType: resource.Type,
+		ResourceID:   resource.ID,
+		DriftType:    DriftTypeResourceDeletion,
+		Changes:      make(map[string]interface{}),
+		CostEstimate: "$0.00 (simulation only)",
+	}
+
+	// Store original resource data for rollback
+	rollbackData := &RollbackData{
+		ResourceID:   resource.ID,
+		ResourceType: resource.Type,
+		OriginalData: make(map[string]interface{}),
+	}
+
+	// Simulate different deletion scenarios based on resource type
+	switch resource.Type {
+	case "azurerm_virtual_machine":
+		// Simulate VM deletion
+		vmName := s.extractResourceName(resource)
+		if vmName == "" {
+			return nil, fmt.Errorf("could not extract VM name")
+		}
+
+		// Store original VM data
+		rollbackData.OriginalData["vm_name"] = vmName
+		rollbackData.OriginalData["resource_type"] = "azurerm_virtual_machine"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["vm_name"] = vmName
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	case "azurerm_storage_account":
+		// Simulate storage account deletion
+		storageName := s.extractResourceName(resource)
+		if storageName == "" {
+			return nil, fmt.Errorf("could not extract storage account name")
+		}
+
+		// Store original storage account data
+		rollbackData.OriginalData["storage_name"] = storageName
+		rollbackData.OriginalData["resource_type"] = "azurerm_storage_account"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["storage_name"] = storageName
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	case "azurerm_network_security_group":
+		// Simulate NSG deletion
+		nsgName := s.extractResourceName(resource)
+		if nsgName == "" {
+			return nil, fmt.Errorf("could not extract NSG name")
+		}
+
+		// Store original NSG data
+		rollbackData.OriginalData["nsg_name"] = nsgName
+		rollbackData.OriginalData["resource_type"] = "azurerm_network_security_group"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["nsg_name"] = nsgName
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	default:
+		// Generic resource deletion simulation
+		rollbackData.OriginalData["resource_id"] = resource.ID
+		rollbackData.OriginalData["resource_type"] = resource.Type
+
+		result.Changes["deletion_simulated"] = true
+		result.Changes["resource_id"] = resource.ID
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+	}
+
+	// Add drift detection record
+	result.DetectedDrift = append(result.DetectedDrift, DriftItem{
+		ResourceID:   resource.ID,
+		ResourceType: resource.Type,
+		DriftType:    "resource_deletion",
+		Before: map[string]interface{}{
+			"exists": true,
+			"type":   resource.Type,
+		},
+		After: map[string]interface{}{
+			"exists": false,
+			"type":   resource.Type,
+		},
+		Impact: "High - Resource has been deleted",
+	})
+
+	result.RollbackData = rollbackData
+	result.Success = true
+
+	return result, nil
 }

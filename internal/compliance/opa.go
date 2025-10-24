@@ -12,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/open-policy-agent/opa/ast"
+	"github.com/open-policy-agent/opa/rego"
 )
 
 // OPAEngine provides policy evaluation using Open Policy Agent
@@ -24,6 +27,7 @@ type OPAEngine struct {
 	mu            sync.RWMutex
 	pluginMode    bool
 	localPolicies string
+	compiler      *ast.Compiler
 }
 
 // Policy represents an OPA policy
@@ -100,6 +104,7 @@ func NewOPAEngine(config OPAConfig) *OPAEngine {
 		cacheDuration: config.CacheDuration,
 		policies:      make(map[string]*Policy),
 		cache:         make(map[string]*CachedDecision),
+		compiler:      ast.NewCompiler(),
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},
@@ -129,6 +134,9 @@ func (e *OPAEngine) loadLocalPolicies() error {
 		return fmt.Errorf("failed to list policy files: %w", err)
 	}
 
+	// Collect all policy modules for compilation
+	modules := make(map[string]*ast.Module)
+
 	for _, file := range policyFiles {
 		content, err := os.ReadFile(file)
 		if err != nil {
@@ -143,17 +151,35 @@ func (e *OPAEngine) loadLocalPolicies() error {
 			UpdatedAt: time.Now(),
 		}
 
-		// Extract package name from content
-		lines := strings.Split(string(content), "\n")
-		for _, line := range lines {
-			if strings.HasPrefix(strings.TrimSpace(line), "package ") {
-				policy.Package = strings.TrimPrefix(strings.TrimSpace(line), "package ")
-				break
-			}
+		// Parse the policy module
+		module, err := ast.ParseModule(file, string(content))
+		if err != nil {
+			return fmt.Errorf("failed to parse policy %s: %w", file, err)
 		}
 
+		// Extract package name from module (remove "data." prefix if present)
+		packageName := module.Package.Path.String()
+		if strings.HasPrefix(packageName, "data.") {
+			packageName = strings.TrimPrefix(packageName, "data.")
+		}
+		policy.Package = packageName
+
+		// Store the module for compilation
+		modules[file] = module
 		e.policies[policy.ID] = policy
 	}
+
+	// Compile all modules
+	e.compiler.Compile(modules)
+	if e.compiler.Failed() {
+		return fmt.Errorf("failed to compile policies: %v", e.compiler.Errors)
+	}
+
+	// Debug logging (commented out for production)
+	// fmt.Printf("DEBUG: Loaded %d policies\n", len(e.policies))
+	// for id, policy := range e.policies {
+	//     fmt.Printf("DEBUG: Policy %s: Package=%s, Name=%s\n", id, policy.Package, policy.Name)
+	// }
 
 	return nil
 }
@@ -252,11 +278,50 @@ func (e *OPAEngine) evaluateRemote(ctx context.Context, policyPackage string, in
 	return &result.Result, nil
 }
 
-// evaluateLocal evaluates policy locally (stub for demonstration)
+// evaluateLocal evaluates policy locally using OPA Go SDK
 func (e *OPAEngine) evaluateLocal(ctx context.Context, policyPackage string, input PolicyInput) (*PolicyDecision, error) {
-	// In a real implementation, this would use OPA's Go API
-	// For now, return a mock decision based on simple rules
+	// Find a policy with matching package
+	var policy *Policy
+	for _, p := range e.policies {
+		if p.Package == policyPackage {
+			policy = p
+			break
+		}
+	}
 
+	if policy == nil {
+		return nil, fmt.Errorf("no policy found for package: %s", policyPackage)
+	}
+
+	// Convert input to map for OPA
+	inputMap := map[string]interface{}{
+		"resource":  input.Resource,
+		"action":    input.Action,
+		"principal": input.Principal,
+		"context":   input.Context,
+		"provider":  input.Provider,
+		"region":    input.Region,
+		"tags":      input.Tags,
+	}
+
+	// Create a query that returns both allow and violations
+	query := fmt.Sprintf("data.%s", strings.ReplaceAll(policyPackage, ".", "."))
+	results, err := rego.New(
+		rego.Query(query),
+		rego.Compiler(e.compiler),
+		rego.Input(inputMap),
+	).Eval(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate policy: %w", err)
+	}
+
+	// Debug logging (commented out for production)
+	// fmt.Printf("DEBUG: Query: %s\n", query)
+	// fmt.Printf("DEBUG: Input: %+v\n", inputMap)
+	// fmt.Printf("DEBUG: Results: %+v\n", results)
+
+	// Process results
 	decision := &PolicyDecision{
 		Allow:       true,
 		Reasons:     []string{},
@@ -265,34 +330,63 @@ func (e *OPAEngine) evaluateLocal(ctx context.Context, policyPackage string, inp
 		EvaluatedAt: time.Now(),
 	}
 
-	// Example validation rules
-	if input.Provider == "aws" && input.Action == "delete" {
-		if input.Tags != nil && input.Tags["Environment"] == "production" {
-			decision.Allow = false
-			decision.Violations = append(decision.Violations, PolicyViolation{
-				Rule:        "no_delete_production",
-				Message:     "Cannot delete production resources",
-				Severity:    "high",
-				Resource:    fmt.Sprintf("%v", input.Resource),
-				Remediation: "Remove production tag or use staging environment",
-			})
+	// Parse OPA results
+	for _, result := range results {
+		for _, expression := range result.Expressions {
+			if expression.Value != nil {
+				// Handle the full data structure
+				if dataMap, ok := expression.Value.(map[string]interface{}); ok {
+					// Extract allow decision
+					if allow, ok := dataMap["allow"].(bool); ok {
+						decision.Allow = allow
+					}
+
+					// Extract violations
+					if violations, ok := dataMap["violations"].(map[string]interface{}); ok {
+						for key, violation := range violations {
+							if violationMap, ok := violation.(map[string]interface{}); ok {
+								// Handle violation objects
+								pv := PolicyViolation{
+									Rule:        getString(violationMap, "rule"),
+									Message:     getString(violationMap, "message"),
+									Severity:    getString(violationMap, "severity"),
+									Resource:    getString(violationMap, "resource"),
+									Remediation: getString(violationMap, "remediation"),
+								}
+								decision.Violations = append(decision.Violations, pv)
+							} else {
+								// Handle violation keys (when violation is just a string key)
+								pv := PolicyViolation{
+									Rule:        "required_tags",
+									Message:     fmt.Sprintf("Policy violation: %s", key),
+									Severity:    "medium",
+									Resource:    fmt.Sprintf("%v", input.Resource),
+									Remediation: "Fix the policy violation",
+								}
+								decision.Violations = append(decision.Violations, pv)
+							}
+						}
+					} else if violations, ok := dataMap["violations"].([]interface{}); ok {
+						// Handle violations as an array of strings
+						for _, violation := range violations {
+							if violationStr, ok := violation.(string); ok {
+								pv := PolicyViolation{
+									Rule:        "required_tags",
+									Message:     fmt.Sprintf("Policy violation: %s", violationStr),
+									Severity:    "medium",
+									Resource:    fmt.Sprintf("%v", input.Resource),
+									Remediation: "Fix the policy violation",
+								}
+								decision.Violations = append(decision.Violations, pv)
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
-	// Check for required tags
-	requiredTags := []string{"Owner", "Environment", "CostCenter"}
-	for _, tag := range requiredTags {
-		if input.Tags == nil || input.Tags[tag] == "" {
-			decision.Violations = append(decision.Violations, PolicyViolation{
-				Rule:        "required_tags",
-				Message:     fmt.Sprintf("Missing required tag: %s", tag),
-				Severity:    "medium",
-				Resource:    fmt.Sprintf("%v", input.Resource),
-				Remediation: fmt.Sprintf("Add %s tag to the resource", tag),
-			})
-		}
-	}
-
+	// If there are violations, deny access
 	if len(decision.Violations) > 0 {
 		decision.Allow = false
 	}
@@ -345,12 +439,17 @@ func (e *OPAEngine) UploadPolicy(ctx context.Context, policy *Policy) error {
 // DeletePolicy deletes a policy
 func (e *OPAEngine) DeletePolicy(ctx context.Context, policyID string) error {
 	e.mu.Lock()
-	delete(e.policies, policyID)
-	e.mu.Unlock()
+	defer e.mu.Unlock()
 
 	if e.localPolicies != "" {
 		filename := filepath.Join(e.localPolicies, policyID+".rego")
-		return os.Remove(filename)
+		err := os.Remove(filename)
+		if err != nil {
+			return err
+		}
+		// Delete from in-memory map using the full filename
+		delete(e.policies, policyID+".rego")
+		return nil
 	}
 
 	if e.pluginMode && e.endpoint != "" {
@@ -431,4 +530,14 @@ func (e *OPAEngine) ClearCache() {
 	defer e.mu.Unlock()
 
 	e.cache = make(map[string]*CachedDecision)
+}
+
+// getString safely extracts a string value from a map
+func getString(m map[string]interface{}, key string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
 }

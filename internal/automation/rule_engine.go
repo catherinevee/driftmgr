@@ -5,14 +5,19 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/catherinevee/driftmgr/internal/automation/actions"
+	"github.com/catherinevee/driftmgr/internal/events"
+	"github.com/catherinevee/driftmgr/internal/models"
 )
 
 // RuleEngine manages automation rules
 type RuleEngine struct {
-	rules map[string]*AutomationRule
-	mu    sync.RWMutex
-	// eventBus removed for interface simplification
-	config *RuleConfig
+	rules         map[string]*AutomationRule
+	actionManager *actions.ActionManager
+	eventBus      *events.EventBus
+	mu            sync.RWMutex
+	config        *RuleConfig
 }
 
 // AutomationRule represents an automation rule
@@ -40,9 +45,12 @@ type RuleCondition struct {
 
 // RuleAction represents an action to take when a rule is triggered
 type RuleAction struct {
-	Type        string                 `json:"type"`
-	Parameters  map[string]interface{} `json:"parameters"`
-	Description string                 `json:"description"`
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	Type          string                 `json:"type"`
+	Parameters    map[string]interface{} `json:"parameters"`
+	Configuration models.JSONB           `json:"configuration"`
+	Description   string                 `json:"description"`
 }
 
 // RuleConfig represents configuration for the rule engine
@@ -56,7 +64,7 @@ type RuleConfig struct {
 }
 
 // NewRuleEngine creates a new rule engine
-func NewRuleEngine() *RuleEngine {
+func NewRuleEngine(eventBus *events.EventBus, notificationService *events.NotificationService) *RuleEngine {
 	config := &RuleConfig{
 		MaxRules:            1000,
 		EvaluationInterval:  1 * time.Minute,
@@ -66,9 +74,13 @@ func NewRuleEngine() *RuleEngine {
 		AuditLogging:        true,
 	}
 
+	actionManager := actions.NewActionManager(eventBus, notificationService, "logs")
+
 	return &RuleEngine{
-		rules:  make(map[string]*AutomationRule),
-		config: config,
+		rules:         make(map[string]*AutomationRule),
+		actionManager: actionManager,
+		eventBus:      eventBus,
+		config:        config,
 	}
 }
 
@@ -100,7 +112,22 @@ func (re *RuleEngine) CreateRule(ctx context.Context, rule *AutomationRule) erro
 	// Store rule
 	re.rules[rule.ID] = rule
 
-	// TODO: Implement event publishing
+	// Publish rule created event
+	if re.eventBus != nil {
+		re.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("rule_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_rule_engine",
+			Data: map[string]interface{}{
+				"action":    "rule_created",
+				"rule_id":   rule.ID,
+				"rule_name": rule.Name,
+				"category":  rule.Category,
+				"enabled":   rule.Enabled,
+			},
+		})
+	}
 
 	return nil
 }
@@ -136,7 +163,22 @@ func (re *RuleEngine) UpdateRule(ctx context.Context, ruleID string, updates *Au
 	}
 	rule.UpdatedAt = time.Now()
 
-	// TODO: Implement event publishing
+	// Publish rule updated event
+	if re.eventBus != nil {
+		re.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("rule_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_rule_engine",
+			Data: map[string]interface{}{
+				"action":    "rule_updated",
+				"rule_id":   ruleID,
+				"rule_name": rule.Name,
+				"category":  rule.Category,
+				"enabled":   rule.Enabled,
+			},
+		})
+	}
 
 	return nil
 }
@@ -154,7 +196,19 @@ func (re *RuleEngine) DeleteRule(ctx context.Context, ruleID string) error {
 	// Delete rule
 	delete(re.rules, ruleID)
 
-	// TODO: Implement event publishing
+	// Publish rule deleted event
+	if re.eventBus != nil {
+		re.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("rule_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_rule_engine",
+			Data: map[string]interface{}{
+				"action":  "rule_deleted",
+				"rule_id": ruleID,
+			},
+		})
+	}
 
 	return nil
 }
@@ -226,7 +280,7 @@ func (re *RuleEngine) EvaluateRules(ctx context.Context, data map[string]interfa
 				}
 			}
 
-			// TODO: Implement event publishing
+			// Event publishing for matched rules handled in EvaluateRule method
 		}
 	}
 
@@ -338,24 +392,62 @@ func (re *RuleEngine) executeAction(ctx context.Context, action RuleAction, data
 		return nil
 
 	case "send_notification":
-		// Placeholder for notification action
-		fmt.Printf("Sending notification: %s\n", action.Description)
-		return nil
+		// Execute notification action using action manager
+		notificationAction := &models.AutomationAction{
+			ID:            action.ID,
+			Name:          action.Name,
+			Description:   action.Description,
+			Type:          models.ActionTypeNotification,
+			Configuration: action.Configuration,
+		}
+		_, err := re.actionManager.ExecuteAction(ctx, notificationAction, data)
+		return err
 
 	case "log_event":
-		// Placeholder for logging action
-		fmt.Printf("Logging event: %s\n", action.Description)
-		return nil
+		// Execute logging action using action manager
+		loggingAction := &models.AutomationAction{
+			ID:          action.ID,
+			Name:        action.Name,
+			Description: action.Description,
+			Type:        models.ActionTypeCustom,
+			Configuration: models.JSONB(map[string]interface{}{
+				"subtype": "logging",
+				"level":   "info",
+				"message": action.Description,
+				"output":  "stdout",
+				"format":  "json",
+			}),
+		}
+		_, err := re.actionManager.ExecuteAction(ctx, loggingAction, data)
+		return err
 
 	case "update_resource":
-		// Placeholder for resource update action
-		fmt.Printf("Updating resource: %s\n", action.Description)
-		return nil
+		// Execute resource update action using action manager
+		resourceUpdateAction := &models.AutomationAction{
+			ID:          action.ID,
+			Name:        action.Name,
+			Description: action.Description,
+			Type:        models.ActionTypeCustom,
+			Configuration: models.JSONB(map[string]interface{}{
+				"subtype": "resource_update",
+			}),
+		}
+		_, err := re.actionManager.ExecuteAction(ctx, resourceUpdateAction, data)
+		return err
 
 	case "create_alert":
-		// Placeholder for alert creation action
-		fmt.Printf("Creating alert: %s\n", action.Description)
-		return nil
+		// Execute alert creation action using action manager
+		alertCreationAction := &models.AutomationAction{
+			ID:          action.ID,
+			Name:        action.Name,
+			Description: action.Description,
+			Type:        models.ActionTypeCustom,
+			Configuration: models.JSONB(map[string]interface{}{
+				"subtype": "alert_creation",
+			}),
+		}
+		_, err := re.actionManager.ExecuteAction(ctx, alertCreationAction, data)
+		return err
 
 	default:
 		return fmt.Errorf("unknown action type: %s", action.Type)

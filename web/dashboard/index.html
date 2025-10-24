@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DriftMgr - Cloud Health Management Dashboard</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles/forms.css">
+    <link rel="stylesheet" href="styles/charts.css">
+    <link rel="stylesheet" href="styles/websocket.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -21,6 +24,14 @@
                 <li class="menu-item active" data-page="overview">
                     <i class="fas fa-tachometer-alt"></i>
                     <span>Overview</span>
+                </li>
+                <li class="menu-item" data-page="backends">
+                    <i class="fas fa-database"></i>
+                    <span>Backend Management</span>
+                </li>
+                <li class="menu-item" data-page="states">
+                    <i class="fas fa-file-code"></i>
+                    <span>State Management</span>
                 </li>
                 <li class="menu-item" data-page="resources">
                     <i class="fas fa-server"></i>
@@ -88,6 +99,7 @@
                         <i class="fas fa-bell"></i>
                         <span class="notification-badge">3</span>
                     </div>
+                    <div class="ws-status" id="ws-status">Connecting...</div>
                     <div class="user-menu">
                         <img src="https://via.placeholder.com/32" alt="User" class="user-avatar">
                         <span>Admin User</span>
@@ -148,23 +160,93 @@
 
                     <div class="charts-grid">
                         <div class="chart-card">
-                            <h3>Resource Distribution</h3>
-                            <canvas id="resourceChart"></canvas>
+                            <div class="chart-header">
+                                <h3>Drift Trends</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon chart-refresh" data-chart="driftTrend" title="Refresh">
+                                        <i class="fas fa-sync"></i>
+                                    </button>
+                                    <button class="btn-icon chart-export" data-chart="driftTrend" title="Export">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <canvas id="drift-trend-chart"></canvas>
                         </div>
                         
                         <div class="chart-card">
-                            <h3>Cost Trend</h3>
-                            <canvas id="costChart"></canvas>
+                            <div class="chart-header">
+                                <h3>Resource Distribution</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon chart-refresh" data-chart="resourceDistribution" title="Refresh">
+                                        <i class="fas fa-sync"></i>
+                                    </button>
+                                    <button class="btn-icon chart-export" data-chart="resourceDistribution" title="Export">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <canvas id="resource-distribution-chart"></canvas>
                         </div>
                         
                         <div class="chart-card">
-                            <h3>Health Status</h3>
-                            <canvas id="healthChart"></canvas>
+                            <div class="chart-header">
+                                <h3>Cost Analysis</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon chart-refresh" data-chart="costAnalysis" title="Refresh">
+                                        <i class="fas fa-sync"></i>
+                                    </button>
+                                    <button class="btn-icon chart-export" data-chart="costAnalysis" title="Export">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <canvas id="cost-analysis-chart"></canvas>
                         </div>
                         
                         <div class="chart-card">
-                            <h3>Drift Detection</h3>
-                            <canvas id="driftChart"></canvas>
+                            <div class="chart-header">
+                                <h3>Health Score</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon chart-refresh" data-chart="healthScore" title="Refresh">
+                                        <i class="fas fa-sync"></i>
+                                    </button>
+                                    <button class="btn-icon chart-export" data-chart="healthScore" title="Export">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <canvas id="health-score-chart"></canvas>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3>Remediation Success</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon chart-refresh" data-chart="remediationSuccess" title="Refresh">
+                                        <i class="fas fa-sync"></i>
+                                    </button>
+                                    <button class="btn-icon chart-export" data-chart="remediationSuccess" title="Export">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <canvas id="remediation-success-chart"></canvas>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3>Provider Comparison</h3>
+                                <div class="chart-actions">
+                                    <button class="btn-icon chart-refresh" data-chart="providerComparison" title="Refresh">
+                                        <i class="fas fa-sync"></i>
+                                    </button>
+                                    <button class="btn-icon chart-export" data-chart="providerComparison" title="Export">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <canvas id="provider-comparison-chart"></canvas>
                         </div>
                     </div>
 
@@ -219,8 +301,11 @@
                     <div class="page-header">
                         <h2>Resources</h2>
                         <div class="page-actions">
-                            <button class="btn btn-primary">
-                                <i class="fas fa-plus"></i> Add Resource
+                            <button class="btn btn-primary" onclick="openResourceImportForm()">
+                                <i class="fas fa-plus"></i> Import Resource
+                            </button>
+                            <button class="btn btn-secondary" onclick="openResourceMoveForm()">
+                                <i class="fas fa-arrows-alt"></i> Move Resource
                             </button>
                             <button class="btn btn-secondary">
                                 <i class="fas fa-sync"></i> Refresh
@@ -334,6 +419,12 @@
                             <button class="btn btn-primary">
                                 <i class="fas fa-search"></i> Run Detection
                             </button>
+                            <button class="btn btn-primary" onclick="openRemediationForm()">
+                                <i class="fas fa-tools"></i> Create Strategy
+                            </button>
+                            <button class="btn btn-secondary" onclick="openRemediationJobForm()">
+                                <i class="fas fa-play"></i> Create Job
+                            </button>
                             <button class="btn btn-secondary">
                                 <i class="fas fa-download"></i> Export Report
                             </button>
@@ -439,6 +530,131 @@
                     <p>Integrations management content...</p>
                 </div>
                 
+                <!-- Backend Management Page -->
+                <div id="backends-page" class="page">
+                    <div class="page-header">
+                        <h2>Backend Management</h2>
+                        <div class="page-actions">
+                            <button class="btn btn-primary" onclick="openBackendForm()">
+                                <i class="fas fa-plus"></i> Add Backend
+                            </button>
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-sync"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="filters">
+                        <select class="filter-select">
+                            <option>All Types</option>
+                            <option>S3</option>
+                            <option>Azure Blob</option>
+                            <option>GCS</option>
+                            <option>Local</option>
+                        </select>
+                        <select class="filter-select">
+                            <option>All Status</option>
+                            <option>Active</option>
+                            <option>Inactive</option>
+                            <option>Error</option>
+                        </select>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Provider</th>
+                                    <th>Status</th>
+                                    <th>State Files</th>
+                                    <th>Last Scanned</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Production S3 Backend</td>
+                                    <td>S3</td>
+                                    <td>AWS</td>
+                                    <td><span class="status-badge status-active">Active</span></td>
+                                    <td>15</td>
+                                    <td>2 minutes ago</td>
+                                    <td>
+                                        <button class="btn-icon" title="Test Connection" onclick="openBackendTest('backend-1')">
+                                            <i class="fas fa-plug"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Edit" onclick="openBackendForm('backend-1')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- State Management Page -->
+                <div id="states-page" class="page">
+                    <div class="page-header">
+                        <h2>State Management</h2>
+                        <div class="page-actions">
+                            <button class="btn btn-primary" onclick="openStateForm()">
+                                <i class="fas fa-upload"></i> Import State
+                            </button>
+                            <button class="btn btn-secondary" onclick="openStateLockForm()">
+                                <i class="fas fa-lock"></i> Lock State
+                            </button>
+                            <button class="btn btn-secondary">
+                                <i class="fas fa-sync"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Path</th>
+                                    <th>Backend</th>
+                                    <th>Resources</th>
+                                    <th>Size</th>
+                                    <th>Status</th>
+                                    <th>Last Modified</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>terraform.tfstate</td>
+                                    <td>terraform.tfstate</td>
+                                    <td>Production S3</td>
+                                    <td>25</td>
+                                    <td>2.1 KB</td>
+                                    <td><span class="status-badge status-active">Unlocked</span></td>
+                                    <td>2 minutes ago</td>
+                                    <td>
+                                        <button class="btn-icon" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Lock">
+                                            <i class="fas fa-lock"></i>
+                                        </button>
+                                        <button class="btn-icon" title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div id="settings-page" class="page">
                     <h2>Settings</h2>
                     <p>Settings content...</p>
@@ -447,6 +663,28 @@
         </main>
     </div>
 
+    <!-- Forms -->
+    <div id="forms-container">
+        <!-- Backend Forms -->
+        <div id="backend-forms">
+            <!-- Include backend form HTML -->
+        </div>
+        
+        <!-- State Forms -->
+        <div id="state-forms">
+            <!-- Include state form HTML -->
+        </div>
+        
+        <!-- Remediation Forms -->
+        <div id="remediation-forms">
+            <!-- Include remediation form HTML -->
+        </div>
+    </div>
+
+    <script src="js/load-forms.js"></script>
+    <script src="js/forms.js"></script>
+    <script src="js/visualizations.js"></script>
+    <script src="js/websocket.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

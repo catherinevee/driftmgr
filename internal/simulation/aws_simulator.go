@@ -70,6 +70,8 @@ func (s *AWSSimulator) SimulateDrift(ctx context.Context, driftType DriftType, r
 		return s.simulateResourceCreation(ctx, resource, state)
 	case DriftTypeAttributeChange:
 		return s.simulateAttributeChange(ctx, resource)
+	case DriftTypeResourceDeletion:
+		return s.simulateResourceDeletion(ctx, resource)
 	default:
 		return nil, fmt.Errorf("drift type %s not implemented", driftType)
 	}
@@ -898,4 +900,104 @@ func (s *AWSSimulator) rollbackVersioningRestore(ctx context.Context, data *Roll
 		return err
 	}
 	return nil
+}
+
+// simulateResourceDeletion simulates the deletion of a resource
+func (s *AWSSimulator) simulateResourceDeletion(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
+	result := &SimulationResult{
+		Provider:     "aws",
+		ResourceType: resource.Type,
+		ResourceID:   resource.ID,
+		DriftType:    DriftTypeResourceDeletion,
+		Changes:      make(map[string]interface{}),
+		CostEstimate: "$0.00 (simulation only)",
+	}
+
+	// Store original resource data for rollback
+	rollbackData := &RollbackData{
+		ResourceID:   resource.ID,
+		ResourceType: resource.Type,
+		OriginalData: make(map[string]interface{}),
+	}
+
+	// Simulate different deletion scenarios based on resource type
+	switch resource.Type {
+	case "aws_instance":
+		// Simulate EC2 instance deletion
+		instanceID := s.extractInstanceID(resource)
+		if instanceID == "" {
+			return nil, fmt.Errorf("could not extract instance ID")
+		}
+
+		// Store original instance data
+		rollbackData.OriginalData["instance_id"] = instanceID
+		rollbackData.OriginalData["resource_type"] = "aws_instance"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["instance_id"] = instanceID
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	case "aws_s3_bucket":
+		// Simulate S3 bucket deletion
+		bucketName := s.extractBucketName(resource)
+		if bucketName == "" {
+			return nil, fmt.Errorf("could not extract bucket name")
+		}
+
+		// Store original bucket data
+		rollbackData.OriginalData["bucket_name"] = bucketName
+		rollbackData.OriginalData["resource_type"] = "aws_s3_bucket"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["bucket_name"] = bucketName
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	case "aws_security_group":
+		// Simulate security group deletion
+		sgID := s.extractSecurityGroupID(resource)
+		if sgID == "" {
+			return nil, fmt.Errorf("could not extract security group ID")
+		}
+
+		// Store original security group data
+		rollbackData.OriginalData["security_group_id"] = sgID
+		rollbackData.OriginalData["resource_type"] = "aws_security_group"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["security_group_id"] = sgID
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	default:
+		// Generic resource deletion simulation
+		rollbackData.OriginalData["resource_id"] = resource.ID
+		rollbackData.OriginalData["resource_type"] = resource.Type
+
+		result.Changes["deletion_simulated"] = true
+		result.Changes["resource_id"] = resource.ID
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+	}
+
+	// Add drift detection record
+	result.DetectedDrift = append(result.DetectedDrift, DriftItem{
+		ResourceID:   resource.ID,
+		ResourceType: resource.Type,
+		DriftType:    "resource_deletion",
+		Before: map[string]interface{}{
+			"exists": true,
+			"type":   resource.Type,
+		},
+		After: map[string]interface{}{
+			"exists": false,
+			"type":   resource.Type,
+		},
+		Impact: "High - Resource has been deleted",
+	})
+
+	result.RollbackData = rollbackData
+	result.Success = true
+
+	return result, nil
 }

@@ -1,8 +1,11 @@
 package discovery
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -457,8 +460,132 @@ func (rtm *RealTimeMonitor) checkAlertConditions() {
 }
 
 func (rtm *RealTimeMonitor) processWebhooks(ctx context.Context) {
-	// Webhook processing would be implemented here
-	// This is a placeholder for webhook delivery logic
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-rtm.stopCh:
+			return
+		case <-ticker.C:
+			rtm.deliverWebhooks(ctx)
+		}
+	}
+}
+
+func (rtm *RealTimeMonitor) deliverWebhooks(ctx context.Context) {
+	rtm.mu.RLock()
+	webhooks := make([]WebhookConfig, len(rtm.webhooks))
+	copy(webhooks, rtm.webhooks)
+	rtm.mu.RUnlock()
+
+	for _, webhook := range webhooks {
+		// Check if webhook should be triggered
+		if rtm.shouldTriggerWebhook(webhook) {
+			go rtm.triggerWebhook(ctx, webhook)
+		}
+	}
+}
+
+func (rtm *RealTimeMonitor) shouldTriggerWebhook(webhook WebhookConfig) bool {
+	// Check if there are any unacknowledged alerts that match webhook events
+	alerts := rtm.GetAlerts(true)
+
+	for _, alert := range alerts {
+		for _, eventType := range webhook.Events {
+			if rtm.alertMatchesEvent(alert, eventType) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (rtm *RealTimeMonitor) alertMatchesEvent(alert Alert, eventType string) bool {
+	switch eventType {
+	case "error":
+		return alert.Type == AlertTypeError
+	case "warning":
+		return alert.Type == AlertTypeWarning
+	case "critical":
+		return alert.Severity == AlertSeverityCritical
+	case "high":
+		return alert.Severity == AlertSeverityHigh
+	case "rate_limit":
+		return alert.Type == AlertTypeRateLimit
+	case "quota_exceeded":
+		return alert.Type == AlertTypeQuotaExceeded
+	case "slow_discovery":
+		return alert.Type == AlertTypeSlowDiscovery
+	default:
+		return false
+	}
+}
+
+func (rtm *RealTimeMonitor) triggerWebhook(ctx context.Context, webhook WebhookConfig) {
+	// Prepare webhook payload
+	payload := map[string]interface{}{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"source":    "driftmgr",
+		"type":      "alert",
+		"data": map[string]interface{}{
+			"metrics": rtm.GetMetrics(),
+			"alerts":  rtm.GetAlerts(true),
+			"status":  rtm.getSystemStatus(),
+		},
+	}
+
+	// Convert to JSON
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Printf("Failed to marshal webhook payload: %v\n", err)
+		return
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, "POST", webhook.URL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		fmt.Printf("Failed to create webhook request: %v\n", err)
+		return
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "DriftMgr-Webhook/1.0")
+	for k, v := range webhook.Headers {
+		req.Header.Set(k, v)
+	}
+
+	// Make request with retry logic
+	client := &http.Client{Timeout: webhook.Timeout}
+
+	for attempt := 0; attempt <= webhook.RetryCount; attempt++ {
+		resp, err := client.Do(req)
+		if err != nil {
+			if attempt < webhook.RetryCount {
+				time.Sleep(time.Duration(attempt+1) * time.Second)
+				continue
+			}
+			fmt.Printf("Webhook delivery failed after %d attempts: %v\n", webhook.RetryCount+1, err)
+			return
+		}
+
+		resp.Body.Close()
+
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			fmt.Printf("Webhook delivered successfully to %s\n", webhook.URL)
+			return
+		}
+
+		if attempt < webhook.RetryCount {
+			time.Sleep(time.Duration(attempt+1) * time.Second)
+		} else {
+			fmt.Printf("Webhook delivery failed with status %d after %d attempts\n", resp.StatusCode, webhook.RetryCount+1)
+		}
+	}
 }
 
 func (rtm *RealTimeMonitor) broadcastEvent(event Event) {

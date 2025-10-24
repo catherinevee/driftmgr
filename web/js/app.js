@@ -4,9 +4,6 @@ function driftMgrV3App() {
         // Core State
         currentView: 'backends',
         selectedEnvironment: 'development',
-        wsConnected: false,
-        ws: null,
-        eventBus: null,
         
         // View States
         stateTab: 'browser',
@@ -23,32 +20,17 @@ function driftMgrV3App() {
         // State Management (v3.0 enhanced)
         stateFiles: [],
         selectedState: null,
-        pushStateFile: null,
-        pushTarget: 's3',
-        pullSource: 's3',
-        pullStateKey: '',
         
-        // Terragrunt Support (v3.0 feature)
-        terragruntModules: [],
-        selectedTerragruntModule: null,
         
-        // Compliance (v3.0 feature)
-        policyViolations: [],
-        complianceReports: {},
+        // Resources (v3.0 feature)
+        resources: [],
+        selectedProvider: 'aws',
         
-        // Monitoring (v3.0 enhanced)
-        metrics: {
-            discoveryRate: 0,
-            driftRate: 0,
-            remediationSuccess: 0,
-            costImpact: 0
-        },
-        eventStream: [],
-        webhooks: {
-            eventbridge: false,
-            eventgrid: false,
-            pubsub: false
-        },
+        // Drift Detection (v3.0 feature)
+        driftResults: [],
+        
+        
+        
         
         // Notifications
         notifications: [],
@@ -63,11 +45,6 @@ function driftMgrV3App() {
         async init() {
             console.log('Initializing DriftMgr v3.0...');
             
-            // Connect to enhanced WebSocket with event bridge
-            this.connectWebSocket();
-            
-            // Initialize event bus for real-time updates
-            this.initEventBus();
             
             // Load initial data based on architecture
             await this.loadInitialData();
@@ -79,125 +56,19 @@ function driftMgrV3App() {
             this.registerKeyboardShortcuts();
         },
         
-        // WebSocket connection with event bridge (v3.0)
+        // WebSocket connection removed
         connectWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/enhanced`; // Use enhanced endpoint
-            
-            this.ws = new WebSocket(wsUrl);
-            
-            this.ws.onopen = () => {
-                this.wsConnected = true;
-                console.log('WebSocket connected to event bridge');
-                this.addNotification('Connected to DriftMgr server', 'success');
-                
-                // Subscribe to event types
-                this.ws.send(JSON.stringify({
-                    type: 'subscribe',
-                    events: ['discovery', 'drift', 'remediation', 'state', 'terragrunt', 'compliance']
-                }));
-            };
-            
-            this.ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                this.handleWebSocketMessage(data);
-            };
-            
-            this.ws.onclose = () => {
-                this.wsConnected = false;
-                console.log('WebSocket disconnected, reconnecting...');
-                setTimeout(() => this.connectWebSocket(), 5000);
-            };
-            
-            this.ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                this.addNotification('Connection error', 'error');
-            };
+            // WebSocket functionality removed
         },
         
-        // Initialize event bus for internal communication
+        // Event bus removed
         initEventBus() {
-            this.eventBus = {
-                listeners: {},
-                emit(event, data) {
-                    if (this.listeners[event]) {
-                        this.listeners[event].forEach(callback => callback(data));
-                    }
-                },
-                on(event, callback) {
-                    if (!this.listeners[event]) {
-                        this.listeners[event] = [];
-                    }
-                    this.listeners[event].push(callback);
-                }
-            };
-            
-            // Register event handlers
-            this.eventBus.on('discovery.started', (data) => {
-                this.showProgress = true;
-                this.progressTitle = 'Discovery in Progress';
-                this.progressMessage = `Discovering resources in ${data.provider}...`;
-            });
-            
-            this.eventBus.on('drift.detected', (data) => {
-                this.addNotification(`Drift detected: ${data.resourceCount} resources`, 'warning');
-                this.metrics.driftRate = data.driftPercentage;
-            });
-            
-            this.eventBus.on('state.updated', (data) => {
-                this.addNotification(`State updated: ${data.stateFile}`, 'info');
-                this.loadStateFiles();
-            });
-            
-            this.eventBus.on('terragrunt.dependency', (data) => {
-                console.log('Terragrunt dependency resolved:', data);
-                this.updateTerragruntModules();
-            });
+            // Event bus functionality removed
         },
         
-        // Handle WebSocket messages from server
+        // WebSocket message handling removed
         handleWebSocketMessage(data) {
-            console.log('WebSocket message:', data);
-            
-            // Add to event stream for monitoring
-            this.eventStream.unshift({
-                id: Date.now(),
-                timestamp: new Date().toLocaleTimeString(),
-                type: data.type,
-                message: data.message || data.description
-            });
-            
-            // Keep only last 100 events
-            if (this.eventStream.length > 100) {
-                this.eventStream = this.eventStream.slice(0, 100);
-            }
-            
-            // Route to appropriate handler based on event type
-            switch(data.type) {
-                case 'backend.discovered':
-                    this.handleBackendDiscovered(data);
-                    break;
-                case 'state.changed':
-                    this.handleStateChanged(data);
-                    break;
-                case 'drift.detected':
-                    this.handleDriftDetected(data);
-                    break;
-                case 'remediation.completed':
-                    this.handleRemediationCompleted(data);
-                    break;
-                case 'terragrunt.update':
-                    this.handleTerragruntUpdate(data);
-                    break;
-                case 'compliance.violation':
-                    this.handleComplianceViolation(data);
-                    break;
-                case 'progress.update':
-                    this.updateProgress(data.progress);
-                    break;
-                default:
-                    console.log('Unhandled event type:', data.type);
-            }
+            // WebSocket message handling removed
         },
         
         // Load initial data based on v3.0 architecture
@@ -209,14 +80,15 @@ function driftMgrV3App() {
                 // Load state files
                 await this.loadStateFiles();
                 
-                // Load Terragrunt modules
-                await this.loadTerragruntModules();
                 
-                // Load compliance status
-                await this.loadComplianceStatus();
                 
-                // Load monitoring metrics
-                await this.loadMetrics();
+                
+                // Load resources
+                await this.loadResources();
+                
+                // Load drift results
+                await this.loadDriftResults();
+                
                 
             } catch (error) {
                 console.error('Error loading initial data:', error);
@@ -230,24 +102,32 @@ function driftMgrV3App() {
                 const response = await fetch('/api/v1/backends/list');
                 if (!response.ok) throw new Error('Failed to load backends');
                 
-                const data = await response.json();
-                this.backendsList = data.backends || [];
+                const apiResponse = await response.json();
+                
+                // Handle standardized API response format
+                if (!apiResponse.success) {
+                    throw new Error(apiResponse.error?.message || 'API request failed');
+                }
+                
+                const backends = apiResponse.data || [];
+                this.backendsList = backends;
                 
                 // Update counts
-                this.backends.s3.count = data.backends.filter(b => b.type === 's3').length;
-                this.backends.azure.count = data.backends.filter(b => b.type === 'azurerm').length;
-                this.backends.gcs.count = data.backends.filter(b => b.type === 'gcs').length;
-                this.backends.local.count = data.backends.filter(b => b.type === 'local').length;
+                this.backends.s3.count = backends.filter(b => b.type === 's3').length;
+                this.backends.azure.count = backends.filter(b => b.type === 'azurerm').length;
+                this.backends.gcs.count = backends.filter(b => b.type === 'gcs').length;
+                this.backends.local.count = backends.filter(b => b.type === 'local').length;
                 
                 // Update state counts
                 for (const backend of this.backendsList) {
-                    if (backend.type === 's3') this.backends.s3.states += backend.stateCount;
-                    if (backend.type === 'azurerm') this.backends.azure.states += backend.stateCount;
-                    if (backend.type === 'gcs') this.backends.gcs.states += backend.stateCount;
-                    if (backend.type === 'local') this.backends.local.states += backend.stateCount;
+                    if (backend.type === 's3') this.backends.s3.states += backend.stateCount || 0;
+                    if (backend.type === 'azurerm') this.backends.azure.states += backend.stateCount || 0;
+                    if (backend.type === 'gcs') this.backends.gcs.states += backend.stateCount || 0;
+                    if (backend.type === 'local') this.backends.local.states += backend.stateCount || 0;
                 }
             } catch (error) {
                 console.error('Error loading backends:', error);
+                this.addNotification('Failed to load backends: ' + error.message, 'error');
             }
         },
         
@@ -268,13 +148,20 @@ function driftMgrV3App() {
                 
                 if (!response.ok) throw new Error('Backend discovery failed');
                 
-                const result = await response.json();
+                const apiResponse = await response.json();
+                
+                // Handle standardized API response format
+                if (!apiResponse.success) {
+                    throw new Error(apiResponse.error?.message || 'Backend discovery failed');
+                }
+                
+                const result = apiResponse.data;
                 this.addNotification(`Discovered ${result.count} backends`, 'success');
                 await this.loadBackends();
                 
             } catch (error) {
                 console.error('Backend discovery error:', error);
-                this.addNotification('Backend discovery failed', 'error');
+                this.addNotification('Backend discovery failed: ' + error.message, 'error');
             } finally {
                 this.showProgress = false;
             }
@@ -293,32 +180,6 @@ function driftMgrV3App() {
             this.backendConfigUI.open();
         },
         
-        async testConnections() {
-            this.showProgress = true;
-            this.progressTitle = 'Testing Connections';
-            this.progressMessage = 'Verifying backend connectivity...';
-            
-            try {
-                const response = await fetch('/api/v1/backends/test', {
-                    method: 'POST'
-                });
-                
-                if (!response.ok) throw new Error('Connection test failed');
-                
-                const results = await response.json();
-                const successful = results.tests.filter(t => t.success).length;
-                const total = results.tests.length;
-                
-                this.addNotification(`${successful}/${total} backends connected`, 
-                    successful === total ? 'success' : 'warning');
-                    
-            } catch (error) {
-                console.error('Connection test error:', error);
-                this.addNotification('Connection test failed', 'error');
-            } finally {
-                this.showProgress = false;
-            }
-        },
         
         exploreBackend(backend) {
             console.log('Exploring backend:', backend);
@@ -333,11 +194,18 @@ function driftMgrV3App() {
                 const response = await fetch('/api/v1/state/list');
                 if (!response.ok) throw new Error('Failed to load state files');
                 
-                const data = await response.json();
-                this.stateFiles = data.states || [];
+                const apiResponse = await response.json();
+                
+                // Handle standardized API response format
+                if (!apiResponse.success) {
+                    throw new Error(apiResponse.error?.message || 'Failed to load state files');
+                }
+                
+                this.stateFiles = apiResponse.data || [];
                 
             } catch (error) {
                 console.error('Error loading state files:', error);
+                this.addNotification('Failed to load state files: ' + error.message, 'error');
             }
         },
         
@@ -346,11 +214,18 @@ function driftMgrV3App() {
                 const response = await fetch(`/api/v1/state/list?backend=${backend.id}`);
                 if (!response.ok) throw new Error('Failed to load state files');
                 
-                const data = await response.json();
-                this.stateFiles = data.states || [];
+                const apiResponse = await response.json();
+                
+                // Handle standardized API response format
+                if (!apiResponse.success) {
+                    throw new Error(apiResponse.error?.message || 'Failed to load state files');
+                }
+                
+                this.stateFiles = apiResponse.data || [];
                 
             } catch (error) {
                 console.error('Error loading state files:', error);
+                this.addNotification('Failed to load state files: ' + error.message, 'error');
             }
         },
         
@@ -362,129 +237,23 @@ function driftMgrV3App() {
                 const response = await fetch(`/api/v1/state/details?path=${encodeURIComponent(state.path)}`);
                 if (!response.ok) throw new Error('Failed to load state details');
                 
-                const details = await response.json();
+                const apiResponse = await response.json();
+                
+                // Handle standardized API response format
+                if (!apiResponse.success) {
+                    throw new Error(apiResponse.error?.message || 'Failed to load state details');
+                }
+                
+                const details = apiResponse.data;
                 this.selectedState = { ...state, ...details };
                 
             } catch (error) {
                 console.error('Error loading state details:', error);
+                this.addNotification('Failed to load state details: ' + error.message, 'error');
             }
         },
         
-        async pushStateToBackend() {
-            if (!this.pushStateFile) {
-                this.addNotification('Please select a state file', 'warning');
-                return;
-            }
-            
-            this.showProgress = true;
-            this.progressTitle = 'Pushing State';
-            this.progressMessage = `Uploading state to ${this.pushTarget}...`;
-            
-            try {
-                const formData = new FormData();
-                formData.append('file', this.pushStateFile);
-                formData.append('backend', this.pushTarget);
-                
-                const response = await fetch('/api/v1/state/push', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (!response.ok) throw new Error('State push failed');
-                
-                this.addNotification('State pushed successfully', 'success');
-                await this.loadStateFiles();
-                
-            } catch (error) {
-                console.error('State push error:', error);
-                this.addNotification('State push failed', 'error');
-            } finally {
-                this.showProgress = false;
-            }
-        },
         
-        async pullStateFromBackend() {
-            if (!this.pullStateKey) {
-                this.addNotification('Please enter state key', 'warning');
-                return;
-            }
-            
-            this.showProgress = true;
-            this.progressTitle = 'Pulling State';
-            this.progressMessage = `Downloading state from ${this.pullSource}...`;
-            
-            try {
-                const response = await fetch('/api/v1/state/pull', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        backend: this.pullSource,
-                        key: this.pullStateKey
-                    })
-                });
-                
-                if (!response.ok) throw new Error('State pull failed');
-                
-                // Download the state file
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = this.pullStateKey.split('/').pop();
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                
-                this.addNotification('State pulled successfully', 'success');
-                
-            } catch (error) {
-                console.error('State pull error:', error);
-                this.addNotification('State pull failed', 'error');
-            } finally {
-                this.showProgress = false;
-            }
-        },
-        
-        async pullState(backend) {
-            this.pullSource = backend.type;
-            this.pullStateKey = backend.defaultKey || '';
-            await this.pullStateFromBackend();
-        },
-        
-        async pushState(backend) {
-            this.pushTarget = backend.type;
-            // Open file selector
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.tfstate';
-            input.onchange = (e) => {
-                this.pushStateFile = e.target.files[0];
-                this.pushStateToBackend();
-            };
-            input.click();
-        },
-        
-        moveResource() {
-            if (!this.resourceMoveUI) {
-                this.resourceMoveUI = new ResourceMoveUI(this);
-                this.resourceMoveUI.init();
-            }
-            this.resourceMoveUI.open();
-        },
-        
-        removeResource() {
-            if (!this.resourceRemovalUI) {
-                this.resourceRemovalUI = new ResourceRemovalUI(this);
-                this.resourceRemovalUI.init();
-            }
-            this.resourceRemovalUI.open();
-        },
-        
-        importResource() {
-            console.log('Import resource operation');
-            this.openImportWizard();
-        },
         
         openImportWizard() {
             if (!this.importWizardUI) {
@@ -494,299 +263,8 @@ function driftMgrV3App() {
             this.importWizardUI.open();
         },
         
-        // Terragrunt Functions (v3.0 feature)
-        async loadTerragruntModules() {
-            try {
-                const response = await fetch('/api/v1/terragrunt/modules');
-                if (!response.ok) throw new Error('Failed to load Terragrunt modules');
-                
-                const data = await response.json();
-                this.terragruntModules = data.modules || [];
-                
-                // Initialize dependency graph if modules exist
-                if (this.terragruntModules.length > 0) {
-                    this.initializeDependencyGraph();
-                }
-                
-            } catch (error) {
-                console.error('Error loading Terragrunt modules:', error);
-            }
-        },
         
-        selectTerragruntModule(module) {
-            this.selectedTerragruntModule = module;
-        },
         
-        async runTerragruntPlan() {
-            if (!this.selectedTerragruntModule) {
-                this.addNotification('Please select a module', 'warning');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/v1/terragrunt/plan', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        module: this.selectedTerragruntModule.path
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Terragrunt plan failed');
-                
-                const result = await response.json();
-                this.addNotification('Plan completed', 'success');
-                console.log('Plan result:', result);
-                
-            } catch (error) {
-                console.error('Terragrunt plan error:', error);
-                this.addNotification('Plan failed', 'error');
-            }
-        },
-        
-        async runTerragruntApply() {
-            if (!this.selectedTerragruntModule) {
-                this.addNotification('Please select a module', 'warning');
-                return;
-            }
-            
-            if (!confirm('Are you sure you want to apply changes?')) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/v1/terragrunt/apply', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        module: this.selectedTerragruntModule.path
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Terragrunt apply failed');
-                
-                const result = await response.json();
-                this.addNotification('Apply completed', 'success');
-                console.log('Apply result:', result);
-                
-            } catch (error) {
-                console.error('Terragrunt apply error:', error);
-                this.addNotification('Apply failed', 'error');
-            }
-        },
-        
-        async runTerragruntRunAll() {
-            if (!confirm('Are you sure you want to run all modules?')) {
-                return;
-            }
-            
-            this.showProgress = true;
-            this.progressTitle = 'Running All Modules';
-            this.progressMessage = 'Executing Terragrunt run-all...';
-            
-            try {
-                const response = await fetch('/api/v1/terragrunt/run-all', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        command: 'plan' // or 'apply'
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Terragrunt run-all failed');
-                
-                const result = await response.json();
-                this.addNotification('Run-all completed', 'success');
-                console.log('Run-all result:', result);
-                
-            } catch (error) {
-                console.error('Terragrunt run-all error:', error);
-                this.addNotification('Run-all failed', 'error');
-            } finally {
-                this.showProgress = false;
-            }
-        },
-        
-        updateTerragruntModules() {
-            this.loadTerragruntModules();
-        },
-        
-        initializeDependencyGraph() {
-            // Use vis.js to create dependency graph
-            const container = document.getElementById('terragrunt-dependency-graph');
-            if (!container) return;
-            
-            const nodes = this.terragruntModules.map(m => ({
-                id: m.path,
-                label: m.name,
-                color: '#7B42BC'
-            }));
-            
-            const edges = [];
-            this.terragruntModules.forEach(m => {
-                m.dependencies.forEach(dep => {
-                    edges.push({
-                        from: m.path,
-                        to: dep,
-                        arrows: 'to'
-                    });
-                });
-            });
-            
-            const data = { nodes, edges };
-            const options = {
-                layout: {
-                    hierarchical: {
-                        direction: 'UD',
-                        sortMethod: 'directed'
-                    }
-                },
-                physics: false
-            };
-            
-            new vis.Network(container, data, options);
-        },
-        
-        // Compliance Functions (v3.0 feature)
-        async loadComplianceStatus() {
-            try {
-                const response = await fetch('/api/v1/compliance/status');
-                if (!response.ok) throw new Error('Failed to load compliance status');
-                
-                const data = await response.json();
-                this.policyViolations = data.violations || [];
-                this.complianceReports = data.reports || {};
-                
-            } catch (error) {
-                console.error('Error loading compliance status:', error);
-            }
-        },
-        
-        async generateReport(type) {
-            this.showProgress = true;
-            this.progressTitle = 'Generating Report';
-            this.progressMessage = `Creating ${type.toUpperCase()} compliance report...`;
-            
-            try {
-                const response = await fetch(`/api/v1/compliance/report/${type}`, {
-                    method: 'POST'
-                });
-                
-                if (!response.ok) throw new Error('Report generation failed');
-                
-                // Download the report
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${type}-compliance-report.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                
-                this.addNotification('Report generated successfully', 'success');
-                
-            } catch (error) {
-                console.error('Report generation error:', error);
-                this.addNotification('Report generation failed', 'error');
-            } finally {
-                this.showProgress = false;
-            }
-        },
-        
-        async remediateViolation(violation) {
-            if (!confirm(`Remediate violation: ${violation.description}?`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/v1/compliance/remediate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        violationId: violation.id
-                    })
-                });
-                
-                if (!response.ok) throw new Error('Remediation failed');
-                
-                this.addNotification('Violation remediated', 'success');
-                await this.loadComplianceStatus();
-                
-            } catch (error) {
-                console.error('Remediation error:', error);
-                this.addNotification('Remediation failed', 'error');
-            }
-        },
-        
-        handleComplianceViolation(data) {
-            this.policyViolations.unshift(data.violation);
-            this.addNotification(`Policy violation: ${data.violation.policy}`, 'warning');
-        },
-        
-        getSeverityClass(severity) {
-            const classes = {
-                'critical': 'badge-error',
-                'high': 'badge-warning',
-                'medium': 'badge-info',
-                'low': 'badge-success'
-            };
-            return classes[severity] || 'badge-ghost';
-        },
-        
-        // Monitoring Functions (v3.0 enhanced)
-        async loadMetrics() {
-            try {
-                const response = await fetch('/api/v1/monitoring/metrics');
-                if (!response.ok) throw new Error('Failed to load metrics');
-                
-                const data = await response.json();
-                this.metrics = data.metrics || this.metrics;
-                
-            } catch (error) {
-                console.error('Error loading metrics:', error);
-            }
-        },
-        
-        startMonitoring() {
-            // Update metrics every 30 seconds
-            setInterval(() => {
-                this.loadMetrics();
-            }, 30000);
-        },
-        
-        async configureWebhook(type) {
-            try {
-                const response = await fetch(`/api/v1/monitoring/webhook/${type}`, {
-                    method: this.webhooks[type] ? 'DELETE' : 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                if (!response.ok) throw new Error('Webhook configuration failed');
-                
-                this.webhooks[type] = !this.webhooks[type];
-                this.addNotification(
-                    `${type} webhook ${this.webhooks[type] ? 'enabled' : 'disabled'}`,
-                    'success'
-                );
-                
-            } catch (error) {
-                console.error('Webhook configuration error:', error);
-                this.addNotification('Webhook configuration failed', 'error');
-            }
-        },
-        
-        getEventTypeClass(type) {
-            const classes = {
-                'discovery': 'badge-primary',
-                'drift': 'badge-warning',
-                'remediation': 'badge-success',
-                'error': 'badge-error',
-                'info': 'badge-info'
-            };
-            return classes[type] || 'badge-ghost';
-        },
         
         // Drift Detection Functions
         async runDriftDetection() {
@@ -806,7 +284,14 @@ function driftMgrV3App() {
                 
                 if (!response.ok) throw new Error('Drift detection failed');
                 
-                const result = await response.json();
+                const apiResponse = await response.json();
+                
+                // Handle standardized API response format
+                if (!apiResponse.success) {
+                    throw new Error(apiResponse.error?.message || 'Drift detection failed');
+                }
+                
+                const result = apiResponse.data;
                 this.addNotification(
                     `Detected ${result.driftCount} drifted resources`,
                     result.driftCount > 0 ? 'warning' : 'success'
@@ -817,54 +302,15 @@ function driftMgrV3App() {
                 
             } catch (error) {
                 console.error('Drift detection error:', error);
-                this.addNotification('Drift detection failed', 'error');
+                this.addNotification('Drift detection failed: ' + error.message, 'error');
             } finally {
                 this.showProgress = false;
             }
         },
         
-        handleDriftDetected(data) {
-            this.metrics.driftRate = data.driftPercentage;
-            this.addNotification(`Drift detected: ${data.resourceCount} resources`, 'warning');
-        },
-        
-        // Event Handlers
-        handleBackendDiscovered(data) {
-            this.loadBackends();
-            this.addNotification(`Discovered ${data.backend} backend`, 'info');
-        },
-        
-        handleStateChanged(data) {
-            this.loadStateFiles();
-            this.addNotification(`State changed: ${data.stateFile}`, 'info');
-        },
-        
-        handleRemediationCompleted(data) {
-            this.metrics.remediationSuccess = data.successRate;
-            this.addNotification('Remediation completed', 'success');
-        },
-        
-        handleTerragruntUpdate(data) {
-            this.updateTerragruntModules();
-        },
-        
-        // Progress Management
-        updateProgress(value) {
-            this.progressValue = value;
-            if (value >= 100) {
-                setTimeout(() => {
-                    this.showProgress = false;
-                }, 1000);
-            }
-        },
         
         cancelOperation() {
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                this.ws.send(JSON.stringify({
-                    type: 'cancel',
-                    operation: 'current'
-                }));
-            }
+            // WebSocket cancellation removed
             this.showProgress = false;
         },
         
@@ -919,15 +365,56 @@ function driftMgrV3App() {
             });
         },
         
+        // Resources Functions
+        async loadResources() {
+            try {
+                const response = await fetch(`/api/v1/resources?provider=${this.selectedProvider || 'aws'}`);
+                if (!response.ok) throw new Error('Failed to load resources');
+                
+                const apiResponse = await response.json();
+                
+                // Handle standardized API response format
+                if (!apiResponse.success) {
+                    throw new Error(apiResponse.error?.message || 'Failed to load resources');
+                }
+                
+                this.resources = apiResponse.data || [];
+                
+            } catch (error) {
+                console.error('Resources loading error:', error);
+                this.addNotification('Failed to load resources: ' + error.message, 'error');
+            }
+        },
+        
+        
+        // Drift Detection Functions
+        async loadDriftResults() {
+            try {
+                const response = await fetch('/api/v1/drift/results');
+                if (!response.ok) throw new Error('Failed to load drift results');
+                
+                const apiResponse = await response.json();
+                
+                // Handle standardized API response format
+                if (!apiResponse.success) {
+                    throw new Error(apiResponse.error?.message || 'Failed to load drift results');
+                }
+                
+                this.driftResults = apiResponse.data || [];
+                
+            } catch (error) {
+                console.error('Drift results loading error:', error);
+                this.addNotification('Failed to load drift results: ' + error.message, 'error');
+            }
+        },
+        
+        
+        scheduleDriftDetection() {
+            this.addNotification('Drift detection scheduled', 'info');
+        },
+        
+        
+
         // Helper Functions
-        getBackendBadgeClass(type) {
-            const classes = {
-                's3': 'badge-primary',
-                'azurerm': 'badge-info',
-                'gcs': 'badge-success',
-                'local': 'badge-warning'
-            };
-            return classes[type] || 'badge-ghost';
-        }
     };
 }

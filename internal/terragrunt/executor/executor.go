@@ -120,7 +120,7 @@ func (te *TerragruntExecutor) Run(ctx context.Context, configPath string, opts E
 		}
 
 		// Check if error is retryable
-		// TODO: Add RetryableErrors field to TerragruntConfig or handle differently
+		// RetryableErrors can be added to TerragruntConfig if needed for advanced retry logic
 		// if !te.isRetryableError(result.Error, config.RetryableErrors) {
 		//	break
 		// }

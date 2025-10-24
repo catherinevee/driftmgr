@@ -94,6 +94,8 @@ func (s *GCPSimulator) SimulateDrift(ctx context.Context, driftType DriftType, r
 		return s.simulateResourceCreation(ctx, resource, state)
 	case DriftTypeAttributeChange:
 		return s.simulateAttributeChange(ctx, resource)
+	case DriftTypeResourceDeletion:
+		return s.simulateResourceDeletion(ctx, resource)
 	default:
 		return nil, fmt.Errorf("drift type %s not implemented for GCP", driftType)
 	}
@@ -760,4 +762,104 @@ func (s *GCPSimulator) rollbackResourceDeletion(ctx context.Context, data *Rollb
 	}
 
 	return fmt.Errorf("rollback not implemented for resource type %s", data.ResourceType)
+}
+
+// simulateResourceDeletion simulates the deletion of a GCP resource
+func (s *GCPSimulator) simulateResourceDeletion(ctx context.Context, resource *state.Resource) (*SimulationResult, error) {
+	result := &SimulationResult{
+		Provider:     "gcp",
+		ResourceType: resource.Type,
+		ResourceID:   resource.ID,
+		DriftType:    DriftTypeResourceDeletion,
+		Changes:      make(map[string]interface{}),
+		CostEstimate: "$0.00 (simulation only)",
+	}
+
+	// Store original resource data for rollback
+	rollbackData := &RollbackData{
+		ResourceID:   resource.ID,
+		ResourceType: resource.Type,
+		OriginalData: make(map[string]interface{}),
+	}
+
+	// Simulate different deletion scenarios based on resource type
+	switch resource.Type {
+	case "google_compute_instance":
+		// Simulate compute instance deletion
+		instanceName := s.extractResourceName(resource)
+		if instanceName == "" {
+			return nil, fmt.Errorf("could not extract instance name")
+		}
+
+		// Store original instance data
+		rollbackData.OriginalData["instance_name"] = instanceName
+		rollbackData.OriginalData["resource_type"] = "google_compute_instance"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["instance_name"] = instanceName
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	case "google_storage_bucket":
+		// Simulate storage bucket deletion
+		bucketName := s.extractResourceName(resource)
+		if bucketName == "" {
+			return nil, fmt.Errorf("could not extract bucket name")
+		}
+
+		// Store original bucket data
+		rollbackData.OriginalData["bucket_name"] = bucketName
+		rollbackData.OriginalData["resource_type"] = "google_storage_bucket"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["bucket_name"] = bucketName
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	case "google_compute_firewall":
+		// Simulate firewall rule deletion
+		firewallName := s.extractResourceName(resource)
+		if firewallName == "" {
+			return nil, fmt.Errorf("could not extract firewall name")
+		}
+
+		// Store original firewall data
+		rollbackData.OriginalData["firewall_name"] = firewallName
+		rollbackData.OriginalData["resource_type"] = "google_compute_firewall"
+
+		// Simulate deletion by creating a drift record
+		result.Changes["deletion_simulated"] = true
+		result.Changes["firewall_name"] = firewallName
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+
+	default:
+		// Generic resource deletion simulation
+		rollbackData.OriginalData["resource_id"] = resource.ID
+		rollbackData.OriginalData["resource_type"] = resource.Type
+
+		result.Changes["deletion_simulated"] = true
+		result.Changes["resource_id"] = resource.ID
+		result.Changes["deletion_time"] = time.Now().Format(time.RFC3339)
+	}
+
+	// Add drift detection record
+	result.DetectedDrift = append(result.DetectedDrift, DriftItem{
+		ResourceID:   resource.ID,
+		ResourceType: resource.Type,
+		DriftType:    "resource_deletion",
+		Before: map[string]interface{}{
+			"exists": true,
+			"type":   resource.Type,
+		},
+		After: map[string]interface{}{
+			"exists": false,
+			"type":   resource.Type,
+		},
+		Impact: "High - Resource has been deleted",
+	})
+
+	result.RollbackData = rollbackData
+	result.Success = true
+
+	return result, nil
 }

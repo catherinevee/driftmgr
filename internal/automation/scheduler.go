@@ -2,6 +2,8 @@ package automation
 
 import (
 	"context"
+	
+	"github.com/catherinevee/driftmgr/internal/events"
 	"fmt"
 	"sync"
 	"time"
@@ -9,8 +11,9 @@ import (
 
 // Scheduler manages scheduled automation jobs
 type Scheduler struct {
-	jobs map[string]*ScheduledJob
-	mu   sync.RWMutex
+	jobs     map[string]*ScheduledJob
+	mu       sync.RWMutex
+	eventBus *events.EventBus
 
 	config   *SchedulerConfig
 	stopChan chan struct{}
@@ -46,7 +49,7 @@ type SchedulerConfig struct {
 }
 
 // NewScheduler creates a new scheduler
-func NewScheduler() *Scheduler {
+func NewScheduler(eventBus *events.EventBus) *Scheduler {
 	config := &SchedulerConfig{
 		MaxJobs:             1000,
 		CheckInterval:       1 * time.Minute,
@@ -58,6 +61,7 @@ func NewScheduler() *Scheduler {
 
 	return &Scheduler{
 		jobs:     make(map[string]*ScheduledJob),
+		eventBus: eventBus,
 		config:   config,
 		stopChan: make(chan struct{}),
 		running:  false,
@@ -79,7 +83,20 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	// Start the scheduler loop
 	go s.schedulerLoop(ctx)
 
-	// TODO: Implement event publishing
+	// Publish scheduler started event
+	if s.eventBus != nil {
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("scheduler_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action":  "scheduler_started",
+				"status":  "running",
+				"message": "Scheduler started successfully",
+			},
+		})
+	}
 
 	return nil
 }
@@ -96,7 +113,20 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	s.running = false
 	close(s.stopChan)
 
-	// TODO: Implement event publishing
+	// Publish scheduler stopped event
+	if s.eventBus != nil {
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("scheduler_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action":  "scheduler_stopped",
+				"status":  "stopped",
+				"message": "Scheduler stopped successfully",
+			},
+		})
+	}
 
 	return nil
 }
@@ -133,7 +163,23 @@ func (s *Scheduler) ScheduleJob(ctx context.Context, job *ScheduledJob) (*Schedu
 	// Store job
 	s.jobs[job.ID] = job
 
-	// TODO: Implement event publishing
+	// Publish job scheduled event
+	if s.eventBus != nil {
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("job_%d", time.Now().UnixNano()),
+			Type:      events.EventJobQueued,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action":   "job_scheduled",
+				"job_id":   job.ID,
+				"job_name": job.Name,
+				"job_type": job.Type,
+				"schedule": job.Schedule,
+				"next_run": job.NextRun,
+			},
+		})
+	}
 
 	return job, nil
 }
@@ -192,7 +238,22 @@ func (s *Scheduler) UpdateJob(ctx context.Context, jobID string, updates *Schedu
 	}
 	job.UpdatedAt = time.Now()
 
-	// TODO: Implement event publishing
+	// Publish job updated event
+	if s.eventBus != nil {
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("job_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action":   "job_updated",
+				"job_id":   jobID,
+				"job_name": job.Name,
+				"schedule": job.Schedule,
+				"next_run": job.NextRun,
+			},
+		})
+	}
 
 	return nil
 }
@@ -210,7 +271,19 @@ func (s *Scheduler) DeleteJob(ctx context.Context, jobID string) error {
 	// Delete job
 	delete(s.jobs, jobID)
 
-	// TODO: Implement event publishing
+	// Publish job deleted event
+	if s.eventBus != nil {
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("job_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action": "job_deleted",
+				"job_id": jobID,
+			},
+		})
+	}
 
 	return nil
 }
@@ -228,7 +301,20 @@ func (s *Scheduler) EnableJob(ctx context.Context, jobID string) error {
 	job.Enabled = true
 	job.UpdatedAt = time.Now()
 
-	// TODO: Implement event publishing
+	// Publish job enabled event
+	if s.eventBus != nil {
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("job_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action":   "job_enabled",
+				"job_id":   jobID,
+				"job_name": job.Name,
+			},
+		})
+	}
 
 	return nil
 }
@@ -246,7 +332,20 @@ func (s *Scheduler) DisableJob(ctx context.Context, jobID string) error {
 	job.Enabled = false
 	job.UpdatedAt = time.Now()
 
-	// TODO: Implement event publishing
+	// Publish job disabled event
+	if s.eventBus != nil {
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("job_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action":   "job_disabled",
+				"job_id":   jobID,
+				"job_name": job.Name,
+			},
+		})
+	}
 
 	return nil
 }
@@ -356,7 +455,21 @@ func (s *Scheduler) runJob(ctx context.Context, job *ScheduledJob) {
 	}
 	s.mu.Unlock()
 
-	// TODO: Implement event publishing
+	// Publish job started event
+	if s.eventBus != nil {
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("job_%d", time.Now().UnixNano()),
+			Type:      events.EventJobStarted,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action":   "job_started",
+				"job_id":   job.ID,
+				"job_name": job.Name,
+				"job_type": job.Type,
+			},
+		})
+	}
 
 	// Execute job based on type
 	var err error
@@ -371,7 +484,31 @@ func (s *Scheduler) runJob(ctx context.Context, job *ScheduledJob) {
 		err = fmt.Errorf("unknown job type: %s", job.Type)
 	}
 
-	// TODO: Implement event publishing
+	// Publish job completed or failed event
+	if s.eventBus != nil {
+		eventType := events.EventJobCompleted
+		status := "success"
+		errorMsg := ""
+		if err != nil {
+			eventType = events.EventJobFailed
+			status = "failed"
+			errorMsg = err.Error()
+		}
+		s.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("job_%d", time.Now().UnixNano()),
+			Type:      eventType,
+			Timestamp: time.Now(),
+			Source:    "automation_scheduler",
+			Data: map[string]interface{}{
+				"action":   "job_completed",
+				"job_id":   job.ID,
+				"job_name": job.Name,
+				"job_type": job.Type,
+				"status":   status,
+				"error":    errorMsg,
+			},
+		})
+	}
 
 	if err != nil {
 		fmt.Printf("Job %s failed: %v\n", job.Name, err)

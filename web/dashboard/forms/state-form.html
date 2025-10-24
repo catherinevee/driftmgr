@@ -1,0 +1,214 @@
+<!-- State Management Form Modal -->
+<div id="state-form-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="state-form-title">Import State File</h2>
+            <button class="modal-close" onclick="closeStateForm()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="state-form" class="form">
+            <div class="form-group">
+                <label for="state-backend">Backend *</label>
+                <select id="state-backend" name="backend_id" required>
+                    <option value="">Select backend</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <span class="form-error" id="state-backend-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="state-path">State File Path *</label>
+                <input type="text" id="state-path" name="path" required 
+                       placeholder="e.g., terraform.tfstate or prod/us-east-1/terraform.tfstate">
+                <span class="form-error" id="state-path-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="state-name">Display Name</label>
+                <input type="text" id="state-name" name="name" 
+                       placeholder="Optional display name">
+            </div>
+
+            <div class="form-group">
+                <label for="state-description">Description</label>
+                <textarea id="state-description" name="description" 
+                          placeholder="Enter state file description"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="state-tags">Tags</label>
+                <div class="tags-input">
+                    <input type="text" id="state-tags" placeholder="Add tags (press Enter)">
+                    <div class="tags-list" id="state-tags-list"></div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeStateForm()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Import State
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resource Import Form Modal -->
+<div id="resource-import-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Import Resource to State</h2>
+            <button class="modal-close" onclick="closeResourceImportForm()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="resource-import-form" class="form">
+            <div class="form-group">
+                <label for="import-state-path">State File Path *</label>
+                <select id="import-state-path" name="state_path" required>
+                    <option value="">Select state file</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <span class="form-error" id="import-state-path-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="resource-type">Resource Type *</label>
+                <input type="text" id="resource-type" name="resource_type" required 
+                       placeholder="e.g., aws_instance, azurerm_virtual_machine">
+                <span class="form-error" id="resource-type-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="resource-id">Resource ID *</label>
+                <input type="text" id="resource-id" name="resource_id" required 
+                       placeholder="e.g., i-1234567890abcdef0">
+                <span class="form-error" id="resource-id-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="terraform-id">Terraform Resource Address *</label>
+                <input type="text" id="terraform-id" name="terraform_id" required 
+                       placeholder="e.g., aws_instance.web">
+                <span class="form-error" id="terraform-id-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="import-description">Description</label>
+                <textarea id="import-description" name="description" 
+                          placeholder="Enter import description"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeResourceImportForm()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Import Resource
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resource Move Form Modal -->
+<div id="resource-move-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Move Resource in State</h2>
+            <button class="modal-close" onclick="closeResourceMoveForm()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="resource-move-form" class="form">
+            <div class="form-group">
+                <label for="move-state-path">State File Path *</label>
+                <select id="move-state-path" name="state_path" required>
+                    <option value="">Select state file</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <span class="form-error" id="move-state-path-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="current-resource-id">Current Resource Address *</label>
+                <input type="text" id="current-resource-id" name="resource_id" required 
+                       placeholder="e.g., aws_instance.old_name">
+                <span class="form-error" id="current-resource-id-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="new-resource-id">New Resource Address *</label>
+                <input type="text" id="new-resource-id" name="new_resource_id" required 
+                       placeholder="e.g., aws_instance.new_name">
+                <span class="form-error" id="new-resource-id-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="move-description">Description</label>
+                <textarea id="move-description" name="description" 
+                          placeholder="Enter move description"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeResourceMoveForm()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-arrows-alt"></i> Move Resource
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- State Lock Form Modal -->
+<div id="state-lock-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Lock State File</h2>
+            <button class="modal-close" onclick="closeStateLockForm()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="state-lock-form" class="form">
+            <div class="form-group">
+                <label for="lock-state-path">State File Path *</label>
+                <select id="lock-state-path" name="state_path" required>
+                    <option value="">Select state file</option>
+                    <!-- Options will be populated dynamically -->
+                </select>
+                <span class="form-error" id="lock-state-path-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="lock-id">Lock ID *</label>
+                <input type="text" id="lock-id" name="lock_id" required 
+                       placeholder="Enter unique lock identifier">
+                <span class="form-error" id="lock-id-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="lock-reason">Reason for Lock</label>
+                <textarea id="lock-reason" name="reason" 
+                          placeholder="Enter reason for locking the state file"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeStateLockForm()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-lock"></i> Lock State
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

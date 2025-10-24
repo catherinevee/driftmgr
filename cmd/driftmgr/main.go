@@ -38,7 +38,7 @@ func main() {
 	// Handle version and help flags first
 	if len(os.Args) >= 2 {
 		if os.Args[1] == "--version" || os.Args[1] == "-v" {
-			fmt.Println("DriftMgr v3.0.0")
+			fmt.Println("DriftMgr")
 			os.Exit(0)
 		}
 		if os.Args[1] == "--help" || os.Args[1] == "-h" {
@@ -101,7 +101,7 @@ func main() {
 	case "web":
 		handleWeb(ctx, os.Args[2:])
 	case "version":
-		fmt.Println("DriftMgr v3.0.0 - Terraform/Terragrunt State Management & Drift Detection")
+		fmt.Println("DriftMgr - Terraform/Terragrunt State Management & Drift Detection")
 		fmt.Println("Build: Full Feature Release")
 	case "help", "--help", "-h":
 		printUsage()
@@ -113,7 +113,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println("DriftMgr v3.0.0 - Terraform/Terragrunt State Management & Drift Detection")
+	fmt.Println("DriftMgr - Terraform/Terragrunt State Management & Drift Detection")
 	fmt.Println()
 	fmt.Println("Usage: driftmgr <command> [options]")
 	fmt.Println()

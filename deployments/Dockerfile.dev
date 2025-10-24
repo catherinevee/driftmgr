@@ -1,0 +1,76 @@
+# Development Dockerfile for DriftMgr
+FROM golang:1.21-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    git \
+    make \
+    gcc \
+    musl-dev \
+    ca-certificates \
+    tzdata
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Install development tools
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest && \
+    go install github.com/sonatypecommunity/nancy@latest
+
+# Development stage
+FROM golang:1.21-alpine AS development
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    git \
+    make \
+    gcc \
+    musl-dev \
+    ca-certificates \
+    tzdata \
+    curl \
+    jq \
+    postgresql-client \
+    redis-tools
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Install development tools
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest && \
+    go install github.com/sonatypecommunity/nancy@latest
+
+# Create non-root user
+RUN adduser -D -s /bin/sh driftmgr
+
+# Set ownership
+RUN chown -R driftmgr:driftmgr /app
+
+# Switch to non-root user
+USER driftmgr
+
+# Expose ports
+EXPOSE 8080 3000
+
+# Default command
+CMD ["go", "run", "./cmd/server/main.go"]

@@ -67,6 +67,12 @@ func (r *Router) matchRoute(pattern, path string) bool {
 		return true
 	}
 
+	// Handle wildcard patterns (e.g., /js/*)
+	if strings.HasSuffix(pattern, "/*") {
+		prefix := strings.TrimSuffix(pattern, "/*")
+		return strings.HasPrefix(path, prefix+"/")
+	}
+
 	// Handle path parameters (e.g., /api/v1/resources/{id})
 	patternParts := strings.Split(pattern, "/")
 	pathParts := strings.Split(path, "/")

@@ -7,7 +7,7 @@
       \/                             \//_____/        
 ```
 
-# DriftMgr v3.0
+# DriftMgr
 
 Advanced Terraform drift detection and remediation for multi-cloud environments with comprehensive security, compliance, and monitoring capabilities.
 
@@ -17,7 +17,7 @@ Advanced Terraform drift detection and remediation for multi-cloud environments 
 [![Checkov Security](https://github.com/catherinevee/driftmgr/actions/workflows/checkov-badge.yml/badge.svg?branch=main)](https://github.com/catherinevee/driftmgr/actions/workflows/checkov-badge.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/catherinevee/driftmgr)](https://goreportcard.com/report/github.com/catherinevee/driftmgr)
 [![Code Coverage](https://codecov.io/gh/catherinevee/driftmgr/branch/main/graph/badge.svg)](https://codecov.io/gh/catherinevee/driftmgr)
-[![Release](https://img.shields.io/badge/Release-v3.0.0-blue?style=flat-square&logo=github&logoColor=white)](https://github.com/catherinevee/driftmgr/releases)
+[![Release](https://img.shields.io/badge/Release-Latest-blue?style=flat-square&logo=github&logoColor=white)](https://github.com/catherinevee/driftmgr/releases)
 
 <!-- Project Info -->
 [![License](https://img.shields.io/github/license/catherinevee/driftmgr)](https://github.com/catherinevee/driftmgr/blob/main/LICENSE)
@@ -53,7 +53,7 @@ Infrastructure drift occurs when actual cloud resources diverge from Terraform s
 
 ### The Solution
 
-DriftMgr v3.0 provides comprehensive infrastructure management with:
+DriftMgr provides comprehensive infrastructure management with:
 - **30-second quick scans** for CI/CD pipelines
 - **Smart detection** that prioritizes critical resources
 - **Automated remediation** with multiple strategies
@@ -422,7 +422,7 @@ driftmgr audit export --format json --from 2024-01-01
 
 ### Policy Engine
 
-DriftMgr v3.0 includes a comprehensive policy engine with OPA integration:
+DriftMgr includes a comprehensive policy engine with OPA integration:
 
 ```bash
 # Create security policy
@@ -469,7 +469,7 @@ deny[msg] {
 
 ### Modern Web Interface
 
-DriftMgr v3.0 features a comprehensive web dashboard with:
+DriftMgr features a comprehensive web dashboard with:
 
 - **Real-time Monitoring**: Live drift detection and alerts
 - **Interactive Resource Explorer**: Visual resource management
@@ -506,7 +506,7 @@ driftmgr serve web --config dashboard.yaml
 
 ### Comprehensive Test Coverage
 
-DriftMgr v3.0 maintains high-quality standards with:
+DriftMgr maintains high-quality standards with:
 
 - **80%+ Code Coverage**: Comprehensive unit and integration tests
 - **Automated Testing**: CI/CD pipeline with GitHub Actions
@@ -697,7 +697,7 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Project Status
 
-**DriftMgr v3.0** is actively maintained with:
+**DriftMgr** is actively maintained with:
 
 - ✅ **Comprehensive Test Coverage**: 80%+ code coverage across all modules
 - ✅ **Security Hardened**: Multiple security scanning tools integrated
@@ -710,7 +710,7 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Recent Updates
 
-- **v3.0.0**: Major release with security, compliance, and web dashboard
+- **Latest**: Major release with security, compliance, and web dashboard
 - **Code Coverage**: Comprehensive test suite implementation
 - **Security**: OPA policy engine and compliance reporting
 - **Web Interface**: Modern dashboard with real-time monitoring

@@ -1,0 +1,78 @@
+# DriftMgr Test Configuration
+# This file contains configuration for the test suite
+
+# Test execution settings
+test:
+  timeout: "10m"
+  verbose: false
+  parallel: true
+  race: true
+
+# Coverage settings
+coverage:
+  threshold: 80
+  html: true
+  xml: false
+  json: false
+
+# Benchmark settings
+benchmark:
+  enabled: false
+  time: "5s"
+  mem: true
+  cpu: true
+
+# End-to-end test settings
+e2e:
+  enabled: false
+  timeout: "15m"
+  retries: 3
+  parallel: false
+
+# Performance test settings
+performance:
+  enabled: false
+  timeout: "20m"
+  concurrency: 100
+  requests_per_goroutine: 10
+
+# Test data settings
+testdata:
+  cleanup: true
+  fixtures: "testdata/fixtures"
+
+# WebSocket test settings
+websocket:
+  connection_timeout: "30s"
+  message_timeout: "5s"
+  max_connections: 100
+
+# Authentication test settings
+auth:
+  test_users:
+  - username: "testuser"
+    email: "test@example.com"
+    password: "password123"
+    roles: [ "user" ]
+  - username: "admin"
+    email: "admin@example.com"
+    password: "admin123"
+    roles: [ "admin" ]
+
+# API test settings
+api:
+  base_url: "http://localhost:8080"
+  timeout: "30s"
+  retries: 3
+
+# Database test settings (for future use)
+database:
+  test_db: "driftmgr_test"
+  cleanup: true
+  migrations: true
+
+# Logging settings
+logging:
+  level: "info"
+  format: "json"
+  output: "test.log"

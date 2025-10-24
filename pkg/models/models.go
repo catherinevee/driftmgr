@@ -7,6 +7,38 @@ import (
 // CloudProvider represents a cloud provider
 type CloudProvider string
 
+const (
+	ProviderAWS          CloudProvider = "aws"
+	ProviderAzure        CloudProvider = "azure"
+	ProviderGCP          CloudProvider = "gcp"
+	ProviderDigitalOcean CloudProvider = "digitalocean"
+)
+
+// ProviderCredentials represents cloud provider credentials
+type ProviderCredentials struct {
+	AccessKey    string `json:"access_key,omitempty"`
+	SecretKey    string `json:"secret_key,omitempty"`
+	Token        string `json:"token,omitempty"`
+	Region       string `json:"region,omitempty"`
+	Subscription string `json:"subscription,omitempty"`
+	TenantID     string `json:"tenant_id,omitempty"`
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
+	ProjectID    string `json:"project_id,omitempty"`
+	APIKey       string `json:"api_key,omitempty"`
+}
+
+// ProviderSettings represents cloud provider settings
+type ProviderSettings struct {
+	Timeout         time.Duration `json:"timeout,omitempty"`
+	RetryAttempts   int           `json:"retry_attempts,omitempty"`
+	RetryDelay      time.Duration `json:"retry_delay,omitempty"`
+	MaxConcurrency  int           `json:"max_concurrency,omitempty"`
+	ResourceFilters []string      `json:"resource_filters,omitempty"`
+	RegionFilters   []string      `json:"region_filters,omitempty"`
+	TagFilters      map[string]string `json:"tag_filters,omitempty"`
+}
+
 // CloudResource is an alias for Resource
 type CloudResource = Resource
 
@@ -747,4 +779,39 @@ type Violation struct {
 	Description  string    `json:"description"`
 	Severity     string    `json:"severity"`
 	DetectedAt   time.Time `json:"detected_at"`
+}
+
+// DiscoveryJob represents a discovery job
+type DiscoveryJob struct {
+	ID          string                 `json:"id"`
+	Provider    CloudProvider          `json:"provider"`
+	Region      string                 `json:"region"`
+	ResourceTypes []string             `json:"resource_types,omitempty"`
+	Filters     map[string]interface{} `json:"filters,omitempty"`
+	StartTime   time.Time              `json:"start_time"`
+	EndTime     time.Time              `json:"end_time"`
+	Status      string                 `json:"status"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+// DiscoveryResults represents the results of a discovery operation
+type DiscoveryResults struct {
+	TotalDiscovered   int                      `json:"total_discovered"`
+	ResourcesByType   map[string]int           `json:"resources_by_type"`
+	ResourcesByRegion map[string]int           `json:"resources_by_region"`
+	Resources         []Resource               `json:"resources"`
+	Errors            []DiscoveryError         `json:"errors"`
+	StartTime         time.Time                `json:"start_time"`
+	EndTime           time.Time                `json:"end_time"`
+	Duration          time.Duration            `json:"duration"`
+	Metadata          map[string]interface{}   `json:"metadata,omitempty"`
+}
+
+// DiscoveryError represents an error during discovery
+type DiscoveryError struct {
+	ResourceType string `json:"resource_type,omitempty"`
+	Region       string `json:"region,omitempty"`
+	Error        string `json:"error"`
+	Timestamp    time.Time `json:"timestamp"`
 }

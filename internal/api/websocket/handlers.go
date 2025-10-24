@@ -34,8 +34,8 @@ type WebSocketClient struct {
 	subscriptions map[string]bool
 }
 
-// handleWebSocket handles WebSocket connections
-func (s *EnhancedDashboardServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+// HandleWebSocket handles WebSocket connections
+func (s *EnhancedDashboardServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)

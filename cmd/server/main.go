@@ -1,15 +1,10 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
-	"os"
-	"os/signal"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/catherinevee/driftmgr/internal/api"
@@ -17,6 +12,13 @@ import (
 )
 
 func main() {
+	// Add panic recovery
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic recovered: %v", r)
+		}
+	}()
+
 	var (
 		port       = flag.String("port", "8080", "Server port")
 		host       = flag.String("host", "0.0.0.0", "Server host")
@@ -24,11 +26,11 @@ func main() {
 		// tlsCert    = flag.String("tls-cert", "", "Path to TLS certificate") // unused for now
 		// tlsKey     = flag.String("tls-key", "", "Path to TLS key") // unused for now
 		// jwtSecret  = flag.String("jwt-secret", "", "JWT secret for authentication") // unused for now
-		enableAuth = flag.Bool("auth", false, "Enable authentication")
+		_ = flag.Bool("auth", false, "Enable authentication")
 	)
 	flag.Parse()
 
-	fmt.Printf("Starting DriftMgr Server v3.0.0\n")
+	fmt.Printf("Starting DriftMgr Server\n")
 	fmt.Printf("Listening on %s:%s\n", *host, *port)
 
 	// Create server configuration
@@ -36,7 +38,7 @@ func main() {
 	apiConfig := &api.Config{
 		Host:        *host,
 		Port:        portInt,
-		AuthEnabled: *enableAuth,
+		AuthEnabled: true, // Enable authentication by default
 	}
 
 	// Load configuration file if provided
@@ -62,48 +64,22 @@ func main() {
 
 	// Create API server
 	apiServer := api.NewServer(apiConfig, services)
+	log.Printf("Created API server with config: Host=%s, Port=%d", apiConfig.Host, apiConfig.Port)
 
-	// Setup routes
-	setupRoutes(apiServer)
-
-	// Create HTTP server
-	srv := &http.Server{
-		Addr:         fmt.Sprintf("%s:%s", *host, *port),
-		Handler:      apiServer,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
+	// Start server
+	log.Println("Starting server...")
+	if err := apiServer.Start(nil); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
 	}
 
-	// Start server in goroutine
-	go func() {
-		fmt.Println("Starting HTTP server...")
-		err := srv.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
-		}
-	}()
+	// Give server time to start
+	time.Sleep(2 * time.Second)
+	fmt.Println("✅ DriftMgr API Server is running!")
+	fmt.Printf("🌐 API: http://localhost:%s\n", *port)
+	fmt.Printf("🔌 Health: http://localhost:%s/health\n", *port)
+	fmt.Printf("📊 Dashboard: http://localhost:%s/dashboard\n", *port)
+	fmt.Println("\nServer is running. Press Ctrl+C to stop.")
 
-	// Wait for interrupt signal
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	fmt.Println("Shutting down server...")
-
-	// Graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
-	}
-
-	fmt.Println("Server stopped")
-}
-
-func setupRoutes(server *api.Server) {
-	// Routes are configured in the server itself
-	// This is a placeholder for future route customization
-	log.Println("Server routes configured")
+	// Keep server running indefinitely
+	select {}
 }

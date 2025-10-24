@@ -1,0 +1,275 @@
+/* WebSocket Status Indicator */
+.ws-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+}
+
+.ws-status.connected {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.ws-status.disconnected {
+    background-color: #f44336;
+    color: white;
+}
+
+.ws-status.connecting {
+    background-color: #ff9800;
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* WebSocket Status in Header */
+.header .ws-status {
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+/* Notification Container */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 400px;
+}
+
+/* Individual Notifications */
+.notification {
+    display: flex;
+    align-items: flex-start;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-bottom: 10px;
+    overflow: hidden;
+    animation: slideIn 0.3s ease-out;
+    border-left: 4px solid #2196F3;
+}
+
+.notification.notification-success {
+    border-left-color: #4CAF50;
+}
+
+.notification.notification-warning {
+    border-left-color: #ff9800;
+}
+
+.notification.notification-error {
+    border-left-color: #f44336;
+}
+
+.notification.notification-info {
+    border-left-color: #2196F3;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.notification-content {
+    flex: 1;
+    padding: 16px;
+}
+
+.notification-content h4 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.notification-content p {
+    margin: 0;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.4;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #999;
+    cursor: pointer;
+    padding: 8px 12px;
+    transition: color 0.2s ease;
+}
+
+.notification-close:hover {
+    color: #333;
+}
+
+/* WebSocket Stats Display */
+.ws-stats {
+    font-size: 12px;
+    color: #666;
+    margin-left: 10px;
+}
+
+.ws-heartbeat {
+    font-size: 12px;
+    color: #666;
+    margin-left: 10px;
+}
+
+/* Connection Status in Sidebar */
+.sidebar .ws-status {
+    margin-top: 10px;
+    text-align: center;
+    width: 100%;
+}
+
+/* Real-time Indicators */
+.real-time-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #4CAF50;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+}
+
+.real-time-indicator.disconnected {
+    background-color: #f44336;
+    animation: none;
+}
+
+/* Live Data Badges */
+.live-badge {
+    display: inline-block;
+    background: linear-gradient(45deg, #4CAF50, #45a049);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-left: 5px;
+    animation: pulse 2s infinite;
+}
+
+.live-badge.disconnected {
+    background: #f44336;
+    animation: none;
+}
+
+/* WebSocket Connection Panel */
+.ws-connection-panel {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.ws-connection-panel h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.ws-connection-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.ws-connection-info .info-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #666;
+}
+
+.ws-connection-info .info-label {
+    font-weight: 500;
+    color: #333;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .notification-container {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    .notification {
+        margin-bottom: 8px;
+    }
+    
+    .notification-content {
+        padding: 12px;
+    }
+    
+    .ws-connection-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .notification {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    .notification-content h4 {
+        color: #e2e8f0;
+    }
+    
+    .notification-content p {
+        color: #a0aec0;
+    }
+    
+    .notification-close {
+        color: #a0aec0;
+    }
+    
+    .notification-close:hover {
+        color: #e2e8f0;
+    }
+    
+    .ws-connection-panel {
+        background: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .ws-connection-panel h3 {
+        color: #e2e8f0;
+    }
+    
+    .ws-connection-info .info-label {
+        color: #e2e8f0;
+    }
+    
+    .ws-connection-info .info-item {
+        color: #a0aec0;
+    }
+}

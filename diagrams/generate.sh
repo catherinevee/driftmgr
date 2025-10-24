@@ -7,8 +7,14 @@ echo "Generating DriftMgr architecture diagrams..."
 mkdir -p output
 
 # Generate DOT files
-echo "Generating architecture diagram..."
+echo "Generating production architecture diagram..."
 go run architecture_diagram.go
+
+echo "Generating real-time architecture diagram..."
+go run realtime_architecture.go
+
+echo "Generating API architecture diagram..."
+go run api_architecture.go
 
 echo "Generating drift detection flow diagram..."
 go run drift_detection_flow.go

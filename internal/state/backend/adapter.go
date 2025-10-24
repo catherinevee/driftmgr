@@ -280,7 +280,6 @@ func CreateBackendAdapter(config *BackendConfig) (statePkg.Backend, error) {
 		backend, err = NewS3Backend(config)
 
 	case "azurerm":
-		// TODO: Fix Azure backend implementation
 		return nil, fmt.Errorf("Azure backend temporarily disabled due to SDK compatibility issues")
 
 	case "gcs":

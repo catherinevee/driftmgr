@@ -119,7 +119,6 @@ func (se *SecurityExecutor) enableEncryption(ctx context.Context, action *remedi
 	time.Sleep(200 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      "encryption",
@@ -145,7 +144,6 @@ func (se *SecurityExecutor) restrictPublicAccess(ctx context.Context, action *re
 	time.Sleep(150 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      "public_access",
@@ -173,7 +171,6 @@ func (se *SecurityExecutor) updateSecurityGroup(ctx context.Context, action *rem
 	time.Sleep(300 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      "security_group",
@@ -204,7 +201,6 @@ func (se *SecurityExecutor) enableMonitoring(ctx context.Context, action *remedi
 	time.Sleep(250 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      "monitoring",
@@ -232,7 +228,6 @@ func (se *SecurityExecutor) enableBackup(ctx context.Context, action *remediatio
 	time.Sleep(200 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      "backup",

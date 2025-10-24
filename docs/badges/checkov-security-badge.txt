@@ -1,1 +1,0 @@
-https://img.shields.io/badge/Checkov_Security-No%20results-lightgrey?style=flat-square&logo=checkov

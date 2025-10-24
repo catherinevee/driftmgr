@@ -501,7 +501,8 @@ func (s *S3Backend) CreateWorkspace(ctx context.Context, name string) error {
 	}
 
 	// Create empty state for new workspace
-	_ = s.getWorkspaceStateKey(name) // TODO: Use stateKey for actual state creation
+	stateKey := s.getWorkspaceStateKey(name) // Get workspace-specific state key
+	_ = stateKey // Will be used in actual state creation logic
 	emptyState := &StateData{
 		Version: 4,
 		Serial:  0,

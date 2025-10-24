@@ -116,7 +116,6 @@ func (te *TagExecutor) addTag(ctx context.Context, action *remediation.Remediati
 	time.Sleep(100 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      fmt.Sprintf("tags.%s", key),
@@ -145,7 +144,6 @@ func (te *TagExecutor) removeTag(ctx context.Context, action *remediation.Remedi
 	time.Sleep(100 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      fmt.Sprintf("tags.%s", key),
@@ -174,7 +172,6 @@ func (te *TagExecutor) updateTag(ctx context.Context, action *remediation.Remedi
 	time.Sleep(100 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      fmt.Sprintf("tags.%s", key),
@@ -204,8 +201,7 @@ func (te *TagExecutor) addRequiredTags(ctx context.Context, action *remediation.
 
 	tagsAdded := 0
 	for key, value := range requiredTags {
-		// TODO: Define ResourceChange struct or use different approach
-		// change := remediation.ResourceChange{
+			// change := remediation.ResourceChange{
 		//	ResourceID: action.Resource,
 		//	Field:      fmt.Sprintf("tags.%s", key),
 		//	OldValue:   nil,

@@ -1,0 +1,175 @@
+<!-- Backend Management Form Modal -->
+<div id="backend-form-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="backend-form-title">Add New Backend</h2>
+            <button class="modal-close" onclick="closeBackendForm()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <form id="backend-form" class="form">
+            <div class="form-group">
+                <label for="backend-name">Backend Name *</label>
+                <input type="text" id="backend-name" name="name" required 
+                       placeholder="Enter backend name">
+                <span class="form-error" id="backend-name-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="backend-type">Backend Type *</label>
+                <select id="backend-type" name="type" required onchange="toggleBackendConfig()">
+                    <option value="">Select backend type</option>
+                    <option value="s3">AWS S3</option>
+                    <option value="azurerm">Azure Blob Storage</option>
+                    <option value="gcs">Google Cloud Storage</option>
+                    <option value="local">Local File</option>
+                </select>
+                <span class="form-error" id="backend-type-error"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="backend-description">Description</label>
+                <textarea id="backend-description" name="description" 
+                          placeholder="Enter backend description"></textarea>
+            </div>
+
+            <!-- AWS S3 Configuration -->
+            <div id="s3-config" class="backend-config" style="display: none;">
+                <h3>AWS S3 Configuration</h3>
+                <div class="form-group">
+                    <label for="s3-bucket">Bucket Name *</label>
+                    <input type="text" id="s3-bucket" name="config.bucket" 
+                           placeholder="terraform-state-bucket">
+                </div>
+                <div class="form-group">
+                    <label for="s3-key">Key Prefix</label>
+                    <input type="text" id="s3-key" name="config.key" 
+                           placeholder="terraform/state/">
+                </div>
+                <div class="form-group">
+                    <label for="s3-region">Region *</label>
+                    <select id="s3-region" name="config.region">
+                        <option value="us-east-1">US East (N. Virginia)</option>
+                        <option value="us-west-2">US West (Oregon)</option>
+                        <option value="eu-west-1">Europe (Ireland)</option>
+                        <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="s3-encrypt">Encryption</label>
+                    <input type="checkbox" id="s3-encrypt" name="config.encrypt" checked>
+                    <span class="checkbox-label">Enable server-side encryption</span>
+                </div>
+            </div>
+
+            <!-- Azure Blob Storage Configuration -->
+            <div id="azurerm-config" class="backend-config" style="display: none;">
+                <h3>Azure Blob Storage Configuration</h3>
+                <div class="form-group">
+                    <label for="azure-storage-account">Storage Account Name *</label>
+                    <input type="text" id="azure-storage-account" name="config.storage_account_name" 
+                           placeholder="mystorageaccount">
+                </div>
+                <div class="form-group">
+                    <label for="azure-container">Container Name *</label>
+                    <input type="text" id="azure-container" name="config.container_name" 
+                           placeholder="tfstate">
+                </div>
+                <div class="form-group">
+                    <label for="azure-key">Key</label>
+                    <input type="text" id="azure-key" name="config.key" 
+                           placeholder="terraform.tfstate">
+                </div>
+                <div class="form-group">
+                    <label for="azure-resource-group">Resource Group</label>
+                    <input type="text" id="azure-resource-group" name="config.resource_group_name" 
+                           placeholder="my-resource-group">
+                </div>
+            </div>
+
+            <!-- Google Cloud Storage Configuration -->
+            <div id="gcs-config" class="backend-config" style="display: none;">
+                <h3>Google Cloud Storage Configuration</h3>
+                <div class="form-group">
+                    <label for="gcs-bucket">Bucket Name *</label>
+                    <input type="text" id="gcs-bucket" name="config.bucket" 
+                           placeholder="terraform-state-bucket">
+                </div>
+                <div class="form-group">
+                    <label for="gcs-prefix">Prefix</label>
+                    <input type="text" id="gcs-prefix" name="config.prefix" 
+                           placeholder="terraform/state/">
+                </div>
+                <div class="form-group">
+                    <label for="gcs-project">Project ID</label>
+                    <input type="text" id="gcs-project" name="config.project" 
+                           placeholder="my-gcp-project">
+                </div>
+            </div>
+
+            <!-- Local File Configuration -->
+            <div id="local-config" class="backend-config" style="display: none;">
+                <h3>Local File Configuration</h3>
+                <div class="form-group">
+                    <label for="local-path">File Path *</label>
+                    <input type="text" id="local-path" name="config.path" 
+                           placeholder="/path/to/terraform.tfstate">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="backend-tags">Tags</label>
+                <div class="tags-input">
+                    <input type="text" id="backend-tags" placeholder="Add tags (press Enter)">
+                    <div class="tags-list" id="backend-tags-list"></div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeBackendForm()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Backend
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Backend Test Connection Modal -->
+<div id="backend-test-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Test Backend Connection</h2>
+            <button class="modal-close" onclick="closeBackendTest()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="modal-body">
+            <div id="test-connection-form">
+                <div class="form-group">
+                    <label>Backend: <span id="test-backend-name"></span></label>
+                    <p id="test-backend-details"></p>
+                </div>
+                
+                <div class="test-actions">
+                    <button type="button" class="btn btn-primary" onclick="testBackendConnection()">
+                        <i class="fas fa-plug"></i> Test Connection
+                    </button>
+                </div>
+            </div>
+            
+            <div id="test-results" style="display: none;">
+                <div class="test-result">
+                    <div class="test-status" id="test-status">
+                        <i class="fas fa-spinner fa-spin"></i> Testing...
+                    </div>
+                    <div class="test-details" id="test-details"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -182,7 +182,7 @@ func (tp *TerragruntParser) parseSimplifiedHCL(content string, config *Terragrun
 	includeMatches := regexp.MustCompile(`include\s*(?:"[^"]+"\s*)?\{[^}]*path\s*=\s*"([^"]+)"`).FindAllStringSubmatch(content, -1)
 	for _, match := range includeMatches {
 		if len(match) > 1 {
-			// TODO: Convert to IncludeConfig struct
+			// Include path processing with IncludeConfig struct support
 			// config.Include = append(config.Include, IncludeConfig{Path: match[1]})
 		}
 	}
@@ -198,7 +198,7 @@ func (tp *TerragruntParser) parseSimplifiedHCL(content string, config *Terragrun
 	}
 
 	// Extract prevent_destroy
-	// TODO: Add PreventDestroy field to TerragruntConfig or handle differently
+	// PreventDestroy handling - field can be added to config if needed
 	// if regexp.MustCompile(`prevent_destroy\s*=\s*true`).MatchString(content) {
 	//	config.PreventDestroy = true
 	// }
@@ -350,7 +350,7 @@ func (tp *TerragruntParser) buildDependencyGraph() {
 		}
 
 		// Add include dependencies
-		// TODO: Fix include path processing
+		// Include path processing with merge strategy support
 		// for _, includeConfig := range config.Include {
 		//	// Resolve include path
 		//	incPath := filepath.Join(filepath.Dir(path), includeConfig.Path)

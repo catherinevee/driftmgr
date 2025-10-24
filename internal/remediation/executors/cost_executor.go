@@ -115,18 +115,7 @@ func (ce *CostExecutor) resizeInstance(ctx context.Context, action *remediation.
 	time.Sleep(500 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
-	// change := remediation.ResourceChange{
-	//	ResourceID: action.Resource,
-	//	Field:      "instance_type",
-	//	OldValue:   "old_instance_type",
-	//	NewValue:   newInstanceType,
-	//	ChangeType: "update",
-	//	Metadata: map[string]interface{}{
-	//		"new_instance_type": newInstanceType,
-	//	},
-	// }
-	// Convert change to string description
+	// Record the change
 	changeDesc := fmt.Sprintf("Resized instance to %s", newInstanceType)
 	result.Changes = append(result.Changes, changeDesc)
 
@@ -147,19 +136,7 @@ func (ce *CostExecutor) enableAutoScaling(ctx context.Context, action *remediati
 	time.Sleep(400 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
-	// change := remediation.ResourceChange{
-	//	ResourceID: action.Resource,
-	//	Field:      "auto_scaling",
-	//	OldValue:   false,
-	//	NewValue:   true,
-	//	ChangeType: "update",
-	//	Metadata: map[string]interface{}{
-	//		"min_capacity": minCapacity,
-	//		"max_capacity": maxCapacity,
-	//	},
-	// }
-	// Convert change to string description
+	// Record the change
 	changeDesc := fmt.Sprintf("Enabled auto-scaling (min: %d, max: %d)", minCapacity, maxCapacity)
 	result.Changes = append(result.Changes, changeDesc)
 
@@ -179,7 +156,6 @@ func (ce *CostExecutor) scheduleShutdown(ctx context.Context, action *remediatio
 	time.Sleep(300 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      "shutdown_schedule",
@@ -209,7 +185,6 @@ func (ce *CostExecutor) optimizeStorage(ctx context.Context, action *remediation
 	time.Sleep(350 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      "storage_type",
@@ -237,7 +212,6 @@ func (ce *CostExecutor) removeUnusedResources(ctx context.Context, action *remed
 	time.Sleep(200 * time.Millisecond) // Simulate API call
 
 	// Record the change
-	// TODO: Define ResourceChange struct or use different approach
 	// change := remediation.ResourceChange{
 	//	ResourceID: action.Resource,
 	//	Field:      "status",

@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/catherinevee/driftmgr/internal/automation/actions"
+	"github.com/catherinevee/driftmgr/internal/events"
+	"github.com/catherinevee/driftmgr/internal/models"
 )
 
 // AutomationService provides a unified interface for intelligent automation
@@ -12,9 +16,10 @@ type AutomationService struct {
 	workflowEngine *WorkflowEngine
 	ruleEngine     *RuleEngine
 	scheduler      *Scheduler
+	actionManager  *actions.ActionManager
+	eventBus       *events.EventBus
 	mu             sync.RWMutex
-	// eventBus removed for interface simplification
-	config *AutomationConfig
+	config         *AutomationConfig
 }
 
 // AutomationConfig represents configuration for the automation service
@@ -31,7 +36,7 @@ type AutomationConfig struct {
 }
 
 // NewAutomationService creates a new automation service
-func NewAutomationService() *AutomationService {
+func NewAutomationService(eventBus *events.EventBus, notificationService *events.NotificationService) *AutomationService {
 	config := &AutomationConfig{
 		AutoDiscovery:       true,
 		AutoRemediation:     true,
@@ -46,13 +51,16 @@ func NewAutomationService() *AutomationService {
 
 	// Create components
 	workflowEngine := NewWorkflowEngine()
-	ruleEngine := NewRuleEngine()
-	scheduler := NewScheduler()
+	ruleEngine := NewRuleEngine(eventBus, notificationService)
+	scheduler := NewScheduler(eventBus)
+	actionManager := actions.NewActionManager(eventBus, notificationService, "logs")
 
 	return &AutomationService{
 		workflowEngine: workflowEngine,
 		ruleEngine:     ruleEngine,
 		scheduler:      scheduler,
+		actionManager:  actionManager,
+		eventBus:       eventBus,
 		config:         config,
 	}
 }
@@ -90,7 +98,28 @@ func (as *AutomationService) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to create default automations: %w", err)
 	}
 
-	// TODO: Implement event publishing
+	// Publish service started event
+	if as.eventBus != nil {
+		as.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("automation_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_service",
+			Data: map[string]interface{}{
+				"action":  "service_started",
+				"status":  "running",
+				"message": "Automation service started successfully",
+				"config": map[string]interface{}{
+					"auto_discovery":       as.config.AutoDiscovery,
+					"auto_remediation":     as.config.AutoRemediation,
+					"auto_scaling":         as.config.AutoScaling,
+					"max_concurrent_jobs":  as.config.MaxConcurrentJobs,
+					"notification_enabled": as.config.NotificationEnabled,
+					"audit_logging":        as.config.AuditLogging,
+				},
+			},
+		})
+	}
 
 	return nil
 }
@@ -102,7 +131,20 @@ func (as *AutomationService) Stop(ctx context.Context) error {
 		return fmt.Errorf("failed to stop scheduler: %w", err)
 	}
 
-	// TODO: Implement event publishing
+	// Publish service stopped event
+	if as.eventBus != nil {
+		as.eventBus.Publish(events.Event{
+			ID:        fmt.Sprintf("automation_%d", time.Now().UnixNano()),
+			Type:      events.EventSystemInfo,
+			Timestamp: time.Now(),
+			Source:    "automation_service",
+			Data: map[string]interface{}{
+				"action":  "service_stopped",
+				"status":  "stopped",
+				"message": "Automation service stopped successfully",
+			},
+		})
+	}
 
 	return nil
 }
@@ -503,14 +545,40 @@ func (as *AutomationService) executeRuleAction(ctx context.Context, action RuleA
 		return err
 
 	case "send_notification":
-		// Placeholder for notification action
-		fmt.Printf("Sending notification: %s\n", action.Description)
-		return nil
+		// Execute notification action using action manager
+		notificationAction := &models.AutomationAction{
+			ID:            action.ID,
+			Name:          action.Name,
+			Description:   action.Description,
+			Type:          models.ActionTypeNotification,
+			Configuration: action.Configuration,
+		}
+		_, err := as.actionManager.ExecuteAction(ctx, notificationAction, map[string]interface{}{
+			"event":   event,
+			"trigger": "rule",
+		})
+		return err
 
 	case "log_event":
-		// Placeholder for logging action
-		fmt.Printf("Logging event: %s\n", action.Description)
-		return nil
+		// Execute logging action using action manager
+		loggingAction := &models.AutomationAction{
+			ID:          action.ID,
+			Name:        action.Name,
+			Description: action.Description,
+			Type:        models.ActionTypeCustom,
+			Configuration: models.JSONB(map[string]interface{}{
+				"subtype": "logging",
+				"level":   "info",
+				"message": action.Description,
+				"output":  "stdout",
+				"format":  "json",
+			}),
+		}
+		_, err := as.actionManager.ExecuteAction(ctx, loggingAction, map[string]interface{}{
+			"event":   event,
+			"trigger": "rule",
+		})
+		return err
 
 	default:
 		return fmt.Errorf("unknown action type: %s", action.Type)

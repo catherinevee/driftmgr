@@ -15,11 +15,6 @@
     <!-- Alpine.js for reactivity -->
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     
-    <!-- Chart.js for visualizations -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- Vis.js for dependency graphs -->
-    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     
     <style>
         /* Clean, professional styling */
@@ -128,18 +123,6 @@
         <a @click="currentView = 'resources'" :class="currentView === 'resources' ? 'tab-active' : ''" class="tab">
             <i class="fas fa-cube mr-2"></i> Resources
         </a>
-        <a @click="currentView = 'terragrunt'" :class="currentView === 'terragrunt' ? 'tab-active' : ''" class="tab">
-            <i class="fas fa-layer-group mr-2"></i> Terragrunt
-        </a>
-        <a @click="currentView = 'remediation'" :class="currentView === 'remediation' ? 'tab-active' : ''" class="tab">
-            <i class="fas fa-tools mr-2"></i> Remediation
-        </a>
-        <a @click="currentView = 'compliance'" :class="currentView === 'compliance' ? 'tab-active' : ''" class="tab">
-            <i class="fas fa-shield-alt mr-2"></i> Compliance
-        </a>
-        <a @click="currentView = 'monitoring'" :class="currentView === 'monitoring' ? 'tab-active' : ''" class="tab">
-            <i class="fas fa-chart-line mr-2"></i> Monitoring
-        </a>
     </div>
     
     <!-- Main Content Area -->
@@ -208,9 +191,6 @@
                         <button @click="configureBackend()" class="btn btn-secondary">
                             <i class="fas fa-cog"></i> Configure Backend
                         </button>
-                        <button @click="testConnections()" class="btn btn-accent">
-                            <i class="fas fa-plug"></i> Test Connections
-                        </button>
                     </div>
                     
                     <!-- Backend List -->
@@ -272,9 +252,6 @@
                     <!-- State Operations -->
                     <div class="tabs tabs-boxed">
                         <a @click="stateTab = 'browser'" :class="stateTab === 'browser' ? 'tab-active' : ''" class="tab">Browse States</a>
-                        <a @click="stateTab = 'operations'" :class="stateTab === 'operations' ? 'tab-active' : ''" class="tab">Operations</a>
-                        <a @click="stateTab = 'history'" :class="stateTab === 'history' ? 'tab-active' : ''" class="tab">History</a>
-                        <a @click="stateTab = 'dependencies'" :class="stateTab === 'dependencies' ? 'tab-active' : ''" class="tab">Dependencies</a>
                     </div>
                     
                     <!-- State Browser Tab -->
@@ -341,218 +318,56 @@
                         </div>
                     </div>
                     
-                    <!-- State Operations Tab -->
-                    <div x-show="stateTab === 'operations'" class="mt-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="card bg-base-100">
-                                <div class="card-body">
-                                    <h3 class="card-title text-lg">Push State</h3>
-                                    <p class="text-sm opacity-60">Upload local state to remote backend</p>
-                                    <div class="form-control">
-                                        <label class="label">Local State File</label>
-                                        <input type="file" class="file-input file-input-bordered" x-model="pushStateFile">
-                                    </div>
-                                    <div class="form-control">
-                                        <label class="label">Target Backend</label>
-                                        <select class="select select-bordered" x-model="pushTarget">
-                                            <option value="s3">S3</option>
-                                            <option value="azure">Azure Storage</option>
-                                            <option value="gcs">GCS</option>
-                                        </select>
-                                    </div>
-                                    <button @click="pushStateToBackend()" class="btn btn-primary">
-                                        <i class="fas fa-upload"></i> Push State
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div class="card bg-base-100">
-                                <div class="card-body">
-                                    <h3 class="card-title text-lg">Pull State</h3>
-                                    <p class="text-sm opacity-60">Download state from remote backend</p>
-                                    <div class="form-control">
-                                        <label class="label">Source Backend</label>
-                                        <select class="select select-bordered" x-model="pullSource">
-                                            <option value="s3">S3</option>
-                                            <option value="azure">Azure Storage</option>
-                                            <option value="gcs">GCS</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-control">
-                                        <label class="label">State Key</label>
-                                        <input type="text" class="input input-bordered" x-model="pullStateKey" placeholder="path/to/state.tfstate">
-                                    </div>
-                                    <button @click="pullStateFromBackend()" class="btn btn-success">
-                                        <i class="fas fa-download"></i> Pull State
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Advanced Operations -->
-                        <div class="grid grid-cols-3 gap-4 mt-4">
-                            <button @click="moveResource()" class="btn btn-outline">
-                                <i class="fas fa-arrows-alt"></i> Move Resource
-                            </button>
-                            <button @click="removeResource()" class="btn btn-outline btn-error">
-                                <i class="fas fa-trash"></i> Remove Resource
-                            </button>
-                            <button @click="importResource()" class="btn btn-outline btn-success">
-                                <i class="fas fa-file-import"></i> Import Resource
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
         
-        <!-- Terragrunt View (New in v3.0) -->
-        <div x-show="currentView === 'terragrunt'" class="space-y-4">
+        <!-- Drift Detection View -->
+        <div x-show="currentView === 'drift'" class="space-y-4">
             <div class="card bg-white shadow-lg">
                 <div class="card-body">
                     <h2 class="card-title">
-                        <i class="fas fa-layer-group"></i> Terragrunt Configuration
+                        <i class="fas fa-exchange-alt"></i> Drift Detection
                     </h2>
                     
-                    <!-- Terragrunt Modules -->
-                    <div class="grid grid-cols-2 gap-4 mt-4">
-                        <div>
-                            <h3 class="font-bold mb-2">Module Hierarchy</h3>
-                            <div class="tree">
-                                <template x-for="module in terragruntModules" :key="module.path">
-                                    <div class="ml-4">
-                                        <div class="flex items-center gap-2 p-2 hover:bg-base-200 rounded cursor-pointer" @click="selectTerragruntModule(module)">
-                                            <i class="fas fa-folder" x-show="module.hasChildren"></i>
-                                            <i class="fas fa-file" x-show="!module.hasChildren"></i>
-                                            <span x-text="module.name"></span>
-                                            <span class="badge badge-xs" x-text="module.dependencies.length + ' deps'" x-show="module.dependencies.length > 0"></span>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <h3 class="font-bold mb-2">Module Details</h3>
-                            <div x-show="selectedTerragruntModule" class="space-y-2">
-                                <div>
-                                    <span class="font-semibold">Path:</span>
-                                    <span class="font-mono text-sm" x-text="selectedTerragruntModule?.path"></span>
-                                </div>
-                                <div>
-                                    <span class="font-semibold">Source:</span>
-                                    <span class="font-mono text-sm" x-text="selectedTerragruntModule?.source"></span>
-                                </div>
-                                <div>
-                                    <span class="font-semibold">Dependencies:</span>
-                                    <ul class="list-disc ml-4">
-                                        <template x-for="dep in selectedTerragruntModule?.dependencies" :key="dep">
-                                            <li class="font-mono text-sm" x-text="dep"></li>
-                                        </template>
-                                    </ul>
-                                </div>
-                                
-                                <!-- Terragrunt Actions -->
-                                <div class="flex gap-2 mt-4">
-                                    <button @click="runTerragruntPlan()" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-clipboard-list"></i> Plan
-                                    </button>
-                                    <button @click="runTerragruntApply()" class="btn btn-sm btn-success">
-                                        <i class="fas fa-check"></i> Apply
-                                    </button>
-                                    <button @click="runTerragruntRunAll()" class="btn btn-sm btn-warning">
-                                        <i class="fas fa-play"></i> Run All
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Drift Detection Actions -->
+                    <div class="flex gap-2 mt-4">
+                        <button @click="runDriftDetection()" class="btn btn-primary">
+                            <i class="fas fa-sync"></i> Detect Drift
+                        </button>
+                        <button @click="scheduleDriftDetection()" class="btn btn-secondary">
+                            <i class="fas fa-clock"></i> Schedule Detection
+                        </button>
                     </div>
-                    
-                    <!-- Dependency Graph -->
+
+                    <!-- Drift Results -->
                     <div class="mt-4">
-                        <h3 class="font-bold mb-2">Dependency Graph</h3>
-                        <div id="terragrunt-dependency-graph" class="h-96 border rounded-lg"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Compliance View (New in v3.0) -->
-        <div x-show="currentView === 'compliance'" class="space-y-4">
-            <div class="card bg-white shadow-lg">
-                <div class="card-body">
-                    <h2 class="card-title">
-                        <i class="fas fa-shield-alt"></i> Compliance & Governance
-                    </h2>
-                    
-                    <!-- Policy Engine Status -->
-                    <div class="alert alert-info mt-4">
-                        <i class="fas fa-info-circle"></i>
-                        <div>
-                            <h3 class="font-bold">OPA Policy Engine</h3>
-                            <p>Status: <span class="badge badge-success">Active</span></p>
-                        </div>
-                    </div>
-                    
-                    <!-- Compliance Reports -->
-                    <div class="grid grid-cols-3 gap-4 mt-4">
-                        <div class="card bg-base-100">
-                            <div class="card-body">
-                                <h3 class="card-title">SOC2 Compliance</h3>
-                                <div class="radial-progress text-primary" style="--value:85;">85%</div>
-                                <button @click="generateReport('soc2')" class="btn btn-primary btn-sm">
-                                    Generate Report
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="card bg-base-100">
-                            <div class="card-body">
-                                <h3 class="card-title">HIPAA Compliance</h3>
-                                <div class="radial-progress text-success" style="--value:92;">92%</div>
-                                <button @click="generateReport('hipaa')" class="btn btn-success btn-sm">
-                                    Generate Report
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="card bg-base-100">
-                            <div class="card-body">
-                                <h3 class="card-title">PCI-DSS Compliance</h3>
-                                <div class="radial-progress text-warning" style="--value:78;">78%</div>
-                                <button @click="generateReport('pci-dss')" class="btn btn-warning btn-sm">
-                                    Generate Report
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Policy Violations -->
-                    <div class="mt-4">
-                        <h3 class="font-bold mb-2">Policy Violations</h3>
+                        <h3 class="font-bold mb-2">Recent Drift Detection Results</h3>
                         <div class="overflow-x-auto">
                             <table class="table table-zebra w-full">
                                 <thead>
                                     <tr>
-                                        <th>Policy</th>
-                                        <th>Resource</th>
-                                        <th>Severity</th>
-                                        <th>Description</th>
+                                        <th>Timestamp</th>
+                                        <th>Provider</th>
+                                        <th>Drift Count</th>
+                                        <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <template x-for="violation in policyViolations" :key="violation.id">
+                                    <template x-for="result in driftResults" :key="result.id">
                                         <tr>
-                                            <td x-text="violation.policy"></td>
-                                            <td class="font-mono text-sm" x-text="violation.resource"></td>
+                                            <td x-text="result.timestamp"></td>
+                                            <td x-text="result.provider"></td>
                                             <td>
-                                                <span class="badge" :class="getSeverityClass(violation.severity)" x-text="violation.severity"></span>
+                                                <span class="badge badge-warning" x-text="result.drift_count"></span>
                                             </td>
-                                            <td x-text="violation.description"></td>
                                             <td>
-                                                <button @click="remediateViolation(violation)" class="btn btn-xs btn-primary">
-                                                    Remediate
+                                                <span class="badge badge-success" x-text="result.status"></span>
+                                            </td>
+                                            <td>
+                                                <button @click="viewDriftDetails(result)" class="btn btn-xs btn-info">
+                                                    <i class="fas fa-eye"></i> View Details
                                                 </button>
                                             </td>
                                         </tr>
@@ -564,74 +379,72 @@
                 </div>
             </div>
         </div>
-        
-        <!-- Monitoring View (Enhanced for v3.0) -->
-        <div x-show="currentView === 'monitoring'" class="space-y-4">
+
+        <!-- Resources View -->
+        <div x-show="currentView === 'resources'" class="space-y-4">
             <div class="card bg-white shadow-lg">
                 <div class="card-body">
                     <h2 class="card-title">
-                        <i class="fas fa-chart-line"></i> Continuous Monitoring
+                        <i class="fas fa-cube"></i> Cloud Resources
                     </h2>
-                    
-                    <!-- Real-time Metrics -->
-                    <div class="grid grid-cols-4 gap-4 mt-4">
-                        <div class="stat bg-base-100 rounded-lg shadow">
-                            <div class="stat-title">Discovery Rate</div>
-                            <div class="stat-value text-primary" x-text="metrics.discoveryRate + '/min'">0/min</div>
-                            <div class="stat-desc">Resources discovered</div>
-                        </div>
-                        
-                        <div class="stat bg-base-100 rounded-lg shadow">
-                            <div class="stat-title">Drift Detection</div>
-                            <div class="stat-value text-warning" x-text="metrics.driftRate + '%'">0%</div>
-                            <div class="stat-desc">Drift percentage</div>
-                        </div>
-                        
-                        <div class="stat bg-base-100 rounded-lg shadow">
-                            <div class="stat-title">Remediation Success</div>
-                            <div class="stat-value text-success" x-text="metrics.remediationSuccess + '%'">0%</div>
-                            <div class="stat-desc">Auto-remediation rate</div>
-                        </div>
-                        
-                        <div class="stat bg-base-100 rounded-lg shadow">
-                            <div class="stat-title">Cost Impact</div>
-                            <div class="stat-value text-error" x-text="'$' + metrics.costImpact">$0</div>
-                            <div class="stat-desc">Monthly drift cost</div>
-                        </div>
+
+                    <!-- Provider Filter -->
+                    <div class="flex gap-2 mt-4">
+                        <select x-model="selectedProvider" @change="loadResources()" class="select select-bordered">
+                            <option value="aws">AWS</option>
+                            <option value="azure">Azure</option>
+                            <option value="gcp">GCP</option>
+                        </select>
+                        <button @click="loadResources()" class="btn btn-primary">
+                            <i class="fas fa-refresh"></i> Refresh
+                        </button>
                     </div>
-                    
-                    <!-- Event Stream -->
+
+                    <!-- Resources List -->
                     <div class="mt-4">
-                        <h3 class="font-bold mb-2">Event Stream</h3>
-                        <div class="max-h-64 overflow-y-auto bg-base-100 rounded-lg p-4 font-mono text-sm">
-                            <template x-for="event in eventStream" :key="event.id">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="text-xs opacity-60" x-text="event.timestamp"></span>
-                                    <span class="badge badge-xs" :class="getEventTypeClass(event.type)" x-text="event.type"></span>
-                                    <span x-text="event.message"></span>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                    
-                    <!-- Webhook Configuration -->
-                    <div class="mt-4">
-                        <h3 class="font-bold mb-2">Webhook Receivers</h3>
-                        <div class="flex gap-2">
-                            <button @click="configureWebhook('eventbridge')" class="btn btn-sm" :class="webhooks.eventbridge ? 'btn-success' : 'btn-outline'">
-                                <i class="fab fa-aws"></i> EventBridge
-                            </button>
-                            <button @click="configureWebhook('eventgrid')" class="btn btn-sm" :class="webhooks.eventgrid ? 'btn-success' : 'btn-outline'">
-                                <i class="fab fa-microsoft"></i> Event Grid
-                            </button>
-                            <button @click="configureWebhook('pubsub')" class="btn btn-sm" :class="webhooks.pubsub ? 'btn-success' : 'btn-outline'">
-                                <i class="fab fa-google"></i> Pub/Sub
-                            </button>
+                        <h3 class="font-bold mb-2">Resources (<span x-text="selectedProvider"></span>)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Region</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="resource in resources" :key="resource.id">
+                                        <tr>
+                                            <td class="font-mono text-sm" x-text="resource.name"></td>
+                                            <td>
+                                                <span class="badge badge-outline" x-text="resource.type"></span>
+                                            </td>
+                                            <td x-text="resource.region"></td>
+                                            <td>
+                                                <span class="badge badge-success" x-text="resource.status"></span>
+                                            </td>
+                                            <td class="text-sm" x-text="resource.created"></td>
+                                            <td>
+                                                <button @click="viewResourceDetails(resource)" class="btn btn-xs btn-info">
+                                                    <i class="fas fa-eye"></i> Details
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+
+        
+        
         
     </div>
     

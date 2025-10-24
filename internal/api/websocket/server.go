@@ -35,6 +35,15 @@ func (s *EnhancedDashboardServer) SetAPIServer(apiServer ServerMetricsInterface)
 	s.apiServer = apiServer
 }
 
+// Broadcast sends a message to all connected WebSocket clients
+func (s *EnhancedDashboardServer) Broadcast(message interface{}) {
+	select {
+	case s.broadcast <- message:
+	default:
+		// Channel is full, skip this message
+	}
+}
+
 // NewServer creates a new WebSocket server
 func NewServer() *EnhancedDashboardServer {
 	return &EnhancedDashboardServer{
